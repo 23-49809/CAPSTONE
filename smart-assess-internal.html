@@ -710,7 +710,7 @@ function renderToasts(){
 function renderConfirm(){
   if(!state.confirm) return '';
   var c = state.confirm;
-  return '<div class="modal-overlay" data-action="close-confirm"><div class="modal narrow fade-in" onclick="event.stopPropagation()">'
+  return '<div class="modal-overlay" data-action="close-confirm"><div class="modal narrow fade-in">'
     + '<div class="modal-head"><div><h3>'+esc(c.title)+'</h3></div><button class="modal-close" data-action="close-confirm">'+ic('x','15px')+'</button></div>'
     + '<p style="font-size:13.5px;color:var(--ink-soft);">'+esc(c.message)+'</p>'
     + '<div class="modal-foot"><button class="btn btn-outline" data-action="close-confirm">Cancel</button>'
@@ -1087,7 +1087,7 @@ function renderProfile(acct){
 
 /* ---------------- Modals ---------------- */
 function modalWrap(inner, wide){
-  return '<div class="modal-overlay" data-action="close-modal"><div class="modal'+(wide?'':'')+' fade-in" onclick="event.stopPropagation()">'+inner+'</div></div>';
+  return '<div class="modal-overlay" data-action="close-modal"><div class="modal'+(wide?'':'')+' fade-in">'+inner+'</div></div>';
 }
 function renderModal(){
   var m = state.modal;
@@ -1243,6 +1243,17 @@ function bindEvents(){
     if(!el) return;
     var action = el.getAttribute('data-action');
 
+    // The overlay itself (not the modal card, not a button inside it) is
+    // the only thing a "click outside to close" should react to. Without
+    // this guard, closest() walking up from a click on blank modal content
+    // (nothing else in its path has data-action) lands on the overlay's
+    // own close-modal/close-confirm and closes it — a real click on a
+    // button inside the modal never reaches this far up because closest()
+    // finds that nearer button first, so this never blocks a real button.
+    if((action==='close-modal' || action==='close-confirm') && el.classList.contains('modal-overlay') && el!==ev.target){
+      return;
+    }
+
     if(action==='nav'){
       state.view = el.getAttribute('data-view');
       state.sidebarOpen = false;
@@ -1270,10 +1281,20 @@ function bindEvents(){
       render();
     } else if(action==='toggle-staff-status'){
       var a = findAccount(el.getAttribute('data-id'));
-      if(a){ doConfirm({title:(a.status==='active'?'Deactivate Account':'Activate Account'), message:(a.status==='active'?'This will immediately block '+a.fullName+' from logging in. Continue?':'This will restore login access for '+a.fullName+'. Continue?'), confirmLabel:(a.status==='active'?'Deactivate':'Activate'), danger:a.status==='active', action:'toggle-staff-status', id:a.id}); }
+      var selfAcc1 = currentAccount();
+      if(a && selfAcc1 && a.username===selfAcc1.username && a.status==='active'){
+        pushToast('You cannot deactivate your own account while logged in.', 'alert');
+      } else if(a){
+        doConfirm({title:(a.status==='active'?'Deactivate Account':'Activate Account'), message:(a.status==='active'?'This will immediately block '+a.fullName+' from logging in. Continue?':'This will restore login access for '+a.fullName+'. Continue?'), confirmLabel:(a.status==='active'?'Deactivate':'Activate'), danger:a.status==='active', action:'toggle-staff-status', id:a.id});
+      }
     } else if(action==='delete-staff'){
       var a2 = findAccount(el.getAttribute('data-id'));
-      if(a2) doConfirm({title:'Delete Staff Account', message:'This permanently removes '+a2.fullName+' ('+a2.username+') from the system. This cannot be undone.', confirmLabel:'Delete', danger:true, action:'delete-staff', id:a2.id});
+      var selfAcc2 = currentAccount();
+      if(a2 && selfAcc2 && a2.username===selfAcc2.username){
+        pushToast('You cannot delete your own account while logged in.', 'alert');
+      } else if(a2){
+        doConfirm({title:'Delete Staff Account', message:'This permanently removes '+a2.fullName+' ('+a2.username+') from the system. This cannot be undone.', confirmLabel:'Delete', danger:true, action:'delete-staff', id:a2.id});
+      }
     } else if(action==='close-modal'){
       state.modal = null; render();
     } else if(action==='close-confirm'){
@@ -1384,10 +1405,13 @@ function bindEvents(){
       var id = form.getAttribute('data-id');
       var acc = findAccount(id);
       if(acc){
+        var selfEdit = currentAccount() && acc.username===currentAccount().username;
+        var wantsInactive = fd.get('status')==='inactive';
         acc.fullName = fd.get('fullName'); acc.username = fd.get('username'); acc.password = fd.get('password');
         acc.email = fd.get('email'); acc.contact = fd.get('contact'); acc.role = fd.get('role');
-        acc.position = fd.get('positionTitle') || ROLE_LABEL[acc.role]; acc.status = fd.get('status');
-        pushToast('Account updated.', 'check');
+        acc.position = fd.get('positionTitle') || ROLE_LABEL[acc.role];
+        acc.status = (selfEdit && wantsInactive) ? 'active' : fd.get('status');
+        pushToast(selfEdit && wantsInactive ? 'Account updated. (You cannot deactivate your own account while logged in, so status was kept Active.)' : 'Account updated.', 'check');
       }
       state.modal = null; render();
 
