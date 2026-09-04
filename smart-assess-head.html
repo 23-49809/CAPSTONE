@@ -119,6 +119,19 @@
   .flash{ border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:18px; font-size:13.5px; background:var(--success-bg); color:var(--success); }
   .fade-in{ animation:fadeIn .25s ease both; }
   @keyframes fadeIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  :root{ color-scheme:light; --paper:#f4f7f5; --surface:#fff; --surface-2:#eaf2ed; --ink:#10251b; --ink-soft:#3d5147; --ink-faint:#64756c; --line:#d7e3da; --line-strong:#b7cbbd; --brand-900:#073b2d; --brand-800:#0a513d; --brand-700:#0b6b4f; --brand-600:#0b815e; --brand-500:#12a878; --brand-100:#cdeee0; --brand-50:#effaf5; --shadow-lg:0 18px 40px -28px rgba(7,59,45,.36); --shadow-md:0 8px 20px -14px rgba(7,59,45,.3); --radius-lg:14px; --radius-md:10px; --radius-sm:7px; }
+  body{ background:var(--paper); }
+  body::before{ content:""; position:fixed; inset:0; pointer-events:none; opacity:.28; background-image:linear-gradient(rgba(11,107,79,.035) 1px, transparent 1px),linear-gradient(90deg,rgba(11,107,79,.035) 1px,transparent 1px); background-size:32px 32px; z-index:-1; }
+  h1,h2,h3,h4{ font-family:var(--font-body); font-weight:750; letter-spacing:-.025em; }
+  .site-header{ background:var(--brand-900); border-bottom:3px solid var(--brand-500); }
+  .brand-name{ font-family:var(--font-body); letter-spacing:.01em; }
+  .btn{ border-radius:var(--radius-sm); box-shadow:none; }
+  .btn-primary{ background:var(--brand-700); }
+  .btn-primary:hover{ background:var(--brand-800); }
+  .login-shell{ background:var(--brand-900); }
+  .login-card,.panel-card,.announcement-card,.stat-card{ border-radius:var(--radius-md); box-shadow:var(--shadow-md); }
+  .dash-tabs,.seg{ border-radius:var(--radius-md); }
+  .dash-tabs button,.seg button,.badge{ border-radius:var(--radius-sm); }
 </style>
 
 <div id="app"></div>
