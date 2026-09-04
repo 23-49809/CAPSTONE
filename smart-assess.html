@@ -99,8 +99,10 @@
 
   /* ============ Hero ============ */
   .hero{ position:relative; overflow:hidden; color:#fff;
-    background: radial-gradient(ellipse 900px 500px at 12% -10%, rgba(63,174,116,.45), transparent 60%),
-      linear-gradient(155deg, var(--brand-900) 0%, var(--brand-700) 58%, var(--brand-600) 100%); }
+    background: linear-gradient(90deg, rgba(4,53,39,.96) 0%, rgba(6,78,59,.84) 47%, rgba(6,78,59,.56) 100%),
+      url("bg MAO.jpg") center / cover no-repeat; }
+  .hero::after{ content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg, rgba(4,53,39,.12), rgba(4,53,39,.28)); }
+  .hero .wrap{ z-index:1; }
   .hero-motif{ position:absolute; right:-40px; top:0; bottom:0; width:52%; opacity:.14; pointer-events:none; }
   .hero-motif svg{ width:100%; height:100%; }
   .hero-inner{ position:relative; padding:96px 0 88px; max-width:780px; }
