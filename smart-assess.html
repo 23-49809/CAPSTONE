@@ -142,11 +142,10 @@
 
   /* ============ Wizard shell ============ */
   .wizard-shell{ flex:1; background:
-      radial-gradient(ellipse 900px 500px at 90% -10%, rgba(63,174,116,.35), transparent 60%),
-      linear-gradient(160deg, var(--brand-900) 0%, var(--brand-700) 55%, var(--brand-600) 100%);
+      linear-gradient(120deg, rgba(4,53,39,.9) 0%, rgba(6,78,59,.72) 55%, rgba(6,78,59,.5) 100%),
+      url("bg MAO.jpg") center / cover no-repeat;
     padding:48px 20px 64px; position:relative; overflow:hidden;
   }
-  .wizard-motif{ position:absolute; left:-60px; bottom:-40px; width:340px; opacity:.12; pointer-events:none; }
   .wizard-col{ max-width:900px; margin:0 auto; position:relative; }
   .wizard-col.narrow{ max-width:620px; }
   .wizard-header{ color:#fff; padding:6px 8px 26px; }
@@ -757,7 +756,7 @@ function renderWizard(){
   const body = state.step===1?renderStep1():state.step===2?renderStep2():state.step===3?renderStep3():renderStep4();
   const isLast = state.step===4;
   return renderHeader()
-    + '<div class="wizard-shell"><div class="wizard-motif">'+buildingMotif()+'</div><div class="wizard-col fade-in">'
+    + '<div class="wizard-shell"><div class="wizard-col fade-in">'
     + '<div class="wizard-header"><h1>'+esc(flowTitle)+'</h1><p>'+esc(flowSub)+'</p></div>'
     + '<div class="stepper">' + labels.map(function(l,idx){ return stepPill(idx+1, l); }).join('') + '</div>'
     + '<div class="wizard-card">'
@@ -828,7 +827,7 @@ function renderTrack(){
     }
   }
   return renderHeader()
-  + '<div class="wizard-shell"><div class="wizard-motif">'+buildingMotif()+'</div><div class="wizard-col narrow fade-in">'
+  + '<div class="wizard-shell"><div class="wizard-col narrow fade-in">'
     + '<div class="wizard-header"><h1>Track Your Request</h1><p>Enter your reference number to view live status &mdash; no account needed.</p></div>'
     + '<div class="track-card">'
       + '<div class="track-form"><input id="track-input" type="text" placeholder="e.g. DR-2026-00001" value="'+esc(t.query)+'"><button class="btn btn-primary" data-action="track-search">'+ic('search')+' Track</button></div>'
