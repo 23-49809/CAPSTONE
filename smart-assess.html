@@ -275,6 +275,54 @@
   .fade-in{ animation:fadeIn .25s ease both; }
   @keyframes fadeIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
 
+  /* ============ Mobile responsive tightening ============
+     The grid/column breakpoints above already stack the layout at 768px
+     and 640px. This block only trims padding/sizing that stays fixed at
+     desktop scale and would otherwise crowd or overflow a phone screen —
+     no colors, branding, typography scale, or content changes. */
+  @media (max-width:600px){
+    .site-header .wrap{ min-height:auto; padding-top:14px; padding-bottom:14px; gap:12px; }
+    .brand-mark{ width:36px; height:36px; }
+    .brand-name{ font-size:18px; }
+    .header-actions .btn{ padding:11px 18px; min-height:44px; font-size:15px; }
+
+    .hero-inner{ padding:48px 0 42px; }
+    .hero p.lede{ font-size:17px; }
+
+    .section{ padding:56px 0; }
+    .section-head{ margin-bottom:36px; }
+    .service-card{ padding:28px 24px; }
+    .site-footer{ padding:44px 0 30px; }
+
+    .wizard-shell{ padding:28px 14px 44px; }
+    .wizard-header{ padding:4px 4px 20px; }
+    .wizard-card-head{ padding:22px 20px 4px; }
+    .wizard-card-body{ padding:18px 20px 8px; }
+    .wizard-card-foot{ padding:16px 20px 20px; flex-wrap:wrap; gap:12px; }
+    .wizard-card-foot .btn{ flex:1; min-width:120px; }
+
+    .stepper{ -webkit-overflow-scrolling:touch; }
+    .step-pill{ min-width:128px; padding:10px 13px; }
+
+    .confirm-card{ padding:32px 22px; }
+    .confirm-ref{ font-size:19px; padding:12px; word-break:break-all; }
+    .confirm-actions .btn{ width:100%; }
+
+    .track-card{ padding:22px 20px; }
+    .track-form{ flex-direction:column; }
+    .track-form input{ width:100%; }
+    .track-form .btn{ width:100%; }
+  }
+  @media (max-width:480px){
+    html,body{ overflow-x:hidden; }
+    .wrap{ padding-left:16px; padding-right:16px; }
+    .hero h1{ font-size:clamp(30px,8.5vw,40px); }
+    .hero .btn-hero,.btn-link,.wizard-card-foot .btn{ min-height:44px; }
+    .wizard-card-head h2{ align-items:flex-start; }
+    .field input,.field select,.field textarea{ min-height:44px; }
+    .section-divider{ gap:8px; }
+  }
+
 </style>
 
 <div id="app"></div>

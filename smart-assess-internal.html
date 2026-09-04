@@ -244,6 +244,51 @@
   .clock-card .btn-ghost-w{ background:rgba(255,255,255,.16); color:#fff; border:1.5px solid rgba(255,255,255,.4); }
   .clock-card .btn-ghost-w:hover{ background:rgba(255,255,255,.26); }
   .clock-card .btn-ghost-w[disabled]{ opacity:.5; }
+
+  /* ============ Mobile responsive tightening ============
+     The sidebar already collapses to an off-canvas drawer and the grids
+     already stack at their existing breakpoints (900px/980px/560px/520px).
+     This block trims header content and fixed paddings that would
+     otherwise overflow or crowd a phone screen — no colors, branding,
+     typography scale, or content changes. */
+  @media (max-width:640px){
+    .app-header .hd-inner{ padding:0 14px; gap:8px; }
+    .hd-brand .hb-tag{ display:none; }
+    .role-tag{ display:none; }
+    .hd-avatar{ padding:4px; gap:0; }
+    .hd-avatar .hd-name, .hd-avatar .hd-role, .hd-avatar br{ display:none; }
+    .main-content{ padding:18px 14px 44px; }
+    .page-head h1{ font-size:20px; }
+
+    .login-shell{ padding:32px 14px; }
+    .login-card{ padding:26px 22px; }
+
+    .modal-overlay{ padding:14px; }
+    .modal{ padding:22px 18px; }
+    .panel-card{ padding:16px 16px; }
+
+    .toast-wrap{ left:14px; right:14px; bottom:14px; align-items:stretch; }
+    .toast{ max-width:none; }
+
+    .clock-card{ padding:18px 18px; }
+    .clock-card > div:last-child{ display:flex; gap:10px; flex-wrap:wrap; width:100%; }
+    .clock-card .btn-ghost-w{ flex:1; min-width:120px; }
+  }
+  @media (max-width:400px){
+    .hd-brand .hb-name{ font-size:15px; }
+    .stat-card .num{ font-size:23px; }
+  }
+  @media (max-width:480px){
+    html,body{ overflow-x:hidden; }
+    .login-shell{ padding-left:12px; padding-right:12px; }
+    .login-card{ padding-left:18px; padding-right:18px; }
+    .login-brand .lb-name{ font-size:16px; }
+    .field input,.field select,.field textarea{ min-height:44px; }
+    .login-card .btn{ min-height:44px; }
+    .page-head{ gap:10px; }
+    .page-head > *{ max-width:100%; }
+    .action-row .action-btn{ min-height:44px; }
+  }
 </style>
 
 <div id="app"></div>
