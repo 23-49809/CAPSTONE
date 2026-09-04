@@ -98,7 +98,11 @@
   .btn-link .icon{ width:16px; height:16px; }
 
   /* ============ Hero ============ */
-  .hero{ position:relative; overflow:hidden; color:#fff; background:url("bg MAO.jpg") center / cover no-repeat; }
+  .hero{ position:relative; overflow:hidden; color:#fff;
+    background: linear-gradient(90deg, rgba(4,53,39,.48) 0%, rgba(6,78,59,.42) 47%, rgba(6,78,59,.28) 100%),
+      url("bg MAO.jpg") center / cover no-repeat; }
+  .hero::after{ content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg, rgba(4,53,39,.12), rgba(4,53,39,.28)); }
+  .hero .wrap{ z-index:1; }
   .hero-inner{ position:relative; padding:96px 0 88px; max-width:780px; }
   .eyebrow{ font-size:14px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#c3ecd4; margin-bottom:22px; display:block; }
   .hero h1{ color:#fff; font-size:clamp(36px,5.4vw,58px); line-height:1.15; letter-spacing:-.01em; margin-bottom:24px; }
