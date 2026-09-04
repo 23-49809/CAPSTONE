@@ -31,12 +31,26 @@ No page in either portal links to the other's login. Access is enforced
 | `jessica.staff` | Assessor's Staff |
 | `rodel.head` | Department Head |
 
-Restart commands are unchanged from before (`brew services start mariadb`,
-`python3 manage.py runserver 127.0.0.1:8001` in `ai_checker/`, `php -S
-127.0.0.1:8000 -t .` in `web/`). Reset + reseed:
+**`config.php` now reads the DB password from the `SMART_ASSESS_DB_PASS`
+environment variable** (falling back to the placeholder `change-me` if it's
+unset — the app will fail every DB query until you export the real one).
+Set it once per terminal session before starting the PHP server:
+
+```bash
+export SMART_ASSESS_DB_PASS='SmartAssess_2026!'   # matches database/schema.sql
+```
+
+Restart commands, otherwise unchanged from before:
+```bash
+brew services start mariadb
+cd ai_checker && python3 manage.py runserver 127.0.0.1:8001   # separate terminal
+cd web && SMART_ASSESS_DB_PASS='SmartAssess_2026!' php -S 127.0.0.1:8000 -t .
+```
+
+Reset + reseed:
 ```bash
 mysql -u "$(whoami)" < database/schema.sql   # drops & recreates smart_assess
-php database/seed_demo_requests.php          # 5 sample requests
+php database/seed_demo_requests.php          # 5 sample requests (needs the env var set too)
 ```
 
 ## Role model
