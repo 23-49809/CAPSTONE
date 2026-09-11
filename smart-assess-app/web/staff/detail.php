@@ -9,6 +9,7 @@ if (!$req) {
     header('Location: /staff/requests.php');
     exit;
 }
+$statusError = $_GET['error'] ?? '';
 
 $pageTitle = $req['reference_no'];
 require __DIR__ . '/../includes/internal_header.php';
@@ -22,6 +23,7 @@ require __DIR__ . '/../includes/internal_header.php';
   <div class="wrap" style="max-width:820px;padding-top:26px;padding-bottom:60px">
     <span class="badge <?= status_badge_class($req['status']) ?>"><?= esc($req['status']) ?></span>
     &nbsp;<?php if ($req['requirement_complete']): ?><span class="badge green"><?= icon_span('check','12px') ?> Complete</span><?php else: ?><span class="badge amber"><?= icon_span('alert','12px') ?> Needs review</span><?php endif; ?>
+    <?php if ($statusError === 'incomplete_requirements'): ?><div class="flash error" style="margin-top:16px"><?= icon_span('alert') ?> Approval is blocked while required documents are incomplete.</div><?php endif; ?>
 
     <div class="review-card" style="margin:16px 0">
       <div class="review-row"><span class="k">Service</span><span class="v"><?= $req['flow'] === 'docreq' ? 'Document Request' : 'Land Transfer' ?></span></div>
