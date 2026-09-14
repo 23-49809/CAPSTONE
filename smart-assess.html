@@ -255,7 +255,9 @@
   .upload-box.filled{ border-style:solid; border-color:var(--brand-500); background:var(--brand-50); }
   .upload-head{ display:flex; align-items:center; gap:9px; font-weight:700; font-size:13.5px; margin-bottom:4px; }
   .upload-head .icon{ width:17px; height:17px; color:var(--brand-600); }
-  .upload-hint{ font-size:12.5px; color:var(--ink-faint); margin-top:2px; }
+  .upload-hint{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-faint); margin-top:2px; }
+  .upload-mini-icon{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; color:var(--brand-600); }
+  .upload-mini-icon .icon{ width:16px; height:16px; }
   .upload-filename{ font-size:12.5px; color:var(--brand-700); margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
   .upload-filename .icon{ width:15px; height:15px; }
   .upload-remove{ background:none; border:none; color:var(--danger); font-size:11.5px; font-weight:700; cursor:pointer; font-family:var(--font-body); text-decoration:underline; }
@@ -826,7 +828,7 @@ function uploadBox(key, label, fd){
 }
 function idReferenceCard(type){
   const accepted = type === 'accepted';
-  const imageName = accepted ? 'ID CLear.png' : 'Blurry ID.png';
+  const imageName = accepted ? 'ID%20CLear.png' : 'Blurry%20ID.png';
   return '<div class="reference-card '+(accepted ? 'accept' : 'reject')+'">'
     + '<div class="reference-label"><span>'+(accepted ? '✓ Accepted' : '✕ Not Accepted')+'</span><span class="status-mark">'+(accepted ? '✓' : '✕')+'</span></div>'
     + '<div class="sample-id '+(accepted ? 'clear' : 'blur')+'"><img src="'+imageName+'" alt="'+(accepted ? 'Accepted ID reference' : 'Rejected blurry ID reference')+'" /></div>'
@@ -835,11 +837,12 @@ function idReferenceCard(type){
 }
 function idGuidancePanel(){
   return '<div class="id-guidance-panel">'
-    + '<div class="guidance-header">'+ic('id')+'<span>ID Upload Guidelines</span></div>'
+    + '<div class="guidance-header">'+ic('id')+'<span>Valid ID Verification</span></div>'
     + '<div class="reference-grid">'
       + idReferenceCard('accepted')
       + idReferenceCard('rejected')
     + '</div>'
+    + '<div class="reference-note">Upload a clear, valid, and unexpired ID.</div>'
   + '</div>';
 }
 function renderStep3(){
