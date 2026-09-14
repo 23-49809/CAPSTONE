@@ -497,8 +497,14 @@ const state = {
 const PH_MOBILE_RE = /^\+63\d{10}$/;
 const ZIP_RE = /^\d{4}$/;
 const ARP_RE = /^14-\d{4}-\d{5}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE = /^[^\s@]+@gmail\.com$/i;
 const VALID_FILE_RE = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
+function normalizeGmailEmail(value){
+  const s = String(value == null ? '' : value).trim();
+  if(!s) return '';
+  if(s.indexOf('@') > -1) return s;
+  return s + '@gmail.com';
+}
 const BARANGAYS = [
   'POBLACION','ANILAO PROPER','ANILAO EAST','BASALANGIT','BULACAN','CALAMIAS',
   'ESTRELLA','GASANG','LAUREL','LIGAYA','MAINAGA','MAINT','MAJUBEN','MALIMATOC-I',
@@ -780,7 +786,7 @@ function renderStep1(){
       + '<div class="field"><label>Last Name<span class="req">*</span></label><input id="f-lastName" class="'+(inv('lastName')?'invalid':'')+'" type="text" value="'+esc(fd.lastName)+'" data-bind="lastName" placeholder="Dela Cruz">' + fieldError('lastName') + '</div>'
       + '<div class="field"><label>Middle Name</label><input id="f-middleName" type="text" value="'+esc(fd.middleName)+'" data-bind="middleName" placeholder="Santos"></div>'
       + '<div class="field"><label>Contact Number<span class="req">*</span></label><div class="contact-input"><span>+63</span><input id="f-contact" class="'+(inv('contact')?'invalid':'')+'" type="tel" value="'+esc(fd.contact.replace(/^\+63/,''))+'" data-bind="contact" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX"></div>' + fieldError('contact') + '</div>'
-      + '<div class="field" style="grid-column:1/-1"><label>Email Address<span class="req">*</span></label><input id="f-email" class="'+(inv('email')?'invalid':'')+'" type="text" value="'+esc(fd.email || 'gmail.com' ? (fd.email && fd.email.indexOf('@')>-1 ? fd.email : (fd.email || '')+'@gmail.com') : 'gmail.com')+'" data-bind="email" placeholder="juan.delacruz@gmail.com">' + fieldError('email') + '</div>'
+      + '<div class="field" style="grid-column:1/-1"><label>Email Address<span class="req">*</span></label><input id="f-email" class="'+(inv('email')?'invalid':'')+'" type="text" value="'+esc(normalizeGmailEmail(fd.email))+'" data-bind="email" placeholder="juan.delacruz@gmail.com">' + fieldError('email') + '</div>'
     + '</div>'
     + '<div class="section-divider">'+ic('pin')+'<span>Address Information</span></div>'
     + '<div class="field-grid">'
@@ -1130,6 +1136,10 @@ function bindEvents(root){
         const formatted = digits.length > 4 ? digits.slice(0,4)+'-'+digits.slice(4) : digits;
         el.value = formatted;
         state.formData[key] = '14-'+formatted;
+      } else if(key==='email'){
+        const value = String(el.value || '').replace(/\s+/g,'');
+        state.formData[key] = normalizeGmailEmail(value);
+        el.value = normalizeGmailEmail(value);
       } else {
         state.formData[key] = el.value;
       }
