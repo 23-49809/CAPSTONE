@@ -15,7 +15,7 @@ $pageTitle = 'Land Transfers';
 require __DIR__ . '/../includes/internal_header.php';
 ?>
 <div class="dash-shell">
-  <div class="dash-top"><div class="wrap"><h1>Land Transfers</h1><p>Sale, Donation, and Inheritance transfer requests only.</p></div></div>
+  <div class="dash-top"><div class="wrap"><h1>Land Transfers</h1><p>Sale, Donation, and Estate transfer requests only.</p></div></div>
   <div class="wrap">
     <div class="toolbar">
       <form method="get">
