@@ -701,6 +701,11 @@ function barangaySelect(fd){
     + '</select>'
   + '</div>';
 }
+function arpField(fd){
+  const remainder = fd.arp.replace(/^14-/, '').replace(/\D/g,'').slice(0,9);
+  const displayValue = remainder.length > 4 ? remainder.slice(0,4)+'-'+remainder.slice(4) : remainder;
+  return '<div class="field"><label>ARP / Tax Declaration Number<span class="req">*</span></label><div class="arp-input"><span>14-</span><input id="f-arp" class="'+(inv('arp')?'invalid':'')+'" type="text" value="'+esc(displayValue)+'" data-bind="arp" inputmode="numeric" maxlength="10" placeholder="XXXX-XXXXX"></div>' + fieldError('arp') + '</div>';
+}
 
 function renderStep1(){
   const fd = state.formData;
@@ -723,8 +728,7 @@ function renderStep1(){
     + '</div>'
   + '</div>';
 }
-
-function renderStep2(){
+        + arpField(fd)
   const fd = state.formData;
   const advisory = getAdvisory(state.flow, fd);
   const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd) + fieldError('barangay') + '</div>';
@@ -751,7 +755,7 @@ function renderStep2(){
       + '</div>'
     + '</div>';
   }
-  return '<div class="wizard-card-head"><h2>'+ic('home')+' Enter Property &amp; Transfer Details</h2><p>Provide property information and transfer details. Additional files are required when filing on behalf of the owner.</p></div>'
+      + arpField(fd)
   + '<div class="wizard-card-body">'
     + '<div class="field" style="margin-bottom:20px"><label>Type of Transfer<span class="req">*</span></label>'
       + '<select id="f-transferType" class="'+(inv('transferType')?'invalid':'')+'" data-bind-select="transferType">'
