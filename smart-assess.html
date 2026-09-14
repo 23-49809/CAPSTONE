@@ -850,8 +850,8 @@ function uploadBox(key, label, fd){
 
   if(isCompactUpload){
     const isAuthLetter = key==='authLetter';
-    const title = isAuthLetter ? 'Upload Authorization Letter' : 'Upload ID';
-    const subtitle = isAuthLetter ? 'Upload an image of the authorization letter' : 'Click to upload or drag and drop';
+    const title = isAuthLetter ? 'Upload Authorization Letter' : (key==='requesterId' ? 'Upload Authorized Representative\'s Valid ID' : 'Upload Property Owner\'s Valid ID');
+    const subtitle = isAuthLetter ? 'Upload an image of the authorization letter' : 'Upload';
     const previewMarkup = file && file.preview
       ? '<div class="upload-preview-wrap"><div class="upload-preview"><img src="'+esc(file.preview)+'" alt="Selected file preview" /></div><div class="upload-meta"><span>'+esc(file.name)+'</span><span class="upload-sep">•</span><span class="upload-link" data-replace-file="'+key+'">Replace</span><span class="upload-sep">•</span><span class="upload-link" data-remove-file="'+key+'">Remove</span></div></div>'
       : '<div class="upload-placeholder"><div class="upload-icon-wrap">'+ic('file')+'</div><div class="upload-title">'+title+'</div><div class="upload-subtitle">'+subtitle+'</div></div>';
