@@ -282,27 +282,28 @@
   .reference-card.accept .status-mark{ background:var(--success); color:#fff; }
   .reference-card.reject .reference-label{ color:var(--danger); }
   .reference-card.reject .status-mark{ background:var(--danger); color:#fff; }
-  .sample-id{ position:relative; width:100%; height:200px; border-radius:12px; border:1px solid rgba(18,34,45,.18); background:linear-gradient(180deg,#eaf4fa 0%,#dfeef6 100%); overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
-  .sample-id .sample-flag{ position:absolute; left:14px; top:12px; width:54px; height:32px; border-radius:5px; overflow:hidden; }
+  .sample-id{ position:relative; width:100%; height:210px; border-radius:12px; border:1px solid rgba(18,34,45,.18); background:linear-gradient(180deg,#dfeff6 0%,#d7edf5 100%); overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.35); }
+  .sample-id::before{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 84% 18%, rgba(255,255,255,.45), transparent 28%), radial-gradient(circle at 12% 100%, rgba(255,255,255,.25), transparent 42%); }
+  .sample-id .sample-flag{ position:absolute; left:14px; top:14px; width:60px; height:36px; border-radius:5px; overflow:hidden; z-index:2; }
   .sample-id .sample-flag::before, .sample-id .sample-flag::after, .sample-id .sample-flag .mid{ position:absolute; left:0; width:100%; height:33.333%; content:""; }
   .sample-id .sample-flag::before{ top:0; background:#1f4eaf; }
   .sample-id .sample-flag::after{ bottom:0; background:#d62828; }
   .sample-id .sample-flag .mid{ top:33.333%; background:#f5d75d; }
   .sample-id .sample-flag .sun{ position:absolute; left:50%; top:50%; width:10px; height:10px; border-radius:50%; background:#fff; transform:translate(-50%,-50%); }
-  .sample-id .sample-country{ position:absolute; left:50%; top:12px; transform:translateX(-50%); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:rgba(20,35,45,.88); text-align:center; white-space:nowrap; }
-  .sample-id .sample-country.sub{ top:30px; font-size:9px; letter-spacing:.12em; }
-  .sample-id .sample-seal{ position:absolute; right:16px; top:18px; width:56px; height:56px; border:2px solid rgba(19,44,54,.7); border-radius:50%; background:rgba(255,255,255,.12); }
+  .sample-id .sample-country{ position:absolute; left:50%; top:12px; transform:translateX(-50%); font-size:11px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; color:rgba(20,35,45,.9); text-align:center; white-space:nowrap; z-index:2; }
+  .sample-id .sample-country.sub{ top:28px; font-size:8px; letter-spacing:.12em; }
+  .sample-id .sample-seal{ position:absolute; right:18px; top:18px; width:58px; height:58px; border:2px solid rgba(19,44,54,.7); border-radius:50%; background:rgba(255,255,255,.12); z-index:2; }
   .sample-id .sample-seal::before{ content:""; position:absolute; inset:8px; border:1.5px solid rgba(19,44,54,.7); border-radius:50%; }
-  .sample-id .sample-photo{ position:absolute; left:18px; top:58px; width:82px; height:92px; border:1px solid rgba(20,34,42,.2); background:linear-gradient(180deg,#dfe6eb 0%,#cdd5d8 100%); }
-  .sample-id .sample-photo::before{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 28%, #f3d2b3 0 19%, transparent 20%), radial-gradient(circle at 50% 36%, rgba(0,0,0,.8) 0 27%, transparent 28%), radial-gradient(circle at 50% 71%, #f0c8a9 0 28%, transparent 29%), linear-gradient(180deg, rgba(18,30,38,.10), rgba(18,30,38,.02)); }
-  .sample-id .sample-details{ position:absolute; left:118px; right:18px; top:58px; }
+  .sample-id .sample-photo{ position:absolute; left:18px; top:58px; width:94px; height:110px; border:1px solid rgba(20,34,42,.18); background:linear-gradient(180deg,#eef2f4 0%,#d7dde1 100%); z-index:2; }
+  .sample-id .sample-photo::before{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 30%, #f3d3b5 0 18%, transparent 19%), radial-gradient(circle at 50% 36%, rgba(0,0,0,.8) 0 22%, transparent 23%), radial-gradient(circle at 50% 68%, #e9bf9d 0 25%, transparent 26%), linear-gradient(180deg, rgba(18,30,38,.12), rgba(18,30,38,.02)); }
+  .sample-id .sample-details{ position:absolute; left:128px; right:16px; top:58px; z-index:2; }
   .sample-id .sample-row{ margin-bottom:6px; }
   .sample-id .sample-row .k{ display:block; font-size:7px; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:rgba(25,42,55,.8); }
   .sample-id .sample-row .v{ display:block; font-size:12px; font-weight:800; color:rgba(18,35,47,.96); line-height:1.15; }
   .sample-id .sample-row .v.small{ font-size:10px; }
-  .sample-id .sample-foot{ position:absolute; left:50%; bottom:10px; transform:translateX(-50%); font-size:8px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(18,35,47,.8); }
+  .sample-id .sample-foot{ position:absolute; left:50%; bottom:10px; transform:translateX(-50%); font-size:8px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(18,35,47,.8); z-index:2; }
   .sample-id.clear{ filter:none; }
-  .sample-id.blur{ filter:blur(2.2px) brightness(.92) saturate(.7); }
+  .sample-id.blur{ filter:blur(2.4px) brightness(.88) saturate(.7) contrast(.92); }
   .reference-card .example-note{ font-size:12px; font-weight:600; line-height:1.5; color:var(--ink-soft); }
   .reference-card.accept .example-note{ color:var(--success); }
   .reference-card.reject .example-note{ color:var(--danger); }
@@ -863,6 +864,8 @@ function idReferenceCard(type){
       + '<div class="sample-details">'
         + '<div class="sample-row"><span class="k">Last Name</span><span class="v">DELA CRUZ</span></div>'
         + '<div class="sample-row"><span class="k">First Name</span><span class="v">MARIA ANGELICA</span></div>'
+        + '<div class="sample-row"><span class="k">Middle Name</span><span class="v">SANTOS</span></div>'
+        + '<div class="sample-row"><span class="k">Date of Birth</span><span class="v small">2001-04-15</span></div>'
         + '<div class="sample-row"><span class="k">ID Number</span><span class="v small">1234 5678 9012</span></div>'
       + '</div>'
       + '<div class="sample-foot">Sample — Not a Government ID</div>'
