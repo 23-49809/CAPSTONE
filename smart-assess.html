@@ -1008,11 +1008,13 @@ function saveTrackingNumber(){
       const fallbackCtx = fallback.getContext('2d');
       fallbackCtx.fillStyle = '#f5f8fa';
       fallbackCtx.fillRect(0, 0, fallback.width, fallback.height);
-      fallbackCtx.fillStyle = '#12354d';
-      fallbackCtx.fillRect(0, 0, fallback.width, 18);
+      fallbackCtx.fillStyle = '#087f5b';
+      fallbackCtx.fillRect(0, 0, fallback.width, 24);
+      fallbackCtx.fillStyle = '#d9f4e8';
+      fallbackCtx.fillRect(105, 65, 14, 850);
       fallbackCtx.fillStyle = '#ffffff';
       fallbackCtx.fillRect(105, 65, 1190, 850);
-      fallbackCtx.fillStyle = '#12354d';
+      fallbackCtx.fillStyle = '#087f5b';
       fallbackCtx.font = '700 34px Georgia, serif';
       fallbackCtx.fillText("MUNICIPAL ASSESSOR'S OFFICE", 155, 145);
       fallbackCtx.font = '700 22px Arial, sans-serif';
@@ -1023,6 +1025,12 @@ function saveTrackingNumber(){
       fallbackCtx.fillText("Requester's Name: "+(submission.applicant || '—'), 155, 365);
       fallbackCtx.fillText('Request Type: '+requestType, 155, 415);
       fallbackCtx.fillText('Date Submitted: '+dateSubmitted, 155, 465);
+      fallbackCtx.fillStyle = '#e7f7ef';
+      fallbackCtx.fillRect(145, 500, 900, 100);
+      fallbackCtx.strokeStyle = '#087f5b';
+      fallbackCtx.lineWidth = 3;
+      fallbackCtx.strokeRect(145, 500, 900, 100);
+      fallbackCtx.fillStyle = '#087f5b';
       fallbackCtx.font = '700 48px monospace';
       fallbackCtx.fillText(submission.id, 155, 570);
       fallbackCtx.font = '18px Arial, sans-serif';
@@ -1046,11 +1054,15 @@ function saveTrackingNumber(){
     }
     ctx.fillStyle = 'rgba(8, 35, 52, .34)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#087f5b';
+    ctx.fillRect(0, 0, canvas.width, 24);
     ctx.fillStyle = 'rgba(255, 255, 255, .94)';
     ctx.fillRect(105, 65, 1190, 850);
     ctx.fillStyle = 'rgba(255, 255, 255, .72)';
     ctx.fillRect(105, 65, 1190, 850);
-    ctx.strokeStyle = '#c5d3db';
+    ctx.fillStyle = '#d9f4e8';
+    ctx.fillRect(105, 65, 14, 850);
+    ctx.strokeStyle = '#b8d9cc';
     ctx.lineWidth = 2;
     ctx.strokeRect(105, 65, 1190, 850);
     if(logo.naturalWidth && logo.naturalHeight){
@@ -1060,7 +1072,7 @@ function saveTrackingNumber(){
       const logoHeight = logo.naturalHeight * logoScale;
       ctx.drawImage(logo, 155, 105, logoWidth, logoHeight);
     }
-    ctx.fillStyle = '#12354d';
+    ctx.fillStyle = '#087f5b';
     ctx.font = '700 34px Georgia, serif';
     ctx.fillText("MUNICIPAL ASSESSOR'S OFFICE", 295, 145);
     ctx.fillStyle = '#5c7483';
@@ -1089,7 +1101,18 @@ function saveTrackingNumber(){
     ctx.fillText(submission.id, 155, 555);
     ctx.font = '700 23px Arial, sans-serif';
     ctx.fillText(dateSubmitted, 760, 535);
-    ctx.fillStyle = 'rgba(225, 239, 243, .94)';
+    ctx.fillStyle = '#e7f7ef';
+    ctx.fillRect(145, 455, 1090, 145);
+    ctx.strokeStyle = '#087f5b';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(145, 455, 1090, 145);
+    ctx.fillStyle = '#087f5b';
+    ctx.font = '700 16px Arial, sans-serif';
+    ctx.fillText('TRACKING NUMBER', 180, 490);
+    ctx.fillStyle = '#12354d';
+    ctx.font = '700 48px monospace';
+    ctx.fillText(submission.id, 180, 555);
+    ctx.fillStyle = '#e7f7ef';
     ctx.fillRect(155, 665, 1090, 125);
     ctx.fillStyle = '#315a6d';
     ctx.font = '18px Arial, sans-serif';
