@@ -966,7 +966,7 @@ function saveTrackingNumber(){
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
 }
 function renderConfirmation(){
   const r = state.lastSubmission;
