@@ -474,7 +474,7 @@ const STATUS_META = {
   'Received':{ sms:function(id){ return 'SMART ASSESS: Your request '+id+' has been received by the Mabini Assessor\'s Office.'; } },
   'Processing':{ sms:function(id){ return 'SMART ASSESS: Your request '+id+' is now under review.'; } },
   'Approved':{ sms:function(id){ return 'SMART ASSESS: Good news! Your request '+id+' has been approved.'; } },
-  'Rejected':{ sms:function(id, missing){ return 'SMART ASSESS: Your request '+id+' needs corrections. Missing/invalid: '+((missing&&missing.length)?missing.join(', '):'see portal for details')+'.'; } },
+  'Rejected':{ sms:function(id, missing){ return 'SMART ASSESS: Your request '+id+' needs co  ctions. Missing/invalid: '+((missing&&missing.length)?missing.join(', '):'see portal for details')+'.'; } },
   'Out for Release':{ sms:function(id){ return 'SMART ASSESS: Your document for request '+id+' is ready for release at the MAO.'; } }
 };
 
