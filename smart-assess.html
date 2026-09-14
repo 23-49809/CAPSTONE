@@ -259,6 +259,15 @@
   .upload-filename{ font-size:12.5px; color:var(--brand-700); margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
   .upload-filename .icon{ width:15px; height:15px; }
   .upload-remove{ background:none; border:none; color:var(--danger); font-size:11.5px; font-weight:700; cursor:pointer; font-family:var(--font-body); text-decoration:underline; }
+  .id-guidance{ display:flex; align-items:center; gap:12px; margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); }
+  .id-photo-card{ width:54px; height:38px; flex-shrink:0; display:flex; align-items:center; gap:6px; padding:5px; border-radius:5px; background:linear-gradient(135deg,#d9f1e2,#fff); border:1px solid #a9cdb5; color:var(--brand-700); }
+  .id-photo-card .icon{ width:18px; height:18px; }
+  .id-photo-lines{ display:flex; flex:1; flex-direction:column; gap:3px; }
+  .id-photo-lines span{ display:block; height:3px; border-radius:2px; background:currentColor; opacity:.45; }
+  .id-photo-lines span:first-child{ width:80%; }
+  .id-photo-lines span:last-child{ width:58%; }
+  .id-guidance-text{ color:var(--ink-soft); font-size:12px; line-height:1.4; }
+  .id-guidance-text strong{ display:block; color:var(--ink); font-size:12.5px; margin-bottom:2px; }
 
   /* Review */
   .review-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
@@ -783,6 +792,7 @@ function uploadBox(key, label, fd){
   const file = fd.files[key];
   const err = state.errors[key];
   const cls = 'upload-box'+(file && file.valid?' filled':'')+(err?' invalid':'');
+  const isIdUpload = key==='ownerId' || key==='requesterId';
   const filenameLine = file
     ? ('<div class="upload-filename">'+ic('file')+esc(file.name)+' &middot; '+fmtBytes(file.size)+(file.valid?'':' &mdash; <span style="color:var(--danger)">invalid format</span>')+' <button type="button" class="upload-remove" data-remove-file="'+key+'">Remove</button></div>')
     : '<div class="upload-hint">Drop file here or click to browse (JPG, PNG, or PDF)</div>';
@@ -790,6 +800,7 @@ function uploadBox(key, label, fd){
     + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'">'
     + '<div class="upload-head">'+ic('id')+esc(label)+'</div>'
     + filenameLine
+    + (isIdUpload ? '<div class="id-guidance"><div class="id-photo-card">'+ic('user')+'<span class="id-photo-lines"><span></span><span></span></span></div><div class="id-guidance-text"><strong>Use a valid, unexpired ID photo</strong>Upload a clear image of the complete ID. Make sure all details are readable.</div></div>' : '')
     + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
   + '</div>';
 }
