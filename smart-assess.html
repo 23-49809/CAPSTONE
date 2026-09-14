@@ -956,10 +956,22 @@ function renderWizard(){
             : '<button class="btn btn-primary" data-action="next-step">Next '+ic('arrowRight')+'</button>')
       + '</div>'
     + '</div>'
-    + '</div></div>';
+    + '</div></div>' + (state.submitConfirmation ? renderSubmitConfirmationModal() : '');
 }
 
 /* ---------- Confirmation ---------- */
+function renderSubmitConfirmationModal(){
+  return '<div class="submit-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="submit-confirm-title">'
+    + '<div class="submit-modal">'
+      + '<h2 id="submit-confirm-title">Are you sure your details are correct?</h2>'
+      + '<p>Please review all the information and uploaded documents carefully before submitting your request. Once submitted, your request will be processed by the Municipal Assessor\'s Office.</p>'
+      + '<div class="submit-modal-actions">'
+        + '<button class="btn btn-ghost" data-action="cancel-submit">Cancel</button>'
+        + '<button class="btn btn-primary" data-action="confirm-submit">Yes, Submit Request</button>'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+}
 function saveTrackingNumber(){
   const submission = state.lastSubmission;
   if(!submission || !submission.id) return;
@@ -1012,7 +1024,6 @@ function saveTrackingNumber(){
   ctx.font = '18px Arial, sans-serif';
   ctx.fillText('Please save this receipt. You will need your tracking number', 180, 670);
   ctx.fillText('to check your request status.', 180, 702);
-  const blob = null;
   canvas.toBlob(function(receiptBlob){
     if(!receiptBlob) return;
     const url = URL.createObjectURL(receiptBlob);
@@ -1036,8 +1047,6 @@ function renderConfirmation(){
     + '<div style="margin-top:20px;font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center">Your Request Tracking Number</div>'
     + '<div class="confirm-ref" aria-label="Your Request Tracking Number">'+esc(r.id)+'</div>'
     + '<p class="field-hint" style="margin:10px 0 0;text-align:center">Please save this number. You will need it to check your request status.</p>'
-    + '<div class="check-banner '+(r.requirementComplete?'ok':'bad')+'" style="text-align:left">'+ic(r.requirementComplete?'check':'alert')
-      + '<span>'+(r.requirementComplete ? 'All requirement-checker items were satisfied.' : 'Missing/invalid: '+esc(r.missing.join(', '))+'. Bring these to the office or wait for a follow-up.')+'</span></div>'
     + '<div class="confirm-actions">'
       + '<button class="btn btn-ghost" data-action="save-tracking">Save My Tracking Number</button>'
       + '<button class="btn btn-primary" data-action="view-status">'+ic('search')+' View My Request Status</button>'
@@ -1150,6 +1159,8 @@ function bindEvents(root){
       else if(a==='next-step') nextStep();
       else if(a==='prev-step') prevStep();
       else if(a==='submit') submitRequest();
+      else if(a==='cancel-submit'){ state.submitConfirmation = false; render(); }
+      else if(a==='confirm-submit') confirmSubmitRequest();
       else if(a==='save-tracking') saveTrackingNumber();
       else if(a==='view-status') go('track');
       else if(a==='track-search'){
