@@ -194,6 +194,11 @@
   .contact-input > span{ padding:12px 0 12px 14px; background:var(--surface); color:var(--ink-soft); font-size:14.5px; }
   .contact-input > input{ min-width:0; flex:1; border:0; border-radius:0; box-shadow:none; }
   .field .contact-input > input:focus{ border:0; box-shadow:none; outline:none; }
+  .arp-input{ display:flex; align-items:center; border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); overflow:hidden; transition:border-color .15s ease, box-shadow .15s ease; }
+  .arp-input:focus-within{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); }
+  .arp-input > span{ padding:12px 0 12px 14px; background:var(--surface); color:var(--ink-soft); font-size:14.5px; font-weight:600; }
+  .arp-input > input{ min-width:0; flex:1; border:0; border-radius:0; box-shadow:none; }
+  .field .arp-input > input:focus{ border:0; box-shadow:none; outline:none; }
   .field input::placeholder{ color:var(--ink-faint); }
   .field input:focus, .field select:focus{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); outline:none; }
   .field input.invalid, .field select.invalid{ border-color:var(--danger); }
@@ -445,6 +450,7 @@ const state = {
 /* ======================= Validation rules ======================= */
 const PH_MOBILE_RE = /^\+63\d{10}$/;
 const ZIP_RE = /^\d{4}$/;
+const ARP_RE = /^14-\d{4}-\d{5}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_FILE_RE = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 const BARANGAYS = [
@@ -480,7 +486,8 @@ function validateStep2(flow, fd, errors){
     if(fd.transferType && !fd.purpose) errors.purpose = 'Please select a purpose.';
   }
   if(!fd.arp.trim()) errors.arp = 'ARP / Tax Declaration number is required.';
-  if(!fd.propertyAddress.trim()) errors.propertyAddress = 'Property address is required.';
+  else if(!ARP_RE.test(fd.arp.trim())) errors.arp = 'Use format 14-XXXX-XXXXX.';
+  if(flow!=='docreq' && !fd.propertyAddress.trim()) errors.propertyAddress = 'Property address is required.';
   if(!fd.barangay.trim()) errors.barangay = 'Barangay is required.';
 }
 function requiredIdKeys(fd){ return fd.isOwner ? ['ownerId'] : ['ownerId','requesterId','authLetter']; }
