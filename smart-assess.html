@@ -825,17 +825,9 @@ function renderStep2(){
         + '<option value="">Select transfer type</option>'
         + TRANSFER_TYPES.map(function(t){ return '<option value="'+esc(t)+'" '+(fd.transferType===t?'selected':'')+'>'+esc(t)+'</option>'; }).join('')
       + '</select>' + fieldError('transferType') + '</div>'
-    + (fd.transferType ? (
-        '<div class="field" style="margin-bottom:20px"><label>Purpose of the Requested Document<span class="req">*</span></label>'
-        + '<select id="f-purpose" class="'+(inv('purpose')?'invalid':'')+'" data-bind-select="purpose">'
-          + '<option value="">Select a purpose</option>'
-          + PURPOSES.map(function(p){ return '<option value="'+esc(p)+'" '+(fd.purpose===p?'selected':'')+'>'+esc(p)+'</option>'; }).join('')
-        + '</select>' + fieldError('purpose') + '</div>'
-        + (advisory ? '<div class="advisory">'+ic('alert')+'<span>'+esc(advisory)+'</span></div>' : '')
-      ) : '')
+    + (fd.transferType ? '' : '')
     + '<div class="field-grid">'
       + arpField(fd)
-      + '<div class="field"><label>Property Address<span class="req">*</span></label><input id="f-propertyAddress" class="'+(inv('propertyAddress')?'invalid':'')+'" type="text" value="'+esc(fd.propertyAddress)+'" data-bind="propertyAddress" placeholder="Brgy. Poblacion, Mabini, Batangas">' + fieldError('propertyAddress') + '</div>'
       + barangayField
     + '</div>'
   + '</div>';
@@ -938,13 +930,12 @@ function renderStep4(){
       + '</div>'
       + '<div class="review-card"><h3>'+ic('home')+' Property Details</h3>'
         + '<div class="review-row"><span class="k">ARP / Tax Decl. No.</span><span class="v">'+esc(fd.arp||'—')+'</span></div>'
-        + '<div class="review-row"><span class="k">Property Address</span><span class="v">'+esc(fd.propertyAddress||'—')+'</span></div>'
         + '<div class="review-row"><span class="k">Barangay</span><span class="v">'+esc(fd.barangay||'—')+'</span></div>'
         + '<div class="review-row"><span class="k">Ownership Status</span><span class="v">'+(fd.isOwner?'Registered property owner':'Not the registered property owner')+'</span></div>'
       + '</div>'
       + '<div class="review-card"><h3>'+ic('doc')+' Document &amp; Ownership</h3>'
         + docTypeRow
-        + '<div class="review-row"><span class="k">Purpose</span><span class="v">'+esc(fd.purpose||'—')+'</span></div>'
+        + (state.flow==='docreq' ? '<div class="review-row"><span class="k">Purpose</span><span class="v">'+esc(fd.purpose||'—')+'</span></div>' : '')
       + '</div>'
       + '<div class="review-card"><h3>'+ic('file')+' Uploaded Files</h3>'
         + uploadedRows
