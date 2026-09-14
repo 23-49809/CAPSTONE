@@ -944,6 +944,47 @@ function render(){
 }
 
 function bindEvents(root){
+  function closeBarangayMenus(){
+    root.querySelectorAll('[data-barangay-dropdown].open').forEach(function(dropdown){
+      dropdown.classList.remove('open');
+      const trigger = dropdown.querySelector('[data-barangay-trigger]');
+      const menu = dropdown.querySelector('[data-barangay-menu]');
+      if(trigger) trigger.setAttribute('aria-expanded','false');
+      if(menu) menu.hidden = true;
+    });
+  }
+  root.querySelectorAll('[data-barangay-trigger]').forEach(function(trigger){
+    trigger.addEventListener('click', function(e){
+      e.stopPropagation();
+      const dropdown = trigger.closest('[data-barangay-dropdown]');
+      const menu = dropdown.querySelector('[data-barangay-menu]');
+      const isOpen = dropdown.classList.contains('open');
+      closeBarangayMenus();
+      if(!isOpen){
+        dropdown.classList.add('open');
+        trigger.setAttribute('aria-expanded','true');
+        menu.hidden = false;
+        const selected = menu.querySelector('.selected');
+        if(selected) selected.scrollIntoView({block:'nearest'});
+      }
+    });
+    trigger.addEventListener('keydown', function(e){
+      if(e.key==='Escape') closeBarangayMenus();
+    });
+  });
+  root.querySelectorAll('[data-barangay-option]').forEach(function(option){
+    option.addEventListener('click', function(e){
+      e.stopPropagation();
+      const dropdown = option.closest('[data-barangay-dropdown]');
+      const select = dropdown.querySelector('[data-bind-select="barangay"]');
+      select.value = option.getAttribute('data-barangay-option');
+      select.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+  });
+  root.addEventListener('click', function(e){
+    if(!e.target.closest('[data-barangay-dropdown]')) closeBarangayMenus();
+  });
+
   root.querySelectorAll('[data-nav]').forEach(function(el){
     el.addEventListener('click', function(){ go(el.getAttribute('data-nav')); });
   });
