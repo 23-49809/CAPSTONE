@@ -444,6 +444,7 @@ function validateStep1(fd, errors){
   if(!fd.email.trim()) errors.email = 'Email address is required.';
   else if(!EMAIL_RE.test(fd.email.trim())) errors.email = 'Enter a valid email address.';
   if(!fd.addressLine.trim()) errors.addressLine = 'House number / street is required.';
+  if(!fd.barangay.trim()) errors.barangay = 'Barangay is required.';
   if(!fd.province.trim()) errors.province = 'Province is required.';
   if(!fd.city.trim()) errors.city = 'City/Municipality is required.';
   if(!ZIP_RE.test(fd.zip.trim())) errors.zip = 'Zip code must be 4 digits.';
@@ -546,7 +547,7 @@ function submitRequest(){
   validateStep1(fd, errors); validateStep2(state.flow, fd, errors); validateUploads(state.flow, fd, errors);
   if(Object.keys(errors).length){
     state.errors = errors;
-    if(errors.firstName||errors.lastName||errors.contact||errors.email||errors.addressLine||errors.province||errors.city||errors.zip) state.step=1;
+    if(errors.firstName||errors.lastName||errors.contact||errors.email||errors.addressLine||errors.barangay||errors.province||errors.city||errors.zip) state.step=1;
     else if(errors.documentType||errors.transferType||errors.purpose||errors.arp||errors.propertyAddress||errors.barangay) state.step=2;
     else state.step=3;
     render(); return;
@@ -558,7 +559,7 @@ function submitRequest(){
     id: refNo, flow: state.flow,
     applicant: [fd.firstName, fd.middleName, fd.lastName].filter(Boolean).join(' '),
     contact: fd.contact, email: fd.email,
-    address: fd.addressLine + ', ' + fd.city + ', ' + fd.province + ' ' + fd.zip,
+    address: fd.addressLine + ', ' + fd.barangay + ', ' + fd.city + ', ' + fd.province + ' ' + fd.zip,
     docType: state.flow==='docreq' ? fd.documentType : fd.transferType,
     purpose: fd.purpose, arp: fd.arp, propertyAddress: fd.propertyAddress, barangay: fd.barangay,
     isOwner: fd.isOwner,
@@ -784,7 +785,7 @@ function renderStep4(){
       + '<div class="review-card"><h3>'+ic('user')+' Personal Information</h3>'
         + '<div class="review-row"><span class="k">Full Name</span><span class="v">'+esc(fullName)+'</span></div>'
         + '<div class="review-row"><span class="k">Email</span><span class="v">'+esc(fd.email||'—')+'</span></div>'
-        + '<div class="review-row"><span class="k">Address</span><span class="v">'+esc(fd.addressLine)+', '+esc(fd.city)+', '+esc(fd.province)+'</span></div>'
+        + '<div class="review-row"><span class="k">Address</span><span class="v">'+esc(fd.addressLine)+', '+esc(fd.barangay)+', '+esc(fd.city)+', '+esc(fd.province)+'</span></div>'
         + '<div class="review-row"><span class="k">Zip Code</span><span class="v">'+esc(fd.zip||'—')+'</span></div>'
         + '<div class="review-row"><span class="k">Contact Number</span><span class="v">'+esc(fd.contact||'—')+'</span></div>'
       + '</div>'
