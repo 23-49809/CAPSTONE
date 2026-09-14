@@ -987,6 +987,7 @@ function renderConfirmation(){
     + '<div class="confirm-icon">'+ic('check')+'</div>'
     + '<h2>Request Submitted</h2>'
     + '<p style="color:var(--ink-soft);font-size:14px;margin-top:8px">Your '+(r.flow==='docreq'?'document request':'land transfer request')+' has been received by the Municipal Assessor\'s Office. You will get SMS updates at '+esc(r.contact)+'.</p>'
+    + '<div style="margin-top:20px;font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center">Your Request Tracking Number</div>'
     + '<div class="confirm-ref" aria-label="Your Request Tracking Number">'+esc(r.id)+'</div>'
     + '<p class="field-hint" style="margin:10px 0 0;text-align:center">Please save this number. You will need it to check your request status.</p>'
     + '<div class="check-banner '+(r.requirementComplete?'ok':'bad')+'" style="text-align:left">'+ic(r.requirementComplete?'check':'alert')
