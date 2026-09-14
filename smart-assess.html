@@ -470,14 +470,6 @@ const LAND_TRANSFER_DOCS = [
 const DOCREQ_STEPS = ['Step 1: Personal','Step 2: Property','Step 3: Uploads','Step 4: Review'];
 const LT_STEPS = ['Step 1: Personal','Step 2: Transfer','Step 3: Documents','Step 4: Review'];
 const STATUS_FLOW = ['Received','Processing','Approved','Rejected','Out for Release'];
-const STATUS_META = {
-  'Received':{ sms:function(id){ return 'SMART ASSESS: Your request '+id+' has been received by the Mabini Assessor\'s Office.'; } },
-  'Processing':{ sms:function(id){ return 'SMART ASSESS: Your request '+id+' is now under review.'; } },
-  'Approved':{ sms:function(id){ return 'SMART ASSESS: Good news! Your request '+id+' has been approved.'; } },
-  'Rejected':{ sms:function(id, missing){ return 'SMART ASSESS: Your request '+id+' needs co  ctions. Missing/invalid: '+((missing&&missing.length)?missing.join(', '):'see portal for details')+'.'; } },
-  'Out for Release':{ sms:function(id){ return 'SMART ASSESS: Your document for request '+id+' is ready for release at the MAO.'; } }
-};
-
 /* ======================= State ======================= */
 function blankFormData(){
   return {
@@ -595,15 +587,12 @@ function getAdvisory(flow, fd){
   return null;
 }
 
-/* ======================= Status / SMS ======================= */
+/* ======================= Status tracking ======================= */
 function pushStatus(record, status){
   record.status = status;
   record.timestamps = record.timestamps || {};
-  record.smsLog = record.smsLog || [];
   const at = new Date().toISOString();
   record.timestamps[status] = at;
-  const body = STATUS_META[status].sms(record.id, record.missing);
-  record.smsLog.push({ status:status, body:body, at:at });
 }
 
 /* ======================= Navigation helpers ======================= */
@@ -658,7 +647,7 @@ function submitRequest(){
     files: JSON.parse(JSON.stringify(fd.files)),
     advisory: getAdvisory(state.flow, fd),
     requirementComplete: missing.length===0, missing: missing,
-    timestamps:{}, smsLog:[]
+    timestamps:{}
   };
   pushStatus(record, 'Received');
   const list = loadRequests(); list.unshift(record); saveRequests(list);
@@ -986,16 +975,15 @@ function renderConfirmation(){
   + '<div class="confirm-shell"><div class="confirm-card fade-in">'
     + '<div class="confirm-icon">'+ic('check')+'</div>'
     + '<h2>Request Submitted</h2>'
-    + '<p style="color:var(--ink-soft);font-size:14px;margin-top:8px">Your '+(r.flow==='docreq'?'document request':'land transfer request')+' has been received by the Municipal Assessor\'s Office. You will get SMS updates at '+esc(r.contact)+'.</p>'
+    + '<p style="color:var(--ink-soft);font-size:14px;margin-top:8px">Your '+(r.flow==='docreq'?'document request':'land transfer request')+' has been received by the Municipal Assessor\'s Office. Use your tracking number below to check your request status.</p>'
     + '<div style="margin-top:20px;font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center">Your Request Tracking Number</div>'
     + '<div class="confirm-ref" aria-label="Your Request Tracking Number">'+esc(r.id)+'</div>'
     + '<p class="field-hint" style="margin:10px 0 0;text-align:center">Please save this number. You will need it to check your request status.</p>'
     + '<div class="check-banner '+(r.requirementComplete?'ok':'bad')+'" style="text-align:left">'+ic(r.requirementComplete?'check':'alert')
-      + '<span>'+(r.requirementComplete ? 'All requirement-checker items were satisfied.' : 'Missing/invalid: '+esc(r.missing.join(', '))+'. Bring these to the office or wait for a follow-up SMS.')+'</span></div>'
+      + '<span>'+(r.requirementComplete ? 'All requirement-checker items were satisfied.' : 'Missing/invalid: '+esc(r.missing.join(', '))+'. Bring these to the office or wait for a follow-up.')+'</span></div>'
     + '<div class="confirm-actions">'
-      + '<button class="btn btn-ghost" data-action="save-tracking">Save Tracking Number</button>'
-      + '<button class="btn btn-ghost" data-nav="track">'+ic('search')+' View Request Status</button>'
-      + '<button class="btn btn-primary" data-nav="landing">Back to Home</button>'
+      + '<button class="btn btn-ghost" data-action="save-tracking">Save My Tracking Number</button>'
+      + '<button class="btn btn-primary" data-action="view-status">'+ic('search')+' View My Request Status</button>'
     + '</div>'
   + '</div></div>';
 }
@@ -1008,12 +996,6 @@ function timelineHtml(record){
   return '<ul class="timeline">' + entries.map(function(e){
     return '<li><span class="t-dot"></span><div><div class="t-status">'+esc(e.status)+'</div><div class="t-when">'+fmtDateTime(e.at)+'</div></div></li>';
   }).join('') + '</ul>';
-}
-function smsLogHtml(record){
-  if(!record.smsLog || !record.smsLog.length) return '<p style="font-size:12.5px;color:var(--ink-faint)">No messages sent yet.</p>';
-  return record.smsLog.slice().reverse().map(function(m){
-    return '<div class="sms-item">'+esc(m.body)+'<div class="sms-when">'+fmtDateTime(m.at)+'</div></div>';
-  }).join('');
 }
 function renderTrack(){
   const t = state.track;
@@ -1029,10 +1011,9 @@ function renderTrack(){
         + '<div class="review-row"><span class="k">Applicant</span><span class="v">'+esc(r.applicant)+'</span></div>'
         + '<div class="review-row"><span class="k">Service</span><span class="v">'+(r.flow==='docreq'?'Document Request':'Land Transfer')+' &mdash; '+esc(r.docType)+'</span></div>'
         + '<div class="modal-section-title">'+ic('timer')+' Status Timeline</div>' + timelineHtml(r)
-        + '<div class="modal-section-title">'+ic('smsIcon')+' SMS Notifications (simulated)</div>' + smsLogHtml(r)
         + '</div>';
     } else {
-      resultBlock = '<div class="track-result"><p style="color:var(--ink-soft);font-size:14px">No request found with reference number "'+esc(t.query)+'". Double-check the code from your confirmation screen or SMS.</p></div>';
+      resultBlock = '<div class="track-result"><p style="color:var(--ink-soft);font-size:14px">No request found with reference number "'+esc(t.query)+'". Double-check the tracking number from your confirmation screen.</p></div>';
     }
   }
   return renderHeader()
@@ -1113,6 +1094,7 @@ function bindEvents(root){
       else if(a==='prev-step') prevStep();
       else if(a==='submit') submitRequest();
       else if(a==='save-tracking') saveTrackingNumber();
+      else if(a==='view-status') go('track');
       else if(a==='track-search'){
         const q = (document.getElementById('track-input').value||'').trim().toUpperCase();
         state.track.query = q; state.track.searched = true;
