@@ -196,6 +196,7 @@
   .field .contact-input > input:focus{ border:0; box-shadow:none; outline:none; }
   .arp-input{ display:flex; align-items:center; border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); overflow:hidden; transition:border-color .15s ease, box-shadow .15s ease; }
   .arp-input:focus-within{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); }
+  .arp-input.invalid{ border-color:var(--danger); }
   .arp-input > span{ padding:12px 0 12px 14px; background:var(--surface); color:var(--ink-soft); font-size:14.5px; font-weight:600; }
   .arp-input > input{ min-width:0; flex:1; border:0; border-radius:0; box-shadow:none; }
   .field .arp-input > input:focus{ border:0; box-shadow:none; outline:none; }
@@ -704,7 +705,7 @@ function barangaySelect(fd){
 function arpField(fd){
   const remainder = fd.arp.replace(/^14-/, '').replace(/\D/g,'').slice(0,9);
   const displayValue = remainder.length > 4 ? remainder.slice(0,4)+'-'+remainder.slice(4) : remainder;
-  return '<div class="field"><label>ARP / Tax Declaration Number<span class="req">*</span></label><div class="arp-input"><span>14-</span><input id="f-arp" class="'+(inv('arp')?'invalid':'')+'" type="text" value="'+esc(displayValue)+'" data-bind="arp" inputmode="numeric" maxlength="10" placeholder="XXXX-XXXXX"></div>' + fieldError('arp') + '</div>';
+  return '<div class="field"><label>ARP / Tax Declaration Number<span class="req">*</span></label><div class="arp-input'+(inv('arp')?' invalid':'')+'"><span>14-</span><input id="f-arp" type="text" value="'+esc(displayValue)+'" data-bind="arp" inputmode="numeric" maxlength="10" placeholder="XXXX-XXXXX"></div>' + fieldError('arp') + '</div>';
 }
 
 function renderStep1(){
