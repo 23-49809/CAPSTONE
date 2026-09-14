@@ -825,7 +825,6 @@ function renderStep2(){
         + '<option value="">Select transfer type</option>'
         + TRANSFER_TYPES.map(function(t){ return '<option value="'+esc(t)+'" '+(fd.transferType===t?'selected':'')+'>'+esc(t)+'</option>'; }).join('')
       + '</select>' + fieldError('transferType') + '</div>'
-    + (fd.transferType ? '' : '')
     + '<div class="field-grid">'
       + arpField(fd)
       + barangayField
