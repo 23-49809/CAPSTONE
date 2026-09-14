@@ -907,7 +907,6 @@ function renderStep3(){
     + docsBlock
     + idGuidancePanel()
     + '<div class="upload-grid">' + idKeys.map(function(k){ return uploadBox(k, idLabel(state.flow,k), fd); }).join('') + '</div>'
-    + (!fd.isOwner ? '<div class="advisory">'+ic('alert')+'<span>Since you are not the registered owner, our AI rule-based checker requires the Authorized Representative\'s Valid ID, Property Owner Valid ID, and Authorization Letter before this request can be processed.</span></div>' : '')
   + '</div>';
 }
 
