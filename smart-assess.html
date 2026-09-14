@@ -729,7 +729,8 @@ function renderStep1(){
     + '</div>'
   + '</div>';
 }
-        + arpField(fd)
+
+function renderStep2(){
   const fd = state.formData;
   const advisory = getAdvisory(state.flow, fd);
   const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd) + fieldError('barangay') + '</div>';
@@ -750,13 +751,12 @@ function renderStep1(){
           + (advisory ? '<div class="advisory">'+ic('alert')+'<span>'+esc(advisory)+'</span></div>' : '')
         ) : '')
       + '<div class="field-grid">'
-        + '<div class="field"><label>ARP / Tax Declaration Number<span class="req">*</span></label><input id="f-arp" class="'+(inv('arp')?'invalid':'')+'" type="text" value="'+esc(fd.arp)+'" data-bind="arp" placeholder="024-01-0032">' + fieldError('arp') + '</div>'
-        + '<div class="field"><label>Property Address<span class="req">*</span></label><input id="f-propertyAddress" class="'+(inv('propertyAddress')?'invalid':'')+'" type="text" value="'+esc(fd.propertyAddress)+'" data-bind="propertyAddress" placeholder="Brgy. Poblacion, Mabini, Batangas">' + fieldError('propertyAddress') + '</div>'
+        + arpField(fd)
         + barangayField
       + '</div>'
     + '</div>';
   }
-      + arpField(fd)
+  return '<div class="wizard-card-head"><h2>'+ic('home')+' Enter Property &amp; Transfer Details</h2><p>Provide property information and transfer details. Additional files are required when filing on behalf of the owner.</p></div>'
   + '<div class="wizard-card-body">'
     + '<div class="field" style="margin-bottom:20px"><label>Type of Transfer<span class="req">*</span></label>'
       + '<select id="f-transferType" class="'+(inv('transferType')?'invalid':'')+'" data-bind-select="transferType">'
@@ -772,7 +772,7 @@ function renderStep1(){
         + (advisory ? '<div class="advisory">'+ic('alert')+'<span>'+esc(advisory)+'</span></div>' : '')
       ) : '')
     + '<div class="field-grid">'
-      + '<div class="field"><label>ARP / Tax Declaration Number<span class="req">*</span></label><input id="f-arp" class="'+(inv('arp')?'invalid':'')+'" type="text" value="'+esc(fd.arp)+'" data-bind="arp" placeholder="024-01-0032">' + fieldError('arp') + '</div>'
+      + arpField(fd)
       + '<div class="field"><label>Property Address<span class="req">*</span></label><input id="f-propertyAddress" class="'+(inv('propertyAddress')?'invalid':'')+'" type="text" value="'+esc(fd.propertyAddress)+'" data-bind="propertyAddress" placeholder="Brgy. Poblacion, Mabini, Batangas">' + fieldError('propertyAddress') + '</div>'
       + barangayField
     + '</div>'
