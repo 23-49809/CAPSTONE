@@ -56,7 +56,7 @@ const PURPOSES = [
     'For Building Permit', 'For Reclassification', 'Other Legal Requirement',
 ];
 
-const TRANSFER_TYPES = ['Sale', 'Donation', 'Inheritance'];
+const TRANSFER_TYPES = ['Sale', 'Donation', 'Estate'];
 
 const LAND_TRANSFER_DOCS = [
     ['key' => 'ctcTdOrTitle', 'label' => 'Certified True Copy of Tax Declaration or Title'],
@@ -167,12 +167,12 @@ function validate_personal(array $p): array
     return $errors;
 }
 
-function validate_property_common(array $p): array
+function validate_property_common(array $p, bool $requiresPurpose = true, bool $requiresPropertyAddress = true): array
 {
     $errors = [];
-    if (!in_array($p['purpose'] ?? '', PURPOSES, true)) $errors['purpose'] = 'Please select a purpose.';
+    if ($requiresPurpose && !in_array($p['purpose'] ?? '', PURPOSES, true)) $errors['purpose'] = 'Please select a purpose.';
     if (trim($p['arp_number'] ?? '') === '') $errors['arp_number'] = 'ARP / Tax Declaration number is required.';
-    if (trim($p['property_address'] ?? '') === '') $errors['property_address'] = 'Property address is required.';
+    if ($requiresPropertyAddress && trim($p['property_address'] ?? '') === '') $errors['property_address'] = 'Property address is required.';
     if (trim($p['barangay'] ?? '') === '') $errors['barangay'] = 'Barangay is required.';
     return $errors;
 }

@@ -24,7 +24,7 @@ PURPOSES = [
     "Other Legal Requirement",
 ]
 
-TRANSFER_TYPES = ["Sale", "Donation", "Inheritance"]
+TRANSFER_TYPES = ["Sale", "Donation", "Estate"]
 
 LAND_TRANSFER_DOCS = [
     {"key": "ctcTdOrTitle", "label": "Certified True Copy of Tax Declaration or Title"},
@@ -108,10 +108,6 @@ def get_advisory(flow, document_type, transfer_type, purpose):
             return ('"Certification of No Liens and Encumbrances" is typically requested for loans '
                     'or financing. For a building permit, try "Certification of No/With Existing '
                     'Improvement" or "Certification of Assessment."')
-    else:
-        if transfer_type == "Inheritance" and purpose in ("For Building Permit", "For Reclassification"):
-            return ('Inheritance transfers are usually filed "For Transfer" or "For Titling." '
-                    'Double-check the purpose you selected.')
     return None
 
 

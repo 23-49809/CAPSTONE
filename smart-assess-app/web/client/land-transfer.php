@@ -9,7 +9,7 @@ $values = [
     'first_name' => $client['first_name'] ?? '', 'middle_name' => '', 'last_name' => $client['last_name'] ?? '',
     'contact_number' => $client['contact_number'] ?? '', 'email' => $client['email'] ?? '',
     'address_line' => '', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '',
-    'transfer_type' => '', 'purpose' => '', 'arp_number' => '', 'property_address' => '', 'barangay' => '',
+    'transfer_type' => '', 'arp_number' => '', 'barangay' => '',
     'is_owner' => true,
 ];
 $aiIssue = null;
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['is_owner'] = isset($_POST['is_owner']);
 
     $errors = array_merge($errors, validate_personal($values));
-    $errors = array_merge($errors, validate_property_common($values));
+    $errors = array_merge($errors, validate_property_common($values, false, false));
     if (!in_array($values['transfer_type'], TRANSFER_TYPES, true)) {
         $errors['transfer_type'] = 'Please select a transfer type.';
     }
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'flow' => $flow,
             'document_type' => null,
             'transfer_type' => $values['transfer_type'],
-            'purpose' => $values['purpose'],
+            'purpose' => '',
             'is_owner' => $values['is_owner'],
             'uploaded_files' => $uploadedMeta,
         ]);
@@ -67,8 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $client['id'] ?? null, $refNo, $flow, $values['first_name'], $values['middle_name'] ?: null, $values['last_name'],
                     $values['contact_number'], $values['email'],
                     $values['address_line'], $values['province'], $values['city'], $values['zip_code'],
-                    null, $values['transfer_type'], $values['purpose'],
-                    $values['arp_number'], $values['property_address'], $values['barangay'], $values['is_owner'] ? 1 : 0,
+                    null, $values['transfer_type'], '',
+                    $values['arp_number'], '', $values['barangay'], $values['is_owner'] ? 1 : 0,
                     $ai['requirement_complete'] ? 1 : 0, $ai['advisory'],
                 ]);
                 $requestId = (int) $pdo->lastInsertId();
@@ -162,16 +162,7 @@ require __DIR__ . '/../includes/client_header.php';
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="field"><label>Purpose<span class="req">*</span></label>
-            <select name="purpose">
-              <option value="">Select a purpose</option>
-              <?php foreach (PURPOSES as $p): ?>
-                <option value="<?= esc($p) ?>" <?= $values['purpose'] === $p ? 'selected' : '' ?>><?= esc($p) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
           <div class="field"><label>ARP / Tax Declaration Number<span class="req">*</span></label><input type="text" name="arp_number" value="<?= esc($values['arp_number']) ?>"></div>
-          <div class="field"><label>Property Address<span class="req">*</span></label><input type="text" name="property_address" value="<?= esc($values['property_address']) ?>"></div>
           <div class="field"><label>Barangay (Property Location)<span class="req">*</span></label><input type="text" name="barangay" value="<?= esc($values['barangay']) ?>"></div>
         </div>
 
