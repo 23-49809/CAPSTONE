@@ -828,7 +828,7 @@ function uploadBox(key, label, fd){
 }
 function idReferenceCard(type){
   const accepted = type === 'accepted';
-  const imageName = accepted ? 'ID%20CLear.png' : 'Blurry%20ID.png';
+  const imageName = accepted ? './ID CLear.png' : './Blurry ID.png';
   return '<div class="reference-card '+(accepted ? 'accept' : 'reject')+'">'
     + '<div class="reference-label"><span>'+(accepted ? '✓ Accepted' : '✕ Not Accepted')+'</span><span class="status-mark">'+(accepted ? '✓' : '✕')+'</span></div>'
     + '<div class="sample-id '+(accepted ? 'clear' : 'blur')+'"><img src="'+imageName+'" alt="'+(accepted ? 'Accepted ID reference' : 'Rejected blurry ID reference')+'" /></div>'
