@@ -854,7 +854,7 @@ function renderStep3(){
       + '<div class="upload-grid">' + LAND_TRANSFER_DOCS.map(function(d){ return uploadBox(d.key, d.label, fd); }).join('') + '</div>'
       + '<div class="section-divider">'+ic('id')+'<span>Identity Verification</span></div>';
   }
-  return '<div class="wizard-card-head"><h2>'+ic('id')+' '+(state.flow==='landtransfer'?'Documents':'Owner &amp; Uploads')+'</h2><p>Upload required documents and IDs based on your ownership status.</p></div>'
+  return '<div class="wizard-card-head"><h2>'+ic('id')+' Valid ID Verification</h2><p>Upload a clear, valid, and unexpired ID.</p></div>'
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">I am the registered property owner</span></label>'
     + docsBlock
