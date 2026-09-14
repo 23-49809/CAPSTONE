@@ -974,12 +974,13 @@ function renderConfirmation(){
     + '<div class="confirm-icon">'+ic('check')+'</div>'
     + '<h2>Request Submitted</h2>'
     + '<p style="color:var(--ink-soft);font-size:14px;margin-top:8px">Your '+(r.flow==='docreq'?'document request':'land transfer request')+' has been received by the Municipal Assessor\'s Office. You will get SMS updates at '+esc(r.contact)+'.</p>'
-    + '<div class="confirm-ref">'+esc(r.id)+'</div>'
+    + '<div class="confirm-ref" aria-label="Your Request Tracking Number">'+esc(r.id)+'</div>'
+    + '<p class="field-hint" style="margin:10px 0 0;text-align:center">Please save this number. You will need it to check your request status.</p>'
     + '<div class="check-banner '+(r.requirementComplete?'ok':'bad')+'" style="text-align:left">'+ic(r.requirementComplete?'check':'alert')
       + '<span>'+(r.requirementComplete ? 'All requirement-checker items were satisfied.' : 'Missing/invalid: '+esc(r.missing.join(', '))+'. Bring these to the office or wait for a follow-up SMS.')+'</span></div>'
     + '<div class="confirm-actions">'
-      + '<button class="btn btn-ghost" onclick="window.print()">Print Confirmation</button>'
-      + '<button class="btn btn-ghost" data-nav="track">'+ic('search')+' Track This Request</button>'
+      + '<button class="btn btn-ghost" data-action="save-tracking">Save Tracking Number</button>'
+      + '<button class="btn btn-ghost" data-nav="track">'+ic('search')+' View Request Status</button>'
       + '<button class="btn btn-primary" data-nav="landing">Back to Home</button>'
     + '</div>'
   + '</div></div>';
@@ -1097,6 +1098,7 @@ function bindEvents(root){
       else if(a==='next-step') nextStep();
       else if(a==='prev-step') prevStep();
       else if(a==='submit') submitRequest();
+      else if(a==='save-tracking') saveTrackingNumber();
       else if(a==='track-search'){
         const q = (document.getElementById('track-input').value||'').trim().toUpperCase();
         state.track.query = q; state.track.searched = true;
