@@ -459,7 +459,7 @@ const DOC_TYPES = [
   'Certification of Assessment'
 ];
 const PURPOSES = ['Personal Copy','For Transfer','For Titling','For Building Permit','For Reclassification','Other Legal Requirement'];
-const TRANSFER_TYPES = ['Sale','Donation','Inheritance'];
+const TRANSFER_TYPES = ['Sale','Donation','Estate'];
 const LAND_TRANSFER_DOCS = [
   { key:'ctcTdOrTitle', label:'Certified True Copy of Tax Declaration or Title' },
   { key:'notarialDeed', label:'Notarial Deed of Sale or Donation' },
@@ -483,7 +483,7 @@ function blankFormData(){
   return {
     firstName:'', lastName:'', middleName:'', contact:'+63', email:'',
     addressLine:'', province:'Batangas', city:'Mabini', zip:'4202',
-    documentType:'', transferType:'', purpose:'', arp:'', propertyAddress:'', barangay:'',
+    documentType:'', transferType:'', purpose:'', arp:'', barangay:'',
     isOwner:true, files:{}
   };
 }
@@ -543,13 +543,9 @@ function validateStep2(flow, fd, errors){
   if(flow==='docreq'){
     if(!fd.documentType) errors.documentType = 'Please select a document type.';
     if(fd.documentType && !fd.purpose) errors.purpose = 'Please select a purpose.';
-  } else {
-    if(!fd.transferType) errors.transferType = 'Please select a transfer type.';
-    if(fd.transferType && !fd.purpose) errors.purpose = 'Please select a purpose.';
-  }
+  } else if(!fd.transferType) errors.transferType = 'Please select a transfer type.';
   if(!fd.arp.trim()) errors.arp = 'ARP / Tax Declaration number is required.';
   else if(!ARP_RE.test(fd.arp.trim())) errors.arp = 'Use format 14-XXXX-XXXXX.';
-  if(flow!=='docreq' && !fd.propertyAddress.trim()) errors.propertyAddress = 'Property address is required.';
   if(!fd.barangay.trim()) errors.barangay = 'Barangay is required.';
 }
 function requiredIdKeys(fd){ return fd.isOwner ? ['ownerId'] : ['requesterId','ownerId','authLetter']; }
@@ -595,9 +591,6 @@ function getAdvisory(flow, fd){
       return 'A holdings certificate confirms land ownership records, not structures. For a building permit, "Certification of No/With Existing Improvement" is usually required instead.';
     if(fd.documentType==='Certification of No Liens and Encumbrances' && fd.purpose==='For Building Permit')
       return '"Certification of No Liens and Encumbrances" is typically requested for loans or financing. For a building permit, try "Certification of No/With Existing Improvement" or "Certification of Assessment."';
-  } else {
-    if(fd.transferType==='Inheritance' && fd.purpose && ['For Building Permit','For Reclassification'].indexOf(fd.purpose)>-1)
-      return 'Inheritance transfers are usually filed "For Transfer" or "For Titling." Double-check the purpose you selected.';
   }
   return null;
 }
@@ -647,7 +640,7 @@ function submitRequest(){
   if(Object.keys(errors).length){
     state.errors = errors;
     if(errors.firstName||errors.lastName||errors.contact||errors.email||errors.addressLine||errors.barangay||errors.province||errors.city||errors.zip) state.step=1;
-    else if(errors.documentType||errors.transferType||errors.purpose||errors.arp||errors.propertyAddress||errors.barangay) state.step=2;
+    else if(errors.documentType||errors.transferType||errors.purpose||errors.arp||errors.barangay) state.step=2;
     else state.step=3;
     render(); return;
   }
@@ -660,7 +653,7 @@ function submitRequest(){
     contact: fd.contact, email: fd.email,
     address: fd.addressLine + ', ' + fd.barangay + ', ' + fd.city + ', ' + fd.province + ' ' + fd.zip,
     docType: state.flow==='docreq' ? fd.documentType : fd.transferType,
-    purpose: fd.purpose, arp: fd.arp, propertyAddress: fd.propertyAddress, barangay: fd.barangay,
+    purpose: fd.purpose, arp: fd.arp, barangay: fd.barangay,
     isOwner: fd.isOwner,
     files: JSON.parse(JSON.stringify(fd.files)),
     advisory: getAdvisory(state.flow, fd),
