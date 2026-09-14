@@ -982,19 +982,68 @@ function saveTrackingNumber(){
   if(!ctx) return;
   const background = new Image();
   const logo = new Image();
-  background.src = 'bg%20MAO.jpg';
-  logo.src = 'LOGO.png';
   const requestType = submission.flow==='docreq' ? 'Document Request' : 'Land Transfer Request';
   const submittedAt = new Date(submission.submittedAt || Date.now());
   const dateSubmitted = submittedAt.toLocaleDateString('en-PH', {year:'numeric', month:'long', day:'numeric'});
   let loaded = 0;
+  let drawn = false;
+  function downloadReceipt(receiptCanvas){
+    function saveBlob(receiptBlob){
+      if(!receiptBlob) return;
+      const url = URL.createObjectURL(receiptBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'smart-assess-request-confirmation-'+submission.id+'.png';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    }
+    try {
+      receiptCanvas.toBlob(saveBlob, 'image/png');
+    } catch(error) {
+      const fallback = document.createElement('canvas');
+      fallback.width = 1400;
+      fallback.height = 980;
+      const fallbackCtx = fallback.getContext('2d');
+      fallbackCtx.fillStyle = '#f5f8fa';
+      fallbackCtx.fillRect(0, 0, fallback.width, fallback.height);
+      fallbackCtx.fillStyle = '#12354d';
+      fallbackCtx.fillRect(0, 0, fallback.width, 18);
+      fallbackCtx.fillStyle = '#ffffff';
+      fallbackCtx.fillRect(105, 65, 1190, 850);
+      fallbackCtx.fillStyle = '#12354d';
+      fallbackCtx.font = '700 34px Georgia, serif';
+      fallbackCtx.fillText("MUNICIPAL ASSESSOR'S OFFICE", 155, 145);
+      fallbackCtx.font = '700 22px Arial, sans-serif';
+      fallbackCtx.fillText('REQUEST CONFIRMATION', 155, 190);
+      fallbackCtx.font = '700 30px Arial, sans-serif';
+      fallbackCtx.fillText('Request Submitted', 155, 290);
+      fallbackCtx.font = '18px Arial, sans-serif';
+      fallbackCtx.fillText("Requester's Name: "+(submission.applicant || '—'), 155, 365);
+      fallbackCtx.fillText('Request Type: '+requestType, 155, 415);
+      fallbackCtx.fillText('Date Submitted: '+dateSubmitted, 155, 465);
+      fallbackCtx.font = '700 48px monospace';
+      fallbackCtx.fillText(submission.id, 155, 570);
+      fallbackCtx.font = '18px Arial, sans-serif';
+      fallbackCtx.fillText('Please save this receipt. You will need your tracking number', 155, 700);
+      fallbackCtx.fillText('to check your request status.', 155, 735);
+      fallback.toBlob(saveBlob, 'image/png');
+    }
+  }
   function drawReceipt(){
     loaded += 1;
-    if(loaded < 2) return;
-    const scale = Math.max(canvas.width/background.naturalWidth, canvas.height/background.naturalHeight);
-    const bgWidth = background.naturalWidth * scale;
-    const bgHeight = background.naturalHeight * scale;
-    ctx.drawImage(background, (canvas.width-bgWidth)/2, (canvas.height-bgHeight)/2, bgWidth, bgHeight);
+    if(loaded < 2 || drawn) return;
+    drawn = true;
+    if(background.naturalWidth && background.naturalHeight){
+      const scale = Math.max(canvas.width/background.naturalWidth, canvas.height/background.naturalHeight);
+      const bgWidth = background.naturalWidth * scale;
+      const bgHeight = background.naturalHeight * scale;
+      ctx.drawImage(background, (canvas.width-bgWidth)/2, (canvas.height-bgHeight)/2, bgWidth, bgHeight);
+    } else {
+      ctx.fillStyle = '#dce9ed';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     ctx.fillStyle = 'rgba(8, 35, 52, .34)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'rgba(255, 255, 255, .94)';
@@ -1004,11 +1053,13 @@ function saveTrackingNumber(){
     ctx.strokeStyle = '#c5d3db';
     ctx.lineWidth = 2;
     ctx.strokeRect(105, 65, 1190, 850);
-    const logoSize = 105;
-    const logoScale = Math.min(logoSize/logo.naturalWidth, logoSize/logo.naturalHeight);
-    const logoWidth = logo.naturalWidth * logoScale;
-    const logoHeight = logo.naturalHeight * logoScale;
-    ctx.drawImage(logo, 155, 105, logoWidth, logoHeight);
+    if(logo.naturalWidth && logo.naturalHeight){
+      const logoSize = 105;
+      const logoScale = Math.min(logoSize/logo.naturalWidth, logoSize/logo.naturalHeight);
+      const logoWidth = logo.naturalWidth * logoScale;
+      const logoHeight = logo.naturalHeight * logoScale;
+      ctx.drawImage(logo, 155, 105, logoWidth, logoHeight);
+    }
     ctx.fillStyle = '#12354d';
     ctx.font = '700 34px Georgia, serif';
     ctx.fillText("MUNICIPAL ASSESSOR'S OFFICE", 295, 145);
@@ -1047,20 +1098,14 @@ function saveTrackingNumber(){
     ctx.fillStyle = '#78909c';
     ctx.font = '14px Arial, sans-serif';
     ctx.fillText('Municipal Assessor\'s Office  •  Smart Assess Public Client Portal', 155, 865);
-    canvas.toBlob(function(receiptBlob){
-      if(!receiptBlob) return;
-      const url = URL.createObjectURL(receiptBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'smart-assess-request-confirmation-'+submission.id+'.png';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    }, 'image/png');
+    downloadReceipt(canvas);
   }
   background.onload = drawReceipt;
+  background.onerror = drawReceipt;
   logo.onload = drawReceipt;
+  logo.onerror = drawReceipt;
+  background.src = 'bg%20MAO.jpg';
+  logo.src = 'LOGO.png';
 }
 function viewSubmittedStatus(){
   const submission = state.lastSubmission;
