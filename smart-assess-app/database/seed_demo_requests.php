@@ -150,7 +150,7 @@ seed_request([
     'created_at' => date('Y-m-d H:i:s', $now - 12 * 3600),
 ]);
 seed_request([
-    'flow' => 'landtransfer', 'transfer_type' => 'Inheritance', 'purpose' => 'For Titling',
+    'flow' => 'landtransfer', 'transfer_type' => 'Estate', 'purpose' => 'For Titling',
     'first_name' => 'Bienvenido', 'last_name' => 'Cruz', 'contact' => '0918-330-2244', 'email' => 'b.cruz@example.com',
     'address_line' => 'Zone 2', 'zip' => '4202', 'arp' => '024-04-0518', 'property_address' => 'Brgy. Poblacion, Mabini', 'barangay' => 'Poblacion',
     'is_owner' => true, 'files' => ['ownerId' => false, 'ctcTdOrTitle' => true], 'final_status' => 'Received',
