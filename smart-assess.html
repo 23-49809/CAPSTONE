@@ -1199,7 +1199,7 @@ function bindEvents(root){
       else if(a==='cancel-submit'){ state.submitConfirmation = false; render(); }
       else if(a==='confirm-submit') confirmSubmitRequest();
       else if(a==='save-tracking') saveTrackingNumber();
-      else if(a==='view-status') go('track');
+      else if(a==='view-status') viewSubmittedStatus();
       else if(a==='track-search'){
         const q = (document.getElementById('track-input').value||'').trim().toUpperCase();
         state.track.query = q; state.track.searched = true;
