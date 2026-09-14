@@ -197,6 +197,23 @@
   .field input::placeholder{ color:var(--ink-faint); }
   .field input:focus, .field select:focus{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); outline:none; }
   .field input.invalid, .field select.invalid{ border-color:var(--danger); }
+  .barangay-dropdown{ position:relative; width:100%; }
+  .barangay-trigger{ width:100%; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); font:inherit; font-size:14.5px; text-align:left; cursor:pointer; transition:border-color .15s ease, box-shadow .15s ease; }
+  .barangay-trigger:hover{ border-color:var(--brand-500); }
+  .barangay-trigger:focus-visible, .barangay-dropdown.open .barangay-trigger{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); outline:none; }
+  .barangay-trigger.invalid{ border-color:var(--danger); }
+  .barangay-trigger.placeholder{ color:var(--ink-faint); }
+  .barangay-chevron{ width:9px; height:9px; flex-shrink:0; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg) translateY(-2px); transition:transform .15s ease; }
+  .barangay-dropdown.open .barangay-chevron{ transform:rotate(225deg) translate(-1px,-1px); }
+  .barangay-menu{ position:absolute; z-index:20; top:calc(100% + 6px); left:0; right:0; max-height:280px; overflow-y:auto; overscroll-behavior:contain; padding:6px; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--surface); box-shadow:var(--shadow-md); }
+  .barangay-menu[hidden]{ display:none; }
+  .barangay-option{ width:100%; min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--ink); font:inherit; font-size:14px; line-height:1.35; text-align:left; cursor:pointer; }
+  .barangay-option:hover, .barangay-option:focus-visible{ background:var(--brand-50); color:var(--brand-800); outline:none; }
+  .barangay-option.selected{ background:var(--brand-100); color:var(--brand-800); font-weight:700; }
+  .barangay-option .barangay-check{ width:16px; height:16px; flex-shrink:0; opacity:0; color:var(--brand-700); }
+  .barangay-option.selected .barangay-check{ opacity:1; }
+  .barangay-native-select{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  @media (max-width:640px){ .barangay-menu{ max-height:240px; } .barangay-option{ min-height:46px; padding:11px 12px; } }
   .field-error{ font-size:12.5px; color:var(--danger); }
   .field-hint{ font-size:12px; color:var(--ink-faint); }
   .section-divider{ display:flex; align-items:center; gap:8px; margin:6px 0 18px; color:var(--brand-600); }
