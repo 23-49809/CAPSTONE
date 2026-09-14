@@ -269,6 +269,52 @@
   .id-guidance-text{ color:var(--ink-soft); font-size:12px; line-height:1.4; }
   .id-guidance-text strong{ display:block; color:var(--ink); font-size:12.5px; margin-bottom:2px; }
 
+  .id-guidance-panel{ margin:0 0 22px; padding:18px 18px 16px; background:linear-gradient(180deg,#f7fbff 0%,#f3f5f8 100%); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:inset 0 1px 0 rgba(255,255,255,.8); }
+  .guidance-header{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .guidance-header .icon{ width:18px; height:18px; color:var(--brand-700); }
+  .guidance-header span{ font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:800; color:var(--brand-700); }
+  .reference-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:640px){ .reference-grid{ grid-template-columns:1fr; } }
+  .reference-card{ display:flex; flex-direction:column; gap:10px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); }
+  .reference-label{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .reference-label .status-mark{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; }
+  .reference-card.accept .reference-label{ color:var(--success); }
+  .reference-card.accept .status-mark{ background:var(--success); color:#fff; }
+  .reference-card.reject .reference-label{ color:var(--danger); }
+  .reference-card.reject .status-mark{ background:var(--danger); color:#fff; }
+  .sample-id{ position:relative; width:100%; height:200px; border-radius:12px; border:1px solid rgba(18,34,45,.18); background:linear-gradient(180deg,#eaf4fa 0%,#dfeef6 100%); overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
+  .sample-id .sample-flag{ position:absolute; left:14px; top:12px; width:54px; height:32px; border-radius:5px; overflow:hidden; }
+  .sample-id .sample-flag::before, .sample-id .sample-flag::after, .sample-id .sample-flag .mid{ position:absolute; left:0; width:100%; height:33.333%; content:""; }
+  .sample-id .sample-flag::before{ top:0; background:#1f4eaf; }
+  .sample-id .sample-flag::after{ bottom:0; background:#d62828; }
+  .sample-id .sample-flag .mid{ top:33.333%; background:#f5d75d; }
+  .sample-id .sample-flag .sun{ position:absolute; left:50%; top:50%; width:10px; height:10px; border-radius:50%; background:#fff; transform:translate(-50%,-50%); }
+  .sample-id .sample-country{ position:absolute; left:50%; top:12px; transform:translateX(-50%); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:rgba(20,35,45,.88); text-align:center; white-space:nowrap; }
+  .sample-id .sample-country.sub{ top:30px; font-size:9px; letter-spacing:.12em; }
+  .sample-id .sample-seal{ position:absolute; right:16px; top:18px; width:56px; height:56px; border:2px solid rgba(19,44,54,.7); border-radius:50%; background:rgba(255,255,255,.12); }
+  .sample-id .sample-seal::before{ content:""; position:absolute; inset:8px; border:1.5px solid rgba(19,44,54,.7); border-radius:50%; }
+  .sample-id .sample-photo{ position:absolute; left:18px; top:58px; width:82px; height:92px; border:1px solid rgba(20,34,42,.2); background:linear-gradient(180deg,#dfe6eb 0%,#cdd5d8 100%); }
+  .sample-id .sample-photo::before{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 28%, #f3d2b3 0 19%, transparent 20%), radial-gradient(circle at 50% 36%, rgba(0,0,0,.8) 0 27%, transparent 28%), radial-gradient(circle at 50% 71%, #f0c8a9 0 28%, transparent 29%), linear-gradient(180deg, rgba(18,30,38,.10), rgba(18,30,38,.02)); }
+  .sample-id .sample-details{ position:absolute; left:118px; right:18px; top:58px; }
+  .sample-id .sample-row{ margin-bottom:6px; }
+  .sample-id .sample-row .k{ display:block; font-size:7px; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:rgba(25,42,55,.8); }
+  .sample-id .sample-row .v{ display:block; font-size:12px; font-weight:800; color:rgba(18,35,47,.96); line-height:1.15; }
+  .sample-id .sample-row .v.small{ font-size:10px; }
+  .sample-id .sample-foot{ position:absolute; left:50%; bottom:10px; transform:translateX(-50%); font-size:8px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(18,35,47,.8); }
+  .sample-id.clear{ filter:none; }
+  .sample-id.blur{ filter:blur(2.2px) brightness(.92) saturate(.7); }
+  .reference-card .example-note{ font-size:12px; font-weight:600; line-height:1.5; color:var(--ink-soft); }
+  .reference-card.accept .example-note{ color:var(--success); }
+  .reference-card.reject .example-note{ color:var(--danger); }
+  .photo-guide{ margin-top:18px; padding:14px 16px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); display:flex; align-items:center; gap:14px; }
+  .photo-guide-frame{ width:88px; height:92px; border:1px solid rgba(18,34,44,.2); border-radius:8px; background:linear-gradient(180deg,#eef5f6 0%,#dfe9ee 100%); position:relative; overflow:hidden; }
+  .photo-guide-frame::before{ content:""; position:absolute; inset:10px 16px 14px 16px; border-radius:50% 50% 45% 45%; background:linear-gradient(180deg,#f2d4ba 0%,#e2b792 100%); }
+  .photo-guide-frame::after{ content:""; position:absolute; left:22%; top:20%; width:56%; height:28%; border-radius:50%; background:rgba(0,0,0,.75); }
+  .photo-guide-copy{ flex:1; }
+  .photo-guide-label{ display:block; font-size:12px; letter-spacing:.08em; text-transform:uppercase; font-weight:800; color:var(--brand-700); margin-bottom:4px; }
+  .photo-guide-text{ font-size:12.5px; line-height:1.5; color:var(--ink-soft); }
+  .reference-note{ margin-top:12px; font-size:12px; color:var(--ink-faint); line-height:1.5; text-align:center; }
+
   /* Review */
   .review-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
   @media (max-width:640px){ .review-grid{ grid-template-columns:1fr; } }
@@ -804,6 +850,43 @@ function uploadBox(key, label, fd){
     + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
   + '</div>';
 }
+function idReferenceCard(type){
+  const accepted = type === 'accepted';
+  return '<div class="reference-card '+(accepted ? 'accept' : 'reject')+'">'
+    + '<div class="reference-label"><span>'+(accepted ? '✓ Accepted' : '✕ Not Accepted')+'</span><span class="status-mark">'+(accepted ? '✓' : '✕')+'</span></div>'
+    + '<div class="sample-id '+(accepted ? 'clear' : 'blur')+'">'
+      + '<div class="sample-flag"><span class="mid"></span><span class="sun"></span></div>'
+      + '<div class="sample-country">Republic of the Philippines</div>'
+      + '<div class="sample-country sub">National Identification Card</div>'
+      + '<div class="sample-seal"></div>'
+      + '<div class="sample-photo"></div>'
+      + '<div class="sample-details">'
+        + '<div class="sample-row"><span class="k">Last Name</span><span class="v">DELA CRUZ</span></div>'
+        + '<div class="sample-row"><span class="k">First Name</span><span class="v">MARIA ANGELICA</span></div>'
+        + '<div class="sample-row"><span class="k">ID Number</span><span class="v small">1234 5678 9012</span></div>'
+      + '</div>'
+      + '<div class="sample-foot">Sample — Not a Government ID</div>'
+    + '</div>'
+    + '<div class="example-note">'+(accepted ? 'Clear, readable, complete, and unexpired ID.' : 'Blurry, cropped, expired, obstructed, or unreadable ID.')+'</div>'
+  + '</div>';
+}
+function idGuidancePanel(){
+  return '<div class="id-guidance-panel">'
+    + '<div class="guidance-header">'+ic('id')+'<span>ID Upload Guidelines</span></div>'
+    + '<div class="reference-grid">'
+      + idReferenceCard('accepted')
+      + idReferenceCard('rejected')
+    + '</div>'
+    + '<div class="photo-guide">'
+      + '<div class="photo-guide-frame"></div>'
+      + '<div class="photo-guide-copy">'
+        + '<span class="photo-guide-label">Example ID Photo</span>'
+        + '<div class="photo-guide-text">Face fully visible, good lighting, plain background, and no filters, sunglasses, or face obstruction.</div>'
+      + '</div>'
+    + '</div>'
+    + '<div class="reference-note">Reference images are for guidance only. Please upload your own valid identification document and photo.</div>'
+  + '</div>';
+}
 function renderStep3(){
   const fd = state.formData;
   const idKeys = requiredIdKeys(fd);
@@ -817,6 +900,7 @@ function renderStep3(){
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">I am the registered property owner</span></label>'
     + docsBlock
+    + idGuidancePanel()
     + '<div class="upload-grid">' + idKeys.map(function(k){ return uploadBox(k, idLabel(state.flow,k), fd); }).join('') + '</div>'
     + (!fd.isOwner ? '<div class="advisory">'+ic('alert')+'<span>Since you are not the registered owner, our AI rule-based checker requires a Requester ID and a signed Authorization Letter before this request can be processed.</span></div>' : '')
   + '</div>';
