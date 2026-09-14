@@ -261,6 +261,20 @@
   .upload-filename{ font-size:12.5px; color:var(--brand-700); margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
   .upload-filename .icon{ width:15px; height:15px; }
   .upload-remove{ background:none; border:none; color:var(--danger); font-size:11.5px; font-weight:700; cursor:pointer; font-family:var(--font-body); text-decoration:underline; }
+  .upload-box.compact{ padding:0; min-height:178px; display:flex; align-items:center; justify-content:center; background:var(--surface); }
+  .upload-box.compact .upload-surface{ width:100%; min-height:178px; display:flex; align-items:center; justify-content:center; padding:20px 18px; }
+  .upload-box.compact .upload-placeholder{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:6px; color:var(--ink-soft); }
+  .upload-box.compact .upload-icon-wrap{ width:50px; height:50px; border-radius:12px; background:rgba(18,117,93,.08); border:1px solid rgba(18,117,93,.2); color:var(--brand-700); display:flex; align-items:center; justify-content:center; }
+  .upload-box.compact .upload-icon-wrap .icon{ width:24px; height:24px; }
+  .upload-box.compact .upload-title{ font-size:14px; font-weight:700; color:var(--ink); }
+  .upload-box.compact .upload-subtitle{ font-size:12px; color:var(--ink-faint); }
+  .upload-box.compact .upload-preview-wrap{ width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  .upload-box.compact .upload-preview{ width:100%; max-width:250px; height:150px; border-radius:12px; overflow:hidden; border:1px solid var(--line); background:var(--surface-2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.25); }
+  .upload-box.compact .upload-preview img{ display:block; width:100%; height:100%; object-fit:cover; }
+  .upload-box.compact .upload-meta{ display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; color:var(--ink-faint); font-size:12px; }
+  .upload-box.compact .upload-meta .upload-link{ color:var(--brand-700); font-weight:700; text-decoration:none; cursor:pointer; }
+  .upload-box.compact .upload-meta .upload-link:hover{ text-decoration:underline; }
+  .upload-box.compact .upload-meta .upload-sep{ color:var(--ink-faint); }
   .id-guidance{ display:flex; align-items:center; gap:12px; margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); }
   .id-photo-card{ width:54px; height:38px; flex-shrink:0; display:flex; align-items:center; gap:6px; padding:5px; border-radius:5px; background:linear-gradient(135deg,#d9f1e2,#fff); border:1px solid #a9cdb5; color:var(--brand-700); }
   .id-photo-card .icon{ width:18px; height:18px; }
@@ -494,7 +508,17 @@ const BARANGAYS = [
   'TALAGA PROPER','TALAGA EAST'
 ];
 
-function fileMetaFromFile(f){ return { name:f.name, size:f.size, type:f.type, valid: VALID_FILE_RE.test(f.type) && f.size>0 && f.size < 15*1024*1024 }; }
+function fileMetaFromFile(f, preview){ return { name:f.name, size:f.size, type:f.type, valid: VALID_FILE_RE.test(f.type) && f.size>0 && f.size < 15*1024*1024, preview: preview || null }; }
+function processUploadedFile(key, file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    state.formData.files[key] = fileMetaFromFile(file, reader.result);
+    delete state.errors[key];
+    render();
+  };
+  reader.readAsDataURL(file);
+}
 
 function validateStep1(fd, errors){
   if(!fd.firstName.trim()) errors.firstName = 'First name is required.';
@@ -813,8 +837,21 @@ function renderStep2(){
 function uploadBox(key, label, fd){
   const file = fd.files[key];
   const err = state.errors[key];
-  const cls = 'upload-box'+(file && file.valid?' filled':'')+(err?' invalid':'');
   const isIdUpload = key==='ownerId' || key==='requesterId';
+  const cls = 'upload-box'+(file && file.valid?' filled':'')+(err?' invalid':'')+(isIdUpload ? ' compact' : '');
+
+  if(isIdUpload){
+    const previewMarkup = file && file.preview
+      ? '<div class="upload-preview-wrap"><div class="upload-preview"><img src="'+esc(file.preview)+'" alt="Selected ID preview" /></div><div class="upload-meta"><span>'+esc(file.name)+'</span><span class="upload-sep">•</span><span class="upload-link" data-replace-file="'+key+'">Replace</span><span class="upload-sep">•</span><span class="upload-link" data-remove-file="'+key+'">Remove</span></div></div>'
+      : '<div class="upload-placeholder"><div class="upload-icon-wrap">'+ic('file')+'</div><div class="upload-title">Upload ID</div><div class="upload-subtitle">Click to upload or drag and drop</div></div>';
+
+    return '<div class="'+cls+'" data-upload="'+key+'">'
+      + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'" accept=".jpg,.jpeg,.png,image/jpeg,image/png">'
+      + '<div class="upload-surface">'+previewMarkup+'</div>'
+      + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
+    + '</div>';
+  }
+
   const filenameLine = file
     ? ('<div class="upload-filename">'+ic('file')+esc(file.name)+' &middot; '+fmtBytes(file.size)+(file.valid?'':' &mdash; <span style="color:var(--danger)">invalid format</span>')+' <button type="button" class="upload-remove" data-remove-file="'+key+'">Remove</button></div>')
     : '<div class="upload-hint"><span class="upload-mini-icon">'+ic('file')+'</span>Upload your ID</div>';
@@ -822,7 +859,6 @@ function uploadBox(key, label, fd){
     + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'">'
     + '<div class="upload-head">'+ic('id')+esc(label)+'</div>'
     + filenameLine
-    + (isIdUpload ? '<div class="id-guidance"><div class="id-photo-card">'+ic('file')+'</div><div class="id-guidance-text"><strong>Upload a clear, valid, and unexpired ID.</strong>Attach the full document image in a readable format.</div></div>' : '')
     + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
   + '</div>';
 }
@@ -1105,7 +1141,7 @@ function bindEvents(root){
   }
   root.querySelectorAll('[data-upload]').forEach(function(box){
     box.addEventListener('click', function(e){
-      if(e.target.closest('[data-remove-file]')) return;
+      if(e.target.closest('[data-remove-file]') || e.target.closest('[data-replace-file]')) return;
       const key = box.getAttribute('data-upload');
       const input = document.getElementById('file-'+key);
       if(input) input.click();
@@ -1115,14 +1151,14 @@ function bindEvents(root){
       e.preventDefault();
       const key = box.getAttribute('data-upload');
       const f = e.dataTransfer.files && e.dataTransfer.files[0];
-      if(f){ state.formData.files[key] = fileMetaFromFile(f); delete state.errors[key]; render(); }
+      if(f){ processUploadedFile(key, f); }
     });
   });
   root.querySelectorAll('[data-file-input]').forEach(function(input){
     input.addEventListener('change', function(){
       const key = input.getAttribute('data-file-input');
       const f = input.files && input.files[0];
-      if(f){ state.formData.files[key] = fileMetaFromFile(f); delete state.errors[key]; render(); }
+      if(f){ processUploadedFile(key, f); }
     });
   });
   root.querySelectorAll('[data-remove-file]').forEach(function(btn){
@@ -1131,6 +1167,14 @@ function bindEvents(root){
       const key = btn.getAttribute('data-remove-file');
       delete state.formData.files[key];
       render();
+    });
+  });
+  root.querySelectorAll('[data-replace-file]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      const key = btn.getAttribute('data-replace-file');
+      const input = document.getElementById('file-'+key);
+      if(input) input.click();
     });
   });
 }
