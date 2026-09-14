@@ -329,6 +329,11 @@
   .confirm-icon .icon{ width:30px; height:30px; }
   .confirm-ref{ font-family:var(--font-mono); font-size:22px; font-weight:600; color:var(--brand-700); background:var(--brand-50); border:1px dashed var(--line-strong); border-radius:var(--radius-sm); padding:14px; margin:20px 0; letter-spacing:.03em; }
   .confirm-actions{ display:flex; gap:10px; justify-content:center; margin-top:26px; flex-wrap:wrap; }
+  .submit-modal-backdrop{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(18,35,52,.48); }
+  .submit-modal{ width:min(100%,520px); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:0 20px 60px rgba(18,35,52,.24); padding:28px; }
+  .submit-modal h2{ margin:0; color:var(--ink); font-size:21px; }
+  .submit-modal p{ margin:12px 0 0; color:var(--ink-soft); font-size:14px; line-height:1.6; }
+  .submit-modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; flex-wrap:wrap; }
 
   /* ============ Track ============ */
   .track-card{ background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:30px 32px; }
@@ -482,7 +487,7 @@ function blankFormData(){
 const state = {
   view:'landing', flow:null, step:1, maxStep:1,
   formData: blankFormData(), errors:{}, lastSubmission:null,
-  track:{ query:'', result:null, searched:false }
+  track:{ query:'', result:null, searched:false }, submitConfirmation:false
 };
 
 /* ======================= Validation rules ======================= */
@@ -633,6 +638,12 @@ function submitRequest(){
     else state.step=3;
     render(); return;
   }
+  state.submitConfirmation = true;
+  render();
+}
+function confirmSubmitRequest(){
+  state.submitConfirmation = false;
+  const fd = state.formData;
   const checklist = getRequirementChecklist(state.flow, fd);
   const missing = checklist.filter(function(c){ return c.status!=='ok'; }).map(function(c){ return c.label; });
   const refNo = nextRefNo(state.flow);
@@ -647,7 +658,7 @@ function submitRequest(){
     files: JSON.parse(JSON.stringify(fd.files)),
     advisory: getAdvisory(state.flow, fd),
     requirementComplete: missing.length===0, missing: missing,
-    timestamps:{}
+    timestamps:{}, submittedAt:new Date().toISOString()
   };
   pushStatus(record, 'Received');
   const list = loadRequests(); list.unshift(record); saveRequests(list);
@@ -892,8 +903,6 @@ function renderStep3(){
 function renderStep4(){
   const fd = state.formData;
   const checklist = getRequirementChecklist(state.flow, fd);
-  const complete = checklistIsComplete(checklist);
-  const missing = checklist.filter(function(c){ return c.status!=='ok'; }).map(function(c){ return c.label; });
   const fullName = [fd.firstName, fd.middleName, fd.lastName].filter(Boolean).join(' ') || '—';
   const uploadedRows = checklist.map(function(c){
     const badge = c.status==='ok' ? esc((fd.files[c.key]||{}).name||'') : (c.status==='flagged' ? 'Invalid format' : 'Not uploaded');
@@ -904,10 +913,6 @@ function renderStep4(){
     : '<div class="review-row"><span class="k">Type of Transfer</span><span class="v">'+esc(fd.transferType||'—')+'</span></div>';
   return '<div class="wizard-card-head"><h2>'+ic('checklistIcon')+' Review Your Request</h2><p>Confirm the details below before submitting your request to the Municipal Assessor\'s Office.</p></div>'
   + '<div class="wizard-card-body">'
-    + '<div class="check-banner '+(complete?'ok':'bad')+'">'+ic(complete?'check':'alert')
-      + '<span>'+(complete ? 'AI Rule-Based Requirement Checker: All requirements met' : 'AI Rule-Based Requirement Checker: '+missing.length+' item(s) need attention')
-      + (complete ? '' : '<span class="sub">Missing/invalid: '+esc(missing.join(', '))+'</span>')
-      + '</span></div>'
     + '<div class="review-grid">'
       + '<div class="review-card"><h3>'+ic('user')+' Personal Information</h3>'
         + '<div class="review-row"><span class="k">Full Name</span><span class="v">'+esc(fullName)+'</span></div>'
@@ -958,15 +963,67 @@ function renderWizard(){
 function saveTrackingNumber(){
   const submission = state.lastSubmission;
   if(!submission || !submission.id) return;
-  const blob = new Blob([submission.id+'\n'], {type:'text/plain;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'smart-assess-tracking-number-'+submission.id+'.txt';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1400;
+  canvas.height = 900;
+  const ctx = canvas.getContext('2d');
+  if(!ctx) return;
+  const requestType = submission.flow==='docreq' ? 'Document Request' : 'Land Transfer Request';
+  const submittedAt = new Date(submission.submittedAt || Date.now());
+  const dateSubmitted = submittedAt.toLocaleDateString('en-PH', {year:'numeric', month:'long', day:'numeric'});
+  ctx.fillStyle = '#f5f8fa';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#12354d';
+  ctx.fillRect(0, 0, canvas.width, 18);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(90, 70, 1220, 760);
+  ctx.strokeStyle = '#d9e2e8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(90, 70, 1220, 760);
+  ctx.fillStyle = '#12354d';
+  ctx.font = '700 34px Georgia, serif';
+  ctx.fillText('SMART ASSESS', 145, 145);
+  ctx.fillStyle = '#5c7483';
+  ctx.font = '700 18px Arial, sans-serif';
+  ctx.fillText('REQUEST CONFIRMATION', 145, 185);
+  ctx.strokeStyle = '#c5d3db';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(145, 220); ctx.lineTo(1255, 220); ctx.stroke();
+  ctx.fillStyle = '#12354d';
+  ctx.font = '700 30px Arial, sans-serif';
+  ctx.fillText('Request Submitted', 145, 285);
+  ctx.fillStyle = '#5c7483';
+  ctx.font = '18px Arial, sans-serif';
+  ctx.fillText('Tracking Number', 145, 350);
+  ctx.fillStyle = '#12354d';
+  ctx.font = '700 52px monospace';
+  ctx.fillText(submission.id, 145, 415);
+  ctx.fillStyle = '#5c7483';
+  ctx.font = '18px Arial, sans-serif';
+  ctx.fillText('Request Type', 145, 500);
+  ctx.fillText('Date Submitted', 760, 500);
+  ctx.fillStyle = '#12354d';
+  ctx.font = '700 24px Arial, sans-serif';
+  ctx.fillText(requestType, 145, 545);
+  ctx.fillText(dateSubmitted, 760, 545);
+  ctx.fillStyle = '#eef5f7';
+  ctx.fillRect(145, 625, 1110, 105);
+  ctx.fillStyle = '#315a6d';
+  ctx.font = '18px Arial, sans-serif';
+  ctx.fillText('Please save this receipt. You will need your tracking number', 180, 670);
+  ctx.fillText('to check your request status.', 180, 702);
+  const blob = null;
+  canvas.toBlob(function(receiptBlob){
+    if(!receiptBlob) return;
+    const url = URL.createObjectURL(receiptBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'smart-assess-request-confirmation-'+submission.id+'.png';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }, 'image/png');
 }
 function renderConfirmation(){
   const r = state.lastSubmission;
