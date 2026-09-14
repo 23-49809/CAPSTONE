@@ -494,8 +494,8 @@ function validateStep2(flow, fd, errors){
 function requiredIdKeys(fd){ return fd.isOwner ? ['ownerId'] : ['ownerId','requesterId','authLetter']; }
 function idLabel(flow, key){
   const map = {
-    docreq:{ ownerId:'Valid Government-Issued ID (Current, not expired)', requesterId:'Valid ID of Requester (Current, not expired)', authLetter:'Authorization Letter' },
-    landtransfer:{ ownerId:'Valid ID of Property Owner (Current, not expired)', requesterId:'Valid ID of Requester (Current, not expired)', authLetter:'Authorization Letter' }
+    docreq:{ ownerId:'Valid Government-Issued ID', requesterId:'Valid ID of Requester', authLetter:'Authorization Letter' },
+    landtransfer:{ ownerId:'Valid ID of Property Owner', requesterId:'Valid ID of Requester', authLetter:'Authorization Letter' }
   };
   return map[flow][key];
 }
@@ -517,7 +517,7 @@ function checklistIsComplete(items){ return items.every(function(i){ return i.st
 function validateUploads(flow, fd, errors){
   getRequirementChecklist(flow, fd).forEach(function(item){
     if(item.status==='missing') errors[item.key] = item.label+' upload is required.';
-    else if(item.status==='flagged') errors[item.key] = 'Upload a clear JPG, PNG, or PDF of a current, non-expired ID.';
+    else if(item.status==='flagged') errors[item.key] = 'This file is not a valid scan (use JPG, PNG, or PDF).';
   });
 }
 function getAdvisory(flow, fd){
@@ -802,12 +802,10 @@ function renderStep3(){
       + '<div class="upload-grid">' + LAND_TRANSFER_DOCS.map(function(d){ return uploadBox(d.key, d.label, fd); }).join('') + '</div>'
       + '<div class="section-divider">'+ic('id')+'<span>Identity Verification</span></div>';
   }
-  const idAdvisory = '<div class="advisory">'+ic('alert')+'<span>Present a clear, readable government-issued ID that is valid and not expired. The Assessor\'s Office will verify the ID details during review.</span></div>';
   return '<div class="wizard-card-head"><h2>'+ic('id')+' '+(state.flow==='landtransfer'?'Documents':'Owner &amp; Uploads')+'</h2><p>Upload required documents and IDs based on your ownership status.</p></div>'
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">I am the registered property owner</span></label>'
     + docsBlock
-    + idAdvisory
     + '<div class="upload-grid">' + idKeys.map(function(k){ return uploadBox(k, idLabel(state.flow,k), fd); }).join('') + '</div>'
     + (!fd.isOwner ? '<div class="advisory">'+ic('alert')+'<span>Since you are not the registered owner, our AI rule-based checker requires a Requester ID and a signed Authorization Letter before this request can be processed.</span></div>' : '')
   + '</div>';
