@@ -408,8 +408,8 @@ const STATUS_META = {
 /* ======================= State ======================= */
 function blankFormData(){
   return {
-    firstName:'', lastName:'', middleName:'', contact:'', email:'',
-    addressLine:'', province:'Batangas', city:'Mabini', zip:'',
+    firstName:'', lastName:'', middleName:'', contact:'+63', email:'',
+    addressLine:'', province:'Batangas', city:'Mabini', zip:'4202',
     documentType:'', transferType:'', purpose:'', arp:'', propertyAddress:'', barangay:'',
     isOwner:true, files:{}
   };
@@ -421,25 +421,32 @@ const state = {
 };
 
 /* ======================= Validation rules ======================= */
-const PH_MOBILE_RE = /^09\d{2}-\d{3}-\d{4}$/;
+const PH_MOBILE_RE = /^\+63\d{10}$/;
 const ZIP_RE = /^\d{4}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_FILE_RE = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
+const BARANGAYS = [
+  'POBLACION','ANILAO PROPER','ANILAO EAST','BASALANGIT','BULACAN','CALAMIAS',
+  'ESTRELLA','GASANG','LAUREL','LIGAYA','MAINAGA','MAINT','MAJUBEN','MALIMATOC-I',
+  'MALIMATOC-II','NAG-IBA','PILAHAN','D. ANAHAO','D. BALIBAGUHAN','D. LUDA',
+  'D. NIOGAN','SAGUING','SAMPAGUITA','SAN FRANCISCO','SAN JOSE','SAN JUAN',
+  'SAN TEODORO','SOLO','STA. ANA','STA. MESA','STO. NINO','STO. TOMAS',
+  'TALAGA PROPER','TALAGA EAST'
+];
 
 function fileMetaFromFile(f){ return { name:f.name, size:f.size, type:f.type, valid: VALID_FILE_RE.test(f.type) && f.size>0 && f.size < 15*1024*1024 }; }
 
 function validateStep1(fd, errors){
   if(!fd.firstName.trim()) errors.firstName = 'First name is required.';
   if(!fd.lastName.trim()) errors.lastName = 'Last name is required.';
-  if(!fd.contact.trim()) errors.contact = 'Contact number is required.';
-  else if(!PH_MOBILE_RE.test(fd.contact.trim())) errors.contact = 'Use format 09XX-XXX-XXXX.';
+  if(fd.contact === '+63') errors.contact = 'Enter 10 digits after +63.';
+  else if(!PH_MOBILE_RE.test(fd.contact.trim())) errors.contact = 'Enter 10 digits after +63.';
   if(!fd.email.trim()) errors.email = 'Email address is required.';
   else if(!EMAIL_RE.test(fd.email.trim())) errors.email = 'Enter a valid email address.';
-  if(!fd.addressLine.trim()) errors.addressLine = 'House number / street / barangay is required.';
+  if(!fd.addressLine.trim()) errors.addressLine = 'House number / street is required.';
   if(!fd.province.trim()) errors.province = 'Province is required.';
   if(!fd.city.trim()) errors.city = 'City/Municipality is required.';
-  if(!fd.zip.trim()) errors.zip = 'Zip code is required.';
-  else if(!ZIP_RE.test(fd.zip.trim())) errors.zip = 'Zip code must be 4 digits.';
+  if(!ZIP_RE.test(fd.zip.trim())) errors.zip = 'Zip code must be 4 digits.';
 }
 function validateStep2(flow, fd, errors){
   if(flow==='docreq'){
@@ -658,15 +665,16 @@ function renderStep1(){
       + '<div class="field"><label>First Name<span class="req">*</span></label><input id="f-firstName" class="'+(inv('firstName')?'invalid':'')+'" type="text" value="'+esc(fd.firstName)+'" data-bind="firstName" placeholder="Juan">' + fieldError('firstName') + '</div>'
       + '<div class="field"><label>Last Name<span class="req">*</span></label><input id="f-lastName" class="'+(inv('lastName')?'invalid':'')+'" type="text" value="'+esc(fd.lastName)+'" data-bind="lastName" placeholder="Dela Cruz">' + fieldError('lastName') + '</div>'
       + '<div class="field"><label>Middle Name</label><input id="f-middleName" type="text" value="'+esc(fd.middleName)+'" data-bind="middleName" placeholder="Santos"></div>'
-      + '<div class="field"><label>Contact Number<span class="req">*</span></label><input id="f-contact" class="'+(inv('contact')?'invalid':'')+'" type="text" value="'+esc(fd.contact)+'" data-bind="contact" placeholder="09XX-XXX-XXXX">' + fieldError('contact') + '</div>'
+      + '<div class="field"><label>Contact Number<span class="req">*</span></label><div class="contact-input"><span>+63</span><input id="f-contact" class="'+(inv('contact')?'invalid':'')+'" type="tel" value="'+esc(fd.contact.replace(/^\\+63/,''))+'" data-bind="contact" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX"></div>' + fieldError('contact') + '</div>'
       + '<div class="field" style="grid-column:1/-1"><label>Email Address<span class="req">*</span></label><input id="f-email" class="'+(inv('email')?'invalid':'')+'" type="text" value="'+esc(fd.email)+'" data-bind="email" placeholder="juan.delacruz@email.com">' + fieldError('email') + '</div>'
     + '</div>'
     + '<div class="section-divider">'+ic('pin')+'<span>Address Information</span></div>'
     + '<div class="field-grid">'
-      + '<div class="field" style="grid-column:1/-1"><label>House No. / Street / Village / Barangay<span class="req">*</span></label><input id="f-addressLine" class="'+(inv('addressLine')?'invalid':'')+'" type="text" value="'+esc(fd.addressLine)+'" data-bind="addressLine" placeholder="123 Rizal St., Brgy. Poblacion">' + fieldError('addressLine') + '</div>'
+      + '<div class="field"><label>House No. / Street<span class="req">*</span></label><input id="f-addressLine" class="'+(inv('addressLine')?'invalid':'')+'" type="text" value="'+esc(fd.addressLine)+'" data-bind="addressLine" placeholder="123 Rizal St.">' + fieldError('addressLine') + '</div>'
+      + '<div class="field"><label>Barangay<span class="req">*</span></label><select id="f-barangay" class="'+(inv('barangay')?'invalid':'')+'" data-bind-select="barangay"><option value="">Select a barangay</option>'+BARANGAYS.map(function(b){ return '<option value="'+esc(b)+'" '+(fd.barangay===b?'selected':'')+'>'+esc(b)+'</option>'; }).join('')+'</select>' + fieldError('barangay') + '</div>'
       + '<div class="field"><label>Province<span class="req">*</span></label><input id="f-province" class="'+(inv('province')?'invalid':'')+'" type="text" value="'+esc(fd.province)+'" data-bind="province">' + fieldError('province') + '</div>'
       + '<div class="field"><label>City/Municipality<span class="req">*</span></label><input id="f-city" class="'+(inv('city')?'invalid':'')+'" type="text" value="'+esc(fd.city)+'" data-bind="city">' + fieldError('city') + '</div>'
-      + '<div class="field"><label>Zip Code<span class="req">*</span></label><input id="f-zip" class="'+(inv('zip')?'invalid':'')+'" type="text" value="'+esc(fd.zip)+'" data-bind="zip" placeholder="4202">' + fieldError('zip') + '</div>'
+      + '<div class="field"><label>Zip Code</label><input id="f-zip" type="text" value="4202" readonly aria-readonly="true">' + fieldError('zip') + '</div>'
     + '</div>'
   + '</div>';
 }
@@ -674,7 +682,7 @@ function renderStep1(){
 function renderStep2(){
   const fd = state.formData;
   const advisory = getAdvisory(state.flow, fd);
-  const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label><input id="f-barangay" class="'+(inv('barangay')?'invalid':'')+'" type="text" value="'+esc(fd.barangay)+'" data-bind="barangay" placeholder="e.g. Poblacion">' + fieldError('barangay') + '</div>';
+  const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label><select id="f-barangay" class="'+(inv('barangay')?'invalid':'')+'" data-bind-select="barangay"><option value="">Select a barangay</option>'+BARANGAYS.map(function(b){ return '<option value="'+esc(b)+'" '+(fd.barangay===b?'selected':'')+'>'+esc(b)+'</option>'; }).join('')+'</select>' + fieldError('barangay') + '</div>';
   if(state.flow==='docreq'){
     return '<div class="wizard-card-head"><h2>'+ic('home')+' Enter Property Information</h2><p>Fill in document and property details. Additional files are required when filing on behalf of the owner.</p></div>'
     + '<div class="wizard-card-body">'
@@ -923,7 +931,11 @@ function bindEvents(root){
   });
 
   root.querySelectorAll('[data-bind]').forEach(function(el){
-    el.addEventListener('input', function(){ state.formData[el.getAttribute('data-bind')] = el.value; clearFieldError(el.getAttribute('data-bind')); });
+    el.addEventListener('input', function(){
+      const key = el.getAttribute('data-bind');
+      state.formData[key] = key==='contact' ? '+63'+el.value.replace(/\D/g,'').slice(0,10) : el.value;
+      clearFieldError(key);
+    });
   });
   root.querySelectorAll('[data-bind-select]').forEach(function(el){
     el.addEventListener('change', function(){
