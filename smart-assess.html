@@ -679,6 +679,21 @@ function stepPill(i, label){
 }
 function fieldError(key){ return state.errors[key] ? '<div class="field-error" id="err-'+key+'">'+esc(state.errors[key])+'</div>' : ''; }
 function inv(key){ return state.errors[key] ? ' invalid' : ''; }
+function barangaySelect(fd){
+  const selected = fd.barangay || '';
+  const selectedLabel = selected || 'Select a barangay';
+  return '<div class="barangay-dropdown" data-barangay-dropdown>'
+    + '<button type="button" class="barangay-trigger'+(inv('barangay')?' invalid':'')+(selected?'':' placeholder')+'" data-barangay-trigger aria-haspopup="listbox" aria-expanded="false">'
+      + '<span>'+esc(selectedLabel)+'</span><span class="barangay-chevron" aria-hidden="true"></span>'
+    + '</button>'
+    + '<div class="barangay-menu" role="listbox" hidden data-barangay-menu aria-label="Barangay">'
+      + BARANGAYS.map(function(b){ return '<button type="button" class="barangay-option'+(selected===b?' selected':'')+'" role="option" aria-selected="'+(selected===b?'true':'false')+'" data-barangay-option="'+esc(b)+'"><span>'+esc(b)+'</span><span class="barangay-check" aria-hidden="true">&#10003;</span></button>'; }).join('')
+    + '</div>'
+    + '<select id="f-barangay" class="barangay-native-select" data-bind-select="barangay" tabindex="-1" aria-hidden="true"><option value="">Select a barangay</option>'
+      + BARANGAYS.map(function(b){ return '<option value="'+esc(b)+'" '+(selected===b?'selected':'')+'>'+esc(b)+'</option>'; }).join('')
+    + '</select>'
+  + '</div>';
+}
 
 function renderStep1(){
   const fd = state.formData;
@@ -694,7 +709,7 @@ function renderStep1(){
     + '<div class="section-divider">'+ic('pin')+'<span>Address Information</span></div>'
     + '<div class="field-grid">'
       + '<div class="field"><label>House No. / Street<span class="req">*</span></label><input id="f-addressLine" class="'+(inv('addressLine')?'invalid':'')+'" type="text" value="'+esc(fd.addressLine)+'" data-bind="addressLine" placeholder="123 Rizal St.">' + fieldError('addressLine') + '</div>'
-      + '<div class="field"><label>Barangay<span class="req">*</span></label><select id="f-barangay" class="'+(inv('barangay')?'invalid':'')+'" data-bind-select="barangay"><option value="">Select a barangay</option>'+BARANGAYS.map(function(b){ return '<option value="'+esc(b)+'" '+(fd.barangay===b?'selected':'')+'>'+esc(b)+'</option>'; }).join('')+'</select>' + fieldError('barangay') + '</div>'
+      + '<div class="field"><label>Barangay<span class="req">*</span></label>'+barangaySelect(fd) + fieldError('barangay') + '</div>'
       + '<div class="field"><label>Province<span class="req">*</span></label><input id="f-province" class="'+(inv('province')?'invalid':'')+'" type="text" value="'+esc(fd.province)+'" data-bind="province">' + fieldError('province') + '</div>'
       + '<div class="field"><label>City/Municipality<span class="req">*</span></label><input id="f-city" class="'+(inv('city')?'invalid':'')+'" type="text" value="'+esc(fd.city)+'" data-bind="city">' + fieldError('city') + '</div>'
       + '<div class="field"><label>Zip Code</label><input id="f-zip" type="text" value="4202" readonly aria-readonly="true">' + fieldError('zip') + '</div>'
@@ -705,7 +720,7 @@ function renderStep1(){
 function renderStep2(){
   const fd = state.formData;
   const advisory = getAdvisory(state.flow, fd);
-  const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label><select id="f-barangay" class="'+(inv('barangay')?'invalid':'')+'" data-bind-select="barangay"><option value="">Select a barangay</option>'+BARANGAYS.map(function(b){ return '<option value="'+esc(b)+'" '+(fd.barangay===b?'selected':'')+'>'+esc(b)+'</option>'; }).join('')+'</select>' + fieldError('barangay') + '</div>';
+  const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd) + fieldError('barangay') + '</div>';
   if(state.flow==='docreq'){
     return '<div class="wizard-card-head"><h2>'+ic('home')+' Enter Property Information</h2><p>Fill in document and property details. Additional files are required when filing on behalf of the owner.</p></div>'
     + '<div class="wizard-card-body">'
