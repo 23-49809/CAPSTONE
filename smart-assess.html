@@ -1024,7 +1024,16 @@ function bindEvents(root){
   root.querySelectorAll('[data-bind]').forEach(function(el){
     el.addEventListener('input', function(){
       const key = el.getAttribute('data-bind');
-      state.formData[key] = key==='contact' ? '+63'+el.value.replace(/\D/g,'').slice(0,10) : el.value;
+      if(key==='contact'){
+        state.formData[key] = '+63'+el.value.replace(/\D/g,'').slice(0,10);
+      } else if(key==='arp'){
+        const digits = el.value.replace(/\D/g,'').slice(0,9);
+        const formatted = digits.length > 4 ? digits.slice(0,4)+'-'+digits.slice(4) : digits;
+        el.value = formatted;
+        state.formData[key] = '14-'+formatted;
+      } else {
+        state.formData[key] = el.value;
+      }
       clearFieldError(key);
     });
   });
