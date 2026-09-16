@@ -71,4 +71,26 @@ require __DIR__ . '/includes/client_header.php';
 </div></section>
 
 <?php require __DIR__ . '/includes/site_footer.php'; ?>
+<script>
+(function(){
+  const slider = document.querySelector('[data-hero-slider]');
+  if (!slider) return;
+  const slides = Array.from(slider.querySelectorAll('.hero-slide'));
+  const dots = Array.from(slider.querySelectorAll('[data-slide-to]'));
+  let current = 0;
+  let timer;
+  function show(index){
+    current = (index + slides.length) % slides.length;
+    slides.forEach((slide, i) => slide.classList.toggle('is-active', i === current));
+    dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
+  }
+  function restart(){ clearInterval(timer); timer = setInterval(() => show(current + 1), 5500); }
+  slider.querySelector('[data-slider-prev]').addEventListener('click', () => { show(current - 1); restart(); });
+  slider.querySelector('[data-slider-next]').addEventListener('click', () => { show(current + 1); restart(); });
+  dots.forEach(dot => dot.addEventListener('click', () => { show(Number(dot.dataset.slideTo)); restart(); }));
+  slider.addEventListener('mouseenter', () => clearInterval(timer));
+  slider.addEventListener('mouseleave', restart);
+  restart();
+})();
+</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
