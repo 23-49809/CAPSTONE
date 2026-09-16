@@ -1293,6 +1293,7 @@ function bindEvents(root){
     const dots = Array.from(slider.querySelectorAll('[data-action="slider-dot"]'));
     let slideIndex = 0;
     let slideTimer;
+    let touchStartX = 0;
     const showSlide = function(index){
       slideIndex = (index + slides.length) % slides.length;
       slides.forEach(function(slide, i){ slide.classList.toggle('active', i===slideIndex); });
@@ -1304,6 +1305,12 @@ function bindEvents(root){
     };
     slider.addEventListener('mouseenter', function(){ clearInterval(slideTimer); });
     slider.addEventListener('mouseleave', restartSlider);
+    slider.addEventListener('touchstart', function(event){ touchStartX = event.changedTouches[0].clientX; clearInterval(slideTimer); }, {passive:true});
+    slider.addEventListener('touchend', function(event){
+      const distance = event.changedTouches[0].clientX - touchStartX;
+      if(Math.abs(distance)>45) showSlide(distance<0 ? slideIndex+1 : slideIndex-1);
+      restartSlider();
+    }, {passive:true});
     slider._showSlide = showSlide;
     slider._restartSlider = restartSlider;
     restartSlider();

@@ -74,6 +74,7 @@ require __DIR__ . '/includes/client_header.php';
   const dots = Array.from(slider.querySelectorAll('[data-slide-to]'));
   let current = 0;
   let timer;
+  let touchStartX = 0;
   function show(index){
     current = (index + slides.length) % slides.length;
     slides.forEach((slide, i) => slide.classList.toggle('is-active', i === current));
@@ -85,6 +86,12 @@ require __DIR__ . '/includes/client_header.php';
   dots.forEach(dot => dot.addEventListener('click', () => { show(Number(dot.dataset.slideTo)); restart(); }));
   slider.addEventListener('mouseenter', () => clearInterval(timer));
   slider.addEventListener('mouseleave', restart);
+  slider.addEventListener('touchstart', event => { touchStartX = event.changedTouches[0].clientX; clearInterval(timer); }, {passive:true});
+  slider.addEventListener('touchend', event => {
+    const distance = event.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(distance) > 45) show(distance < 0 ? current + 1 : current - 1);
+    restart();
+  }, {passive:true});
   restart();
 })();
 </script>
