@@ -203,6 +203,6 @@ INSERT INTO users (role_id, name, username, password_hash, status) VALUES
 INSERT INTO clients (first_name, last_name, email, contact_number, password_hash, status) VALUES
   ('Ramon', 'Villareal', 'r.villareal@example.com', '0917-224-5510', '$2y$12$.kZ2.nAJztNKxIcAHX7q3uM8NzT7zLZWFEIaH/EusUQEEY5jYpt6e', 'Active');
 
-INSERT INTO announcements (title, body, author, created_at) VALUES
-  ('Office schedule for Rizal Day', 'The MAO will be closed on December 30. Document release for approved requests will resume the next business day.', 'Rodel H. Ortega', NOW() - INTERVAL 3 DAY),
-  ('Reminder: verify scanned uploads', 'Please confirm scans are legible before approving. Blurry or cropped IDs should be flagged for resubmission.', 'Rodel H. Ortega', NOW() - INTERVAL 1 DAY);
+INSERT INTO announcements (title, body, author, start_date, end_date, status, created_at) VALUES
+  ('Office schedule for Rizal Day', 'The MAO will be closed on December 30. Document release for approved requests will resume the next business day.', 'Rodel H. Ortega', CURDATE() - INTERVAL 3 DAY, CURDATE() + INTERVAL 30 DAY, 'Published', NOW() - INTERVAL 3 DAY),
+  ('Reminder: verify scanned uploads', 'Please confirm scans are legible before approving. Blurry or cropped IDs should be flagged for resubmission.', 'Rodel H. Ortega', CURDATE() - INTERVAL 1 DAY, NULL, 'Draft', NOW() - INTERVAL 1 DAY);
