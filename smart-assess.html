@@ -112,7 +112,7 @@
   .home-slider{ position:relative; height:470px; min-height:470px; overflow:hidden; color:#fff; }
   .home-slide{ position:absolute; inset:0; display:none; height:100%; overflow:hidden; }
   .home-slide.active{ display:block; animation:homeSlideIn .35s ease both; }
-  .home-slide-inner{ max-width:760px; height:100%; padding:74px 70px 84px 0; }
+  .home-slide .home-slide-inner{ max-width:760px; height:100%; padding:74px 70px 84px 0; }
   .home-slide h1{ color:#fff; font-size:clamp(36px,5.4vw,58px); line-height:1.15; margin:10px 0 18px; }
   .home-slide p{ color:#effaf3; font-size:19px; max-width:610px; margin-bottom:28px; }
   .home-slide .hero-requirements{ font-size:16px; color:#d6f1df; margin-top:-16px; }
@@ -132,7 +132,7 @@
   .requirements-modal-head{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
   .requirements-close{ border:0; border-radius:50%; width:36px; height:36px; background:var(--surface-2); color:var(--ink); cursor:pointer; }
   @keyframes homeSlideIn{ from{ opacity:0; transform:translateX(15px); } to{ opacity:1; transform:none; } }
-  @media (max-width:768px){ .home-slider{ height:540px; min-height:540px; } .home-slide-inner{ padding:60px 50px 78px 20px; } .home-slide p{ font-size:17px; } .home-slide-control{ width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
+  @media (max-width:768px){ .home-slider{ height:540px; min-height:540px; } .home-slide .home-slide-inner{ padding:60px 50px 78px 20px; } .home-slide p{ font-size:17px; } .home-slide-control{ width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
 
   /* ============ Services / cards ============ */
   .section{ padding:88px 0; }
