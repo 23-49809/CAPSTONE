@@ -146,6 +146,10 @@ CREATE TABLE announcements (
   title       VARCHAR(200) NOT NULL,
   body        TEXT NOT NULL,
   author      VARCHAR(150) NOT NULL,
+  start_date  DATE NOT NULL,
+  end_date    DATE NULL,
+  image_url   VARCHAR(500) NULL,
+  status      ENUM('Draft','Published') NOT NULL DEFAULT 'Draft',
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
