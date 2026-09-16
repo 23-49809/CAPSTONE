@@ -8,20 +8,22 @@ $announcements = $announcementQuery->fetchAll();
 $pageTitle = 'Home';
 require __DIR__ . '/includes/client_header.php';
 ?>
-<section class="hero-slider" data-hero-slider aria-label="Assessor Office updates">
+<section class="hero hero-slider" data-hero-slider aria-label="Assessor Office updates">
   <div class="hero-slides">
-    <article class="hero-slide is-active"><div class="wrap"><div class="hero-slide-copy">
-      <span class="eyebrow">Public Service Guide</span><h1>Document Request Requirements</h1>
+    <article class="hero-slide is-active"><div class="wrap"><div class="hero-inner hero-slide-copy">
+      <span class="eyebrow">Public Service Guide</span><h1>Document Request</h1>
       <p>Prepare the required documents before submitting your request.</p>
+      <p class="hero-requirements">Valid government-issued ID, completed request details, and property or authorization documents when applicable.</p>
       <a class="btn btn-hero" href="#document-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
     </div></div></article>
-    <article class="hero-slide"><div class="wrap"><div class="hero-slide-copy">
-      <span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer Requirements</h1>
+    <article class="hero-slide"><div class="wrap"><div class="hero-inner hero-slide-copy">
+      <span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer</h1>
       <p>Make sure you have all required documents before processing your land transfer.</p>
+      <p class="hero-requirements">Certified title or tax declaration, notarized deed, vicinity map, certifications, tax clearance, and valid ID.</p>
       <a class="btn btn-hero" href="#land-transfer-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
     </div></div></article>
-    <article class="hero-slide<?= !$announcements ? ' no-announcement' : '' ?>"><div class="wrap"><div class="hero-slide-copy">
-      <span class="eyebrow">Department Head Announcement</span><h1>Office Announcement</h1>
+    <article class="hero-slide<?= !$announcements ? ' no-announcement' : '' ?>"><div class="wrap"><div class="hero-inner hero-slide-copy">
+      <span class="eyebrow">Important Notice</span><h1>Office Announcement</h1>
       <?php if ($announcements): foreach ($announcements as $announcement): ?>
         <div class="hero-announcement"><h2><?= esc($announcement['title']) ?></h2><p><?= esc($announcement['body']) ?></p><time datetime="<?= esc($announcement['start_date']) ?>">Posted <?= esc(fmt_date($announcement['start_date'])) ?></time></div>
       <?php endforeach; else: ?><p>No current announcements.</p><?php endif; ?>
@@ -38,13 +40,6 @@ require __DIR__ . '/includes/client_header.php';
     <details id="land-transfer-requirements"><summary>Land Transfer Requirements</summary><p>Prepare the certified title or tax declaration, notarized deed, vicinity map, certification documents, and tax clearance before submitting.</p><a class="btn-link" href="/client/land-transfer.php">Start Land Transfer <?= icon_span('arrowRight','15px') ?></a></details>
   </div>
 </section>
-<section class="hero"><div class="wrap"><div class="hero-inner">
-  <span class="eyebrow">Smart Assess Public Client Portal</span>
-  <h1>Official Municipal Portal for Property &amp; Land Services</h1>
-  <p class="lede">Digitalizing governance for the citizens of Mabini. Access property assessments, tax declarations, and municipal resources with clarity and integrity.</p>
-  <a class="btn btn-hero" href="#services">Get Started <?= icon_span('arrowRight') ?></a>
-</div></div></section>
-
 <section class="section" id="services"><div class="wrap">
   <div class="section-head"><h2>How Can We Help You?</h2>
     <p>Choose the service that best matches your needs. We offer two main pathways to access municipal property assessment services:</p></div>
