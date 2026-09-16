@@ -1,8 +1,43 @@
 <?php
 require_once __DIR__ . '/includes/functions.php';
+$pdo = db();
+$today = date('Y-m-d');
+$announcementQuery = $pdo->prepare("SELECT * FROM announcements WHERE status = 'Published' AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC, created_at DESC");
+$announcementQuery->execute([$today, $today]);
+$announcements = $announcementQuery->fetchAll();
 $pageTitle = 'Home';
 require __DIR__ . '/includes/client_header.php';
 ?>
+<section class="hero-slider" data-hero-slider aria-label="Assessor Office updates">
+  <div class="hero-slides">
+    <article class="hero-slide is-active"><div class="wrap"><div class="hero-slide-copy">
+      <span class="eyebrow">Public Service Guide</span><h1>Document Request Requirements</h1>
+      <p>Prepare the required documents before submitting your request.</p>
+      <a class="btn btn-hero" href="#document-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
+    </div></div></article>
+    <article class="hero-slide"><div class="wrap"><div class="hero-slide-copy">
+      <span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer Requirements</h1>
+      <p>Make sure you have all required documents before processing your land transfer.</p>
+      <a class="btn btn-hero" href="#land-transfer-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
+    </div></div></article>
+    <article class="hero-slide<?= !$announcements ? ' no-announcement' : '' ?>"><div class="wrap"><div class="hero-slide-copy">
+      <span class="eyebrow">Department Head Announcement</span><h1>Office Announcement</h1>
+      <?php if ($announcements): foreach ($announcements as $announcement): ?>
+        <div class="hero-announcement"><h2><?= esc($announcement['title']) ?></h2><p><?= esc($announcement['body']) ?></p><time datetime="<?= esc($announcement['start_date']) ?>">Posted <?= esc(fmt_date($announcement['start_date'])) ?></time></div>
+      <?php endforeach; else: ?><p>No current announcements.</p><?php endif; ?>
+    </div></div></article>
+  </div>
+  <button class="hero-slider-control prev" type="button" data-slider-prev aria-label="Previous slide"><?= icon_span('arrowLeft') ?></button>
+  <button class="hero-slider-control next" type="button" data-slider-next aria-label="Next slide"><?= icon_span('arrowRight') ?></button>
+  <div class="hero-slider-dots" role="tablist" aria-label="Hero slides"><button class="is-active" type="button" data-slide-to="0" aria-label="Document request slide"></button><button type="button" data-slide-to="1" aria-label="Land transfer slide"></button><button type="button" data-slide-to="2" aria-label="Announcement slide"></button></div>
+</section>
+
+<section class="requirements-strip" aria-label="General requirements">
+  <div class="wrap requirements-grid">
+    <details id="document-requirements"><summary>Document Request Requirements</summary><p>Prepare a valid government-issued ID, the accomplished request form, and any supporting property or authorization documents requested for your selected document.</p><a class="btn-link" href="/client/document-request.php">Start Document Request <?= icon_span('arrowRight','15px') ?></a></details>
+    <details id="land-transfer-requirements"><summary>Land Transfer Requirements</summary><p>Prepare the certified title or tax declaration, notarized deed, vicinity map, certification documents, and tax clearance before submitting.</p><a class="btn-link" href="/client/land-transfer.php">Start Land Transfer <?= icon_span('arrowRight','15px') ?></a></details>
+  </div>
+</section>
 <section class="hero"><div class="wrap"><div class="hero-inner">
   <span class="eyebrow">Smart Assess Public Client Portal</span>
   <h1>Official Municipal Portal for Property &amp; Land Services</h1>
