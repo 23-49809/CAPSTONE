@@ -723,6 +723,20 @@ function renderHeader(){
     + '</div></header>';
 }
 
+function renderRequirementsModal(){
+  if(!state.requirements) return '';
+  const isLand = state.requirements==='landtransfer';
+  const title = isLand ? 'Land Transfer Requirements' : 'Document Request Requirements';
+  const items = isLand
+    ? ['Certified True Copy of Tax Declaration or Title','Notarial Deed of Sale or Donation','Vicinity Map','Certification of No Improvement','Tax Clearance','Valid government-issued ID']
+    : ['Valid government-issued ID','Completed request details','Property or tax declaration information','Authorization letter and representative ID, if filing for the owner'];
+  return '<div class="requirements-modal" data-action="close-requirements"><div class="requirements-modal-card" role="dialog" aria-modal="true" aria-labelledby="requirements-title">'
+    + '<div class="requirements-modal-head"><h3 id="requirements-title">'+title+'</h3><button class="requirements-close" type="button" data-action="close-requirements" aria-label="Close">'+ic('check')+'</button></div>'
+    + '<ul>'+items.map(function(item){ return '<li>'+esc(item)+'</li>'; }).join('')+'</ul>'
+    + '<button class="btn btn-primary" data-action="start-'+(isLand?'landtransfer':'docreq')+'">Start Request '+ic('arrowRight')+'</button>'
+  + '</div></div>';
+}
+
 /* ---------- Landing ---------- */
 function renderLanding(){
   return renderHeader()
