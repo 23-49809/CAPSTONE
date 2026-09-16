@@ -70,13 +70,15 @@ img{ max-width:100%; }
 .btn-link:hover{ background:var(--brand-100); }
 
 /* Public homepage slider */
-.hero-slider{ position:relative; overflow:hidden; color:#fff; background:var(--brand-900); }
+.hero-slider{ position:relative; overflow:hidden; color:#fff; }
 .hero-slides{ min-height:410px; }
-.hero-slide{ display:none; min-height:410px; background:linear-gradient(90deg, rgba(4,53,39,.96), rgba(4,120,87,.78)); }
+.hero-slide{ display:none; min-height:410px; }
 .hero-slide.is-active{ display:block; animation:heroSlideIn .35s ease both; }
 .hero-slide-copy{ max-width:720px; padding:76px 0 86px; }
+.hero-slide-copy.hero-inner{ max-width:720px; }
 .hero-slide h1{ color:#fff; font-size:clamp(34px,5vw,56px); line-height:1.12; margin:10px 0 18px; }
 .hero-slide-copy > p{ max-width:590px; color:#effaf3; font-size:20px; margin-bottom:30px; }
+.hero-slide-copy .hero-requirements{ font-size:16px; color:#d6f1df; margin-top:-16px; }
 .hero-announcement{ max-width:680px; margin-bottom:24px; }
 .hero-announcement h2{ color:#fff; font-size:25px; margin-bottom:8px; }
 .hero-announcement p{ color:#effaf3; font-size:17px; line-height:1.55; }
