@@ -740,6 +740,13 @@ function renderRequirementsModal(){
 /* ---------- Landing ---------- */
 function renderLanding(){
   return renderHeader()
+  + '<section class="home-slider" data-home-slider aria-label="Assessor Office updates">'
+    + '<div class="home-slide active"><div class="wrap"><div class="home-slide-inner"><span class="eyebrow">Public Service Guide</span><h2>Document Request Requirements</h2><p>Prepare the required documents before submitting your request.</p><button class="btn btn-hero" data-action="show-requirements" data-requirements="docreq">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="home-slide-inner"><span class="eyebrow">Property Transaction Guide</span><h2>Land Transfer Requirements</h2><p>Make sure you have all required documents before processing your land transfer.</p><button class="btn btn-hero" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="home-slide-inner"><span class="eyebrow">Department Head Announcement</span><h2>Office Announcement</h2><div class="announcement-copy"><h3>Office Closure Notice</h3><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office operations will resume on September 28, 2026.</p><time>September 16, 2026</time></div></div></div></div>'
+    + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
+    + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Document request slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Land transfer slide"></button><button data-action="slider-dot" data-slide="2" aria-label="Announcement slide"></button></div>'
+  + '</section>'
   + '<section class="hero"><div class="wrap"><div class="hero-inner fade-in">'
     + '<span class="eyebrow">Smart Assess Public Client Portal</span>'
     + '<h1>Official Municipal Portal for Property &amp; Land Services</h1>'
@@ -770,6 +777,7 @@ function renderLanding(){
       + '<div><div class="chip-icon">'+ic('headset')+'</div><h4>24/7 Support</h4><p>Access our services anytime. Our support team is here to help with any questions or concerns.</p></div>'
     + '</div></div></section>'
 
+  + renderRequirementsModal()
   + '<footer class="site-footer"><div class="wrap"><div class="footer-grid">'
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
     + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: assessor@mabini.gov.ph</p></div>'
