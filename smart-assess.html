@@ -131,6 +131,22 @@
   .requirements-modal-card ul{ margin:0 0 24px; padding-left:22px; color:var(--ink-soft); }
   .requirements-modal-head{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
   .requirements-close{ border:0; border-radius:50%; width:36px; height:36px; background:var(--surface-2); color:var(--ink); cursor:pointer; }
+  .public-detail-page{ padding:82px 0; }
+  .public-detail-page .section-head{ margin-bottom:34px; }
+  .public-detail-page .section-head .eyebrow{ color:var(--brand-700); margin-bottom:10px; }
+  .public-detail-page .section-head h1{ font-size:clamp(32px,4vw,46px); }
+  .public-detail-page .panel-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:24px; box-shadow:var(--shadow-md); }
+  .public-detail-page .panel-card h2{ font-size:25px; margin-bottom:16px; }
+  .public-requirements-list{ color:var(--ink-soft); margin:0 0 24px; padding-left:22px; }
+  .public-requirements-list li{ margin-bottom:9px; }
+  .detail-back{ margin-top:26px; }
+  .announcement-detail{ max-width:820px; margin:0 auto 18px; }
+  .announcement-detail-meta{ color:var(--ink-faint); font-size:14px; font-weight:700; }
+  .announcement-detail h2{ font-size:30px; margin:10px 0 12px; }
+  .announcement-detail > p{ color:var(--ink-soft); }
+  .announcement-detail-note{ margin-top:24px; padding:16px 18px; border-radius:var(--radius-sm); background:var(--surface-2); color:var(--ink-soft); }
+  .announcement-detail-note strong{ color:var(--ink); }
+  .announcement-detail-note p{ margin-top:5px; }
   @keyframes homeSlideIn{ from{ opacity:0; transform:translateX(15px); } to{ opacity:1; transform:none; } }
   @media (max-width:768px){ .home-slider{ height:540px; min-height:540px; } .home-slide .home-slide-inner{ padding:60px 50px 78px 20px; } .home-slide p{ font-size:17px; } .home-slide-control{ width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
 
@@ -742,9 +758,9 @@ function renderRequirementsModal(){
 function renderLanding(){
   return renderHeader()
   + '<section class="hero home-slider" data-home-slider aria-label="Assessor Office updates">'
-    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Public Service Guide</span><h1>Document Request</h1><p>Prepare the required documents before submitting your request.</p><p class="hero-requirements">Valid government-issued ID, completed request details, and property or authorization documents when applicable.</p><button class="btn btn-hero" data-action="show-requirements" data-requirements="docreq">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
-    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer</h1><p>Make sure all required documents are complete before processing your land transfer.</p><p class="hero-requirements">Certified title or tax declaration, notarized deed, vicinity map, certifications, tax clearance, and valid ID.</p><button class="btn btn-hero" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
-    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><div class="announcement-copy"><h3>Office Closure Notice</h3><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><time>September 16, 2026</time></div></div></div></div>'
+    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Public Service Guide</span><h1>Document Request</h1><p>Prepare the required documents before submitting your request.</p><p class="hero-requirements">Valid government-issued ID, completed request details, and property or authorization documents when applicable.</p><button class="btn btn-hero" data-action="view-requirements-page">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer</h1><p>Make sure all required documents are complete before processing your land transfer.</p><p class="hero-requirements">Certified title or tax declaration, notarized deed, vicinity map, certifications, tax clearance, and valid ID.</p><button class="btn btn-hero" data-action="view-requirements-page">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><div class="announcement-copy"><h3>Office Closure Notice</h3><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><time>September 16, 2026</time></div><button class="btn btn-hero" data-action="view-announcement-page">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
     + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
     + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Document request slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Land transfer slide"></button><button data-action="slider-dot" data-slide="2" aria-label="Announcement slide"></button></div>'
   + '</section>'
@@ -779,6 +795,17 @@ function renderLanding(){
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
 }
+
+  function renderRequirementsPage(){
+    return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Public Service Guide</span><h1>Service Requirements</h1><p>Review the general requirements before starting your request.</p></div><div class="requirements-grid">'
+      + '<article class="panel-card" id="document-requirements"><h2>Document Request Requirements</h2><ul class="public-requirements-list"><li>Valid government-issued ID</li><li>Completed request details</li><li>Property or tax declaration information</li><li>Authorization letter and representative ID, if filing for the owner</li></ul><button class="btn btn-primary" data-action="start-docreq">Start Document Request '+ic('arrowRight')+'</button></article>'
+      + '<article class="panel-card" id="land-transfer-requirements"><h2>Land Transfer Requirements</h2><ul class="public-requirements-list"><li>Certified True Copy of Tax Declaration or Title</li><li>Notarial Deed of Sale or Donation</li><li>Vicinity Map</li><li>Certification of No Improvement</li><li>Tax Clearance</li><li>Valid government-issued ID</li></ul><button class="btn btn-primary" data-action="start-landtransfer">Start Land Transfer '+ic('arrowRight')+'</button></article>'
+    + '</div><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">'+ic('arrowLeft')+' Back to Home</button></div></div></section>';
+  }
+
+  function renderAnnouncementPage(){
+    return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><p>Official updates from the Department Head.</p></div><article class="panel-card announcement-detail"><div class="announcement-detail-meta">Announcement date: September 16, 2026 &middot; Office closure date: September 25, 2026</div><h2>Office Closure Notice</h2><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the closure date and check your request requirements before submitting or claiming documents. Follow any additional instructions provided by the Assessor’s Office.</p></div></article><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">'+ic('arrowLeft')+' Back to Home</button></div></div></section>';
+  }
 
 /* ---------- Wizard ---------- */
 function stepPill(i, label){
@@ -1238,6 +1265,8 @@ function render(){
   const app = document.getElementById('app');
   let html = '';
   if(state.view==='landing') html = renderLanding();
+  else if(state.view==='requirements') html = renderRequirementsPage();
+  else if(state.view==='announcement') html = renderAnnouncementPage();
   else if(state.view==='wizard') html = renderWizard();
   else if(state.view==='confirmation') html = renderConfirmation();
   else if(state.view==='track') html = renderTrack();
@@ -1325,6 +1354,8 @@ function bindEvents(root){
       if(a==='get-started') goToServices();
       else if(a==='start-docreq') startFlow('docreq');
       else if(a==='start-landtransfer') startFlow('landtransfer');
+      else if(a==='view-requirements-page') go('requirements');
+      else if(a==='view-announcement-page') go('announcement');
       else if(a==='show-requirements'){ state.requirements = el.getAttribute('data-requirements'); render(); }
       else if(a==='close-requirements'){ state.requirements = null; render(); }
       else if(a==='slider-prev' || a==='slider-next' || a==='slider-dot'){

@@ -14,19 +14,19 @@ require __DIR__ . '/includes/client_header.php';
       <span class="eyebrow">Public Service Guide</span><h1>Document Request</h1>
       <p>Prepare the required documents before submitting your request.</p>
       <p class="hero-requirements">Valid government-issued ID, completed request details, and property or authorization documents when applicable.</p>
-      <a class="btn btn-hero" href="#document-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
+      <a class="btn btn-hero" href="/requirements.php#document-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
     </div></div></article>
     <article class="hero-slide"><div class="wrap"><div class="hero-inner hero-slide-copy">
       <span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer</h1>
       <p>Make sure you have all required documents before processing your land transfer.</p>
       <p class="hero-requirements">Certified title or tax declaration, notarized deed, vicinity map, certifications, tax clearance, and valid ID.</p>
-      <a class="btn btn-hero" href="#land-transfer-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
+      <a class="btn btn-hero" href="/requirements.php#land-transfer-requirements">View Requirements <?= icon_span('arrowRight') ?></a>
     </div></div></article>
     <article class="hero-slide<?= !$announcements ? ' no-announcement' : '' ?>"><div class="wrap"><div class="hero-inner hero-slide-copy">
       <span class="eyebrow">Important Notice</span><h1>Office Announcement</h1>
       <?php if ($announcements): foreach ($announcements as $announcement): ?>
         <div class="hero-announcement"><h2><?= esc($announcement['title']) ?></h2><p><?= esc($announcement['body']) ?></p><time datetime="<?= esc($announcement['start_date']) ?>">Posted <?= esc(fmt_date($announcement['start_date'])) ?></time></div>
-      <?php endforeach; else: ?><p>No current announcements.</p><?php endif; ?>
+      <?php endforeach; ?><a class="btn btn-hero" href="/announcement.php">View Announcement <?= icon_span('arrowRight') ?></a><?php else: ?><p>No current announcements.</p><?php endif; ?>
     </div></div></article>
   </div>
   <button class="hero-slider-control prev" type="button" data-slider-prev aria-label="Previous slide"><?= icon_span('arrowLeft') ?></button>
