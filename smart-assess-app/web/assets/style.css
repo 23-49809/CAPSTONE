@@ -70,7 +70,7 @@ img{ max-width:100%; }
 .btn-link:hover{ background:var(--brand-100); }
 
 /* Public homepage slider */
-.hero-slider{ position:relative; height:470px; min-height:470px; overflow:hidden; color:#fff; }
+.hero-slider{ position:relative; height:620px; min-height:620px; overflow:hidden; color:#fff; }
 .hero-slides{ position:relative; height:100%; }
 .hero-slide{ position:absolute; inset:0; display:none; height:100%; overflow:hidden; }
 .hero-slide.is-active{ display:block; animation:heroSlideIn .35s ease both; }
@@ -114,7 +114,7 @@ img{ max-width:100%; }
 .announcement-detail-note p{ margin-top:5px; }
 @keyframes heroSlideIn{ from{ opacity:0; transform:translateX(16px); } to{ opacity:1; transform:none; } }
 @media (max-width:720px){
-   .hero-slider{ height:540px; min-height:540px; }
+   .hero-slider{ height:700px; min-height:700px; }
    .hero-slide-copy{ padding:60px 54px 78px 20px; }
    .hero-slide-copy > p{ font-size:17px; }
    .hero-slider-control{ width:42px; height:42px; }
