@@ -1292,6 +1292,28 @@ function bindEvents(root){
     if(!e.target.closest('[data-barangay-dropdown]')) closeBarangayMenus();
   });
 
+  const slider = root.querySelector('[data-home-slider]');
+  if(slider){
+    const slides = Array.from(slider.querySelectorAll('.home-slide'));
+    const dots = Array.from(slider.querySelectorAll('[data-action="slider-dot"]'));
+    let slideIndex = 0;
+    let slideTimer;
+    const showSlide = function(index){
+      slideIndex = (index + slides.length) % slides.length;
+      slides.forEach(function(slide, i){ slide.classList.toggle('active', i===slideIndex); });
+      dots.forEach(function(dot, i){ dot.classList.toggle('active', i===slideIndex); });
+    };
+    const restartSlider = function(){
+      clearInterval(slideTimer);
+      slideTimer = setInterval(function(){ showSlide(slideIndex+1); }, 5500);
+    };
+    slider.addEventListener('mouseenter', function(){ clearInterval(slideTimer); });
+    slider.addEventListener('mouseleave', restartSlider);
+    slider._showSlide = showSlide;
+    slider._restartSlider = restartSlider;
+    restartSlider();
+  }
+
   root.querySelectorAll('[data-nav]').forEach(function(el){
     el.addEventListener('click', function(){ go(el.getAttribute('data-nav')); });
   });
@@ -1301,6 +1323,17 @@ function bindEvents(root){
       if(a==='get-started') goToServices();
       else if(a==='start-docreq') startFlow('docreq');
       else if(a==='start-landtransfer') startFlow('landtransfer');
+      else if(a==='show-requirements'){ state.requirements = el.getAttribute('data-requirements'); render(); }
+      else if(a==='close-requirements'){ state.requirements = null; render(); }
+      else if(a==='slider-prev' || a==='slider-next' || a==='slider-dot'){
+        const sliderRoot = root.querySelector('[data-home-slider]');
+        if(sliderRoot && sliderRoot._showSlide){
+          const currentSlide = sliderRoot.querySelector('.home-slide.active');
+          const currentIndex = Array.from(sliderRoot.querySelectorAll('.home-slide')).indexOf(currentSlide);
+          const target = a==='slider-prev' ? currentIndex-1 : (a==='slider-next' ? currentIndex+1 : Number(el.getAttribute('data-slide')));
+          sliderRoot._showSlide(target); sliderRoot._restartSlider();
+        }
+      }
       else if(a==='next-step') nextStep();
       else if(a==='prev-step') prevStep();
       else if(a==='submit') submitRequest();
