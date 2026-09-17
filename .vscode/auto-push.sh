@@ -18,15 +18,24 @@ if [[ -z "$remote" || -z "$merge_ref" ]]; then
     exit 1
 fi
 
+# Extra remotes to mirror pushes to, in addition to the tracked upstream remote above.
+extra_remotes=(mine)
+
 while true; do
     if [[ -n "$(git status --porcelain)" ]]; then
         git add -A
         if ! git diff --cached --quiet; then
             git commit -m "Auto-sync: $(date '+%Y-%m-%d %H:%M:%S')"
             if ! git push "$remote" "$branch"; then
-                print "Auto-sync paused: push failed. Resolve the remote issue, then restart this task."
+                print "Auto-sync paused: push to '$remote' failed. Resolve the remote issue, then restart this task."
                 exit 1
             fi
+            for extra in "${extra_remotes[@]}"; do
+                [[ "$extra" == "$remote" ]] && continue
+                if git remote get-url "$extra" >/dev/null 2>&1; then
+                    git push "$extra" "$branch" || print "Auto-sync warning: push to '$extra' failed."
+                fi
+            done
         fi
     fi
     sleep 5
