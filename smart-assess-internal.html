@@ -171,6 +171,12 @@
   .icon-btn:hover{ background:var(--surface-2); }
   .icon-btn.danger{ color:var(--danger); border-color:var(--danger-bg); }
   .row-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  .staff-accounts-table th:last-child, .staff-accounts-table td:last-child{ width:420px; min-width:420px; }
+  .staff-row-actions{ display:flex; align-items:center; gap:8px; width:100%; flex-wrap:nowrap; }
+  .staff-row-actions .staff-action{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; height:40px; padding:6px 8px; white-space:nowrap; }
+  .staff-row-actions .staff-action-view, .staff-row-actions .staff-action-edit{ width:88px; }
+  .staff-row-actions .staff-action-status{ width:160px; }
+  .staff-row-actions .staff-action-archive{ width:60px; min-width:60px; height:40px; padding:0; }
   .empty-state{ padding:56px 20px; text-align:center; color:var(--ink-faint); font-size:13.5px; }
   .empty-state .icon{ width:30px; height:30px; margin:0 auto 12px; color:var(--line-strong); }
 
@@ -769,16 +775,16 @@ function renderStaffAccounts(acct, jumpToInfo){
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by name, username, or email" value="'+esc(state.search.staffAccounts)+'" data-input="search-staff"></div>'
     + '<select data-input="filter-staff-status"><option value="all"'+(statusF==='all'?' selected':'')+'>All Statuses</option><option value="active"'+(statusF==='active'?' selected':'')+'>Active</option><option value="inactive"'+(statusF==='inactive'?' selected':'')+'>Inactive</option></select>'
   + '</div>'
-  + '<div class="table-wrap"><table><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="staff-accounts-table"><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(a){
       return '<tr><td class="cell-name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
         + '<td class="mono">'+esc(a.username)+'</td><td>'+esc(a.email)+'</td><td>'+esc(a.position)+'</td>'
         + '<td><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
-        + '<td><div class="row-actions">'
-          + '<button class="icon-btn" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
-          + '<button class="icon-btn" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
-          + '<button class="icon-btn" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
-          + '<button class="icon-btn" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">'+ic('archive','13px')+'</button>'
+        + '<td><div class="staff-row-actions">'
+          + '<button class="icon-btn staff-action staff-action-view" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
+          + '<button class="icon-btn staff-action staff-action-edit" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
+          + '<button class="icon-btn staff-action staff-action-status" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
+          + '<button class="icon-btn staff-action staff-action-archive" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">'+ic('archive','13px')+'</button>'
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('users','30px')+'No staff accounts match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('staffAccounts', pg)+'</div>';
