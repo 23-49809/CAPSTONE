@@ -988,7 +988,7 @@ function renderHeadDashboard(acct){
     + '</div>'
     + '<div class="panel-card"><h3>'+ic('megaphone')+'Recent Announcements</h3>'
       + recentAnn.map(function(a){
-          return '<div class="announcement-card"><h4>'+esc(a.title)+'</h4><div class="ac-meta">'+fmtDate(a.datePosted)+' &middot; '+esc(a.postedBy)+' &middot; <span class="badge '+(a.status==='Published'?'green':'slate')+'">'+a.status+'</span></div></div>';
+          return '<div class="announcement-card"><h4>'+esc(a.title)+'</h4><div class="ac-meta">'+audienceLabel(a.postTo)+' &middot; '+esc(a.postedBy)+' &middot; <span class="badge '+annBadgeClass(a.status)+'">'+a.status+'</span></div></div>';
         }).join('')
       + '<div style="margin-top:2px;"><button class="btn btn-outline btn-sm" data-action="nav" data-view="announcements">See All Announcements</button></div>'
     + '</div>'
