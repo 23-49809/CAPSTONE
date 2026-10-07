@@ -783,9 +783,9 @@ function renderAdminDashboard(acct){
   + '<div class="panel-card"><h3>'+ic('users')+'Recently Added Accounts</h3>'
     + '<div class="table-wrap"><table><thead><tr><th>Full Name</th><th>Username</th><th>Position</th><th>Status</th><th>Date Created</th></tr></thead><tbody>'
     + recent.map(function(a){
-      return '<tr><td class="cell-name">'+esc(a.fullName)+'</td><td class="mono">'+esc(a.username)+'</td><td>'+esc(a.position)+'</td>'
-        + '<td><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
-        + '<td>'+fmtDate(a.dateCreated)+'</td></tr>';
+      return '<tr><td class="cell-name" data-label="Full Name">'+esc(a.fullName)+'</td><td class="mono" data-label="Username">'+esc(a.username)+'</td><td data-label="Position">'+esc(a.position)+'</td>'
+        + '<td data-label="Status"><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
+        + '<td data-label="Date Created">'+fmtDate(a.dateCreated)+'</td></tr>';
     }).join('')
     + '</tbody></table></div></div>';
 }
@@ -808,9 +808,9 @@ function renderStaffAccounts(acct, jumpToInfo){
   + '</div>'
   + '<div class="table-wrap"><table class="staff-accounts-table has-actions"><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(a){
-      return '<tr><td class="cell-name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
-        + '<td class="mono">'+esc(a.username)+'</td><td>'+esc(a.email)+'</td><td>'+esc(a.position)+'</td>'
-        + '<td><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
+      return '<tr><td class="cell-name" data-label="Full Name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
+        + '<td class="mono" data-label="Username">'+esc(a.username)+'</td><td data-label="Email">'+esc(a.email)+'</td><td data-label="Position">'+esc(a.position)+'</td>'
+        + '<td data-label="Status"><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
         + '<td class="actions-cell"><div class="actions-container staff-row-actions">'
           + '<button class="icon-btn action-button staff-action-view" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
           + '<button class="icon-btn action-button staff-action-edit" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
@@ -828,8 +828,8 @@ function renderArchivedAccounts(){
   + (archived.length ? '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
     + archived.map(function(a){
       return '<tr><td class="cell-name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
-        + '<td class="mono">'+esc(a.username)+'</td><td>'+esc(a.email)+'</td><td>'+esc(a.position)+'</td>'
-        + '<td><span class="badge slate">Archived</span></td>'
+        + '<td class="mono" data-label="Username">'+esc(a.username)+'</td><td data-label="Email">'+esc(a.email)+'</td><td data-label="Position">'+esc(a.position)+'</td>'
+        + '<td data-label="Status"><span class="badge slate">Archived</span></td>'
         + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button restore-button" data-action="restore-staff" data-id="'+a.id+'">'+ic('check','13px')+'Restore</button>'
         + '<button class="icon-btn danger action-button delete-permanently-button" data-action="delete-archived-staff" data-id="'+a.id+'">'+ic('trash','13px')+'Delete Permanently</button></div></td></tr>';
     }).join('')+'</tbody></table></div>' : '<div class="table-wrap"><div class="empty-state">'+ic('archive','30px')+'No archived accounts.</div></div>');
@@ -958,7 +958,7 @@ function renderReports(acct){
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(r){
-      return '<tr><td class="cell-name">'+esc(r.title)+'</td><td><span class="badge blue">'+TYPE_LABEL[r.type]+'</span></td><td>'+fmtDate(r.dateGenerated)+'</td>'
+      return '<tr><td class="cell-name" data-label="Report Title">'+esc(r.title)+'</td><td data-label="Type"><span class="badge blue">'+TYPE_LABEL[r.type]+'</span></td><td data-label="Date Generated">'+fmtDate(r.dateGenerated)+'</td>'
         + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></div></td></tr>';
     }).join('') : '<tr><td colspan="4"><div class="empty-state">'+ic('fileBar','30px')+'No reports match your search.</div></td></tr>')
   + '</tbody></table></div>';
@@ -1014,7 +1014,7 @@ function renderTimestamp(acct){
   + '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time In</th><th>Time Out</th><th>Total Hours</th><th>Status</th></tr></thead><tbody>'
   + (mine.length ? mine.map(function(t){
       var cls = t.status==='On Time'?'green':(t.status==='Late'?'amber':(t.status==='Absent'?'red':'blue'));
-      return '<tr><td>'+fmtDate(t.date)+'</td><td class="mono">'+esc(t.timeIn)+'</td><td class="mono">'+esc(t.timeOut)+'</td><td class="mono">'+esc(t.totalHours)+'</td><td><span class="badge '+cls+'">'+t.status+'</span></td></tr>';
+      return '<tr><td data-label="Date">'+fmtDate(t.date)+'</td><td class="mono" data-label="Time In">'+esc(t.timeIn)+'</td><td class="mono" data-label="Time Out">'+esc(t.timeOut)+'</td><td class="mono" data-label="Total Hours">'+esc(t.totalHours)+'</td><td data-label="Status"><span class="badge '+cls+'">'+t.status+'</span></td></tr>';
     }).join('') : '<tr><td colspan="5"><div class="empty-state">'+ic('timer','30px')+'No attendance records yet.</div></td></tr>')
   + '</tbody></table></div>';
 }
@@ -1022,9 +1022,10 @@ function renderTimestamp(acct){
 function reqTableRow(r, kind){
   var m = STATUS_META[r.status];
   var sub = kind==='doc' ? esc(r.docType) : esc(r.transferType)+' &middot; '+esc(r.tctNo);
-  return '<tr><td class="mono">'+r.id+'</td><td class="cell-name">'+esc(r.applicant)+'<div class="cell-sub">'+sub+'</div></td>'
-    + '<td>'+esc(r.barangay)+'</td><td>'+fmtDate(r.submitted)+'</td>'
-    + '<td><span class="badge '+m.cls+'">'+r.status+'</span></td>'
+  var applicantLabel = kind==='doc' ? 'Applicant / Document Type' : 'Applicant / Transfer Type';
+  return '<tr><td class="mono" data-label="Reference No.">'+r.id+'</td><td class="cell-name" data-label="'+applicantLabel+'">'+esc(r.applicant)+'<div class="cell-sub">'+sub+'</div></td>'
+    + '<td data-label="Barangay">'+esc(r.barangay)+'</td><td data-label="Date Submitted">'+fmtDate(r.submitted)+'</td>'
+    + '<td data-label="Status"><span class="badge '+m.cls+'">'+r.status+'</span></td>'
     + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-'+kind+'-req" data-id="'+r.id+'">'+ic('eye','13px')+'Open</button></div></td></tr>';
 }
 
@@ -1090,8 +1091,8 @@ function renderRequirementResults(acct){
   + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant</th><th>Request Type</th><th>Missing Docs</th><th>Overall Result</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(x){
       var res = overallResult(x.checklist);
-      return '<tr><td class="mono">'+x.ref+'</td><td class="cell-name">'+esc(x.applicant)+'</td><td>'+x.type+'</td><td>'+missingCount(x.checklist)+'</td>'
-        + '<td><span class="badge '+resultBadgeCls(res)+'">'+res+'</span></td>'
+      return '<tr><td class="mono" data-label="Reference No.">'+x.ref+'</td><td class="cell-name" data-label="Applicant">'+esc(x.applicant)+'</td><td data-label="Request Type">'+x.type+'</td><td data-label="Missing Docs">'+missingCount(x.checklist)+'</td>'
+        + '<td data-label="Overall Result"><span class="badge '+resultBadgeCls(res)+'">'+res+'</span></td>'
         + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-req-result" data-ref="'+x.ref+'">'+ic('eye','13px')+'View</button></div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('checklistIcon','30px')+'No requirement checking results match your search.</div></td></tr>')
   + '</tbody></table></div>';
