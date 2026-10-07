@@ -3,12 +3,13 @@ require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['admin']);
 
 $pdo = db();
+publish_due_announcements($pdo);
 $accountTotal = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
 $activeTotal = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'Active'")->fetchColumn();
 $clientTotal = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
 $requestTotal = (int) $pdo->query('SELECT COUNT(*) FROM requests')->fetchColumn();
 $recentAudit = $pdo->query('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 8')->fetchAll();
-$announcements = $pdo->query('SELECT * FROM announcements ORDER BY created_at DESC LIMIT 3')->fetchAll();
+$announcements = $pdo->query("SELECT * FROM announcements WHERE status = 'Published' AND audience IN ('staff','both') ORDER BY created_at DESC LIMIT 3")->fetchAll();
 
 $pageTitle = 'Admin Dashboard';
 require __DIR__ . '/../includes/internal_header.php';
