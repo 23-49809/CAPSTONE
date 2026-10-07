@@ -1538,6 +1538,249 @@ function clockNowLabel(){
   return new Date().toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
 }
 
+/* ================================================================
+ * Reusable DatePicker / TimePicker component.
+ * Renders as a styled trigger button + popover, backed by a hidden
+ * <input> that carries the real value under the field's real `name` —
+ * so any existing code reading FormData (e.g. the save-ann handler)
+ * needs no changes at all. Used by the Create/Edit Announcement
+ * "Schedule for Later" fields; reuse dtPickerField()/initDatePicker()/
+ * initTimePicker() for any future scheduling UI instead of building a
+ * new one. ================================================================ */
+var WEEKDAY_LABELS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+function pad2(n){ return (n<10?'0':'')+n; }
+function isoDateStr(y,m,d){ return y+'-'+pad2(m+1)+'-'+pad2(d); }
+function todayISO(){ var t=new Date(); return isoDateStr(t.getFullYear(), t.getMonth(), t.getDate()); }
+function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
+function formatDateLong(iso){ try{ return new Date(iso+'T00:00:00').toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'}); }catch(e){ return iso; } }
+function formatDateLongWeekday(iso){ try{ return new Date(iso+'T00:00:00').toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'}); }catch(e){ return iso; } }
+function to12Hour(h24){ var p = h24>=12?'PM':'AM'; var h = h24%12; if(h===0) h=12; return {hour:h, period:p}; }
+function to24Hour(h12, period){ var h = h12%12; if(period==='PM') h += 12; return h; }
+function formatTime12(hhmm){
+  if(!hhmm) return '';
+  var parts = hhmm.split(':'); var t = to12Hour(+parts[0]);
+  return t.hour+':'+pad2(+parts[1])+' '+t.period;
+}
+
+/** Markup for one date/time field. kind: 'date'|'time'.
+ *  opts: {placeholder, min (date only), pairDate (time only — the `name`
+ *  of the sibling date field, so the time picker knows when "today" rules
+ *  for past-time disabling apply)}. */
+function dtPickerField(kind, name, value, opts){
+  opts = opts || {};
+  var display = value ? (kind==='date' ? formatDateLong(value) : formatTime12(value)) : (opts.placeholder || (kind==='date' ? 'Select Date' : 'Select Time'));
+  var attrs = kind==='date' ? ' data-datepicker data-min="'+esc(opts.min||todayISO())+'"' : ' data-timepicker'+(opts.pairDate ? ' data-pair-date="'+esc(opts.pairDate)+'"' : '');
+  return '<div class="dt-picker"'+attrs+'>'
+    + '<button type="button" class="dt-trigger" data-dt-trigger aria-haspopup="true" aria-expanded="false">'
+      + '<span class="dt-trigger-text'+(value?'':' placeholder')+'" data-dt-display>'+esc(display)+'</span>'
+      + '<span class="dt-trigger-icon">'+ic(kind==='date'?'calendar':'clock','16px')+'</span>'
+    + '</button>'
+    + '<input type="hidden" name="'+esc(name)+'" value="'+esc(value||'')+'" data-dt-input>'
+    + '<div class="dt-popover" data-dt-popover hidden></div>'
+  + '</div>';
+}
+
+function buildCalendarGrid(viewYear, viewMonth, selectedISO, minISO){
+  var minDate = new Date(minISO+'T00:00:00');
+  var minYear = minDate.getFullYear(), minMonth = minDate.getMonth();
+  var atMin = (viewYear < minYear) || (viewYear===minYear && viewMonth<=minMonth);
+  var first = new Date(viewYear, viewMonth, 1);
+  var startDow = first.getDay();
+  var totalDays = daysInMonth(viewYear, viewMonth);
+  var prevMonthDays = daysInMonth(viewYear, viewMonth===0?11:viewMonth-1);
+  var todayStr = todayISO();
+  var cells = [];
+  for(var i=0;i<startDow;i++){
+    cells.push('<span class="cal-day is-outside" aria-hidden="true">'+(prevMonthDays-startDow+1+i)+'</span>');
+  }
+  for(var d=1; d<=totalDays; d++){
+    var iso = isoDateStr(viewYear, viewMonth, d);
+    var disabled = iso < minISO;
+    var cls = 'cal-day'+(iso===todayStr?' is-today':'')+(iso===selectedISO?' is-selected':'');
+    cells.push('<button type="button" class="'+cls+'" data-cal-day="'+iso+'" '+(disabled?'disabled':'')+' aria-pressed="'+(iso===selectedISO)+'">'+d+'</button>');
+  }
+  var trailing = (7 - (cells.length % 7)) % 7;
+  for(var j=1;j<=trailing;j++){
+    cells.push('<span class="cal-day is-outside" aria-hidden="true">'+j+'</span>');
+  }
+  var monthLabel = first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  return '<div class="cal-head">'
+      + '<button type="button" class="cal-nav" data-cal-prev '+(atMin?'disabled':'')+' aria-label="Previous month">'+ic('chevLeft','14px')+'</button>'
+      + '<span class="cal-title">'+esc(monthLabel)+'</span>'
+      + '<button type="button" class="cal-nav" data-cal-next aria-label="Next month">'+ic('chevRight','14px')+'</button>'
+    + '</div>'
+    + '<div class="cal-grid">'
+      + WEEKDAY_LABELS.map(function(w){ return '<span class="cal-weekday">'+w+'</span>'; }).join('')
+      + cells.join('')
+    + '</div>'
+    + '<div class="cal-foot"><span class="dot"></span> Today</div>';
+}
+
+function buildTimeGrid(hour12, minute, period, isToday){
+  var hourOptions = [1,2,3,4,5,6,7,8,9,10,11,12];
+  var minuteOptions = [0,15,30,45];
+  var periodOptions = ['AM','PM'];
+  function wouldBePast(h12, min, per){
+    if(!isToday) return false;
+    var candidate = new Date();
+    candidate.setHours(to24Hour(h12, per), min, 0, 0);
+    return candidate.getTime() <= Date.now();
+  }
+  return '<div class="tp-display">'+hour12+' : '+pad2(minute)+'<span class="tp-period">'+period+'</span></div>'
+    + '<div class="tp-row"><span class="tp-row-label">Hour</span><div class="tp-chip-row">'
+      + hourOptions.map(function(h){
+          return '<button type="button" class="tp-chip'+(h===hour12?' selected':'')+'" data-tp-hour="'+h+'" '+(wouldBePast(h,minute,period)?'disabled':'')+'>'+h+'</button>';
+        }).join('')
+    + '</div></div>'
+    + '<div class="tp-row"><span class="tp-row-label">Minute</span><div class="tp-chip-row">'
+      + minuteOptions.map(function(m){
+          return '<button type="button" class="tp-chip'+(m===minute?' selected':'')+'" data-tp-minute="'+m+'" '+(wouldBePast(hour12,m,period)?'disabled':'')+'>'+pad2(m)+'</button>';
+        }).join('')
+    + '</div></div>'
+    + '<div class="tp-row"><span class="tp-row-label">Period</span><div class="tp-chip-row">'
+      + periodOptions.map(function(p){
+          return '<button type="button" class="tp-chip'+(p===period?' selected':'')+'" data-tp-period="'+p+'" '+(wouldBePast(hour12,minute,p)?'disabled':'')+'>'+p+'</button>';
+        }).join('')
+    + '</div></div>';
+}
+
+/* -- popover open/close/position plumbing, shared by both picker kinds -- */
+var _dtGlobalHandlersBound = false;
+function ensureDtGlobalHandlers(){
+  if(_dtGlobalHandlersBound) return;
+  _dtGlobalHandlersBound = true;
+  document.addEventListener('click', function(ev){
+    document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){
+      var picker = pop.closest('.dt-picker');
+      if(picker && !picker.contains(ev.target)) closeDtPopover(picker);
+    });
+  }, true);
+  document.addEventListener('keydown', function(ev){
+    if(ev.key==='Escape'){
+      document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){ closeDtPopover(pop.closest('.dt-picker')); });
+    }
+  });
+  window.addEventListener('scroll', function(){
+    document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){ closeDtPopover(pop.closest('.dt-picker')); });
+  }, true);
+}
+function closeDtPopover(picker){
+  if(!picker) return;
+  var trigger = picker.querySelector('[data-dt-trigger]');
+  var popover = picker.querySelector('[data-dt-popover]');
+  if(popover) popover.hidden = true;
+  if(trigger) trigger.setAttribute('aria-expanded','false');
+}
+function openDtPopover(picker){
+  ensureDtGlobalHandlers();
+  document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){
+    if(!picker.contains(pop)) closeDtPopover(pop.closest('.dt-picker'));
+  });
+  var trigger = picker.querySelector('[data-dt-trigger]');
+  var popover = picker.querySelector('[data-dt-popover]');
+  // Measure at full size while invisible (hidden elements have no box to
+  // measure), then place it, then reveal — avoids a visible jump/flash.
+  popover.style.visibility = 'hidden';
+  popover.hidden = false;
+  var rect = trigger.getBoundingClientRect();
+  var popWidth = popover.offsetWidth, popHeight = popover.offsetHeight;
+  var left = Math.max(12, Math.min(rect.left, window.innerWidth - popWidth - 12));
+  var top = rect.bottom + 6;
+  if(top + popHeight > window.innerHeight - 12) top = rect.top - popHeight - 6;
+  if(top < 12) top = 12;
+  popover.style.position = 'fixed';
+  popover.style.left = left+'px';
+  popover.style.top = top+'px';
+  popover.style.visibility = '';
+  if(trigger) trigger.setAttribute('aria-expanded','true');
+}
+
+function initDatePicker(picker){
+  var hidden = picker.querySelector('[data-dt-input]');
+  var trigger = picker.querySelector('[data-dt-trigger]');
+  var display = picker.querySelector('[data-dt-display]');
+  var popover = picker.querySelector('[data-dt-popover]');
+  var minISO = picker.getAttribute('data-min') || todayISO();
+  var viewYear, viewMonth;
+
+  function setView(iso){
+    var d = new Date(iso+'T00:00:00');
+    viewYear = d.getFullYear(); viewMonth = d.getMonth();
+  }
+
+  function renderGrid(){
+    popover.innerHTML = buildCalendarGrid(viewYear, viewMonth, hidden.value, minISO);
+    popover.querySelector('[data-cal-prev]').addEventListener('click', function(ev){
+      ev.stopPropagation();
+      viewMonth--; if(viewMonth<0){ viewMonth=11; viewYear--; }
+      renderGrid();
+    });
+    popover.querySelector('[data-cal-next]').addEventListener('click', function(ev){
+      ev.stopPropagation();
+      viewMonth++; if(viewMonth>11){ viewMonth=0; viewYear++; }
+      renderGrid();
+    });
+    popover.querySelectorAll('[data-cal-day]').forEach(function(btn){
+      btn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        hidden.value = btn.getAttribute('data-cal-day');
+        display.textContent = formatDateLong(hidden.value);
+        display.classList.remove('placeholder');
+        closeDtPopover(picker);
+        picker.dispatchEvent(new Event('change', {bubbles:true}));
+      });
+    });
+  }
+
+  trigger.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    if(!popover.hidden){ closeDtPopover(picker); return; }
+    setView(hidden.value && hidden.value >= minISO ? hidden.value : minISO);
+    renderGrid();
+    openDtPopover(picker);
+  });
+}
+
+function initTimePicker(picker, options){
+  options = options || {};
+  var hidden = picker.querySelector('[data-dt-input]');
+  var trigger = picker.querySelector('[data-dt-trigger]');
+  var display = picker.querySelector('[data-dt-display]');
+  var popover = picker.querySelector('[data-dt-popover]');
+  var hour12 = 9, minute = 0, period = 'AM';
+  if(hidden.value){
+    var parts = hidden.value.split(':'); var t = to12Hour(+parts[0]);
+    hour12 = t.hour; minute = +parts[1]; period = t.period;
+  }
+
+  function writeHidden(){
+    hidden.value = pad2(to24Hour(hour12, period))+':'+pad2(minute);
+    display.textContent = hour12+':'+pad2(minute)+' '+period;
+    display.classList.remove('placeholder');
+  }
+  function renderGrid(){
+    popover.innerHTML = buildTimeGrid(hour12, minute, period, options.isToday ? options.isToday() : false);
+    popover.querySelectorAll('[data-tp-hour]').forEach(function(btn){
+      btn.addEventListener('click', function(ev){ ev.stopPropagation(); hour12=+btn.getAttribute('data-tp-hour'); writeHidden(); renderGrid(); picker.dispatchEvent(new Event('change',{bubbles:true})); });
+    });
+    popover.querySelectorAll('[data-tp-minute]').forEach(function(btn){
+      btn.addEventListener('click', function(ev){ ev.stopPropagation(); minute=+btn.getAttribute('data-tp-minute'); writeHidden(); renderGrid(); picker.dispatchEvent(new Event('change',{bubbles:true})); });
+    });
+    popover.querySelectorAll('[data-tp-period]').forEach(function(btn){
+      btn.addEventListener('click', function(ev){ ev.stopPropagation(); period=btn.getAttribute('data-tp-period'); writeHidden(); renderGrid(); picker.dispatchEvent(new Event('change',{bubbles:true})); });
+    });
+  }
+  picker._timePickerRefresh = renderGrid;
+
+  trigger.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    if(!popover.hidden){ closeDtPopover(picker); return; }
+    renderGrid();
+    openDtPopover(picker);
+  });
+}
+
 function bindEvents(){
   var app = document.getElementById('app');
 
