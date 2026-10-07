@@ -65,9 +65,64 @@ require __DIR__ . '/includes/client_header.php';
   </div>
 </div></section>
 
+<dialog class="requirements-dialog" aria-labelledby="requirements-dialog-title">
+  <div class="requirements-dialog-content">
+    <div class="requirements-dialog-head">
+      <div><span class="eyebrow">Before You Apply</span><h2 id="requirements-dialog-title"></h2></div>
+      <button class="requirements-dialog-close" type="button" data-requirements-close aria-label="Close requirements">Close</button>
+    </div>
+    <p class="requirements-dialog-intro">Have these items ready before starting your request.</p>
+    <ul class="requirements-dialog-list"></ul>
+    <div class="requirements-dialog-actions">
+      <button class="btn btn-ghost" type="button" data-requirements-close>Close</button>
+      <a class="btn btn-primary" data-requirements-start href="/client/document-request.php">Start Request <?= icon_span('arrowRight') ?></a>
+    </div>
+  </div>
+</dialog>
+
 <?php require __DIR__ . '/includes/site_footer.php'; ?>
 <script>
 (function(){
+  const requirementsDialog = document.querySelector('.requirements-dialog');
+  const requirementSets = {
+    document: {
+      title: 'Document Request Requirements',
+      items: ['Valid government-issued ID', 'Completed request details', 'Property or tax declaration information', 'Authorization letter and representative ID, if filing for the owner'],
+      href: '/client/document-request.php',
+      action: 'Start Document Request'
+    },
+    land: {
+      title: 'Land Transfer Requirements',
+      items: ['Certified True Copy of Tax Declaration or Title', 'Notarial Deed of Sale or Donation', 'Vicinity Map', 'Certification of No Improvement', 'Tax Clearance', 'Valid government-issued ID'],
+      href: '/client/land-transfer.php',
+      action: 'Start Land Transfer'
+    }
+  };
+  const requirementTitle = requirementsDialog.querySelector('#requirements-dialog-title');
+  const requirementList = requirementsDialog.querySelector('.requirements-dialog-list');
+  const requirementStart = requirementsDialog.querySelector('[data-requirements-start]');
+  document.querySelectorAll('[data-requirements]').forEach(button => {
+    button.addEventListener('click', () => {
+      const requirements = requirementSets[button.dataset.requirements];
+      if (!requirements) return;
+      requirementTitle.textContent = requirements.title;
+      requirementList.replaceChildren(...requirements.items.map(item => {
+        const listItem = document.createElement('li');
+        listItem.textContent = item;
+        return listItem;
+      }));
+      requirementStart.href = requirements.href;
+      requirementStart.innerHTML = requirements.action + ' <?= icon_span('arrowRight') ?>';
+      requirementsDialog.showModal();
+    });
+  });
+  requirementsDialog.querySelectorAll('[data-requirements-close]').forEach(button => {
+    button.addEventListener('click', () => requirementsDialog.close());
+  });
+  requirementsDialog.addEventListener('click', event => {
+    if (event.target === requirementsDialog) requirementsDialog.close();
+  });
+
   const slider = document.querySelector('[data-hero-slider]');
   if (!slider) return;
   const slides = Array.from(slider.querySelectorAll('.hero-slide'));
