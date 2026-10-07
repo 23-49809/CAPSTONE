@@ -533,7 +533,7 @@ function blankFormData(){
 const state = {
   view:'landing', flow:null, step:1, maxStep:1,
   formData: blankFormData(), errors:{}, lastSubmission:null,
-  track:{ query:'', result:null, searched:false }, submitConfirmation:false, requirements:null
+  track:{ query:'', result:null, searched:false }, submitConfirmation:false, requirements:null, announcementModal:false
 };
 
 /* ======================= Validation rules ======================= */
@@ -758,12 +758,20 @@ function renderRequirementsModal(){
   + '</div></div>';
 }
 
+function renderAnnouncementModal(){
+  if(!state.announcementModal) return '';
+  return '<div class="requirements-modal" data-action="close-announcement"><article class="requirements-modal-card announcement-detail" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title" tabindex="-1">'
+    + '<div class="requirements-modal-head"><div><span class="eyebrow" style="color:var(--brand-700);margin-bottom:8px;">Important Notice</span><h3 id="announcement-modal-title">Office Announcement</h3></div><button class="requirements-close" type="button" data-action="close-announcement" aria-label="Close announcement"><img class="requirements-close-icon" src="close.png" alt=""></button></div>'
+    + '<div class="announcement-detail-meta">Announcement date: September 16, 2026 &middot; Office closure date: September 25, 2026</div><h2>Office Closure Notice</h2><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the closure date and check your request requirements before submitting or claiming documents. Follow any additional instructions provided by the Assessor’s Office.</p></div>'
+  + '</article></div>';
+}
+
 /* ---------- Landing ---------- */
 function renderLanding(){
   return renderHeader()
   + '<section class="hero home-slider" data-home-slider aria-label="Assessor Office updates">'
     + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">MABINI MUNICIPAL ASSESSOR’S OFFICE</span><h1>Welcome to SMART ASSESS</h1><p><em>Your Digital Gateway to Assessor Services</em></p><p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p><button class="btn btn-hero" data-action="get-started">Explore Services '+ic('arrowRight')+'</button></div></div></div>'
-    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Announcements</span><h1>Announcements</h1><div class="announcement-copy"><h3>Office Closure Notice</h3><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><time>September 16, 2026</time></div><button class="btn btn-hero" data-action="view-announcement-page">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Announcements</span><h1>Announcements</h1><div class="announcement-copy"><h3>Office Closure Notice</h3><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><time>September 16, 2026</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
     + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
     + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Welcome to SMART ASSESS slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Announcements slide"></button></div>'
   + '</section>'
@@ -792,6 +800,7 @@ function renderLanding(){
     + '</div></div></section>'
 
   + renderRequirementsModal()
+  + renderAnnouncementModal()
   + '<footer class="site-footer"><div class="wrap"><div class="footer-grid">'
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
     + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: assessor@mabini.gov.ph</p></div>'
@@ -1294,10 +1303,19 @@ function bindEvents(root){
     const trigger = root.querySelector('[data-action="show-requirements"][data-requirements="'+requirement+'"]');
     if(trigger) trigger.focus();
   }
+  function closeAnnouncement(){
+    state.announcementModal = false;
+    renderKeepingHomeSlide();
+    const trigger = root.querySelector('[data-action="show-announcement"]');
+    if(trigger) trigger.focus();
+  }
   root.addEventListener('keydown', function(event){
     if(event.key==='Escape' && state.requirements){
       event.preventDefault();
       closeRequirements();
+    } else if(event.key==='Escape' && state.announcementModal){
+      event.preventDefault();
+      closeAnnouncement();
     }
   });
   root.querySelectorAll('[data-barangay-trigger]').forEach(function(trigger){
@@ -1371,6 +1389,12 @@ function bindEvents(root){
       else if(a==='start-docreq') startFlow('docreq');
       else if(a==='start-landtransfer') startFlow('landtransfer');
       else if(a==='view-announcement-page') go('announcement');
+      else if(a==='show-announcement'){
+        state.announcementModal = true;
+        renderKeepingHomeSlide();
+        const closeButton = root.querySelector('[data-action="close-announcement"].requirements-close');
+        if(closeButton) closeButton.focus();
+      }
       else if(a==='show-requirements'){
         state.requirements = el.getAttribute('data-requirements');
         renderKeepingHomeSlide();
@@ -1380,6 +1404,10 @@ function bindEvents(root){
       else if(a==='close-requirements'){
         if(el.classList.contains('requirements-modal') && event.target!==el) return;
         closeRequirements();
+      }
+      else if(a==='close-announcement'){
+        if(el.classList.contains('requirements-modal') && event.target!==el) return;
+        closeAnnouncement();
       }
       else if(a==='slider-prev' || a==='slider-next' || a==='slider-dot'){
         const sliderRoot = root.querySelector('[data-home-slider]');
