@@ -1330,7 +1330,7 @@ function renderDocReqReport(acct){
   var completed = all.filter(function(r){ return r.status==='Completed'; }).length;
   var rejected = all.filter(function(r){ return r.status==='Rejected'; }).length;
   var inProgress = total - completed - rejected;
-  var docTypes = Array.prototype.slice.call(new Set(all.map(function(r){ return r.docType; }))).sort();
+  var docTypes = uniqueSorted(all.map(function(r){ return r.docType; }));
 
   var data = getDocReqReportRows();
   var list = data.rows, sortState = data.sort;
@@ -1384,7 +1384,7 @@ function renderLandTransferReport(acct){
   var completed = all.filter(function(r){ return r.status==='Completed'; }).length;
   var rejected = all.filter(function(r){ return r.status==='Rejected'; }).length;
   var inProgress = total - completed - rejected;
-  var transferTypes = Array.prototype.slice.call(new Set(all.map(function(r){ return r.transferType; }))).sort();
+  var transferTypes = uniqueSorted(all.map(function(r){ return r.transferType; }));
 
   var data = getLandTransferReportRows();
   var list = data.rows, sortState = data.sort;
