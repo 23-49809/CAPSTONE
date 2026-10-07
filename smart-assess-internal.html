@@ -1255,6 +1255,21 @@ function sortIndicator(sortState, key){
 function sortTh(label, reportKey, sortKey, sortState){
   return '<th class="sortable"><button type="button" class="th-sort" data-action="sort-report" data-report-key="'+reportKey+'" data-sort-key="'+sortKey+'">'+esc(label)+sortIndicator(sortState, sortKey)+'</button></th>';
 }
+/** The always-visible sort control. The table's own clickable column
+ *  headers (sortTh above) only work above the ~1340px breakpoint — below
+ *  it every table in this app collapses into stacked cards and the
+ *  <thead> (header row of a table, not this HTML document's own <head>)
+ *  is visually hidden, so this dropdown is what makes sorting actually
+ *  reachable on a normal laptop screen. */
+function sortSelectHtml(reportKey, sortState, options){
+  var current = sortState.key+':'+sortState.dir;
+  return '<select data-input="sort-'+reportKey+'-report" aria-label="Sort report by">'
+    + options.map(function(o){
+        var val = o[0]+':'+o[1];
+        return '<option value="'+val+'"'+(current===val?' selected':'')+'>'+esc(o[2])+'</option>';
+      }).join('')
+  + '</select>';
+}
 function sortRows(list, sortState, accessors){
   var key = sortState.key, dir = sortState.dir;
   var acc = accessors[key] || function(r){ return r[key]; };
