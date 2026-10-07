@@ -1672,6 +1672,9 @@ function bindEvents(){
 /* ---------------- Init ---------------- */
 function init(){
   render();
+  // Passive check so a Scheduled announcement still goes live on its own
+  // even if the head leaves this tab idle on some other screen.
+  setInterval(function(){ if(publishDueAnnouncements()) render(); }, 15000);
 }
 init();
 
