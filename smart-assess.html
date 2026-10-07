@@ -1277,6 +1277,14 @@ function render(){
 }
 
 function bindEvents(root){
+  function renderKeepingHomeSlide(){
+    const slider = root.querySelector('[data-home-slider]');
+    const activeSlide = slider ? slider.querySelector('.home-slide.active') : null;
+    const slideIndex = slider && activeSlide ? Array.from(slider.querySelectorAll('.home-slide')).indexOf(activeSlide) : -1;
+    render();
+    const updatedSlider = root.querySelector('[data-home-slider]');
+    if(slideIndex>=0 && updatedSlider && updatedSlider._showSlide) updatedSlider._showSlide(slideIndex);
+  }
   function closeBarangayMenus(){
     root.querySelectorAll('[data-barangay-dropdown].open').forEach(function(dropdown){
       dropdown.classList.remove('open');
@@ -1289,7 +1297,7 @@ function bindEvents(root){
   function closeRequirements(){
     const requirement = state.requirements;
     state.requirements = null;
-    render();
+    renderKeepingHomeSlide();
     const trigger = root.querySelector('[data-action="show-requirements"][data-requirements="'+requirement+'"]');
     if(trigger) trigger.focus();
   }
@@ -1372,7 +1380,7 @@ function bindEvents(root){
       else if(a==='view-announcement-page') go('announcement');
       else if(a==='show-requirements'){
         state.requirements = el.getAttribute('data-requirements');
-        render();
+        renderKeepingHomeSlide();
         const closeButton = root.querySelector('.requirements-close');
         if(closeButton) closeButton.focus();
       }
