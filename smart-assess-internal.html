@@ -214,9 +214,14 @@
   .announcement-card .ac-actions{ display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:nowrap; }
   .announcement-card .ac-actions .action-button{ width:88px; height:40px; flex:0 0 88px; justify-content:center; }
 
-  .publish-options{ display:flex; flex-direction:column; gap:10px; }
-  .publish-option{ display:flex; align-items:flex-start; gap:10px; border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); padding:12px 14px; cursor:pointer; font-size:13.5px; color:var(--ink-soft); }
-  .publish-option input{ margin-top:3px; accent-color:var(--brand-600); flex-shrink:0; }
+  .publish-options{ display:flex; flex-direction:column; gap:10px; width:100%; min-width:0; }
+  .publish-option{ display:flex; align-items:flex-start; gap:10px; border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); padding:12px 14px; cursor:pointer; font-size:13.5px; color:var(--ink-soft); width:100%; min-width:0; box-sizing:border-box; }
+  /* .field input (above) sets width:100%/padding/border/background meant for
+     text inputs — it also matches this radio since it's nested in a .field,
+     which is what was inflating it into a huge full-width box. Reset the
+     box model back to a normal small radio control explicitly. */
+  .publish-option input[type="radio"]{ width:16px; height:16px; min-width:16px; flex:0 0 16px; margin:3px 0 0; padding:0; border:1.5px solid var(--line-strong); border-radius:50%; background:var(--surface); accent-color:var(--brand-600); }
+  .publish-option > span{ flex:1 1 auto; min-width:0; overflow-wrap:break-word; }
   .publish-option b{ color:var(--ink); font-size:14px; }
   .publish-option:has(input:checked){ border-color:var(--brand-500); background:var(--brand-50); }
 
