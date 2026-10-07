@@ -73,7 +73,7 @@ require __DIR__ . '/../includes/internal_header.php';
       <input type="hidden" name="action" value="add_account">
       <div class="field"><label>Full Name</label><input type="text" name="name" placeholder="Full name" required></div>
       <div class="field"><label>Username</label><input type="text" name="username" placeholder="username" required></div>
-      <div class="field"><label>Contact Number</label><?= internal_contact_control() ?></div>
+      <div class="field"><label for="add-contact-number">Contact Number</label><?= internal_contact_control(null, null, 'add-contact-number') ?></div>
       <div class="field"><label>Position Title</label><?= internal_position_control() ?></div>
       <div class="field"><label>Role</label>
         <select name="role" required><option value="staff">Assessor's Staff</option><option value="admin">Admin</option><option value="head">Department Head</option></select>
@@ -88,19 +88,19 @@ require __DIR__ . '/../includes/internal_header.php';
           <tr>
             <td><?= esc($a['name']) ?></td>
             <td class="mono"><?= esc($a['username']) ?></td>
-            <td><?= internal_contact_control($a['contact_number'] ?? null, $editFormId) ?></td>
+            <td><?= internal_contact_control($a['contact_number'] ?? null, $editFormId, 'contact-' . (int) $a['id']) ?></td>
             <td><?= internal_position_control($a['position_title'] ?? null, $editFormId) ?></td>
             <td colspan="2">
               <form id="<?= esc($editFormId) ?>" method="post" class="user-row-edit">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="update_account">
                 <input type="hidden" name="user_id" value="<?= (int)$a['id'] ?>">
-                <select name="role" class="mono">
+                <select name="role" class="mono" required>
                   <option value="staff" <?= $roleCode === 'staff' ? 'selected' : '' ?>>Assessor's Staff</option>
                   <option value="admin" <?= $roleCode === 'admin' ? 'selected' : '' ?>>Admin</option>
                   <option value="head" <?= $roleCode === 'head' ? 'selected' : '' ?>>Department Head</option>
                 </select>
-                <select name="status">
+                <select name="status" required>
                   <option value="Active" <?= $a['status'] === 'Active' ? 'selected' : '' ?>>Active</option>
                   <option value="Inactive" <?= $a['status'] === 'Inactive' ? 'selected' : '' ?>>Inactive</option>
                 </select>
