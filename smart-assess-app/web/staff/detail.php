@@ -24,6 +24,12 @@ require __DIR__ . '/../includes/internal_header.php';
     <span class="badge <?= status_badge_class($req['status']) ?>"><?= esc($req['status']) ?></span>
     &nbsp;<?php if ($req['requirement_complete']): ?><span class="badge green"><?= icon_span('check','12px') ?> Complete</span><?php else: ?><span class="badge amber"><?= icon_span('alert','12px') ?> Needs review</span><?php endif; ?>
     <?php if ($statusError === 'incomplete_requirements'): ?><div class="flash error" style="margin-top:16px"><?= icon_span('alert') ?> Approval is blocked while required documents are incomplete.</div><?php endif; ?>
+    <?php $elapsed = request_elapsed_info($req['flow'], $req['created_at'], $req['status']); ?>
+    <?php if ($elapsed['overdue']): ?>
+      <div class="flash error" style="margin-top:16px"><?= icon_span('alert') ?> This request has been open for <?= $elapsed['days'] ?> day<?= $elapsed['days'] === 1 ? '' : 's' ?>, past the <?= $elapsed['limit'] ?>-day expected processing time for this service.</div>
+    <?php else: ?>
+      <p style="font-size:12.5px;color:var(--ink-faint);margin-top:8px"><?= $elapsed['days'] ?> day<?= $elapsed['days'] === 1 ? '' : 's' ?> since submission &middot; expected within <?= $elapsed['limit'] ?> days.</p>
+    <?php endif; ?>
 
     <div class="review-card" style="margin:16px 0">
       <div class="review-row"><span class="k">Service</span><span class="v"><?= $req['flow'] === 'docreq' ? 'Document Request' : 'Land Transfer' ?></span></div>
