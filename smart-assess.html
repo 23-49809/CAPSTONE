@@ -132,7 +132,9 @@
   .requirements-modal-head{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
   .requirements-close{ display:flex; align-items:center; justify-content:center; flex:0 0 44px; border:1px solid var(--line); border-radius:50%; width:44px; height:44px; background:var(--surface-2); color:var(--ink); cursor:pointer; }
   .requirements-close:hover{ background:var(--brand-100); }
-  .requirements-close .icon{ width:20px; height:20px; }
+  .requirements-close img{ width:18px; height:18px; object-fit:contain; }
+  :root[data-theme="dark"] .requirements-close img{ filter:invert(1); }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .requirements-close img{ filter:invert(1); } }
   .public-detail-page{ padding:82px 0; }
   .public-detail-page .section-head{ margin-bottom:34px; }
   .public-detail-page .section-head .eyebrow{ color:var(--brand-700); margin-bottom:10px; }
@@ -750,7 +752,7 @@ function renderRequirementsModal(){
     ? ['Certified True Copy of Tax Declaration or Title','Notarial Deed of Sale or Donation','Vicinity Map','Certification of No Improvement','Tax Clearance','Valid government-issued ID']
     : ['Valid government-issued ID','Completed request details','Property or tax declaration information','Authorization letter and representative ID, if filing for the owner'];
   return '<div class="requirements-modal" data-action="close-requirements"><div class="requirements-modal-card" role="dialog" aria-modal="true" aria-labelledby="requirements-title" tabindex="-1">'
-    + '<div class="requirements-modal-head"><h3 id="requirements-title">'+title+'</h3><button class="requirements-close" type="button" data-action="close-requirements" aria-label="Close requirements">'+ic('x')+'</button></div>'
+    + '<div class="requirements-modal-head"><h3 id="requirements-title">'+title+'</h3><button class="requirements-close" type="button" data-action="close-requirements" aria-label="Close requirements"><img src="close.png" alt="" aria-hidden="true"></button></div>'
     + '<ul>'+items.map(function(item){ return '<li>'+esc(item)+'</li>'; }).join('')+'</ul>'
     + '<button class="btn btn-primary" data-action="start-'+(isLand?'landtransfer':'docreq')+'">Start Request '+ic('arrowRight')+'</button>'
   + '</div></div>';
