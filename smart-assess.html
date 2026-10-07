@@ -798,13 +798,6 @@ function renderLanding(){
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
 }
 
-  function renderRequirementsPage(){
-    return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Public Service Guide</span><h1>Service Requirements</h1><p>Review the general requirements before starting your request.</p></div><div class="requirements-grid">'
-      + '<article class="panel-card" id="document-requirements"><h2>Document Request Requirements</h2><ul class="public-requirements-list"><li>Valid government-issued ID</li><li>Completed request details</li><li>Property or tax declaration information</li><li>Authorization letter and representative ID, if filing for the owner</li></ul><button class="btn btn-primary" data-action="start-docreq">Start Document Request '+ic('arrowRight')+'</button></article>'
-      + '<article class="panel-card" id="land-transfer-requirements"><h2>Land Transfer Requirements</h2><ul class="public-requirements-list"><li>Certified True Copy of Tax Declaration or Title</li><li>Notarial Deed of Sale or Donation</li><li>Vicinity Map</li><li>Certification of No Improvement</li><li>Tax Clearance</li><li>Valid government-issued ID</li></ul><button class="btn btn-primary" data-action="start-landtransfer">Start Land Transfer '+ic('arrowRight')+'</button></article>'
-    + '</div><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">'+ic('arrowLeft')+' Back to Home</button></div></div></section>';
-  }
-
   function renderAnnouncementPage(){
     return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><p>Official updates from the Department Head.</p></div><article class="panel-card announcement-detail"><div class="announcement-detail-meta">Announcement date: September 16, 2026 &middot; Office closure date: September 25, 2026</div><h2>Office Closure Notice</h2><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the closure date and check your request requirements before submitting or claiming documents. Follow any additional instructions provided by the Assessor’s Office.</p></div></article><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">'+ic('arrowLeft')+' Back to Home</button></div></div></section>';
   }
@@ -1267,7 +1260,6 @@ function render(){
   const app = document.getElementById('app');
   let html = '';
   if(state.view==='landing') html = renderLanding();
-  else if(state.view==='requirements') html = renderRequirementsPage();
   else if(state.view==='announcement') html = renderAnnouncementPage();
   else if(state.view==='wizard') html = renderWizard();
   else if(state.view==='confirmation') html = renderConfirmation();
