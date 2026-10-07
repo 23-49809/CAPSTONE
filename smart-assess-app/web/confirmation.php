@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/includes/client_auth.php';
 
+mark_overdue_requests(db());
+
 $refNo = trim($_GET['ref'] ?? '');
 $req = $refNo !== '' ? fetch_request_by_reference($refNo) : null;
 
