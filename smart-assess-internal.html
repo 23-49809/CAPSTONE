@@ -2096,7 +2096,18 @@ function bindEvents(){
       if(saveMode==='draft'){
         annStatus = 'Draft';
       } else if(publishMode==='schedule'){
-        var when = new Date(fd.get('scheduleDate')+'T'+fd.get('scheduleTime')+':00');
+        var schedDateVal = fd.get('scheduleDate')||'', schedTimeVal = fd.get('scheduleTime')||'';
+        var when = schedDateVal && schedTimeVal ? new Date(schedDateVal+'T'+schedTimeVal+':00') : null;
+        if(!when || isNaN(when.getTime()) || when.getTime() <= Date.now()){
+          // The picker's own inline error is already kept in sync live as
+          // the user interacts with it (see bindEvents) — just make sure
+          // it's visible and stop here. No render()/pushToast: either of
+          // those would rebuild this modal from the *saved* record and
+          // throw away whatever the user just typed in Title/Message/etc.
+          var schedErr = form.querySelector('[data-schedule-error]');
+          if(schedErr) schedErr.hidden = false;
+          return;
+        }
         annStatus = 'Scheduled';
         annScheduledAt = when.toISOString();
       } else {
