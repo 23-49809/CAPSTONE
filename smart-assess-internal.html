@@ -1241,9 +1241,29 @@ function doConfirm(payload){
 function runConfirmAction(){
   var c = state.confirm;
   if(!c) return;
-  if(c.action==='delete-staff'){
-    state.accounts = state.accounts.filter(function(a){ return a.id!==c.id; });
-    pushToast('Staff account deleted.', 'trash');
+  if(c.action==='archive-staff'){
+    var accountToArchive = findAccount(c.id);
+    if(accountToArchive){
+      state.accounts = state.accounts.filter(function(a){ return a.id!==c.id; });
+      state.archivedAccounts.push(accountToArchive);
+      state.confirm = null;
+      pushToast('Staff account archived.', 'archive');
+      return;
+    }
+  } else if(c.action==='restore-staff'){
+    var accountToRestore = (state.archivedAccounts || []).find(function(a){ return a.id===c.id; });
+    if(accountToRestore){
+      state.archivedAccounts = state.archivedAccounts.filter(function(a){ return a.id!==c.id; });
+      state.accounts.push(accountToRestore);
+      state.confirm = null;
+      pushToast('Staff account restored.', 'check');
+      return;
+    }
+  } else if(c.action==='delete-archived-staff'){
+    state.archivedAccounts = (state.archivedAccounts || []).filter(function(a){ return a.id!==c.id; });
+    state.confirm = null;
+    pushToast('Archived account permanently deleted.', 'trash');
+    return;
   } else if(c.action==='toggle-staff-status'){
     var a = findAccount(c.id);
     if(a){ a.status = a.status==='active' ? 'inactive' : 'active'; pushToast(a.fullName+' account '+(a.status==='active'?'activated':'deactivated')+'.', 'power'); }
@@ -1323,13 +1343,23 @@ function bindEvents(){
       } else if(a){
         doConfirm({title:(a.status==='active'?'Deactivate Account':'Activate Account'), message:(a.status==='active'?'This will immediately block '+a.fullName+' from logging in. Continue?':'This will restore login access for '+a.fullName+'. Continue?'), confirmLabel:(a.status==='active'?'Deactivate':'Activate'), danger:a.status==='active', action:'toggle-staff-status', id:a.id});
       }
-    } else if(action==='delete-staff'){
-      var a2 = findAccount(el.getAttribute('data-id'));
-      var selfAcc2 = currentAccount();
-      if(a2 && selfAcc2 && a2.username===selfAcc2.username){
-        pushToast('You cannot delete your own account while logged in.', 'alert');
-      } else if(a2){
-        doConfirm({title:'Delete Staff Account', message:'This permanently removes '+a2.fullName+' ('+a2.username+') from the system. This cannot be undone.', confirmLabel:'Delete', danger:true, action:'delete-staff', id:a2.id});
+    } else if(action==='archive-staff'){
+      var accountToArchive = findAccount(el.getAttribute('data-id'));
+      var signedInAccount = currentAccount();
+      if(accountToArchive && signedInAccount && accountToArchive.username===signedInAccount.username){
+        pushToast('You cannot archive your own account while logged in.', 'alert');
+      } else if(accountToArchive){
+        doConfirm({title:'Archive Staff Account', message:'Move '+accountToArchive.fullName+' ('+accountToArchive.username+') to Archived Accounts? The account can be restored later.', confirmLabel:'Archive', action:'archive-staff', id:accountToArchive.id});
+      }
+    } else if(action==='restore-staff'){
+      var accountToRestore = (state.archivedAccounts || []).find(function(a){ return a.id===el.getAttribute('data-id'); });
+      if(accountToRestore){
+        doConfirm({title:'Restore Staff Account', message:'Restore '+accountToRestore.fullName+' ('+accountToRestore.username+') to Staff Accounts?', confirmLabel:'Restore', action:'restore-staff', id:accountToRestore.id});
+      }
+    } else if(action==='delete-archived-staff'){
+      var archivedAccount = (state.archivedAccounts || []).find(function(a){ return a.id===el.getAttribute('data-id'); });
+      if(archivedAccount){
+        doConfirm({title:'Delete Archived Account Permanently', message:'Permanently remove '+archivedAccount.fullName+' ('+archivedAccount.username+') from the system? This cannot be undone.', confirmLabel:'Delete Permanently', danger:true, action:'delete-archived-staff', id:archivedAccount.id});
       }
     } else if(action==='close-modal'){
       state.modal = null; render();
