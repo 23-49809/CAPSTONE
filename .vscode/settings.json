@@ -1,5 +1,6 @@
 {
     "sqltools.connections": [
+
         {
             "mysqlOptions": {
                 "authProtocol": "default",
@@ -11,7 +12,7 @@
             "port": 3306,
             "driver": "MySQL",
             "name": "SMART ASSESS",
-            "database": "assessor_db",
+            "database": "smart_assess",
             "username": "root",
             "password": "assessor"
         }
