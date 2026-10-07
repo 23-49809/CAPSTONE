@@ -503,6 +503,30 @@ function log_activity(int $userId, string $action, ?int $requestId = null): void
  * Saves one uploaded file (from $_FILES) into UPLOAD_DIR, returning its
  * stored metadata. Returns null if no file was submitted for this field.
  */
+/**
+ * Records the AI checker's per-requirement verdict as a document_validation
+ * row — richer, queryable detail alongside request_documents.file_status's
+ * single ok/flagged/missing flag. validated_by stays NULL (this is the
+ * automatic AI pass, not a human); a future staff manual re-check would
+ * set validated_by to record who overrode it.
+ */
+function record_document_validation(PDO $pdo, int $requestDocumentId, string $fileStatus): void
+{
+    $status = match ($fileStatus) {
+        'ok' => 'valid',
+        'flagged' => 'invalid',
+        default => 'pending',
+    };
+    $remarks = match ($fileStatus) {
+        'ok' => 'Passed automatic format/size check.',
+        'flagged' => 'Uploaded file failed the automatic format/size check.',
+        default => 'No file uploaded for this requirement.',
+    };
+    $pdo->prepare(
+        'INSERT INTO document_validation (request_document_id, validation_status, remarks, validated_at) VALUES (?,?,?,NOW())'
+    )->execute([$requestDocumentId, $status, $remarks]);
+}
+
 function save_uploaded_file(string $fieldKey, string $refNo): ?array
 {
     if (empty($_FILES[$fieldKey]['name']) || $_FILES[$fieldKey]['error'] === UPLOAD_ERR_NO_FILE) {
