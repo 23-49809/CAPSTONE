@@ -130,9 +130,19 @@
   .requirements-modal-card h3{ font-size:25px; margin-bottom:12px; }
   .requirements-modal-card ul{ margin:0 0 24px; padding-left:22px; color:var(--ink-soft); }
   .requirements-modal-head{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
+  .requirements-modal-sections{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .requirements-modal-section h4{ font-size:17px; margin-bottom:10px; }
+  .requirements-modal-section ul{ margin-bottom:8px; }
+  .requirements-modal-section li{ margin-bottom:6px; }
   .requirements-close{ display:flex; align-items:center; justify-content:center; flex:0 0 44px; border:1px solid var(--line); border-radius:50%; width:44px; height:44px; background:var(--surface-2); color:var(--ink); cursor:pointer; }
   .requirements-close:hover{ background:var(--brand-100); }
   .requirements-close-icon{ display:block; width:20px; height:20px; object-fit:contain; }
+  .requirements-trigger-row{ display:flex; justify-content:center; margin:-24px 0 28px; }
+  @media (max-width:600px){
+    .requirements-modal-sections{ grid-template-columns:1fr; gap:10px; }
+    .requirements-modal-card{ max-height:calc(100dvh - 28px); }
+    .requirements-trigger-row{ margin:-24px 0 24px; }
+  }
   .public-detail-page{ padding:82px 0; }
   .public-detail-page .section-head{ margin-bottom:34px; }
   .public-detail-page .section-head .eyebrow{ color:var(--brand-700); margin-bottom:10px; }
