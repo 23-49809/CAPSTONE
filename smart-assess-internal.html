@@ -688,6 +688,29 @@ var NAV = {
 var ROLE_LABEL = {admin:'Assessor Admin', head:'Assessor Head', staff:'Assessor Staff'};
 var POSITION_OPTIONS = ['Assessor Admin','Assessor Head','Assessment Clerk','Records Officer'];
 
+/* Announcements > "Post To" — who the announcement is shown to. */
+var ANNOUNCEMENT_AUDIENCES = {client:'Client Interface', staff:'Staff Interface', both:'Both'};
+function audienceLabel(code){ return ANNOUNCEMENT_AUDIENCES[code] || code; }
+function annBadgeClass(status){
+  return status==='Published' ? 'green' : status==='Scheduled' ? 'amber' : status==='Cancelled' ? 'red' : 'slate';
+}
+/** Scheduled -> Published the moment the scheduled time arrives. There's no
+ *  server/cron in this demo, so this runs on every render() plus a standing
+ *  interval (wired near the bootstrap code below) so it fires even if the
+ *  head just leaves the tab open without clicking anything. */
+function publishDueAnnouncements(){
+  var now = new Date();
+  var changed = false;
+  (state.announcements||[]).forEach(function(a){
+    if(a.status==='Scheduled' && a.scheduledAt && new Date(a.scheduledAt) <= now){
+      a.status = 'Published';
+      a.publishedAt = a.scheduledAt;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function contactDigits(value){
   var digits = String(value||'').replace(/\D/g,'');
   if(digits.length>10 && digits.slice(0,2)==='63') digits = digits.slice(2);
@@ -706,6 +729,7 @@ function contactIsValid(value){ return /^9\d{9}$/.test(String(value||'')); }
 
 /* ---------------- Render dispatcher ---------------- */
 function render(){
+  publishDueAnnouncements();
   var app = document.getElementById('app');
   if(!state.session){
     app.innerHTML = renderLogin();
