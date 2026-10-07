@@ -1795,6 +1795,8 @@ function initTimePicker(picker, options){
   var trigger = picker.querySelector('[data-dt-trigger]');
   var display = picker.querySelector('[data-dt-display]');
   var popover = picker.querySelector('[data-dt-popover]');
+  picker._popoverEl = popover;
+  popover._ownerPicker = picker;
   var hour12 = 9, minute = 0, period = 'AM';
   if(hidden.value){
     var parts = hidden.value.split(':'); var t = to12Hour(+parts[0]);
