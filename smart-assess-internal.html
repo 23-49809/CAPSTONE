@@ -1591,6 +1591,15 @@ function bindEvents(){
     } else if(action==='delete-ann'){
       var an = findAnn(el.getAttribute('data-id'));
       if(an) doConfirm({title:'Delete Announcement', message:'This permanently removes "'+an.title+'". This cannot be undone.', confirmLabel:'Delete', danger:true, action:'delete-ann', id:an.id});
+    } else if(action==='ann-publish-now'){
+      var anPub = findAnn(el.getAttribute('data-id'));
+      if(anPub){ anPub.status='Published'; anPub.publishedAt=new Date().toISOString(); anPub.scheduledAt=null; pushToast('Announcement published to '+audienceLabel(anPub.postTo)+'.', 'megaphone'); }
+    } else if(action==='ann-unpublish'){
+      var anUnpub = findAnn(el.getAttribute('data-id'));
+      if(anUnpub){ anUnpub.status='Draft'; anUnpub.publishedAt=null; pushToast('Announcement moved back to Draft.', 'check'); }
+    } else if(action==='ann-cancel'){
+      var anCancel = findAnn(el.getAttribute('data-id'));
+      if(anCancel){ anCancel.status='Cancelled'; anCancel.publishedAt=null; pushToast('Scheduled announcement cancelled.', 'x'); }
     } else if(action==='view-report'){
       state.modal = {type:'report-detail', id:el.getAttribute('data-id')}; render();
     } else if(action==='view-doc-req'){
