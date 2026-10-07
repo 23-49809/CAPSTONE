@@ -48,8 +48,6 @@ CREATE TABLE users (
   role_id       TINYINT NOT NULL,
   name          VARCHAR(150) NOT NULL,
   username      VARCHAR(80)  NOT NULL UNIQUE,
-  contact_number VARCHAR(20) NULL,
-  position_title VARCHAR(80) NULL,
   password_hash VARCHAR(255) NOT NULL,
   status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
