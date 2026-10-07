@@ -1662,19 +1662,24 @@ var _dtGlobalHandlersBound = false;
 function ensureDtGlobalHandlers(){
   if(_dtGlobalHandlersBound) return;
   _dtGlobalHandlersBound = true;
+  // Once open, a popover is relocated to .modal-overlay (see openDtPopover
+  // for why), so it's no longer a DOM descendant of its .dt-picker — these
+  // handlers use the explicit _ownerPicker back-reference instead of
+  // .closest('.dt-picker'), and treat clicks inside the (relocated)
+  // popover itself as "inside", not just clicks on the trigger.
   document.addEventListener('click', function(ev){
     document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){
-      var picker = pop.closest('.dt-picker');
-      if(picker && !picker.contains(ev.target)) closeDtPopover(picker);
+      var picker = pop._ownerPicker;
+      if(picker && !picker.contains(ev.target) && !pop.contains(ev.target)) closeDtPopover(picker);
     });
   }, true);
   document.addEventListener('keydown', function(ev){
     if(ev.key==='Escape'){
-      document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){ closeDtPopover(pop.closest('.dt-picker')); });
+      document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){ if(pop._ownerPicker) closeDtPopover(pop._ownerPicker); });
     }
   });
   window.addEventListener('scroll', function(){
-    document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){ closeDtPopover(pop.closest('.dt-picker')); });
+    document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){ if(pop._ownerPicker) closeDtPopover(pop._ownerPicker); });
   }, true);
 }
 function closeDtPopover(picker){
