@@ -299,7 +299,7 @@ select:focus{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-10
 .seg{ display:flex; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:4px; gap:2px; }
 .seg a{ border:none; background:none; padding:8px 15px; border-radius:999px; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; text-decoration:none; }
 .seg a.active{ background:var(--brand-700); color:#fff; }
-.toolbar select{ font-family:inherit; font-size:13px; padding:9px 12px; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--surface); }
+.toolbar select{ min-width:180px; }
 
 .table-wrap{ overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:44px; }
 table{ width:100%; border-collapse:collapse; min-width:900px; }
