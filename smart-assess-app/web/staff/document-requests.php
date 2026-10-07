@@ -5,7 +5,7 @@ $me = require_role(['staff']);
 mark_overdue_requests(db());
 
 $statusFilter = in_array($_GET['status'] ?? '', STATUS_FLOW, true) ? $_GET['status'] : '';
-$sql = "SELECT * FROM requests WHERE flow = 'docreq'";
+$sql = "SELECT requests.*, (SELECT MAX(created_at) FROM request_status_log WHERE request_id = requests.id) AS last_action_at FROM requests WHERE flow = 'docreq'";
 $params = [];
 if ($statusFilter) { $sql .= ' AND status = ?'; $params[] = $statusFilter; }
 $sql .= ' ORDER BY created_at DESC';
