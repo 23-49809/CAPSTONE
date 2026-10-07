@@ -214,6 +214,32 @@
   .announcement-card .ac-actions{ display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:nowrap; }
   .announcement-card .ac-actions .action-button{ width:88px; height:40px; flex:0 0 88px; justify-content:center; }
 
+  .publish-options{ display:flex; flex-direction:column; gap:10px; }
+  .publish-option{ display:flex; align-items:flex-start; gap:10px; border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); padding:12px 14px; cursor:pointer; font-size:13.5px; color:var(--ink-soft); }
+  .publish-option input{ margin-top:3px; accent-color:var(--brand-600); flex-shrink:0; }
+  .publish-option b{ color:var(--ink); font-size:14px; }
+  .publish-option:has(input:checked){ border-color:var(--brand-500); background:var(--brand-50); }
+
+  /* Generated Reports > Print Report — only the on-screen look; the
+     print-only cropping lives in the @media print block below. */
+  .report-print-head{ font-size:18px; font-weight:700; margin-bottom:4px; }
+
+  @media print{
+    /* Scoped to whichever screen actually has a #report-printable element
+       (the report-detail modal) so printing any other page/modal in this
+       app is completely unaffected. */
+    body:has(#report-printable) *{ visibility:hidden; }
+    body:has(#report-printable) #report-printable,
+    body:has(#report-printable) #report-printable *{ visibility:visible; }
+    body:has(#report-printable) #report-printable{ position:absolute; left:0; top:0; width:100%; margin:0; padding:0; }
+    .no-print{ display:none !important; }
+    @page{ margin:14mm; }
+    body:has(#report-printable){ background:#fff; }
+    #report-printable table{ width:100%; border-collapse:collapse; }
+    #report-printable thead{ display:table-header-group; }
+    #report-printable tr{ break-inside:avoid; }
+  }
+
   @media (max-width:1340px){
     .table-wrap{ overflow:hidden; border:0; background:transparent; }
     .table-wrap table, .table-wrap table.has-actions{ display:block; width:100%; min-width:0; table-layout:auto; border-collapse:separate; border-spacing:0; }
