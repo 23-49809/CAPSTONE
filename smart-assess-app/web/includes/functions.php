@@ -110,7 +110,11 @@ const LAND_TRANSFER_DOCS = [
     ['key' => 'taxClearance', 'label' => 'Tax Clearance'],
 ];
 
-const STATUS_FLOW = ['Received', 'Processing', 'Approved', 'Rejected', 'Out for Release'];
+const STATUS_FLOW = ['Received', 'Processing', 'Approved', 'Rejected', 'Out for Release', 'Timed Out'];
+
+/** Statuses that mean "this request is done" — a request already in one
+ *  of these never gets auto-flagged Timed Out regardless of how old it is. */
+const TERMINAL_STATUSES = ['Approved', 'Rejected', 'Out for Release'];
 
 function status_badge_class(string $status): string
 {
@@ -120,8 +124,57 @@ function status_badge_class(string $status): string
         'Approved' => 'green',
         'Rejected' => 'red',
         'Out for Release' => 'blue',
+        'Timed Out' => 'orange',
         default => 'slate',
     };
+}
+
+/** Requests > expected processing window, in whole days, per flow —
+ *  editable at Admin > Settings. */
+function request_processing_days(string $flow): int
+{
+    $key = $flow === 'docreq' ? 'docreq_processing_days' : 'landtransfer_processing_days';
+    $default = $flow === 'docreq' ? '5' : '10';
+    return max(1, (int) get_setting($key, $default));
+}
+
+/** How long a request has been open, and whether it's past its expected
+ *  processing window — shared by the list tables and the detail page so
+ *  the figure is computed identically everywhere. */
+function request_elapsed_info(string $flow, string $createdAt, string $status): array
+{
+    $days = (int) floor((time() - strtotime($createdAt)) / 86400);
+    $limit = request_processing_days($flow);
+    return [
+        'days' => $days,
+        'limit' => $limit,
+        'overdue' => !in_array($status, TERMINAL_STATUSES, true) && $days >= $limit,
+    ];
+}
+
+/**
+ * Time Stamp Tracking: flags any request still open past its expected
+ * processing window as "Timed Out". There's no background cron in this
+ * app, so every page that reads from `requests` calls this first — same
+ * lazy, idempotent-when-nothing's-due pattern as publish_due_announcements()
+ * uses for announcements. Each flip goes through push_status() with
+ * actor='system', so it's logged with a real, DB-generated timestamp and
+ * stays clearly distinguishable from an actual staff action.
+ */
+function mark_overdue_requests(PDO $pdo): void
+{
+    $stmt = $pdo->prepare(
+        "SELECT id, reference_no FROM requests
+         WHERE status NOT IN ('Approved','Rejected','Out for Release','Timed Out')
+           AND (
+             (flow = 'docreq' AND created_at <= DATE_SUB(NOW(), INTERVAL ? DAY))
+             OR (flow = 'landtransfer' AND created_at <= DATE_SUB(NOW(), INTERVAL ? DAY))
+           )"
+    );
+    $stmt->execute([request_processing_days('docreq'), request_processing_days('landtransfer')]);
+    foreach ($stmt->fetchAll() as $row) {
+        push_status((int) $row['id'], 'Timed Out', $row['reference_no'], [], 'system');
+    }
 }
 
 /** Announcements > "Post To" — who the announcement is shown to. */
