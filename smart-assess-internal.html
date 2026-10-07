@@ -178,6 +178,8 @@
   .actions-container{ display:flex; align-items:center; gap:8px; width:100%; min-width:0; flex-wrap:nowrap; }
   .actions-container .action-button{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; height:40px; padding:6px 10px; white-space:nowrap; }
   .actions-container .archive-button, .actions-container .delete-icon-button{ width:48px; min-width:48px; height:40px; padding:0; flex:0 0 48px; }
+  .actions-container .restore-button{ width:96px; }
+  .actions-container .delete-permanently-button{ width:180px; }
   .staff-row-actions .staff-action-view, .staff-row-actions .staff-action-edit{ width:80px; }
   .staff-row-actions .staff-action-status{ width:156px; }
   .staff-row-actions .archive-button{ width:48px; min-width:48px; }
@@ -205,7 +207,7 @@
   .announcement-card .ac-meta{ font-size:11.5px; color:var(--ink-faint); margin-bottom:8px; }
   .announcement-card p{ font-size:13.5px; color:var(--ink-soft); }
   .announcement-card .ac-actions{ display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:nowrap; }
-  .announcement-card .ac-actions .action-button{ height:40px; flex:0 0 auto; }
+  .announcement-card .ac-actions .action-button{ width:88px; height:40px; flex:0 0 88px; justify-content:center; }
 
   .review-card{ background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-md); padding:18px 20px; }
   .review-row{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
@@ -783,16 +785,16 @@ function renderStaffAccounts(acct, jumpToInfo){
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by name, username, or email" value="'+esc(state.search.staffAccounts)+'" data-input="search-staff"></div>'
     + '<select data-input="filter-staff-status"><option value="all"'+(statusF==='all'?' selected':'')+'>All Statuses</option><option value="active"'+(statusF==='active'?' selected':'')+'>Active</option><option value="inactive"'+(statusF==='inactive'?' selected':'')+'>Inactive</option></select>'
   + '</div>'
-  + '<div class="table-wrap"><table class="staff-accounts-table"><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="staff-accounts-table has-actions"><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(a){
       return '<tr><td class="cell-name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
         + '<td class="mono">'+esc(a.username)+'</td><td>'+esc(a.email)+'</td><td>'+esc(a.position)+'</td>'
         + '<td><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
-        + '<td><div class="staff-row-actions">'
-          + '<button class="icon-btn staff-action staff-action-view" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
-          + '<button class="icon-btn staff-action staff-action-edit" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
-          + '<button class="icon-btn staff-action staff-action-status" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
-          + '<button class="icon-btn staff-action staff-action-archive" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">'+ic('archive','13px')+'</button>'
+        + '<td class="actions-cell"><div class="actions-container staff-row-actions">'
+          + '<button class="icon-btn action-button staff-action-view" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
+          + '<button class="icon-btn action-button staff-action-edit" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
+          + '<button class="icon-btn action-button staff-action-status" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
+          + '<button class="icon-btn action-button archive-button" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">'+ic('archive','13px')+'</button>'
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('users','30px')+'No staff accounts match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('staffAccounts', pg)+'</div>';
@@ -802,13 +804,13 @@ function renderArchivedAccounts(){
   var archived = state.archivedAccounts || [];
   return ''
   + '<div class="page-head"><div><div class="breadcrumb">Assessor Admin</div><h1>Archived Accounts</h1><p>Archived staff accounts are inactive and can be restored or permanently deleted.</p></div></div>'
-  + (archived.length ? '<div class="table-wrap"><table><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
+  + (archived.length ? '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
     + archived.map(function(a){
       return '<tr><td class="cell-name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
         + '<td class="mono">'+esc(a.username)+'</td><td>'+esc(a.email)+'</td><td>'+esc(a.position)+'</td>'
         + '<td><span class="badge slate">Archived</span></td>'
-        + '<td><div class="row-actions"><button class="icon-btn" data-action="restore-staff" data-id="'+a.id+'">'+ic('check','13px')+'Restore</button>'
-        + '<button class="icon-btn danger" data-action="delete-archived-staff" data-id="'+a.id+'">'+ic('trash','13px')+'Delete Permanently</button></div></td></tr>';
+        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button restore-button" data-action="restore-staff" data-id="'+a.id+'">'+ic('check','13px')+'Restore</button>'
+        + '<button class="icon-btn danger action-button delete-permanently-button" data-action="delete-archived-staff" data-id="'+a.id+'">'+ic('trash','13px')+'Delete Permanently</button></div></td></tr>';
     }).join('')+'</tbody></table></div>' : '<div class="table-wrap"><div class="empty-state">'+ic('archive','30px')+'No archived accounts.</div></div>');
 }
 
@@ -871,7 +873,7 @@ function renderHeadDashboard(acct){
   + '<div class="two-col">'
     + '<div class="panel-card"><h3>'+ic('fileBar')+'Recent Generated Reports</h3>'
       + recentReports.map(function(r){
-          return '<div class="review-row"><span class="k">'+esc(r.title)+'</span><button class="icon-btn" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View</button></div>';
+          return '<div class="review-row review-action-row"><span class="k">'+esc(r.title)+'</span><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View</button></div></div>';
         }).join('')
       + '<div style="margin-top:14px;"><button class="btn btn-outline btn-sm" data-action="nav" data-view="reports">See All Reports</button></div>'
     + '</div>'
@@ -906,7 +908,7 @@ function renderAnnouncements(acct){
   + (list.length ? list.map(function(a){
       return '<div class="announcement-card fade-in"><div class="ac-head"><div><h4>'+esc(a.title)+'</h4><div class="ac-meta">Posted '+fmtDate(a.datePosted)+' by '+esc(a.postedBy)+'</div></div><span class="badge '+(a.status==='Published'?'green':'slate')+'">'+a.status+'</span></div>'
         + '<p>'+esc(a.content)+'</p>'
-        + '<div class="ac-actions"><button class="icon-btn" data-action="edit-ann" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button><button class="icon-btn danger" data-action="delete-ann" data-id="'+a.id+'">'+ic('trash','13px')+'Delete</button></div>'
+        + '<div class="ac-actions actions-container"><button class="icon-btn action-button" data-action="edit-ann" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button><button class="icon-btn danger action-button" data-action="delete-ann" data-id="'+a.id+'">'+ic('trash','13px')+'Delete</button></div>'
       + '</div>';
     }).join('') : '<div class="empty-state">'+ic('megaphone','30px')+'No announcements match your search.</div>')
   ;
@@ -933,10 +935,10 @@ function renderReports(acct){
       + '<option value="summary"'+(typeF==='summary'?' selected':'')+'>Summary</option>'
     + '</select>'
   + '</div>'
-  + '<div class="table  <table><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th>Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(r){
       return '<tr><td class="cell-name">'+esc(r.title)+'</td><td><span class="badge blue">'+TYPE_LABEL[r.type]+'</span></td><td>'+fmtDate(r.dateGenerated)+'</td>'
-        + '<td><button class="icon-btn" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></td></tr>';
+        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></div></td></tr>';
     }).join('') : '<tr><td colspan="4"><div class="empty-state">'+ic('fileBar','30px')+'No reports match your search.</div></td></tr>')
   + '</tbody></table></div>';
 }
@@ -1002,7 +1004,7 @@ function reqTableRow(r, kind){
   return '<tr><td class="mono">'+r.id+'</td><td class="cell-name">'+esc(r.applicant)+'<div class="cell-sub">'+sub+'</div></td>'
     + '<td>'+esc(r.barangay)+'</td><td>'+fmtDate(r.submitted)+'</td>'
     + '<td><span class="badge '+m.cls+'">'+r.status+'</span></td>'
-    + '<td><button class="icon-btn" data-action="view-'+kind+'-req" data-id="'+r.id+'">'+ic('eye','13px')+'Open</button></td></tr>';
+    + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-'+kind+'-req" data-id="'+r.id+'">'+ic('eye','13px')+'Open</button></div></td></tr>';
 }
 
 function renderDocRequests(acct){
@@ -1019,7 +1021,7 @@ function renderDocRequests(acct){
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docRequests)+'" data-input="search-doc"></div>'
     + '<select data-input="filter-doc-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
   + '</div>'
-  + '<div class="table-wrap"><table><thead><tr><th>Reference No.</th><th>Applicant / Document Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant / Document Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'doc'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('doc','30px')+'No document requests match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('docRequests', pg)+'</div>';
 }
@@ -1038,7 +1040,7 @@ function renderLandRequests(acct){
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.landRequests)+'" data-input="search-land"></div>'
     + '<select data-input="filter-land-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
   + '</div>'
-  + '<div class="table-wrap"><table><thead><tr><th>Reference No.</th><th>Applicant / Transfer Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant / Transfer Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'land'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('swap','30px')+'No land transfer requests match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('landRequests', pg)+'</div>';
 }
@@ -1064,12 +1066,12 @@ function renderRequirementResults(acct){
       + '<button class="'+(resF==='Invalid'?'active':'')+'" data-action="filter" data-key="reqResult" data-val="Invalid">Invalid</button>'
     + '</div>'
   + '</div>'
-  + '<div class="table-wrap"><table><thead><tr><th>Reference No.</th><th>Applicant</th><th>Request Type</th><th>Missing Docs</th><th>Overall Result</th><th>Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant</th><th>Request Type</th><th>Missing Docs</th><th>Overall Result</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(x){
       var res = overallResult(x.checklist);
       return '<tr><td class="mono">'+x.ref+'</td><td class="cell-name">'+esc(x.applicant)+'</td><td>'+x.type+'</td><td>'+missingCount(x.checklist)+'</td>'
         + '<td><span class="badge '+resultBadgeCls(res)+'">'+res+'</span></td>'
-        + '<td><button class="icon-btn" data-action="view-req-result" data-ref="'+x.ref+'">'+ic('eye','13px')+'View</button></td></tr>';
+        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-req-result" data-ref="'+x.ref+'">'+ic('eye','13px')+'View</button></div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('checklistIcon','30px')+'No requirement checking results match your search.</div></td></tr>')
   + '</tbody></table></div>';
 }
