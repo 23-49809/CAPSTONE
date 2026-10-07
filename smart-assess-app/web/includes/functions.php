@@ -400,13 +400,20 @@ function render_requests_table(array $requests, string $detailBase = '/staff/det
         $checkBadge = $r['requirement_complete']
             ? '<span class="badge green">' . icon_span('check', '12px') . ' Complete</span>'
             : '<span class="badge amber">' . icon_span('alert', '12px') . ' Needs review</span>';
+        $elapsed = request_elapsed_info($r['flow'], $r['created_at'], $r['status']);
+        $receivedCell = fmt_date($r['created_at'])
+            . '<div class="cell-sub' . ($elapsed['overdue'] ? ' overdue' : '') . '">'
+            . ($elapsed['overdue']
+                ? icon_span('alert', '11px') . ' Overdue by ' . ($elapsed['days'] - $elapsed['limit']) . 'd'
+                : $elapsed['days'] . 'd open')
+            . '</div>';
         $rows .= '<tr>'
             . '<td class="mono">' . esc($r['reference_no']) . '</td>'
             . '<td>' . esc(trim($r['first_name'] . ' ' . $r['last_name'])) . '</td>'
             . '<td>' . ($r['flow'] === 'docreq' ? 'Document Request' : 'Land Transfer') . '</td>'
             . '<td>' . esc($r['document_type'] ?: $r['transfer_type']) . '</td>'
             . '<td>' . esc($r['barangay']) . '</td>'
-            . '<td class="mono">' . fmt_date($r['created_at']) . '</td>'
+            . '<td class="mono">' . $receivedCell . '</td>'
             . '<td>' . $checkBadge . '</td>'
             . '<td><span class="badge ' . status_badge_class($r['status']) . '">' . esc($r['status']) . '</span></td>'
             . '<td><a class="icon-btn" href="' . esc($detailBase) . '?id=' . (int) $r['id'] . '">' . icon_span('eye', '14px') . ' View</a></td>'
