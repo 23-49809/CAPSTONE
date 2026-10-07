@@ -871,7 +871,7 @@ function accountFormFields(a){
   + '</div>'
   + '<div class="field-row">'
     + '<div class="field"><label>Email Address</label><input name="email" type="email" value="'+esc(a.email)+'" placeholder="name@mabini.gov.ph" required></div>'
-    + '<div class="field"><label>Contact Number</label><input name="contact" type="text" value="'+esc(a.contact)+'" placeholder="09xx-xxx-xxxx" required></div>'
+    + contactNumberField(a.contact)
   + '</div>'
   + '<div class="field-row">'
     + '<div class="field"><label>Position / Role</label>'
@@ -880,9 +880,22 @@ function accountFormFields(a){
         + '<option value="head"'+(a.role==='head'?' selected':'')+'>Assessor Head</option>'
         + '<option value="admin"'+(a.role==='admin'?' selected':'')+'>Assessor Admin</option>'
       + '</select></div>'
-    + '<div class="field"><label>Position Title</label><input name="positionTitle" type="text" value="'+esc(a.position)+'" placeholder="e.g. Assessment Clerk"></div>'
+    + positionTitleField(a.position)
   + '</div>'
   + '<div class="field"><label>Account Status</label><select name="status"><option value="active"'+(a.status==='active'?' selected':'')+'>Active</option><option value="inactive"'+(a.status==='inactive'?' selected':'')+'>Inactive</option></select></div>';
+}
+
+function contactNumberField(value){
+  return '<div class="field"><label for="internal-contact-number">Contact Number</label><div class="contact-number-input"><span class="contact-prefix" aria-hidden="true">+63</span><input id="internal-contact-number" name="contact" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="9171234567" maxlength="10" value="'+esc(contactDigits(value))+'" data-contact-number required></div><div class="field-error" data-contact-error hidden>Contact number must contain exactly 10 digits after +63 and start with 9.</div></div>';
+}
+
+function positionTitleField(value){
+  var selected = value||'';
+  var legacyOption = selected && POSITION_OPTIONS.indexOf(selected)===-1
+    ? '<option value="'+esc(selected)+'" selected>'+esc(selected)+'</option>' : '';
+  return '<div class="field"><label>Position Title</label><select name="positionTitle" required><option value=""'+(selected?'':' selected')+'>Select Position</option>'
+    + legacyOption + POSITION_OPTIONS.map(function(position){ return '<option value="'+esc(position)+'"'+(selected===position?' selected':'')+'>'+esc(position)+'</option>'; }).join('')
+    + '</select></div>';
 }
 
 function renderCreateAccount(acct){
@@ -1156,7 +1169,7 @@ function renderProfile(acct){
       + '<form data-form="update-profile">'
         + '<div class="field"><label>Full Name</label><input name="fullName" type="text" value="'+esc(acct.fullName)+'" required></div>'
         + '<div class="field-row"><div class="field"><label>Email Address</label><input name="email" type="email" value="'+esc(acct.email)+'" required></div>'
-        + '<div class="field"><label>Contact Number</label><input name="contact" type="text" value="'+esc(acct.contact)+'" required></div></div>'
+        + contactNumberField(acct.contact)+'</div>'
         + '<div class="field"><label>New Password (leave blank to keep current)</label><input name="password" type="text" placeholder="••••••••"></div>'
         + '<button type="submit" class="btn btn-primary">'+ic('check','17px')+' Save Changes</button>'
       + '</form>'
@@ -1197,7 +1210,7 @@ function modalViewStaff(id){
     + '<div class="review-card">'
       + '<div class="review-row"><span class="k">Username</span><span class="v mono">'+esc(a.username)+'</span></div>'
       + '<div class="review-row"><span class="k">Email Address</span><span class="v">'+esc(a.email)+'</span></div>'
-      + '<div class="review-row"><span class="k">Contact Number</span><span class="v">'+esc(a.contact)+'</span></div>'
+      + '<div class="review-row"><span class="k">Contact Number</span><span class="v">'+esc(formatContact(a.contact))+'</span></div>'
       + '<div class="review-row"><span class="k">Position</span><span class="v">'+esc(a.position)+'</span></div>'
       + '<div class="review-row"><span class="k">Role</span><span class="v">'+esc(ROLE_LABEL[a.role])+'</span></div>'
       + '<div class="review-row"><span class="k">Account Status</span><span class="v"><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></span></div>'
