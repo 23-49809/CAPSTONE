@@ -1353,9 +1353,21 @@ function modalReportDetail(id){
   } else {
     rows = [['Barangays Covered', s.barangays], ['Top Barangay', s.topBarangay], ['Requests from Top Barangay', s.topCount]];
   }
-  return '<div class="modal-head"><div><h3>'+esc(r.title)+'</h3><p>Generated '+fmtDate(r.dateGenerated)+'</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
-    + '<div class="review-card">'+rows.map(function(row){ return '<div class="review-row"><span class="k">'+row[0]+'</span><span class="v">'+row[1]+'</span></div>'; }).join('')+'</div>'
-    + '<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Close</button></div>';
+  var preparedBy = currentAccount() ? currentAccount().fullName : 'Assessor Head';
+  var metaRows = [
+    ['Report Type', REPORT_TYPE_LABEL[r.type] || r.type],
+    ['Date Generated', fmtDate(r.dateGenerated)],
+    ['Prepared By', preparedBy]
+  ];
+  return '<div class="modal-head"><div><h3>'+esc(r.title)+'</h3><p>Generated '+fmtDate(r.dateGenerated)+'</p></div><button class="modal-close no-print" data-action="close-modal">'+ic('x','15px')+'</button></div>'
+    + '<div id="report-printable">'
+      + '<div class="report-print-head">'+esc(r.title)+'</div>'
+      + '<div class="review-card">'
+        + metaRows.map(function(row){ return '<div class="review-row"><span class="k">'+row[0]+'</span><span class="v">'+row[1]+'</span></div>'; }).join('')
+        + rows.map(function(row){ return '<div class="review-row"><span class="k">'+row[0]+'</span><span class="v">'+row[1]+'</span></div>'; }).join('')
+      + '</div>'
+    + '</div>'
+    + '<div class="modal-foot no-print"><button class="btn btn-outline" data-action="close-modal">Close</button><button class="btn btn-primary" data-action="print-report">'+ic('printIcon','16px')+' Print Report</button></div>';
 }
 
 function checklistHtml(checklist){
