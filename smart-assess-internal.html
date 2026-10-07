@@ -67,6 +67,11 @@
   .field{ display:flex; flex-direction:column; gap:7px; margin-bottom:16px; }
   .field label{ font-size:13px; font-weight:700; }
   .field input, .field select, .field textarea{ font-family:inherit; font-size:14.5px; padding:12px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--surface); color:var(--ink); width:100%; }
+  .password-input-wrap{ position:relative; }
+  .password-input-wrap input{ padding-right:52px; }
+  .password-toggle{ position:absolute; top:50%; right:6px; transform:translateY(-50%); width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--ink-faint); cursor:pointer; }
+  .password-toggle:hover{ background:var(--surface-2); color:var(--ink); }
+  .password-toggle .icon{ width:19px; height:19px; }
   .field textarea{ resize:vertical; min-height:96px; font-family:inherit; }
   .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); outline:none; }
   .field-error{ font-size:12.5px; color:var(--danger); margin-top:2px; }
@@ -317,6 +322,7 @@ var ICONS = {
   grid: svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
   bell: svg('<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
   eye: svg('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: svg('<path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6 0 10 7 10 7a17.3 17.3 0 0 1-3 3.8"/><path d="M6.2 6.2C3.6 8 2 12 2 12s4 7 10 7a10.7 10.7 0 0 0 4-.8"/>'),
   checklistIcon: svg('<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><polyline points="9 13 11 15 15 11"/>'),
   timer: svg('<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="12" y1="13" x2="15" y2="14.5"/>'),
   sms: svg('<path d="M4 4h16v12H8l-4 4V4z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="11" x2="13" y2="11"/>'),
@@ -637,7 +643,7 @@ function renderLogin(){
     + (err ? '<div class="login-error">'+ic('alert','16px')+'<span>'+esc(err)+'</span></div>' : '')
     + '<form data-form="login">'
       + '<div class="field"><label for="li-user">Username</label><input id="li-user" name="username" type="text" placeholder="e.g. jessica.staff" autocomplete="username" required></div>'
-      + '<div class="field"><label for="li-pass">Password</label><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required></div>'
+      + '<div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">'+ic('eye','19px')+'</button></div></div>'
       + '<button type="submit" class="btn btn-primary btn-block">'+ic('check','18px')+' Sign In</button>'
     + '</form>'
     + '<div class="login-note"><b>Demo accounts</b> (password <span class="mono">Passw0rd!</span> for all):<br>Admin — maricar.admin &middot; Head — rodel.head &middot; Staff — jessica.staff</div>'
@@ -1242,6 +1248,18 @@ function bindEvents(){
     var el = ev.target.closest('[data-action]');
     if(!el) return;
     var action = el.getAttribute('data-action');
+
+    if(action==='toggle-login-password'){
+      var passwordInput = document.getElementById('li-pass');
+      if(!passwordInput) return;
+      var showPassword = passwordInput.type==='password';
+      passwordInput.type = showPassword ? 'text' : 'password';
+      el.innerHTML = ic(showPassword?'eyeOff':'eye','19px');
+      el.setAttribute('aria-label', showPassword?'Hide password':'Show password');
+      el.setAttribute('aria-pressed', String(showPassword));
+      passwordInput.focus();
+      return;
+    }
 
     // The overlay itself (not the modal card, not a button inside it) is
     // the only thing a "click outside to close" should react to. Without
