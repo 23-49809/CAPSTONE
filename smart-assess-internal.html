@@ -1692,10 +1692,26 @@ function closeDtPopover(picker){
 function openDtPopover(picker){
   ensureDtGlobalHandlers();
   document.querySelectorAll('.dt-popover:not([hidden])').forEach(function(pop){
-    if(!picker.contains(pop)) closeDtPopover(pop.closest('.dt-picker'));
+    var ownerPicker = pop._ownerPicker;
+    if(ownerPicker && ownerPicker !== picker) closeDtPopover(ownerPicker);
   });
   var trigger = picker.querySelector('[data-dt-trigger]');
-  var popover = picker.querySelector('[data-dt-popover]');
+  var popover = picker._popoverEl || picker.querySelector('[data-dt-popover]');
+
+  // .modal has animation:fadeIn (see its CSS rule) — a transform-animating
+  // ancestor becomes a containing block for position:fixed descendants for
+  // as long as that animation's fill-mode keeps its effect "in effect",
+  // which with fill-mode:both is forever. Left alone, position:fixed here
+  // would resolve against .modal's box instead of the viewport, which is
+  // *exactly* why the popover was overflowing past the modal's edge (and,
+  // for the time picker specifically, why its chips could render partly
+  // outside the real viewport and stop receiving clicks). Relocating the
+  // popover to be a direct child of .modal-overlay — a sibling of .modal,
+  // not a descendant of it, but still inside the subtree that render()
+  // fully rebuilds, so nothing leaks — escapes that containing block.
+  var overlayEl = picker.closest('.modal-overlay') || document.body;
+  if(popover.parentNode !== overlayEl) overlayEl.appendChild(popover);
+
   // Measure at full size while invisible (hidden elements have no box to
   // measure), then place it, then reveal — avoids a visible jump/flash.
   popover.style.visibility = 'hidden';
