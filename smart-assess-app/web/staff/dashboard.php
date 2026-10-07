@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['staff']);
 
 publish_due_announcements(db());
+mark_overdue_requests(db());
 
 $totals = db()->query("SELECT
     COUNT(*) AS total,

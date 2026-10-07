@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['staff']);
 
+mark_overdue_requests(db());
+
 // Every request together with what the AI Rule-Based Requirement Checker
 // flagged for it, so staff can triage without opening each one individually.
 $requests = db()->query(
