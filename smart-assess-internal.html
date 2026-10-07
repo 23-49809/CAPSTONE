@@ -2294,11 +2294,15 @@ function bindEvents(){
     } else if(action==='print-report'){
       window.print();
     } else if(action==='sort-report'){
+      // data-report-key is the short form ('docreq'/'landtransfer', shared
+      // with the download buttons) — map it to the actual state.sort
+      // property name, which matches state.search/state.filters' naming.
       var sortReportKey = el.getAttribute('data-report-key');
+      var sortStateKey = sortReportKey==='docreq' ? 'docReqReport' : 'landTransferReport';
       var sortFieldKey = el.getAttribute('data-sort-key');
       state.sort = state.sort || {};
-      var curSort = state.sort[sortReportKey] || {key:'submitted', dir:'desc'};
-      state.sort[sortReportKey] = (curSort.key===sortFieldKey)
+      var curSort = state.sort[sortStateKey] || {key:'submitted', dir:'desc'};
+      state.sort[sortStateKey] = (curSort.key===sortFieldKey)
         ? {key:sortFieldKey, dir: curSort.dir==='asc' ? 'desc' : 'asc'}
         : {key:sortFieldKey, dir:'asc'};
       render();
