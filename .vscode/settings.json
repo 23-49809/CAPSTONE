@@ -10,20 +10,6 @@
             "server": "localhost",
             "port": 3306,
             "driver": "MySQL",
-            "name": "Assessor Office Development",
-            "username": "root",
-            "database": "assessor_db"
-        },
-        {
-            "mysqlOptions": {
-                "authProtocol": "default",
-                "enableSsl": "Disabled"
-            },
-            "ssh": "Disabled",
-            "previewLimit": 50,
-            "server": "localhost",
-            "port": 3306,
-            "driver": "MySQL",
             "name": " Assessor Office Development",
             "username": "root",
             "password": "assessor_db",
