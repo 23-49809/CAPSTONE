@@ -573,6 +573,8 @@ function loadState(){
     var parsed = JSON.parse(raw);
     var base = defaultState();
     for(var k in base){ if(!(k in parsed)) parsed[k] = base[k]; }
+    parsed.accounts = parsed.accounts.map(function(account){ account.contact = canonicalContact(account.contact); return account; });
+    parsed.archivedAccounts = (parsed.archivedAccounts || []).map(function(account){ account.contact = canonicalContact(account.contact); return account; });
     parsed.modal = null; parsed.confirm = null; parsed.toasts = [];
     return parsed;
   }catch(e){ return defaultState(); }
@@ -657,6 +659,23 @@ var NAV = {
   ]
 };
 var ROLE_LABEL = {admin:'Assessor Admin', head:'Assessor Head', staff:'Assessor Staff'};
+var POSITION_OPTIONS = ['Assessor Admin','Assessor Head','Assessment Clerk','Records Officer'];
+
+function contactDigits(value){
+  var digits = String(value||'').replace(/\D/g,'');
+  if(digits.length>10 && digits.slice(0,2)==='63') digits = digits.slice(2);
+  else if(digits.length>10 && digits.charAt(0)==='0') digits = digits.slice(1);
+  return digits.slice(0,10);
+}
+function canonicalContact(value){
+  var digits = contactDigits(value);
+  return digits ? '+63'+digits : '';
+}
+function formatContact(value){
+  var digits = contactDigits(value);
+  return digits ? '+63 '+digits : '—';
+}
+function contactIsValid(value){ return /^9\d{9}$/.test(String(value||'')); }
 
 /* ---------------- Render dispatcher ---------------- */
 function render(){
