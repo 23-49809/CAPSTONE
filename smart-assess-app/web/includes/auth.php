@@ -108,6 +108,26 @@ function require_role(array $roles): array
     return $user;
 }
 
+/**
+ * Data-backed permission check against role_permissions, for new code to
+ * adopt incrementally. require_role() above remains the primary
+ * enforcement on every existing page — this doesn't replace it.
+ */
+function user_can(string $permissionKey, ?array $user = null): bool
+{
+    $user = $user ?? current_user();
+    if (!$user || !isset(ROLE_CODE_TO_ID[$user['role']])) {
+        return false;
+    }
+    $stmt = db()->prepare(
+        'SELECT 1 FROM role_permissions rp
+         JOIN permissions p ON p.id = rp.permission_id
+         WHERE rp.role_id = ? AND p.`key` = ? LIMIT 1'
+    );
+    $stmt->execute([ROLE_CODE_TO_ID[$user['role']], $permissionKey]);
+    return (bool) $stmt->fetchColumn();
+}
+
 function role_label(string $role): string
 {
     return match ($role) {
