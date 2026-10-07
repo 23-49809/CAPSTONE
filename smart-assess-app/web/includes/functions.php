@@ -248,6 +248,7 @@ function sms_body_for(string $status, string $refNo, array $missing = []): strin
         'Approved' => "SMART ASSESS: Good news! Your request $refNo has been approved.",
         'Rejected' => "SMART ASSESS: Your request $refNo needs corrections. Missing/invalid: " . ($missing ? implode(', ', $missing) : 'see portal for details') . '.',
         'Out for Release' => "SMART ASSESS: Your document for request $refNo is ready for release at the MAO.",
+        'Timed Out' => "SMART ASSESS: Your request $refNo has exceeded our expected processing time. We apologize for the delay — our office is prioritizing it now.",
         default => "SMART ASSESS: Your request $refNo status is now $status.",
     };
 }
