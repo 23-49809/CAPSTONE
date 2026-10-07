@@ -1371,6 +1371,14 @@ function renderDocReqReport(acct){
       + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by requester or reference no." value="'+esc(state.search.docReqReport)+'" data-input="search-docreq-report"></div>'
       + '<select data-input="filter-docreq-report-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){ return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+s+'</option>'; }).join('')+'</select>'
       + '<select data-input="filter-docreq-report-type"><option value="all">All Document Types</option>'+docTypes.map(function(t){ return '<option value="'+esc(t)+'"'+(typeF===t?' selected':'')+'>'+esc(t)+'</option>'; }).join('')+'</select>'
+      + sortSelectHtml('docreq', sortState, [
+          ['submitted','desc','Sort: Date Submitted (Newest)'],
+          ['submitted','asc','Sort: Date Submitted (Oldest)'],
+          ['applicant','asc','Sort: Requester (A–Z)'],
+          ['applicant','desc','Sort: Requester (Z–A)'],
+          ['docType','asc','Sort: Document Type (A–Z)'],
+          ['status','asc','Sort: Status (A–Z)']
+        ])
     + '</div>'
     + '<div class="table-wrap"><table><thead><tr>'
       + '<th>Reference No.</th>'
