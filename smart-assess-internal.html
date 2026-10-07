@@ -1711,13 +1711,38 @@ function bindEvents(){
     } else if(type==='save-ann'){
       var annId = form.getAttribute('data-id');
       var me2 = currentAccount();
+      var postTo = fd.get('postTo')||'';
+      var saveMode = fd.get('saveMode')||'publish';
+      var publishMode = fd.get('publishMode')||'now';
+      var annStatus = 'Draft', annScheduledAt = null, annPublishedAt = null;
+
+      if(saveMode==='draft'){
+        annStatus = 'Draft';
+      } else if(publishMode==='schedule'){
+        var when = new Date(fd.get('scheduleDate')+'T'+fd.get('scheduleTime')+':00');
+        annStatus = 'Scheduled';
+        annScheduledAt = when.toISOString();
+      } else {
+        annStatus = 'Published';
+        // A plain text edit on an already-published announcement shouldn't
+        // bump its publish timestamp — only stamp a fresh one the first
+        // time it actually becomes Published.
+        var existingAnn = annId ? findAnn(annId) : null;
+        annPublishedAt = (existingAnn && existingAnn.status==='Published' && existingAnn.publishedAt) ? existingAnn.publishedAt : new Date().toISOString();
+      }
+
       if(annId){
         var ex = findAnn(annId);
-        ex.title = fd.get('title'); ex.content = fd.get('content'); ex.status = fd.get('status');
+        ex.title = fd.get('title'); ex.content = fd.get('content'); ex.postTo = postTo;
+        ex.status = annStatus; ex.scheduledAt = annScheduledAt; ex.publishedAt = annPublishedAt;
         pushToast('Announcement updated.', 'check');
       } else {
-        state.announcements.unshift({id:uid('A'), title:fd.get('title'), content:fd.get('content'), status:fd.get('status'), datePosted:'2026-09-04', postedBy: me2?me2.fullName:'Assessor Head'});
-        pushToast('Announcement posted.', 'megaphone');
+        state.announcements.unshift({
+          id:uid('A'), title:fd.get('title'), content:fd.get('content'), postTo:postTo,
+          status:annStatus, scheduledAt:annScheduledAt, publishedAt:annPublishedAt,
+          datePosted:new Date().toISOString().slice(0,10), postedBy: me2?me2.fullName:'Assessor Head'
+        });
+        pushToast(annStatus==='Scheduled' ? 'Announcement scheduled.' : (annStatus==='Draft' ? 'Draft saved.' : 'Announcement posted.'), 'megaphone');
       }
       state.modal = null; render();
 
