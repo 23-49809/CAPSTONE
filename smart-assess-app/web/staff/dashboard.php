@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['staff']);
 
+publish_due_announcements(db());
+
 $totals = db()->query("SELECT
     COUNT(*) AS total,
     SUM(status='Received') AS received,
@@ -10,7 +12,7 @@ $totals = db()->query("SELECT
   FROM requests")->fetch();
 
 $recent = db()->query('SELECT * FROM requests ORDER BY created_at DESC LIMIT 6')->fetchAll();
-$announcements = db()->query('SELECT * FROM announcements ORDER BY created_at DESC LIMIT 3')->fetchAll();
+$announcements = db()->query("SELECT * FROM announcements WHERE status = 'Published' AND audience IN ('staff','both') ORDER BY created_at DESC LIMIT 3")->fetchAll();
 
 $pageTitle = "Staff Dashboard";
 require __DIR__ . '/../includes/internal_header.php';
