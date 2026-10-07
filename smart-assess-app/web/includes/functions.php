@@ -51,29 +51,6 @@ function internal_position_control(?string $selected = null, ?string $formId = n
         . $legacy . implode('', $options) . '</select>';
 }
 
-function internal_contact_control(?string $stored = null, ?string $formId = null): string
-{
-    $form = $formId ? ' form="' . esc($formId) . '"' : '';
-    return '<div class="contact-number-input"><span class="contact-prefix" aria-hidden="true">+63</span>'
-        . '<input type="tel" name="contact_number" value="' . esc(internal_contact_digits($stored)) . '" placeholder="9171234567" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="9[0-9]{9}" required data-contact-number' . $form . '>'
-        . '</div><div class="field-error" data-contact-error hidden>Contact number must contain exactly 10 digits after +63 and start with 9.</div>';
-}
-
-function internal_position_control(?string $selected = null, ?string $formId = null): string
-{
-    $form = $formId ? ' form="' . esc($formId) . '"' : '';
-    $selected = $selected ?? '';
-    $legacy = $selected !== '' && !in_array($selected, INTERNAL_POSITION_OPTIONS, true)
-        ? '<option value="' . esc($selected) . '" selected>' . esc($selected) . '</option>'
-        : '';
-    return '<select name="position_title" required' . $form . '><option value=""' . ($selected === '' ? ' selected' : '') . '>Select Position</option>'
-        . $legacy
-        . implode('', array_map(static function (string $position) use ($selected): string {
-            return '<option value="' . esc($position) . '"' . ($selected === $position ? ' selected' : '') . '>' . esc($position) . '</option>';
-        }, INTERNAL_POSITION_OPTIONS))
-        . '</select>';
-}
-
 /** Shared by both auth systems (client and internal) — a CSRF token isn't
  *  tied to which portal you're on, just to having an active session. */
 function csrf_token(): string
