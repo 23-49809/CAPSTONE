@@ -131,6 +131,155 @@ CREATE TABLE request_documents (
   UNIQUE KEY uniq_request_doc (request_id, doc_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ---------------------------------------------------------------------
+-- Fine-grained RBAC, layered on top of `roles` above. require_role() in
+-- includes/auth.php remains the primary, already-tested enforcement on
+-- every page; user_can() is available for new code to adopt incrementally.
+-- ---------------------------------------------------------------------
+CREATE TABLE permissions (
+  id          TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `key`       VARCHAR(60) NOT NULL UNIQUE,
+  description VARCHAR(200) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE role_permissions (
+  role_id       TINYINT NOT NULL,
+  permission_id TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (role_id, permission_id),
+  FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+  FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO permissions (`key`, description) VALUES
+  ('manage_staff_accounts', 'Create, edit, activate/deactivate, archive, and restore internal accounts'),
+  ('view_roles', 'View the roles reference page'),
+  ('manage_settings', 'Edit office settings and processing-time thresholds'),
+  ('view_audit_logs', 'View the system audit log'),
+  ('view_admin_dashboard', 'View the Admin dashboard'),
+  ('manage_announcements', 'Create, edit, schedule, publish, and cancel announcements'),
+  ('view_reports', 'View generated reports'),
+  ('view_head_dashboard', 'View the Department Head dashboard'),
+  ('process_requests', 'View, review, and update the status of document/land-transfer requests'),
+  ('run_ai_checker', 'View AI Rule-Based Requirement Checker results'),
+  ('send_notifications', 'Send notifications to clients about their requests'),
+  ('view_staff_dashboard', 'View the Staff dashboard');
+
+INSERT INTO role_permissions (role_id, permission_id)
+  SELECT 3, id FROM permissions WHERE `key` IN
+    ('manage_staff_accounts','view_roles','manage_settings','view_audit_logs','view_admin_dashboard');
+INSERT INTO role_permissions (role_id, permission_id)
+  SELECT 4, id FROM permissions WHERE `key` IN
+    ('manage_announcements','view_reports','view_head_dashboard');
+INSERT INTO role_permissions (role_id, permission_id)
+  SELECT 2, id FROM permissions WHERE `key` IN
+    ('process_requests','run_ai_checker','send_notifications','view_staff_dashboard');
+
+-- Reference/lookup tables — mirror DOC_TYPES / TRANSFER_TYPES / STATUS_FLOW
+-- in includes/functions.php (which themselves mirror ai_checker's rules.py)
+-- exactly. requests.document_type / transfer_type / status deliberately
+-- stay as they are (VARCHAR / ENUM) — these tables back a future
+-- admin-managed reference page, not a type change to a live column.
+CREATE TABLE document_types (
+  id          TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(120) NOT NULL UNIQUE,
+  description VARCHAR(255) NULL,
+  active      TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO document_types (name) VALUES
+  ('Certified True Copy of Tax Declaration (CTC-TD)'),
+  ('Certification of No/With Existing Improvement'),
+  ('Certification of Property/No Property Holdings'),
+  ('Certification of No Liens and Encumbrances'),
+  ('Certification of Assessment');
+
+CREATE TABLE transfer_types (
+  id          TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(60) NOT NULL UNIQUE,
+  description VARCHAR(255) NULL,
+  active      TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO transfer_types (name) VALUES ('Sale'), ('Donation'), ('Estate');
+
+CREATE TABLE request_statuses (
+  id          TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(30) NOT NULL UNIQUE,
+  sort_order  TINYINT UNSIGNED NOT NULL,
+  is_terminal TINYINT(1) NOT NULL DEFAULT 0,
+  badge_class VARCHAR(20) NOT NULL DEFAULT 'slate'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO request_statuses (name, sort_order, is_terminal, badge_class) VALUES
+  ('Received', 1, 0, 'slate'),
+  ('Processing', 2, 0, 'amber'),
+  ('Approved', 3, 1, 'green'),
+  ('Rejected', 4, 1, 'red'),
+  ('Out for Release', 5, 1, 'blue'),
+  ('Timed Out', 6, 0, 'orange');
+
+-- Real notifications, with read/unread state — distinct from
+-- request_status_log.sms_body, which is a simulated SMS transcript only.
+CREATE TABLE notifications (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  client_id       INT NULL,
+  request_id      INT NULL,
+  type            VARCHAR(40) NOT NULL,
+  message         TEXT NOT NULL,
+  channel         ENUM('system','sms','email') NOT NULL DEFAULT 'system',
+  delivery_status ENUM('pending','sent','failed') NOT NULL DEFAULT 'sent',
+  read_at         DATETIME NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE,
+  INDEX idx_client_unread (client_id, read_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Login/logout history, distinct from audit_log's coarse action string.
+CREATE TABLE user_sessions (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_type   ENUM('client','staff','admin','head') NOT NULL,
+  user_id     INT NOT NULL,
+  ip_address  VARCHAR(45) NULL,
+  user_agent  VARCHAR(255) NULL,
+  login_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  logout_at   DATETIME NULL,
+  INDEX idx_user (user_type, user_id),
+  INDEX idx_active (logout_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Lightweight staff workflow activity — separate in purpose from
+-- audit_log (accountability for administrative changes).
+CREATE TABLE activity_logs (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT NOT NULL,
+  action      VARCHAR(60) NOT NULL,
+  request_id  INT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE SET NULL,
+  INDEX idx_user_time (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Per-requirement validation detail — richer than request_documents.
+-- file_status, with room for staff to later record a manual re-validation.
+CREATE TABLE document_validation (
+  id                   INT AUTO_INCREMENT PRIMARY KEY,
+  request_document_id INT NOT NULL,
+  validation_status    ENUM('pending','valid','invalid','needs_review') NOT NULL DEFAULT 'pending',
+  remarks              VARCHAR(255) NULL,
+  validated_by         INT NULL,
+  validated_at         DATETIME NULL,
+  created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (request_document_id) REFERENCES request_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (validated_by) REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE KEY uniq_request_document (request_document_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Time Stamp Tracking + simulated SMS log. Doubles as the data source for
 -- both the client's Notifications page and the staff Notifications page —
 -- one event log, two filtered views of it.
