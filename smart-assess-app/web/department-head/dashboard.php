@@ -4,6 +4,7 @@ $me = require_role(['head']);
 
 $pdo = db();
 publish_due_announcements($pdo);
+mark_overdue_requests($pdo);
 $totals = $pdo->query("SELECT
     COUNT(*) AS total,
     SUM(flow='docreq') AS docreq_count,
