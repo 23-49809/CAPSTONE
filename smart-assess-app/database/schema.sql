@@ -105,7 +105,7 @@ CREATE TABLE requests (
   property_address      VARCHAR(255) NOT NULL,
   barangay              VARCHAR(100) NOT NULL,
   is_owner              TINYINT(1)   NOT NULL DEFAULT 1,
-  status                ENUM('Received','Processing','Approved','Rejected','Out for Release')
+  status                ENUM('Received','Processing','Approved','Rejected','Out for Release','Timed Out')
                            NOT NULL DEFAULT 'Received',
   requirement_complete  TINYINT(1)   NOT NULL DEFAULT 0,
   advisory              TEXT NULL,
