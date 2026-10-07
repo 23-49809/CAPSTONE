@@ -324,6 +324,7 @@ var ICONS = {
   eye: svg('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff: svg('<path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6 0 10 7 10 7a17.3 17.3 0 0 1-3 3.8"/><path d="M6.2 6.2C3.6 8 2 12 2 12s4 7 10 7a10.7 10.7 0 0 0 4-.8"/>'),
   checklistIcon: svg('<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><polyline points="9 13 11 15 15 11"/>'),
+  archive: svg('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>'),
   timer: svg('<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="12" y1="13" x2="15" y2="14.5"/>'),
   sms: svg('<path d="M4 4h16v12H8l-4 4V4z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="11" x2="13" y2="11"/>'),
   users: svg('<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
@@ -511,6 +512,7 @@ function defaultState(){
     filters:{staffAccountsStatus:'all', docStatus:'all', landStatus:'all', reqResult:'all', reportType:'all', annStatus:'all'},
     pages:{},
     accounts: SEED_ACCOUNTS.slice(),
+    archivedAccounts:[],
     docRequests: SEED_DOC_REQUESTS.slice(),
     landRequests: SEED_LAND_REQUESTS.slice(),
     announcements: SEED_ANNOUNCEMENTS.slice(),
@@ -589,6 +591,7 @@ var NAV = {
   admin:[
     {view:'dashboard', label:'Dashboard', icon:'grid'},
     {view:'staff-accounts', label:'Staff Accounts', icon:'users'},
+    {view:'archived-accounts', label:'Archived Accounts', icon:'archive'},
     {view:'create-account', label:'Create Account', icon:'userPlus'},
     {view:'staff-info', label:'Staff Information', icon:'idCard'},
     {view:'profile', label:'Profile', icon:'user'}
@@ -684,6 +687,7 @@ function renderShell(acct){
   if(acct.role==='admin'){
     if(view==='dashboard') body = renderAdminDashboard(acct);
     else if(view==='staff-accounts') body = renderStaffAccounts(acct);
+    else if(view==='archived-accounts') body = renderArchivedAccounts();
     else if(view==='create-account') body = renderCreateAccount(acct);
     else if(view==='staff-info') body = renderStaffAccounts(acct, true);
     else if(view==='profile') body = renderProfile(acct);
