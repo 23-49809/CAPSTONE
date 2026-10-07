@@ -229,6 +229,9 @@
     .staff-row-actions .staff-action-status{ width:122px; }
     .table-wrap table tbody td.actions-cell .actions-container{ width:100%; }
   }
+  @media (max-width:560px){
+    .table-wrap table tbody tr{ grid-template-columns:minmax(0,1fr); }
+  }
 
   .review-card{ background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-md); padding:18px 20px; }
   .review-row{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
