@@ -173,12 +173,20 @@ function request_elapsed_info(string $flow, string $sinceTimestamp, string $stat
  */
 function mark_overdue_requests(PDO $pdo): void
 {
+    // Measured from each request's latest logged status change (falling
+    // back to its own created_at if, somehow, it has no log rows yet) —
+    // not its original submission time. See request_elapsed_info() for why.
     $stmt = $pdo->prepare(
-        "SELECT id, reference_no FROM requests
-         WHERE status NOT IN ('Approved','Rejected','Out for Release','Timed Out')
+        "SELECT r.id, r.reference_no
+         FROM requests r
+         LEFT JOIN (
+           SELECT request_id, MAX(created_at) AS last_action_at
+           FROM request_status_log GROUP BY request_id
+         ) l ON l.request_id = r.id
+         WHERE r.status NOT IN ('Approved','Rejected','Out for Release','Timed Out')
            AND (
-             (flow = 'docreq' AND created_at <= DATE_SUB(NOW(), INTERVAL ? DAY))
-             OR (flow = 'landtransfer' AND created_at <= DATE_SUB(NOW(), INTERVAL ? DAY))
+             (r.flow = 'docreq' AND COALESCE(l.last_action_at, r.created_at) <= DATE_SUB(NOW(), INTERVAL ? DAY))
+             OR (r.flow = 'landtransfer' AND COALESCE(l.last_action_at, r.created_at) <= DATE_SUB(NOW(), INTERVAL ? DAY))
            )"
     );
     $stmt->execute([request_processing_days('docreq'), request_processing_days('landtransfer')]);
