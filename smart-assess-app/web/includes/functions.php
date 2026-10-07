@@ -124,6 +124,41 @@ function status_badge_class(string $status): string
     };
 }
 
+/** Announcements > "Post To" — who the announcement is shown to. */
+const ANNOUNCEMENT_AUDIENCES = ['client' => 'Client Interface', 'staff' => 'Staff Interface', 'both' => 'Both'];
+
+function announcement_audience_label(string $audience): string
+{
+    return ANNOUNCEMENT_AUDIENCES[$audience] ?? $audience;
+}
+
+const ANNOUNCEMENT_STATUSES = ['Draft', 'Scheduled', 'Published', 'Cancelled'];
+
+function announcement_status_badge_class(string $status): string
+{
+    return match ($status) {
+        'Draft' => 'slate',
+        'Scheduled' => 'amber',
+        'Published' => 'green',
+        'Cancelled' => 'red',
+        default => 'slate',
+    };
+}
+
+/**
+ * Promotes any "Scheduled" announcement whose scheduled_at has arrived to
+ * "Published". There's no background cron in this app, so every page that
+ * reads from `announcements` calls this first — it's cheap (a single
+ * conditional UPDATE) and idempotent when nothing is due.
+ */
+function publish_due_announcements(PDO $pdo): void
+{
+    $pdo->prepare(
+        "UPDATE announcements SET status = 'Published', published_at = scheduled_at
+         WHERE status = 'Scheduled' AND scheduled_at <= NOW()"
+    )->execute();
+}
+
 /** Reads Admin > Settings (falls back to config.php constants if a key is missing). */
 function get_setting(string $key, string $default = ''): string
 {
