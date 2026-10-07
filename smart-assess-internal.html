@@ -778,7 +778,7 @@ function renderStaffAccounts(acct, jumpToInfo){
           + '<button class="icon-btn" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
           + '<button class="icon-btn" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
           + '<button class="icon-btn" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
-          + '<button class="icon-btn" data-action="archive-staff" data-id="'+a.id+'">'+ic('archive','13px')+'Archive</button>'
+          + '<button class="icon-btn" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">'+ic('archive','13px')+'</button>'
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('users','30px')+'No staff accounts match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('staffAccounts', pg)+'</div>';
@@ -919,7 +919,7 @@ function renderReports(acct){
       + '<option value="summary"'+(typeF==='summary'?' selected':'')+'>Summary</option>'
     + '</select>'
   + '</div>'
-  + '<div class="table-wrap"><table><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th>Actions</th></tr></thead><tbody>'
+  + '<div class="table  <table><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th>Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(r){
       return '<tr><td class="cell-name">'+esc(r.title)+'</td><td><span class="badge blue">'+TYPE_LABEL[r.type]+'</span></td><td>'+fmtDate(r.dateGenerated)+'</td>'
         + '<td><button class="icon-btn" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></td></tr>';
