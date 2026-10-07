@@ -1685,7 +1685,7 @@ function ensureDtGlobalHandlers(){
 function closeDtPopover(picker){
   if(!picker) return;
   var trigger = picker.querySelector('[data-dt-trigger]');
-  var popover = picker.querySelector('[data-dt-popover]');
+  var popover = picker._popoverEl || picker.querySelector('[data-dt-popover]');
   if(popover) popover.hidden = true;
   if(trigger) trigger.setAttribute('aria-expanded','false');
 }
