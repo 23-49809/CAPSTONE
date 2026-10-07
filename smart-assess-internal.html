@@ -1798,15 +1798,23 @@ function initTimePicker(picker, options){
   picker._popoverEl = popover;
   popover._ownerPicker = picker;
   var hour12 = 9, minute = 0, period = 'AM';
+  var hasValue = false;
   if(hidden.value){
+    hasValue = true;
     var parts = hidden.value.split(':'); var t = to12Hour(+parts[0]);
     hour12 = t.hour; minute = +parts[1]; period = t.period;
-  } else if(options.isToday && options.isToday()){
+  }
+
+  function applySmartDefaultIfNeeded(){
     // A blind 9:00 AM default would open with every hour chip disabled
-    // (and no obvious way out) whenever today is picked in the afternoon
-    // or evening, since AM is already entirely in the past — looking and
+    // (and no obvious way out) whenever today is already picked and it's
+    // afternoon/evening, since AM is entirely in the past — looking and
     // behaving exactly like a broken picker. Default to the next 5-minute
     // slot from right now instead, so something valid is already selected.
+    // This has to run at OPEN time, not at init time: the paired date
+    // field is still empty when the modal first renders, so "is today"
+    // can only be answered once the user has actually picked a date.
+    if(hasValue || !options.isToday || !options.isToday()) return;
     var now = new Date();
     var roundedMinute = Math.ceil((now.getMinutes()+1)/5)*5;
     var hourBump = 0;
@@ -1816,6 +1824,7 @@ function initTimePicker(picker, options){
   }
 
   function writeHidden(){
+    hasValue = true;
     hidden.value = pad2(to24Hour(hour12, period))+':'+pad2(minute);
     display.textContent = hour12+':'+pad2(minute)+' '+period;
     display.classList.remove('placeholder');
