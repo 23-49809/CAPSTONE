@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
 
-                push_status($requestId, 'Received', $refNo, $ai['missing']);
+                push_status($requestId, 'Received', $refNo, $ai['missing'], 'client');
                 $pdo->commit();
             } catch (Throwable $e) {
                 $pdo->rollBack();
