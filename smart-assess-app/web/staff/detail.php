@@ -3,6 +3,8 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 $me = require_role(['staff']);
 
+mark_overdue_requests(db());
+
 $id = (int) ($_GET['id'] ?? 0);
 $req = $id ? fetch_request_by_id($id) : null;
 if (!$req) {
