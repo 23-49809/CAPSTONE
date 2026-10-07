@@ -2262,6 +2262,30 @@ function bindEvents(){
       state.modal = {type:'report-detail', id:el.getAttribute('data-id')}; render();
     } else if(action==='print-report'){
       window.print();
+    } else if(action==='sort-report'){
+      var sortReportKey = el.getAttribute('data-report-key');
+      var sortFieldKey = el.getAttribute('data-sort-key');
+      state.sort = state.sort || {};
+      var curSort = state.sort[sortReportKey] || {key:'submitted', dir:'desc'};
+      state.sort[sortReportKey] = (curSort.key===sortFieldKey)
+        ? {key:sortFieldKey, dir: curSort.dir==='asc' ? 'desc' : 'asc'}
+        : {key:sortFieldKey, dir:'asc'};
+      render();
+    } else if(action==='download-report'){
+      var downloadKey = el.getAttribute('data-report-key');
+      if(downloadKey==='docreq'){
+        var docData = getDocReqReportRows();
+        downloadCsv('document-request-report.csv',
+          ['Reference No.','Requester','Document Type','Barangay','Date Submitted','Status'],
+          docData.rows.map(function(r){ return [r.id, r.applicant, r.docType, r.barangay, fmtDate(r.submitted), r.status]; }));
+        pushToast('Document Request Report downloaded.', 'fileBar');
+      } else if(downloadKey==='landtransfer'){
+        var landData = getLandTransferReportRows();
+        downloadCsv('land-transfer-report.csv',
+          ['Reference No.','Requester','Transfer Type','TCT/OCT No.','Barangay','Date Submitted','Status'],
+          landData.rows.map(function(r){ return [r.id, r.applicant, r.transferType, r.tctNo, r.barangay, fmtDate(r.submitted), r.status]; }));
+        pushToast('Land Transfer Report downloaded.', 'fileBar');
+      }
     } else if(action==='view-doc-req'){
       state.modal = {type:'doc-detail', id:el.getAttribute('data-id')}; render();
     } else if(action==='view-land-req'){
