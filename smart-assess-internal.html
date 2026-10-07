@@ -67,6 +67,10 @@
   .field{ display:flex; flex-direction:column; gap:7px; margin-bottom:16px; }
   .field label{ font-size:13px; font-weight:700; }
   .field input, .field select, .field textarea{ font-family:inherit; font-size:14.5px; padding:12px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--surface); color:var(--ink); width:100%; }
+  .contact-number-input{ display:flex; align-items:stretch; width:100%; }
+  .contact-prefix{ display:inline-flex; align-items:center; padding:12px 14px; border:1.5px solid var(--line-strong); border-right:0; border-radius:var(--radius-sm) 0 0 var(--radius-sm); background:var(--surface-2); color:var(--ink-soft); font-size:14.5px; white-space:nowrap; }
+  .contact-number-input input{ flex:1; min-width:0; border-top-left-radius:0; border-bottom-left-radius:0; }
+  .field-error[hidden]{ display:none; }
   .password-input-wrap{ position:relative; }
   .password-input-wrap input{ padding-right:52px; }
   .password-toggle{ position:absolute; top:50%; right:6px; transform:translateY(-50%); width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--ink-faint); cursor:pointer; }
@@ -396,11 +400,11 @@ function initials(name){ var parts=String(name||'').trim().split(/\s+/); if(!par
 
 /* ---------------- Seed data ---------------- */
 var SEED_ACCOUNTS = [
-  {id:'u1', fullName:'Maricar D. Santos', username:'maricar.admin', password:'Passw0rd!', email:'maricar.santos@mabini.gov.ph', contact:'0917-200-1145', position:'Assessor Admin', role:'admin', status:'active', dateCreated:'2025-01-06'},
-  {id:'u2', fullName:'Rodel P. Ilagan', username:'rodel.head', password:'Passw0rd!', email:'rodel.ilagan@mabini.gov.ph', contact:'0917-200-2290', position:'Assessor Head', role:'head', status:'active', dateCreated:'2025-01-06'},
-  {id:'u3', fullName:'Jessica Ann M. Reyes', username:'jessica.staff', password:'Passw0rd!', email:'jessica.reyes@mabini.gov.ph', contact:'0917-200-3317', position:'Assessment Clerk', role:'staff', status:'active', dateCreated:'2025-01-10'},
-  {id:'u4', fullName:'Mark Anthony V. Cruz', username:'mark.staff', password:'Passw0rd!', email:'mark.cruz@mabini.gov.ph', contact:'0917-200-4482', position:'Records Officer', role:'staff', status:'active', dateCreated:'2025-02-14'},
-  {id:'u5', fullName:'Liza D. Fernandez', username:'liza.staff', password:'Passw0rd!', email:'liza.fernandez@mabini.gov.ph', contact:'0917-200-5510', position:'Assessment Clerk', role:'staff', status:'inactive', dateCreated:'2025-03-02'}
+  {id:'u1', fullName:'Maricar D. Santos', username:'maricar.admin', password:'Passw0rd!', email:'maricar.santos@mabini.gov.ph', contact:'+639172001145', position:'Assessor Admin', role:'admin', status:'active', dateCreated:'2025-01-06'},
+  {id:'u2', fullName:'Rodel P. Ilagan', username:'rodel.head', password:'Passw0rd!', email:'rodel.ilagan@mabini.gov.ph', contact:'+639172002290', position:'Assessor Head', role:'head', status:'active', dateCreated:'2025-01-06'},
+  {id:'u3', fullName:'Jessica Ann M. Reyes', username:'jessica.staff', password:'Passw0rd!', email:'jessica.reyes@mabini.gov.ph', contact:'+639172003317', position:'Assessment Clerk', role:'staff', status:'active', dateCreated:'2025-01-10'},
+  {id:'u4', fullName:'Mark Anthony V. Cruz', username:'mark.staff', password:'Passw0rd!', email:'mark.cruz@mabini.gov.ph', contact:'+639172004482', position:'Records Officer', role:'staff', status:'active', dateCreated:'2025-02-14'},
+  {id:'u5', fullName:'Liza D. Fernandez', username:'liza.staff', password:'Passw0rd!', email:'liza.fernandez@mabini.gov.ph', contact:'+639172005510', position:'Assessment Clerk', role:'staff', status:'inactive', dateCreated:'2025-03-02'}
 ];
 
 var STATUS_ORDER = ['Pending','Under Review','Requirements Incomplete','Requirements Complete','Processing','Ready for Release','Completed','Rejected'];
