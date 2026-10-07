@@ -4,6 +4,7 @@ $me = require_role(['admin']);
 
 $pdo = db();
 publish_due_announcements($pdo);
+mark_overdue_requests($pdo);
 $accountTotal = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
 $activeTotal = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'Active'")->fetchColumn();
 $clientTotal = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
