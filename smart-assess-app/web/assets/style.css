@@ -350,3 +350,31 @@ tbody tr:hover{ background:var(--surface-2); }
 .flash{ border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:18px; font-size:13.5px; }
 .flash.error{ background:var(--danger-bg); color:var(--danger); }
 .flash.success{ background:var(--success-bg); color:var(--success); }
+
+/* Generated Reports > Print Report — the on-screen header block for the
+   printable section (the print-only cropping lives in @media print below). */
+.report-print-head{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:20px 22px; margin-bottom:20px; }
+.report-print-head h2{ font-size:18px; margin-bottom:12px; }
+.report-print-head dl{ display:grid; grid-template-columns:160px 1fr; gap:6px 14px; margin:0; font-size:13.5px; }
+.report-print-head dt{ color:var(--ink-faint); font-weight:600; }
+.report-print-head dd{ margin:0; color:var(--ink); }
+
+@media print{
+  /* Crop the page down to #report-printable only — everything else
+     (header, nav, filters, buttons) is hidden rather than removed, so the
+     normal on-screen layout above is completely unaffected. */
+  body *{ visibility:hidden; }
+  #report-printable, #report-printable *{ visibility:visible; }
+  #report-printable{ position:absolute; left:0; top:0; width:100%; margin:0; }
+  .no-print, .site-header, .action-btn, .icon-btn, form button, form input, form select{ display:none !important; }
+
+  @page{ margin:14mm; }
+  body{ background:#fff; font-size:12.5px; }
+  #report-printable .panel-card, #report-printable .report-print-head{
+    border:1px solid #ccc; box-shadow:none; break-inside:avoid; margin-bottom:14px;
+  }
+  #report-printable table{ width:100%; border-collapse:collapse; }
+  #report-printable thead{ display:table-header-group; }
+  #report-printable tr{ break-inside:avoid; }
+  #report-printable .badge{ border:1px solid currentColor; background:none !important; }
+}
