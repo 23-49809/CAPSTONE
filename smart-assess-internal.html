@@ -1627,7 +1627,7 @@ function buildCalendarGrid(viewYear, viewMonth, selectedISO, minISO){
 
 function buildTimeGrid(hour12, minute, period, isToday){
   var hourOptions = [1,2,3,4,5,6,7,8,9,10,11,12];
-  var minuteOptions = [0,15,30,45];
+  var minuteOptions = [0,5,10,15,20,25,30,35,40,45,50,55];
   var periodOptions = ['AM','PM'];
   function wouldBePast(h12, min, per){
     if(!isToday) return false;
@@ -1635,22 +1635,26 @@ function buildTimeGrid(hour12, minute, period, isToday){
     candidate.setHours(to24Hour(h12, per), min, 0, 0);
     return candidate.getTime() <= Date.now();
   }
-  return '<div class="tp-display">'+hour12+' : '+pad2(minute)+'<span class="tp-period">'+period+'</span></div>'
-    + '<div class="tp-row"><span class="tp-row-label">Hour</span><div class="tp-chip-row">'
-      + hourOptions.map(function(h){
-          return '<button type="button" class="tp-chip'+(h===hour12?' selected':'')+'" data-tp-hour="'+h+'" '+(wouldBePast(h,minute,period)?'disabled':'')+'>'+h+'</button>';
-        }).join('')
-    + '</div></div>'
-    + '<div class="tp-row"><span class="tp-row-label">Minute</span><div class="tp-chip-row">'
-      + minuteOptions.map(function(m){
-          return '<button type="button" class="tp-chip'+(m===minute?' selected':'')+'" data-tp-minute="'+m+'" '+(wouldBePast(hour12,m,period)?'disabled':'')+'>'+pad2(m)+'</button>';
-        }).join('')
-    + '</div></div>'
-    + '<div class="tp-row"><span class="tp-row-label">Period</span><div class="tp-chip-row">'
+  return '<div class="tp-head">Select Time</div>'
+    + '<div class="tp-display">'+hour12+'<span class="tp-colon">:</span>'+pad2(minute)+'<span class="tp-period">'+period+'</span></div>'
+    + '<div class="tp-cols">'
+      + '<div class="tp-col"><span class="tp-col-label">Hour</span><div class="tp-chip-grid">'
+        + hourOptions.map(function(h){
+            return '<button type="button" class="tp-chip'+(h===hour12?' selected':'')+'" data-tp-hour="'+h+'" '+(wouldBePast(h,minute,period)?'disabled':'')+' aria-label="'+h+' o\'clock">'+h+'</button>';
+          }).join('')
+      + '</div></div>'
+      + '<div class="tp-col"><span class="tp-col-label">Minute</span><div class="tp-chip-grid">'
+        + minuteOptions.map(function(m){
+            return '<button type="button" class="tp-chip'+(m===minute?' selected':'')+'" data-tp-minute="'+m+'" '+(wouldBePast(hour12,m,period)?'disabled':'')+' aria-label="'+pad2(m)+' minutes">'+pad2(m)+'</button>';
+          }).join('')
+      + '</div></div>'
+    + '</div>'
+    + '<div class="tp-period-row">'
       + periodOptions.map(function(p){
           return '<button type="button" class="tp-chip'+(p===period?' selected':'')+'" data-tp-period="'+p+'" '+(wouldBePast(hour12,minute,p)?'disabled':'')+'>'+p+'</button>';
         }).join('')
-    + '</div></div>';
+    + '</div>'
+    + '<div class="tp-done-row"><button type="button" class="btn btn-primary btn-sm" data-tp-done>Done</button></div>';
 }
 
 /* -- popover open/close/position plumbing, shared by both picker kinds -- */
