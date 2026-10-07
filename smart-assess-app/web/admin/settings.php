@@ -7,6 +7,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
     foreach (['office_name', 'office_phone', 'office_email', 'office_hours'] as $key) {
         set_setting($key, trim($_POST[$key] ?? ''));
     }
+    foreach (['docreq_processing_days', 'landtransfer_processing_days'] as $key) {
+        $days = max(1, (int) ($_POST[$key] ?? 0));
+        set_setting($key, (string) $days);
+    }
     audit('admin', $me['id'], $me['name'], 'Updated system settings');
     $flash = 'Settings saved.';
 }
