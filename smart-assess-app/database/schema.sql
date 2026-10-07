@@ -174,7 +174,12 @@ INSERT INTO settings (setting_key, setting_value) VALUES
   ('office_name', 'Mabini Assessor Office'),
   ('office_phone', '(043) 487-0123'),
   ('office_email', 'assessor@mabini.gov.ph'),
-  ('office_hours', 'Monday to Friday, 8:00 AM - 5:00 PM');
+  ('office_hours', 'Monday to Friday, 8:00 AM - 5:00 PM'),
+  -- Expected processing time (Admin > Settings), in whole days from
+  -- submission — the threshold request_elapsed_info()/mark_overdue_requests()
+  -- compare against to flag a request "Timed Out".
+  ('docreq_processing_days', '5'),
+  ('landtransfer_processing_days', '10');
 
 -- Admin > Audit Logs: every login (client and internal), every status
 -- change, every account/role change gets a row here.
