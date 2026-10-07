@@ -144,15 +144,18 @@ CREATE TABLE request_status_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE announcements (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  title       VARCHAR(200) NOT NULL,
-  body        TEXT NOT NULL,
-  author      VARCHAR(150) NOT NULL,
-  start_date  DATE NOT NULL,
-  end_date    DATE NULL,
-  image_url   VARCHAR(500) NULL,
-  status      ENUM('Draft','Published') NOT NULL DEFAULT 'Draft',
-  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  title         VARCHAR(200) NOT NULL,
+  body          TEXT NOT NULL,
+  author        VARCHAR(150) NOT NULL,
+  audience      ENUM('client','staff','both') NOT NULL DEFAULT 'both',
+  start_date    DATE NOT NULL,
+  end_date      DATE NULL,
+  image_url     VARCHAR(500) NULL,
+  status        ENUM('Draft','Scheduled','Published','Cancelled') NOT NULL DEFAULT 'Draft',
+  scheduled_at  DATETIME NULL,
+  published_at  DATETIME NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Editable office settings (Admin > Settings), instead of hardcoded constants.
