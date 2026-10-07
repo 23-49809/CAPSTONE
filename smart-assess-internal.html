@@ -152,6 +152,10 @@
 
   .table-wrap{ overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); }
   table{ width:100%; border-collapse:collapse; min-width:760px; }
+  .table-wrap table.has-actions{ table-layout:fixed; min-width:1180px; }
+  .table-wrap table.has-actions th.actions-cell, .table-wrap table.has-actions td.actions-cell{ width:420px; min-width:420px; }
+  .table-wrap table.has-actions td:not(.actions-cell){ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .table-wrap table.has-actions td.cell-name, .table-wrap table.has-actions td .cell-sub{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   thead th{ text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); padding:13px 16px; border-bottom:1px solid var(--line); white-space:nowrap; }
   tbody td{ padding:13px 16px; font-size:13.5px; border-bottom:1px solid var(--line); vertical-align:middle; }
   tbody tr:last-child td{ border-bottom:none; }
@@ -171,12 +175,15 @@
   .icon-btn:hover{ background:var(--surface-2); }
   .icon-btn.danger{ color:var(--danger); border-color:var(--danger-bg); }
   .row-actions{ display:flex; gap:6px; flex-wrap:wrap; }
-  .staff-accounts-table th:last-child, .staff-accounts-table td:last-child{ width:420px; min-width:420px; }
-  .staff-row-actions{ display:flex; align-items:center; gap:8px; width:100%; flex-wrap:nowrap; }
-  .staff-row-actions .staff-action{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; height:40px; padding:6px 8px; white-space:nowrap; }
-  .staff-row-actions .staff-action-view, .staff-row-actions .staff-action-edit{ width:88px; }
-  .staff-row-actions .staff-action-status{ width:172px; }
-  .staff-row-actions .staff-action-archive{ width:48px; min-width:48px; height:40px; padding:0; }
+  .actions-container{ display:flex; align-items:center; gap:8px; width:100%; min-width:0; flex-wrap:nowrap; }
+  .actions-container .action-button{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; height:40px; padding:6px 10px; white-space:nowrap; }
+  .actions-container .archive-button, .actions-container .delete-icon-button{ width:48px; min-width:48px; height:40px; padding:0; flex:0 0 48px; }
+  .staff-row-actions .staff-action-view, .staff-row-actions .staff-action-edit{ width:80px; }
+  .staff-row-actions .staff-action-status{ width:156px; }
+  .staff-row-actions .archive-button{ width:48px; min-width:48px; }
+  .review-action-row .k{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .review-action-row .actions-container{ width:auto; flex:0 0 auto; }
+  .review-action-row .action-button{ width:84px; }
   .empty-state{ padding:56px 20px; text-align:center; color:var(--ink-faint); font-size:13.5px; }
   .empty-state .icon{ width:30px; height:30px; margin:0 auto 12px; color:var(--line-strong); }
 
@@ -197,7 +204,8 @@
   .announcement-card h4{ font-size:14.5px; margin-bottom:4px; }
   .announcement-card .ac-meta{ font-size:11.5px; color:var(--ink-faint); margin-bottom:8px; }
   .announcement-card p{ font-size:13.5px; color:var(--ink-soft); }
-  .announcement-card .ac-actions{ display:flex; gap:6px; margin-top:12px; }
+  .announcement-card .ac-actions{ display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:nowrap; }
+  .announcement-card .ac-actions .action-button{ height:40px; flex:0 0 auto; }
 
   .review-card{ background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-md); padding:18px 20px; }
   .review-row{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
