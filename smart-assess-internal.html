@@ -1631,6 +1631,8 @@ function bindEvents(){
       if(anCancel){ anCancel.status='Cancelled'; anCancel.publishedAt=null; pushToast('Scheduled announcement cancelled.', 'x'); }
     } else if(action==='view-report'){
       state.modal = {type:'report-detail', id:el.getAttribute('data-id')}; render();
+    } else if(action==='print-report'){
+      window.print();
     } else if(action==='view-doc-req'){
       state.modal = {type:'doc-detail', id:el.getAttribute('data-id')}; render();
     } else if(action==='view-land-req'){
