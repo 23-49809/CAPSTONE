@@ -1801,6 +1801,18 @@ function initTimePicker(picker, options){
   if(hidden.value){
     var parts = hidden.value.split(':'); var t = to12Hour(+parts[0]);
     hour12 = t.hour; minute = +parts[1]; period = t.period;
+  } else if(options.isToday && options.isToday()){
+    // A blind 9:00 AM default would open with every hour chip disabled
+    // (and no obvious way out) whenever today is picked in the afternoon
+    // or evening, since AM is already entirely in the past — looking and
+    // behaving exactly like a broken picker. Default to the next 5-minute
+    // slot from right now instead, so something valid is already selected.
+    var now = new Date();
+    var roundedMinute = Math.ceil((now.getMinutes()+1)/5)*5;
+    var hourBump = 0;
+    if(roundedMinute>=60){ roundedMinute=0; hourBump=1; }
+    var t2 = to12Hour((now.getHours()+hourBump)%24);
+    hour12 = t2.hour; minute = roundedMinute; period = t2.period;
   }
 
   function writeHidden(){
