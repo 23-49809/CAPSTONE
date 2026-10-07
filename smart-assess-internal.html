@@ -1101,6 +1101,21 @@ function renderStaffDashboard(acct){
         }).join('')
       + '<div style="margin-top:14px;"><button class="btn btn-outline btn-sm" data-action="nav" data-view="land-transfer-requests">View All Land Transfer Requests</button></div>'
     + '</div>'
+  + '</div>'
+  + renderStaffAnnouncements();
+}
+
+/** Announcements posted "Staff Interface" or "Both" — never ones posted
+ *  Client-only. This is the Staff side of the Post To targeting rule. */
+function renderStaffAnnouncements(){
+  var visible = state.announcements.filter(function(a){
+    return a.status==='Published' && (a.postTo==='staff' || a.postTo==='both');
+  }).slice(0,3);
+  if(!visible.length) return '';
+  return '<div class="panel-card"><h3>'+ic('megaphone')+'Announcements from Assessor Head</h3>'
+    + visible.map(function(a){
+        return '<div class="announcement-card"><h4>'+esc(a.title)+'</h4><div class="ac-meta">'+fmtDateTime(a.publishedAt)+' &middot; '+esc(a.postedBy)+'</div><p>'+esc(a.content)+'</p></div>';
+      }).join('')
   + '</div>';
 }
 
