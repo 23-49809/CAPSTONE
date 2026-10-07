@@ -79,21 +79,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 foreach (LAND_TRANSFER_DOCS as $doc) {
                     $saved = save_uploaded_file($doc['key'], $refNo);
+                    $fileStatus = $statusByKey[$doc['key']] ?? 'missing';
                     $docStmt->execute([
                         $requestId, $doc['key'], $doc['label'],
                         $saved['original_name'] ?? null, $saved['stored_path'] ?? null,
                         $saved['mime'] ?? null, $saved['size'] ?? null,
-                        $statusByKey[$doc['key']] ?? 'missing',
+                        $fileStatus,
                     ]);
+                    record_document_validation($pdo, (int) $pdo->lastInsertId(), $fileStatus);
                 }
                 foreach ($idKeys as $key) {
                     $saved = save_uploaded_file($key, $refNo);
+                    $fileStatus = $statusByKey[$key] ?? 'missing';
                     $docStmt->execute([
                         $requestId, $key, id_label($flow, $key),
                         $saved['original_name'] ?? null, $saved['stored_path'] ?? null,
                         $saved['mime'] ?? null, $saved['size'] ?? null,
-                        $statusByKey[$key] ?? 'missing',
+                        $fileStatus,
                     ]);
+                    record_document_validation($pdo, (int) $pdo->lastInsertId(), $fileStatus);
                 }
 
                 push_status($requestId, 'Received', $refNo, $ai['missing'], 'client');
