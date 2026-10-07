@@ -6,6 +6,11 @@
  * started with: python manage.py runserver 127.0.0.1:8001
  */
 
+// The office is in Mabini, Batangas (PH) — every date/time the app renders
+// or compares (announcement scheduling, timestamps) uses this zone so PHP's
+// clock agrees with MySQL's SYSTEM time zone instead of defaulting to UTC.
+date_default_timezone_set('Asia/Manila');
+
 define('DB_HOST', '127.0.0.1');
 define('DB_NAME', 'smart_assess');
 define('DB_USER', 'smart_assess_app');
