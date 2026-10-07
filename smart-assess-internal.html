@@ -1794,6 +1794,13 @@ function initTimePicker(picker, options){
     popover.querySelectorAll('[data-tp-period]').forEach(function(btn){
       btn.addEventListener('click', function(ev){ ev.stopPropagation(); period=btn.getAttribute('data-tp-period'); writeHidden(); renderGrid(); picker.dispatchEvent(new Event('change',{bubbles:true})); });
     });
+    var doneBtn = popover.querySelector('[data-tp-done]');
+    if(doneBtn) doneBtn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      writeHidden();
+      picker.dispatchEvent(new Event('change', {bubbles:true}));
+      closeDtPopover(picker);
+    });
   }
   picker._timePickerRefresh = renderGrid;
 
