@@ -1008,24 +1008,37 @@ function renderAnnouncements(acct){
     var matchS = statusF==='all' || a.status===statusF;
     return matchQ && matchS;
   });
+  var STATUS_TABS = ['all','Draft','Scheduled','Published','Cancelled'];
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Head</div><h1>Announcements</h1><p>Post updates that Assessor Staff will see on their dashboard.</p></div>'
+  + '<div class="page-head"><div><div class="breadcrumb">Assessor Head</div><h1>Announcements</h1><p>Post updates to the Client Interface, the Staff Interface, or both.</p></div>'
     + '<button class="btn btn-primary" data-action="open-ann-modal">'+ic('megaphone','17px')+' Create Announcement</button></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search announcements" value="'+esc(state.search.announcements)+'" data-input="search-announcements"></div>'
     + '<div class="seg">'
-      + '<button class="'+(statusF==='all'?'active':'')+'" data-action="filter" data-key="annStatus" data-val="all">All</button>'
-      + '<button class="'+(statusF==='Published'?'active':'')+'" data-action="filter" data-key="annStatus" data-val="Published">Published</button>'
-      + '<button class="'+(statusF==='Draft'?'active':'')+'" data-action="filter" data-key="annStatus" data-val="Draft">Draft</button>'
+      + STATUS_TABS.map(function(s){ return '<button class="'+(statusF===s?'active':'')+'" data-action="filter" data-key="annStatus" data-val="'+s+'">'+(s==='all'?'All':s)+'</button>'; }).join('')
     + '</div>'
   + '</div>'
+  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Title</th><th>Post To</th><th>Status</th><th>Published / Scheduled</th><th>Created By</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(a){
-      return '<div class="announcement-card fade-in"><div class="ac-head"><div><h4>'+esc(a.title)+'</h4><div class="ac-meta">Posted '+fmtDate(a.datePosted)+' by '+esc(a.postedBy)+'</div></div><span class="badge '+(a.status==='Published'?'green':'slate')+'">'+a.status+'</span></div>'
-        + '<p>'+esc(a.content)+'</p>'
-        + '<div class="ac-actions actions-container"><button class="icon-btn action-button" data-action="edit-ann" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button><button class="icon-btn danger action-button" data-action="delete-ann" data-id="'+a.id+'">'+ic('trash','13px')+'Delete</button></div>'
-      + '</div>';
-    }).join('') : '<div class="empty-state">'+ic('megaphone','30px')+'No announcements match your search.</div>')
-  ;
+      var actions = '<button class="icon-btn action-button" data-action="edit-ann" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>';
+      if(a.status==='Draft' || a.status==='Scheduled'){
+        actions += '<button class="icon-btn action-button" data-action="ann-publish-now" data-id="'+a.id+'">'+ic('megaphone','13px')+'Publish Now</button>';
+      }
+      if(a.status==='Published'){
+        actions += '<button class="icon-btn action-button" data-action="ann-unpublish" data-id="'+a.id+'">'+ic('power','13px')+'Unpublish</button>';
+      }
+      if(a.status==='Scheduled'){
+        actions += '<button class="icon-btn action-button" data-action="ann-cancel" data-id="'+a.id+'">'+ic('x','13px')+'Cancel</button>';
+      }
+      actions += '<button class="icon-btn danger action-button" data-action="delete-ann" data-id="'+a.id+'">'+ic('trash','13px')+'Delete</button>';
+      return '<tr><td class="cell-name" data-label="Title">'+esc(a.title)+'</td>'
+        + '<td data-label="Post To">'+audienceLabel(a.postTo)+'</td>'
+        + '<td data-label="Status"><span class="badge '+annBadgeClass(a.status)+'">'+a.status+'</span></td>'
+        + '<td data-label="Published / Scheduled">'+annDateCell(a)+'</td>'
+        + '<td data-label="Created By">'+esc(a.postedBy)+'</td>'
+        + '<td class="actions-cell"><div class="actions-container">'+actions+'</div></td></tr>';
+    }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('megaphone','30px')+'No announcements match your search.</div></td></tr>')
+  + '</tbody></table></div>';
 }
 
 function renderReports(acct){
