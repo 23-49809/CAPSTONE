@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../includes/client_auth.php';
 $client = require_client();
 
+mark_overdue_requests(db());
+
 $stmt = db()->prepare('SELECT * FROM requests WHERE client_id = ? ORDER BY created_at DESC');
 $stmt->execute([$client['id']]);
 $myRequests = $stmt->fetchAll();

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['head']);
 
 $pdo = db();
+mark_overdue_requests($pdo);
 $statusCounts = array_fill_keys(STATUS_FLOW, 0);
 foreach ($pdo->query("SELECT status, COUNT(*) AS n FROM requests GROUP BY status") as $row) {
     $statusCounts[$row['status']] = (int) $row['n'];
