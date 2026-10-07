@@ -1065,7 +1065,7 @@ function renderReports(acct){
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(r){
-      return '<tr><td class="cell-name" data-label="Report Title">'+esc(r.title)+'</td><td data-label="Type"><span class="badge blue">'+TYPE_LABEL[r.type]+'</span></td><td data-label="Date Generated">'+fmtDate(r.dateGenerated)+'</td>'
+      return '<tr><td class="cell-name" data-label="Report Title">'+esc(r.title)+'</td><td data-label="Type"><span class="badge blue">'+REPORT_TYPE_LABEL[r.type]+'</span></td><td data-label="Date Generated">'+fmtDate(r.dateGenerated)+'</td>'
         + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></div></td></tr>';
     }).join('') : '<tr><td colspan="4"><div class="empty-state">'+ic('fileBar','30px')+'No reports match your search.</div></td></tr>')
   + '</tbody></table></div>';
