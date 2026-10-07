@@ -1051,7 +1051,6 @@ function renderReports(acct){
     var matchT = typeF==='all' || r.type===typeF;
     return matchQ && matchT;
   });
-  var TYPE_LABEL = {document:'Document Requests', 'land-transfer':'Land Transfer', requirement:'Requirement Checker', summary:'Summary'};
   return ''
   + '<div class="page-head"><div><div class="breadcrumb">Assessor Head</div><h1>Generated Reports</h1><p>Reports on document requests, land transfers, and requirement checking outcomes.</p></div></div>'
   + '<div class="toolbar">'
