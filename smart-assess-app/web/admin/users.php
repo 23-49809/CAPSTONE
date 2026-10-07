@@ -84,14 +84,13 @@ require __DIR__ . '/../includes/internal_header.php';
       <table>
         <thead><tr><th>Name</th><th>Username</th><th>Contact Number</th><th>Position Title</th><th colspan="2">Role (Level of Access) &amp; Status</th></tr></thead>
         <tbody>
-        <?php foreach ($accounts as $a): $roleCode = ROLE_ID_TO_CODE[(int)$a['role_id']] ?? 'staff'; ?>
+        <?php foreach ($accounts as $a): $roleCode = ROLE_ID_TO_CODE[(int)$a['role_id']] ?? 'staff'; $editFormId = 'edit-user-' . (int) $a['id']; ?>
           <tr>
             <td><?= esc($a['name']) ?></td>
             <td class="mono"><?= esc($a['username']) ?></td>
-            <td><?= esc(format_internal_contact($a['contact_number'] ?? null)) ?></td>
-            <td><?= esc($a['position_title'] ?? '—') ?></td>
+            <td><?= internal_contact_control($a['contact_number'] ?? null, $editFormId) ?></td>
+            <td><?= internal_position_control($a['position_title'] ?? null, $editFormId) ?></td>
             <td colspan="2">
-              <?php $editFormId = 'edit-user-' . (int) $a['id']; ?>
               <form id="<?= esc($editFormId) ?>" method="post" class="user-row-edit">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="update_account">
