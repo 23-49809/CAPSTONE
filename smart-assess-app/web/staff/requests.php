@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['staff']);
 
+mark_overdue_requests(db());
+
 $flowFilter = in_array($_GET['flow'] ?? '', ['docreq', 'landtransfer'], true) ? $_GET['flow'] : '';
 $statusFilter = in_array($_GET['status'] ?? '', STATUS_FLOW, true) ? $_GET['status'] : '';
 

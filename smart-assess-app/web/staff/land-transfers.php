@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['staff']);
 
+mark_overdue_requests(db());
+
 $statusFilter = in_array($_GET['status'] ?? '', STATUS_FLOW, true) ? $_GET['status'] : '';
 $sql = "SELECT * FROM requests WHERE flow = 'landtransfer'";
 $params = [];
