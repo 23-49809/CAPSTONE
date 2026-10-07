@@ -8,9 +8,9 @@
             "ssh": "Disabled",
             "previewLimit": 50,
             "server": "localhost",
-            "port": 33060,
+            "port": 3306,
             "driver": "MySQL",
-            "name": " Assessor Office Development",
+            "name": " SMART Assess",
             "username": "root",
             "password": "assessor",
             "database": "assessor_db"
