@@ -9,12 +9,17 @@ foreach (db()->query('SELECT role_id, COUNT(*) n FROM users GROUP BY role_id') a
     $name = match ((int) $row['role_id']) { 2 => 'STAFF', 3 => 'ADMIN', 4 => 'DEPARTMENT_HEAD', default => null };
     if ($name) $counts[$name] = (int) $row['n'];
 }
-$descriptions = [
-    'CLIENT' => 'Public/resident accounts. Access: public client portal only (document requests, land transfers, my requests, profile). No access to any internal route.',
-    'STAFF' => "Assessor's Staff. Access: review requests, confirm AI checker results, update status, view notifications. No access to /admin/* or /department-head/*.",
-    'ADMIN' => 'Administrator. Access: user accounts, roles (view), settings, audit logs. No access to /staff/* or /department-head/* unless also granted that role.',
-    'DEPARTMENT_HEAD' => 'Department Head. Access: reports, dashboard/monitoring, announcements. No access to /staff/* or /admin/*.',
-];
+// Pulled live from permissions/role_permissions — not a hardcoded string —
+// so this page reflects the actual data-backed grant, not prose that could
+// drift from it. See includes/auth.php's user_can() for the runtime check.
+$permissionsByRole = [];
+foreach (db()->query(
+    "SELECT rp.role_id, p.description FROM role_permissions rp
+     JOIN permissions p ON p.id = rp.permission_id
+     ORDER BY rp.role_id, p.description"
+) as $row) {
+    $permissionsByRole[(int) $row['role_id']][] = $row['description'];
+}
 
 $pageTitle = 'Roles';
 require __DIR__ . '/../includes/internal_header.php';
