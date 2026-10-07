@@ -1460,6 +1460,37 @@ function bindEvents(){
     updateContact(false);
   });
 
+  (function(){
+    var schedWrap = app.querySelector('[data-schedule-fields]');
+    var radios = app.querySelectorAll('input[name="publishMode"]');
+    if(!schedWrap || !radios.length) return;
+    var dateInput = schedWrap.querySelector('input[name="scheduleDate"]');
+    var timeInput = schedWrap.querySelector('input[name="scheduleTime"]');
+    var futureMsg = 'Scheduled date/time must be in the future.';
+    function isScheduleMode(){
+      var checked = app.querySelector('input[name="publishMode"][value="schedule"]');
+      return !!(checked && checked.checked);
+    }
+    function validateFuture(){
+      if(!dateInput || !timeInput) return;
+      if(!isScheduleMode() || !dateInput.value || !timeInput.value){ timeInput.setCustomValidity(''); return; }
+      var when = new Date(dateInput.value+'T'+timeInput.value+':00');
+      var bad = isNaN(when.getTime()) || when.getTime() <= Date.now();
+      timeInput.setCustomValidity(bad ? futureMsg : '');
+    }
+    function sync(){
+      var scheduled = isScheduleMode();
+      schedWrap.hidden = !scheduled;
+      if(dateInput) dateInput.required = scheduled;
+      if(timeInput) timeInput.required = scheduled;
+      validateFuture();
+    }
+    radios.forEach(function(r){ r.addEventListener('change', sync); });
+    if(dateInput) dateInput.addEventListener('input', validateFuture);
+    if(timeInput) timeInput.addEventListener('input', validateFuture);
+    sync();
+  })();
+
   app.onclick = function(ev){
     var el = ev.target.closest('[data-action]');
     if(!el) return;
