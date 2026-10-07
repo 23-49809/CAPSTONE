@@ -1695,13 +1695,25 @@ function openDtPopover(picker){
   // measure), then place it, then reveal — avoids a visible jump/flash.
   popover.style.visibility = 'hidden';
   popover.hidden = false;
+  popover.style.position = 'fixed';
   var rect = trigger.getBoundingClientRect();
   var popWidth = popover.offsetWidth, popHeight = popover.offsetHeight;
-  var left = Math.max(12, Math.min(rect.left, window.innerWidth - popWidth - 12));
+
+  // Clamp against the MODAL's box, not the browser viewport — the modal
+  // is a centered ~620px card, so clamping to the full window (the old,
+  // buggy behaviour) let the popover drift out past the modal's own edge
+  // while still technically being "on screen".
+  var boundsEl = picker.closest('.modal') || document.body;
+  var bounds = boundsEl.getBoundingClientRect();
+  var minLeft = bounds.left + 8, maxLeft = bounds.right - popWidth - 8;
+  var left = (maxLeft < minLeft) ? minLeft : Math.max(minLeft, Math.min(rect.left, maxLeft));
+
   var top = rect.bottom + 6;
-  if(top + popHeight > window.innerHeight - 12) top = rect.top - popHeight - 6;
-  if(top < 12) top = 12;
-  popover.style.position = 'fixed';
+  var fitsBelow = (top + popHeight) <= (bounds.bottom - 8);
+  var fitsAbove = (rect.top - popHeight - 6) >= (bounds.top + 8);
+  if(!fitsBelow && fitsAbove) top = rect.top - popHeight - 6;
+  top = Math.max(bounds.top + 8, Math.min(top, bounds.bottom - popHeight - 8));
+
   popover.style.left = left+'px';
   popover.style.top = top+'px';
   popover.style.visibility = '';
