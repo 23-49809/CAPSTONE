@@ -1359,6 +1359,22 @@ function clockNowLabel(){
 function bindEvents(){
   var app = document.getElementById('app');
 
+  app.querySelectorAll('[data-contact-number]').forEach(function(input){
+    var error = input.closest('.field').querySelector('[data-contact-error]');
+    var message = 'Contact number must contain exactly 10 digits after +63 and start with 9.';
+    function updateContact(showError){
+      var digits = contactDigits(input.value);
+      input.value = digits;
+      var valid = contactIsValid(digits);
+      input.setCustomValidity(valid?'':message);
+      input.setAttribute('aria-invalid',String(!valid && showError));
+      if(error) error.hidden = valid || !showError;
+    }
+    input.addEventListener('input',function(){ updateContact(true); });
+    input.addEventListener('blur',function(){ updateContact(true); });
+    updateContact(false);
+  });
+
   app.onclick = function(ev){
     var el = ev.target.closest('[data-action]');
     if(!el) return;
@@ -1536,8 +1552,8 @@ function bindEvents(){
       var role = fd.get('role');
       state.accounts.push({
         id: uid('u'), fullName: fd.get('fullName'), username: fd.get('username'), password: fd.get('password'),
-        email: fd.get('email'), contact: fd.get('contact'), role: role,
-        position: fd.get('positionTitle') || ROLE_LABEL[role], status: fd.get('status')||'active',
+        email: fd.get('email'), contact: canonicalContact(fd.get('contact')), role: role,
+        position: fd.get('positionTitle'), status: fd.get('status')||'active',
         dateCreated: '2026-09-04'
       });
       pushToast('Staff account created.', 'userPlus');
@@ -1551,8 +1567,8 @@ function bindEvents(){
         var selfEdit = currentAccount() && acc.username===currentAccount().username;
         var wantsInactive = fd.get('status')==='inactive';
         acc.fullName = fd.get('fullName'); acc.username = fd.get('username'); acc.password = fd.get('password');
-        acc.email = fd.get('email'); acc.contact = fd.get('contact'); acc.role = fd.get('role');
-        acc.position = fd.get('positionTitle') || ROLE_LABEL[acc.role];
+        acc.email = fd.get('email'); acc.contact = canonicalContact(fd.get('contact')); acc.role = fd.get('role');
+        acc.position = fd.get('positionTitle');
         acc.status = (selfEdit && wantsInactive) ? 'active' : fd.get('status');
         pushToast(selfEdit && wantsInactive ? 'Account updated. (You cannot deactivate your own account while logged in, so status was kept Active.)' : 'Account updated.', 'check');
       }
@@ -1561,7 +1577,7 @@ function bindEvents(){
     } else if(type==='update-profile'){
       var me = currentAccount();
       if(me){
-        me.fullName = fd.get('fullName'); me.email = fd.get('email'); me.contact = fd.get('contact');
+        me.fullName = fd.get('fullName'); me.email = fd.get('email'); me.contact = canonicalContact(fd.get('contact'));
         var np = fd.get('password'); if(np){ me.password = np; }
         pushToast('Profile updated.', 'check');
       }
