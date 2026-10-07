@@ -478,6 +478,25 @@ function push_status(int $requestId, string $status, string $refNo, array $missi
     $body = sms_body_for($status, $refNo, $missing);
     $pdo->prepare('INSERT INTO request_status_log (request_id, status, actor, sms_body) VALUES (?, ?, ?, ?)')
         ->execute([$requestId, $status, $actor, $body]);
+
+    // Real notification, read/unread-tracked — only for requests tied to a
+    // registered client account (anonymous submissions have no inbox to
+    // deliver to, same as request_status_log's simulated SMS already did).
+    $clientId = $pdo->prepare('SELECT client_id FROM requests WHERE id = ?');
+    $clientId->execute([$requestId]);
+    $clientId = $clientId->fetchColumn();
+    if ($clientId) {
+        $pdo->prepare('INSERT INTO notifications (client_id, request_id, type, message) VALUES (?,?,?,?)')
+            ->execute([(int) $clientId, $requestId, 'status_change', $body]);
+    }
+}
+
+/** Staff workflow activity — see activity_logs table comment in schema.sql
+ *  for how this differs in purpose from audit_log. */
+function log_activity(int $userId, string $action, ?int $requestId = null): void
+{
+    db()->prepare('INSERT INTO activity_logs (user_id, action, request_id) VALUES (?,?,?)')
+        ->execute([$userId, $action, $requestId]);
 }
 
 /**
