@@ -446,13 +446,13 @@ function attach_request_children(array $req): array
     return $req;
 }
 
-function push_status(int $requestId, string $status, string $refNo, array $missing = []): void
+function push_status(int $requestId, string $status, string $refNo, array $missing = [], string $actor = 'staff'): void
 {
     $pdo = db();
     $pdo->prepare('UPDATE requests SET status = ? WHERE id = ?')->execute([$status, $requestId]);
     $body = sms_body_for($status, $refNo, $missing);
-    $pdo->prepare('INSERT INTO request_status_log (request_id, status, sms_body) VALUES (?, ?, ?)')
-        ->execute([$requestId, $status, $body]);
+    $pdo->prepare('INSERT INTO request_status_log (request_id, status, actor, sms_body) VALUES (?, ?, ?, ?)')
+        ->execute([$requestId, $status, $actor, $body]);
 }
 
 /**
