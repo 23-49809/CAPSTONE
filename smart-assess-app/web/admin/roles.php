@@ -36,7 +36,15 @@ require __DIR__ . '/../includes/internal_header.php';
             <td class="mono"><?= (int)$r['id'] ?></td>
             <td><strong><?= esc($r['name']) ?></strong></td>
             <td class="mono"><?= $counts[$r['name']] ?? 0 ?></td>
-            <td style="font-size:13px;color:var(--ink-soft)"><?= esc($descriptions[$r['name']] ?? '') ?></td>
+            <td style="font-size:13px;color:var(--ink-soft)">
+              <?php if (!empty($permissionsByRole[(int) $r['id']])): ?>
+                <ul style="margin:0;padding-left:16px">
+                  <?php foreach ($permissionsByRole[(int) $r['id']] as $desc): ?><li><?= esc($desc) ?></li><?php endforeach; ?>
+                </ul>
+              <?php else: ?>
+                Public/resident accounts &mdash; access to the public client portal only (document requests, land transfers, my requests, profile). No internal route access.
+              <?php endif; ?>
+            </td>
           </tr>
         <?php endforeach; ?>
         </tbody>
