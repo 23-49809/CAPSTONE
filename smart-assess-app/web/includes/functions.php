@@ -8,6 +8,50 @@ function esc(?string $s): string
     return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8');
 }
 
+const INTERNAL_POSITION_OPTIONS = ['Assessor Admin', 'Assessor Head', 'Assessment Clerk', 'Records Officer'];
+
+function internal_contact_digits(?string $value): string
+{
+    $digits = preg_replace('/\D+/', '', $value ?? '');
+    if (strlen($digits) > 10 && substr($digits, 0, 2) === '63') $digits = substr($digits, 2);
+    elseif (strlen($digits) > 10 && substr($digits, 0, 1) === '0') $digits = substr($digits, 1);
+    return substr($digits, 0, 10);
+}
+
+function canonical_internal_contact(?string $digits): ?string
+{
+    return preg_match('/^9\d{9}$/', $digits ?? '') ? '+63' . $digits : null;
+}
+
+function format_internal_contact(?string $stored): string
+{
+    $digits = internal_contact_digits($stored);
+    return preg_match('/^9\d{9}$/', $digits) ? '+63 ' . $digits : ($stored ?: '—');
+}
+
+function internal_contact_control(?string $stored = null, ?string $formId = null): string
+{
+    $form = $formId ? ' form="' . esc($formId) . '"' : '';
+    return '<div class="contact-number-input"><span class="contact-prefix" aria-hidden="true">+63</span>'
+        . '<input type="tel" name="contact_number" value="' . esc(internal_contact_digits($stored)) . '" placeholder="9171234567" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="9[0-9]{9}" required data-contact-number' . $form . '>'
+        . '</div><div class="field-error" data-contact-error hidden>Contact number must contain exactly 10 digits after +63 and start with 9.</div>';
+}
+
+function internal_position_control(?string $selected = null, ?string $formId = null): string
+{
+    $form = $formId ? ' form="' . esc($formId) . '"' : '';
+    $selected = $selected ?? '';
+    $legacy = $selected !== '' && !in_array($selected, INTERNAL_POSITION_OPTIONS, true)
+        ? '<option value="' . esc($selected) . '" selected>' . esc($selected) . '</option>'
+        : '';
+    return '<select name="position_title" required' . $form . '><option value=""' . ($selected === '' ? ' selected' : '') . '>Select Position</option>'
+        . $legacy
+        . implode('', array_map(static function (string $position) use ($selected): string {
+            return '<option value="' . esc($position) . '"' . ($selected === $position ? ' selected' : '') . '>' . esc($position) . '</option>';
+        }, INTERNAL_POSITION_OPTIONS))
+        . '</select>';
+}
+
 /** Shared by both auth systems (client and internal) — a CSRF token isn't
  *  tied to which portal you're on, just to having an active session. */
 function csrf_token(): string
