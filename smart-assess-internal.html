@@ -887,12 +887,16 @@ function renderShell(acct){
     else if(view==='archived-accounts') body = renderArchivedAccounts();
     else if(view==='create-account') body = renderCreateAccount(acct);
     else if(view==='staff-info') body = renderStaffAccounts(acct, true);
+    else if(view==='docreq-report') body = renderDocReqReport(acct);
+    else if(view==='landtransfer-report') body = renderLandTransferReport(acct);
     else if(view==='profile') body = renderProfile(acct);
     else body = renderAdminDashboard(acct);
   } else if(acct.role==='head'){
     if(view==='dashboard') body = renderHeadDashboard(acct);
     else if(view==='announcements') body = renderAnnouncements(acct);
     else if(view==='reports') body = renderReports(acct);
+    else if(view==='docreq-report') body = renderDocReqReport(acct);
+    else if(view==='landtransfer-report') body = renderLandTransferReport(acct);
     else if(view==='profile') body = renderProfile(acct);
     else body = renderHeadDashboard(acct);
   } else {
