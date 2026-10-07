@@ -694,6 +694,11 @@ function audienceLabel(code){ return ANNOUNCEMENT_AUDIENCES[code] || code; }
 function annBadgeClass(status){
   return status==='Published' ? 'green' : status==='Scheduled' ? 'amber' : status==='Cancelled' ? 'red' : 'slate';
 }
+function annDateCell(a){
+  if(a.status==='Published' && a.publishedAt) return fmtDateTime(a.publishedAt);
+  if(a.status==='Scheduled' && a.scheduledAt) return 'Scheduled: '+fmtDateTime(a.scheduledAt);
+  return '—';
+}
 /** Scheduled -> Published the moment the scheduled time arrives. There's no
  *  server/cron in this demo, so this runs on every render() plus a standing
  *  interval (wired near the bootstrap code below) so it fires even if the
