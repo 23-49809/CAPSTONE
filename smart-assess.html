@@ -126,11 +126,13 @@
   .home-slide-dots button{ width:10px; height:10px; padding:0; border:1px solid #fff; border-radius:50%; background:transparent; cursor:pointer; }
   .home-slide-dots button.active{ background:#fff; }
   .requirements-modal{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(10,19,14,.58); }
-  .requirements-modal-card{ width:min(560px,100%); max-height:88vh; overflow:auto; padding:30px; border-radius:var(--radius-lg); background:var(--surface); color:var(--ink); box-shadow:var(--shadow-lg); }
+  .requirements-modal-card{ width:min(560px,100%); max-height:min(88vh,720px); overflow:auto; padding:clamp(20px,5vw,30px); border-radius:var(--radius-md); background:var(--surface); color:var(--ink); box-shadow:var(--shadow-lg); }
   .requirements-modal-card h3{ font-size:25px; margin-bottom:12px; }
   .requirements-modal-card ul{ margin:0 0 24px; padding-left:22px; color:var(--ink-soft); }
   .requirements-modal-head{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
-  .requirements-close{ border:0; border-radius:50%; width:36px; height:36px; background:var(--surface-2); color:var(--ink); cursor:pointer; }
+  .requirements-close{ display:flex; align-items:center; justify-content:center; flex:0 0 44px; border:1px solid var(--line); border-radius:50%; width:44px; height:44px; background:var(--surface-2); color:var(--ink); cursor:pointer; }
+  .requirements-close:hover{ background:var(--brand-100); }
+  .requirements-close .icon{ width:20px; height:20px; }
   .public-detail-page{ padding:82px 0; }
   .public-detail-page .section-head{ margin-bottom:34px; }
   .public-detail-page .section-head .eyebrow{ color:var(--brand-700); margin-bottom:10px; }
@@ -747,8 +749,8 @@ function renderRequirementsModal(){
   const items = isLand
     ? ['Certified True Copy of Tax Declaration or Title','Notarial Deed of Sale or Donation','Vicinity Map','Certification of No Improvement','Tax Clearance','Valid government-issued ID']
     : ['Valid government-issued ID','Completed request details','Property or tax declaration information','Authorization letter and representative ID, if filing for the owner'];
-  return '<div class="requirements-modal" data-action="close-requirements"><div class="requirements-modal-card" role="dialog" aria-modal="true" aria-labelledby="requirements-title">'
-    + '<div class="requirements-modal-head"><h3 id="requirements-title">'+title+'</h3><button class="requirements-close" type="button" data-action="close-requirements" aria-label="Close">'+ic('check')+'</button></div>'
+  return '<div class="requirements-modal" data-action="close-requirements"><div class="requirements-modal-card" role="dialog" aria-modal="true" aria-labelledby="requirements-title" tabindex="-1">'
+    + '<div class="requirements-modal-head"><h3 id="requirements-title">'+title+'</h3><button class="requirements-close" type="button" data-action="close-requirements" aria-label="Close requirements">'+ic('x')+'</button></div>'
     + '<ul>'+items.map(function(item){ return '<li>'+esc(item)+'</li>'; }).join('')+'</ul>'
     + '<button class="btn btn-primary" data-action="start-'+(isLand?'landtransfer':'docreq')+'">Start Request '+ic('arrowRight')+'</button>'
   + '</div></div>';
@@ -758,8 +760,8 @@ function renderRequirementsModal(){
 function renderLanding(){
   return renderHeader()
   + '<section class="hero home-slider" data-home-slider aria-label="Assessor Office updates">'
-    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Public Service Guide</span><h1>Document Request</h1><p>Prepare the required documents before submitting your request.</p><p class="hero-requirements">Valid government-issued ID, completed request details, and property or authorization documents when applicable.</p><button class="btn btn-hero" data-action="view-requirements-page">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
-    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer</h1><p>Make sure all required documents are complete before processing your land transfer.</p><p class="hero-requirements">Certified title or tax declaration, notarized deed, vicinity map, certifications, tax clearance, and valid ID.</p><button class="btn btn-hero" data-action="view-requirements-page">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Public Service Guide</span><h1>Document Request</h1><p>Prepare the required documents before submitting your request.</p><p class="hero-requirements">Valid government-issued ID, completed request details, and property or authorization documents when applicable.</p><button class="btn btn-hero" data-action="show-requirements" data-requirements="docreq">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer</h1><p>Make sure all required documents are complete before processing your land transfer.</p><p class="hero-requirements">Certified title or tax declaration, notarized deed, vicinity map, certifications, tax clearance, and valid ID.</p><button class="btn btn-hero" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div></div></div>'
     + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><div class="announcement-copy"><h3>Office Closure Notice</h3><p>Please be advised that the Assessor’s Office will be closed on September 25, 2026 due to an official office activity. Regular office services will resume on the next working day.</p><time>September 16, 2026</time></div><button class="btn btn-hero" data-action="view-announcement-page">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
     + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
     + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Document request slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Land transfer slide"></button><button data-action="slider-dot" data-slide="2" aria-label="Announcement slide"></button></div>'
@@ -1284,6 +1286,19 @@ function bindEvents(root){
       if(menu) menu.hidden = true;
     });
   }
+  function closeRequirements(){
+    const requirement = state.requirements;
+    state.requirements = null;
+    render();
+    const trigger = root.querySelector('[data-action="show-requirements"][data-requirements="'+requirement+'"]');
+    if(trigger) trigger.focus();
+  }
+  root.addEventListener('keydown', function(event){
+    if(event.key==='Escape' && state.requirements){
+      event.preventDefault();
+      closeRequirements();
+    }
+  });
   root.querySelectorAll('[data-barangay-trigger]').forEach(function(trigger){
     trigger.addEventListener('click', function(e){
       e.stopPropagation();
@@ -1349,15 +1364,22 @@ function bindEvents(root){
     el.addEventListener('click', function(){ go(el.getAttribute('data-nav')); });
   });
   root.querySelectorAll('[data-action]').forEach(function(el){
-    el.addEventListener('click', function(){
+    el.addEventListener('click', function(event){
       const a = el.getAttribute('data-action');
       if(a==='get-started') goToServices();
       else if(a==='start-docreq') startFlow('docreq');
       else if(a==='start-landtransfer') startFlow('landtransfer');
-      else if(a==='view-requirements-page') go('requirements');
       else if(a==='view-announcement-page') go('announcement');
-      else if(a==='show-requirements'){ state.requirements = el.getAttribute('data-requirements'); render(); }
-      else if(a==='close-requirements'){ state.requirements = null; render(); }
+      else if(a==='show-requirements'){
+        state.requirements = el.getAttribute('data-requirements');
+        render();
+        const closeButton = root.querySelector('.requirements-close');
+        if(closeButton) closeButton.focus();
+      }
+      else if(a==='close-requirements'){
+        if(el.classList.contains('requirements-modal') && event.target!==el) return;
+        closeRequirements();
+      }
       else if(a==='slider-prev' || a==='slider-next' || a==='slider-dot'){
         const sliderRoot = root.querySelector('[data-home-slider]');
         if(sliderRoot && sliderRoot._showSlide){
