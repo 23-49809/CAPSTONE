@@ -40,8 +40,8 @@ $missingLabels = array_map(fn($d) => $d['label'], array_filter($req['documents']
 
 <div class="section-title"><?= icon_span('timer','15px') ?> Status Timeline</div>
 <ul class="timeline">
-  <?php foreach ($req['status_log'] as $log): ?>
-    <li><span class="t-dot"></span><div><div class="t-status"><?= esc($log['status']) ?></div><div class="t-when"><?= fmt_datetime($log['created_at']) ?></div></div></li>
+  <?php foreach ($req['status_log'] as $log): $actor = $log['actor'] ?? 'staff'; ?>
+    <li><span class="t-dot"></span><div><div class="t-status"><?= esc($log['status']) ?><?php if ($actor !== 'staff'): ?> <span class="badge slate" style="font-size:10px;padding:2px 7px"><?= $actor === 'system' ? 'auto-detected' : 'by client' ?></span><?php endif; ?></div><div class="t-when"><?= fmt_datetime($log['created_at']) ?></div></div></li>
   <?php endforeach; ?>
 </ul>
 
