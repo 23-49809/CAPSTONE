@@ -418,7 +418,7 @@ function render_requests_table(array $requests, string $detailBase = '/staff/det
         $checkBadge = $r['requirement_complete']
             ? '<span class="badge green">' . icon_span('check', '12px') . ' Complete</span>'
             : '<span class="badge amber">' . icon_span('alert', '12px') . ' Needs review</span>';
-        $elapsed = request_elapsed_info($r['flow'], $r['created_at'], $r['status']);
+        $elapsed = request_elapsed_info($r['flow'], $r['last_action_at'] ?? $r['created_at'], $r['status']);
         $receivedCell = fmt_date($r['created_at'])
             . '<div class="cell-sub' . ($elapsed['overdue'] ? ' overdue' : '') . '">'
             . ($elapsed['overdue']
