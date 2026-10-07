@@ -664,7 +664,7 @@ function shellChrome(acct, innerHtml){
     + '</div>'
     + '<div class="hd-right">'
       + (acct.role==='admin'?'':'<span class="role-tag">'+ic('idCard','14px')+esc(ROLE_LABEL[acct.role])+'</span>')
-      + '<button class="hd-avatar" data-action="nav" data-view="profile"><span class="avatar-circle">'+esc(initials(acct.fullName))+'</span><span><span class="hd-name">'+esc(acct.fullName)+'</span><br><span class="hd-role">'+esc(acct.position)+'</span></span></button>'
+      + '<button class="hd-avatar" data-action="nav" data-view="profile"><span class="avatar-circle">'+esc(initials(acct.fullName))+'</span><span><span class="hd-name">'+esc(acct.fullName)+'</span>'+(acct.role==='admin'?'':'<br><span class="hd-role">'+esc(acct.position)+'</span>')+'</span></button>'
       + (acct.role==='admin'?'':'<button class="hd-logout" data-action="logout" aria-label="Logout">'+ic('logout','17px')+'</button>')
     + '</div>'
   + '</div></header>'
