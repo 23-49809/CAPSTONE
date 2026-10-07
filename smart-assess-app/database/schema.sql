@@ -138,6 +138,12 @@ CREATE TABLE request_status_log (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   request_id    INT NOT NULL,
   status        VARCHAR(30) NOT NULL,
+  -- Who actually made this status change: 'client' (auto-"Received" on
+  -- submission), 'staff' (a deliberate action from the request detail
+  -- page), or 'system' (automatic timeout detection). created_at is always
+  -- DB-generated (never set by app code), so every row's timestamp is the
+  -- real moment that action happened — never backdated/faked.
+  actor         VARCHAR(10) NOT NULL DEFAULT 'staff',
   sms_body      TEXT NOT NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE
