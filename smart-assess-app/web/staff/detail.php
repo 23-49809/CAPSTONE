@@ -11,6 +11,7 @@ if (!$req) {
     header('Location: /staff/requests.php');
     exit;
 }
+log_activity($me['id'], 'viewed_request', $req['id']);
 $statusError = $_GET['error'] ?? '';
 
 $pageTitle = $req['reference_no'];
