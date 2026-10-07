@@ -47,6 +47,12 @@ function login_user(string $username, string $password): ?array
         $_SESSION['internal_user']['role'] ?? 'staff', $user['id'], $user['name'],
         'Logged in to internal portal'
     );
+    db()->prepare('INSERT INTO user_sessions (user_type, user_id, ip_address, user_agent) VALUES (?,?,?,?)')
+        ->execute([
+            $_SESSION['internal_user']['role'], $user['id'],
+            $_SERVER['REMOTE_ADDR'] ?? null, substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255) ?: null,
+        ]);
+    $_SESSION['internal_session_id'] = (int) db()->lastInsertId();
     return $_SESSION['internal_user'];
 }
 
@@ -55,8 +61,12 @@ function logout_user(): void
     $user = current_user();
     if ($user) {
         audit($user['role'], $user['id'], $user['name'], 'Logged out of internal portal');
+        if (!empty($_SESSION['internal_session_id'])) {
+            db()->prepare('UPDATE user_sessions SET logout_at = NOW() WHERE id = ? AND logout_at IS NULL')
+                ->execute([$_SESSION['internal_session_id']]);
+        }
     }
-    unset($_SESSION['internal_user']);
+    unset($_SESSION['internal_user'], $_SESSION['internal_session_id']);
     session_regenerate_id(true);
 }
 
