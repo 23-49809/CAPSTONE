@@ -36,7 +36,15 @@ function register_client(string $firstName, string $lastName, string $email, str
 
     $_SESSION['client'] = ['id' => $id, 'first_name' => $firstName, 'last_name' => $lastName, 'email' => $email];
     audit('client', $id, "$firstName $lastName", 'Registered a client account');
+    start_client_session($id);
     return ['ok' => true];
+}
+
+function start_client_session(int $clientId): void
+{
+    db()->prepare('INSERT INTO user_sessions (user_type, user_id, ip_address, user_agent) VALUES (?,?,?,?)')
+        ->execute(['client', $clientId, $_SERVER['REMOTE_ADDR'] ?? null, substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255) ?: null]);
+    $_SESSION['client_session_id'] = (int) db()->lastInsertId();
 }
 
 function login_client(string $email, string $password): ?array
@@ -56,14 +64,21 @@ function login_client(string $email, string $password): ?array
         'contact_number' => $client['contact_number'],
     ];
     audit('client', $client['id'], $client['first_name'] . ' ' . $client['last_name'], 'Logged in to client portal');
+    start_client_session((int) $client['id']);
     return $_SESSION['client'];
 }
 
 function logout_client(): void
 {
     $c = current_client();
-    if ($c) audit('client', $c['id'], $c['first_name'] . ' ' . $c['last_name'], 'Logged out of client portal');
-    unset($_SESSION['client']);
+    if ($c) {
+        audit('client', $c['id'], $c['first_name'] . ' ' . $c['last_name'], 'Logged out of client portal');
+        if (!empty($_SESSION['client_session_id'])) {
+            db()->prepare('UPDATE user_sessions SET logout_at = NOW() WHERE id = ? AND logout_at IS NULL')
+                ->execute([$_SESSION['client_session_id']]);
+        }
+    }
+    unset($_SESSION['client'], $_SESSION['client_session_id']);
     session_regenerate_id(true);
 }
 
