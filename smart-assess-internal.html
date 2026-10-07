@@ -231,6 +231,13 @@
     body:has(#report-printable) *{ visibility:hidden; }
     body:has(#report-printable) #report-printable,
     body:has(#report-printable) #report-printable *{ visibility:visible; }
+    /* The report sits inside .modal, which caps itself at max-height:88vh
+       with overflow-y:auto for on-screen use — left as-is, that would clip
+       or scroll-cut a report longer than one screen when printed. Freeing
+       the modal chain of its height/overflow/positioning first lets the
+       absolute-positioned block below lay out at full, uncropped length. */
+    body:has(#report-printable) .modal-overlay{ position:static; overflow:visible; padding:0; background:none; display:block; }
+    body:has(#report-printable) .modal{ position:static; max-height:none; overflow:visible; box-shadow:none; max-width:100%; width:100%; padding:0; margin:0; }
     body:has(#report-printable) #report-printable{ position:absolute; left:0; top:0; width:100%; margin:0; padding:0; }
     .no-print{ display:none !important; }
     @page{ margin:14mm; }
