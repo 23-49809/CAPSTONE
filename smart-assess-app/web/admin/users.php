@@ -114,4 +114,26 @@ require __DIR__ . '/../includes/internal_header.php';
     </div>
   </div>
 </div>
+<script>
+(function(){
+  var message = 'Contact number must contain exactly 10 digits after +63 and start with 9.';
+  document.querySelectorAll('[data-contact-number]').forEach(function(input){
+    var field = input.parentElement.parentElement;
+    var error = field.querySelector('[data-contact-error]');
+    function update(showError){
+      var digits = input.value.replace(/\D/g, '');
+      if (digits.length > 10 && digits.slice(0, 2) === '63') digits = digits.slice(2);
+      else if (digits.length > 10 && digits.charAt(0) === '0') digits = digits.slice(1);
+      input.value = digits.slice(0, 10);
+      var valid = /^9\d{9}$/.test(input.value);
+      input.setCustomValidity(valid ? '' : message);
+      input.setAttribute('aria-invalid', String(!valid && showError));
+      if (error) error.hidden = valid || !showError;
+    }
+    input.addEventListener('input', function(){ update(true); });
+    input.addEventListener('blur', function(){ update(true); });
+    update(false);
+  });
+})();
+</script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
