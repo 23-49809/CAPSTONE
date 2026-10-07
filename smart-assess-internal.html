@@ -610,6 +610,16 @@ function loadState(){
     for(var k in base){ if(!(k in parsed)) parsed[k] = base[k]; }
     parsed.accounts = parsed.accounts.map(function(account){ account.contact = canonicalContact(account.contact); return account; });
     parsed.archivedAccounts = (parsed.archivedAccounts || []).map(function(account){ account.contact = canonicalContact(account.contact); return account; });
+    // Browsers with this app's localStorage saved from before "Post To" /
+    // scheduling existed would otherwise have announcements missing these
+    // fields entirely (postTo undefined renders as the literal word
+    // "undefined") — backfill them to a sane shape instead.
+    parsed.announcements = (parsed.announcements || []).map(function(a){
+      if(!('postTo' in a) || !a.postTo) a.postTo = 'both';
+      if(!('scheduledAt' in a)) a.scheduledAt = null;
+      if(!('publishedAt' in a)) a.publishedAt = a.status==='Published' ? new Date().toISOString() : null;
+      return a;
+    });
     parsed.modal = null; parsed.confirm = null; parsed.toasts = [];
     return parsed;
   }catch(e){ return defaultState(); }
