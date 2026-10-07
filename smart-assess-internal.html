@@ -2316,6 +2316,8 @@ function bindEvents(){
     else if(key==='search-req') state.search.reqResults = el.value;
     else if(key==='search-announcements') state.search.announcements = el.value;
     else if(key==='search-reports') state.search.reports = el.value;
+    else if(key==='search-docreq-report') state.search.docReqReport = el.value;
+    else if(key==='search-landtransfer-report') state.search.landTransferReport = el.value;
     else return;
     render();
     var newEl = document.querySelector('[data-input="'+key+'"]');
@@ -2330,6 +2332,10 @@ function bindEvents(){
     else if(key==='filter-doc-status') state.filters.docStatus = el.value;
     else if(key==='filter-land-status') state.filters.landStatus = el.value;
     else if(key==='filter-report-type') state.filters.reportType = el.value;
+    else if(key==='filter-docreq-report-status') state.filters.docReqReportStatus = el.value;
+    else if(key==='filter-docreq-report-type') state.filters.docReqReportType = el.value;
+    else if(key==='filter-landtransfer-report-status') state.filters.landTransferReportStatus = el.value;
+    else if(key==='filter-landtransfer-report-type') state.filters.landTransferReportType = el.value;
     else return;
     render();
   };
