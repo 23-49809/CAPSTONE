@@ -1746,6 +1746,8 @@ function initDatePicker(picker){
   var trigger = picker.querySelector('[data-dt-trigger]');
   var display = picker.querySelector('[data-dt-display]');
   var popover = picker.querySelector('[data-dt-popover]');
+  picker._popoverEl = popover;
+  popover._ownerPicker = picker;
   var minISO = picker.getAttribute('data-min') || todayISO();
   var viewYear, viewMonth;
 
