@@ -1853,6 +1853,7 @@ function initTimePicker(picker, options){
   trigger.addEventListener('click', function(ev){
     ev.stopPropagation();
     if(!popover.hidden){ closeDtPopover(picker); return; }
+    applySmartDefaultIfNeeded();
     renderGrid();
     openDtPopover(picker);
   });
