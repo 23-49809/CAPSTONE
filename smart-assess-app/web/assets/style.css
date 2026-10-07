@@ -360,16 +360,18 @@ tbody tr:hover{ background:var(--surface-2); }
 .report-print-head dd{ margin:0; color:var(--ink); }
 
 @media print{
-  /* Crop the page down to #report-printable only — everything else
-     (header, nav, filters, buttons) is hidden rather than removed, so the
-     normal on-screen layout above is completely unaffected. */
-  body *{ visibility:hidden; }
-  #report-printable, #report-printable *{ visibility:visible; }
-  #report-printable{ position:absolute; left:0; top:0; width:100%; margin:0; }
-  .no-print, .site-header, .action-btn, .icon-btn, form button, form input, form select{ display:none !important; }
+  /* Scoped to pages that actually have a printable report (only
+     department-head/reports.php, today) — crop down to #report-printable
+     and hide everything else, rather than touching print behavior on any
+     other internal page that doesn't opt in. */
+  body:has(#report-printable) *{ visibility:hidden; }
+  body:has(#report-printable) #report-printable,
+  body:has(#report-printable) #report-printable *{ visibility:visible; }
+  body:has(#report-printable) #report-printable{ position:absolute; left:0; top:0; width:100%; margin:0; }
+  .no-print{ display:none !important; }
 
   @page{ margin:14mm; }
-  body{ background:#fff; font-size:12.5px; }
+  body:has(#report-printable){ background:#fff; font-size:12.5px; }
   #report-printable .panel-card, #report-printable .report-print-head{
     border:1px solid #ccc; box-shadow:none; break-inside:avoid; margin-bottom:14px;
   }
