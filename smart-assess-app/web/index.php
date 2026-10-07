@@ -1,8 +1,9 @@
 <?php
 require_once __DIR__ . '/includes/functions.php';
 $pdo = db();
+publish_due_announcements($pdo);
 $today = date('Y-m-d');
-$announcementQuery = $pdo->prepare("SELECT * FROM announcements WHERE status = 'Published' AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC, created_at DESC");
+$announcementQuery = $pdo->prepare("SELECT * FROM announcements WHERE status = 'Published' AND audience IN ('client','both') AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC, created_at DESC");
 $announcementQuery->execute([$today, $today]);
 $announcements = $announcementQuery->fetchAll();
 $pageTitle = 'Home';
