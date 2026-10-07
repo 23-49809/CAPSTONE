@@ -141,9 +141,19 @@ function request_processing_days(string $flow): int
 /** How long a request has been open, and whether it's past its expected
  *  processing window — shared by the list tables and the detail page so
  *  the figure is computed identically everywhere. */
-function request_elapsed_info(string $flow, string $createdAt, string $status): array
+/**
+ * $sinceTimestamp is when the request's CURRENT status actually started —
+ * the latest request_status_log entry for it, not necessarily the original
+ * submission. That matters: once staff acts on an old, timed-out request,
+ * the clock has to restart from that action, or the very next page load
+ * would immediately flag it "Timed Out" again and undo what staff just
+ * did. Callers fall back to requests.created_at for a request that's
+ * never had a status change logged (shouldn't normally happen, since
+ * submission itself logs "Received", but kept defensive).
+ */
+function request_elapsed_info(string $flow, string $sinceTimestamp, string $status): array
 {
-    $days = (int) floor((time() - strtotime($createdAt)) / 86400);
+    $days = (int) floor((time() - strtotime($sinceTimestamp)) / 86400);
     $limit = request_processing_days($flow);
     return [
         'days' => $days,
