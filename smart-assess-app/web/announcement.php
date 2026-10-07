@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/includes/functions.php';
+publish_due_announcements(db());
 $today = date('Y-m-d');
-$query = db()->prepare("SELECT * FROM announcements WHERE status = 'Published' AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC, created_at DESC");
+$query = db()->prepare("SELECT * FROM announcements WHERE status = 'Published' AND audience IN ('client','both') AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC, created_at DESC");
 $query->execute([$today, $today]);
 $announcements = $query->fetchAll();
 $pageTitle = 'Office Announcement';
