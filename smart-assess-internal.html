@@ -778,10 +778,24 @@ function renderStaffAccounts(acct, jumpToInfo){
           + '<button class="icon-btn" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
           + '<button class="icon-btn" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
           + '<button class="icon-btn" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
-          + '<button class="icon-btn danger" data-action="delete-staff" data-id="'+a.id+'">'+ic('trash','13px')+'Delete</button>'
+          + '<button class="icon-btn" data-action="archive-staff" data-id="'+a.id+'">'+ic('archive','13px')+'Archive</button>'
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('users','30px')+'No staff accounts match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('staffAccounts', pg)+'</div>';
+}
+
+function renderArchivedAccounts(){
+  var archived = state.archivedAccounts || [];
+  return ''
+  + '<div class="page-head"><div><div class="breadcrumb">Assessor Admin</div><h1>Archived Accounts</h1><p>Archived staff accounts are inactive and can be restored or permanently deleted.</p></div></div>'
+  + (archived.length ? '<div class="table-wrap"><table><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
+    + archived.map(function(a){
+      return '<tr><td class="cell-name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
+        + '<td class="mono">'+esc(a.username)+'</td><td>'+esc(a.email)+'</td><td>'+esc(a.position)+'</td>'
+        + '<td><span class="badge slate">Archived</span></td>'
+        + '<td><div class="row-actions"><button class="icon-btn" data-action="restore-staff" data-id="'+a.id+'">'+ic('check','13px')+'Restore</button>'
+        + '<button class="icon-btn danger" data-action="delete-archived-staff" data-id="'+a.id+'">'+ic('trash','13px')+'Delete Permanently</button></div></td></tr>';
+    }).join('')+'</tbody></table></div>' : '<div class="table-wrap"><div class="empty-state">'+ic('archive','30px')+'No archived accounts.</div></div>');
 }
 
 function accountFormFields(a){
