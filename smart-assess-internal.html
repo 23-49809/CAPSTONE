@@ -663,9 +663,9 @@ function shellChrome(acct, innerHtml){
     + '<div class="hd-brand"><img src="data:image/png;base64,'+LOGO_B64+'" alt="Bayan ng Mabini seal"><div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor’s Office System</div></div></div>'
     + '</div>'
     + '<div class="hd-right">'
-      + '<span class="role-tag">'+ic('idCard','14px')+esc(ROLE_LABEL[acct.role])+'</span>'
+      + (acct.role==='admin'?'':'<span class="role-tag">'+ic('idCard','14px')+esc(ROLE_LABEL[acct.role])+'</span>')
       + '<button class="hd-avatar" data-action="nav" data-view="profile"><span class="avatar-circle">'+esc(initials(acct.fullName))+'</span><span><span class="hd-name">'+esc(acct.fullName)+'</span><br><span class="hd-role">'+esc(acct.position)+'</span></span></button>'
-      + '<button class="hd-logout" data-action="logout" aria-label="Logout">'+ic('logout','17px')+'</button>'
+      + (acct.role==='admin'?'':'<button class="hd-logout" data-action="logout" aria-label="Logout">'+ic('logout','17px')+'</button>')
     + '</div>'
   + '</div></header>'
   + '<div class="app-body">'
