@@ -1243,6 +1243,11 @@ function reqTableRow(r, kind){
  * notification actions here (that stays staff-only) — this is a
  * report, not an operational queue.
  * ================================================================ */
+function uniqueSorted(arr){
+  var seen = {}, out = [];
+  arr.forEach(function(v){ if(!seen[v]){ seen[v]=true; out.push(v); } });
+  return out.sort();
+}
 function sortIndicator(sortState, key){
   if(!sortState || sortState.key!==key) return '';
   return sortState.dir==='asc' ? ' ▲' : ' ▼';
