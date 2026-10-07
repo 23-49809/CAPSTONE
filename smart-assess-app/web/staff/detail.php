@@ -56,7 +56,9 @@ require __DIR__ . '/../includes/internal_header.php';
 
     <div class="section-title"><?= icon_span('grid','15px') ?> Staff Actions</div>
     <div class="action-row">
-      <?php foreach (array_slice(STATUS_FLOW, 1) as $s): ?>
+      <?php // "Timed Out" is system-detected (see mark_overdue_requests()), not a
+            // deliberate workflow step, so it's left out of the manual action row. ?>
+      <?php foreach (array_diff(array_slice(STATUS_FLOW, 1), ['Timed Out']) as $s): ?>
         <form method="post" action="update_status.php" style="display:inline">
           <?= csrf_field() ?>
           <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
