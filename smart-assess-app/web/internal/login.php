@@ -45,4 +45,4 @@ require __DIR__ . '/../includes/internal_header.php';
       <span class="mono">maricar.admin</span> (Admin) &middot; <span class="mono">jessica.staff</span> (Staff) &middot; <span class="mono">rodel.head</span> (Dept. Head)</div>
   </div>
 </div></div>
-<?php require __DIR__ . '/../includes/footer.php'; ?>
+<?php require __DIR__ . '/../includes/internal_footer.php'; ?>

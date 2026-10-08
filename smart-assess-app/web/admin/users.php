@@ -167,4 +167,4 @@ require __DIR__ . '/../includes/internal_header.php';
   });
 })();
 </script>
-<?php require __DIR__ . '/../includes/footer.php'; ?>
+<?php require __DIR__ . '/../includes/internal_footer.php'; ?>

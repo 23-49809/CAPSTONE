@@ -53,4 +53,4 @@ require __DIR__ . '/../includes/internal_header.php';
     </div>
   </div>
 </div>
-<?php require __DIR__ . '/../includes/footer.php'; ?>
+<?php require __DIR__ . '/../includes/internal_footer.php'; ?>
