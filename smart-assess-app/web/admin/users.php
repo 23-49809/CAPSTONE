@@ -83,7 +83,7 @@ require __DIR__ . '/../includes/internal_header.php';
   </div></div>
   <div class="wrap">
     <?php if ($flash): ?><div class="flash <?= esc($flashType) ?>"><?= esc($flash) ?></div><?php endif; ?>
-    <form method="post" class="inline-add">
+    <form method="post" class="inline-add" id="create-account">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="add_account">
       <div class="field"><label>Full Name</label><input type="text" name="name" placeholder="Full name" required></div>
