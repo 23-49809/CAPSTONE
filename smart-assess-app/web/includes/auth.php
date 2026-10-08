@@ -30,7 +30,11 @@ function login_user(string $username, string $password): ?array
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    if (!$user || $user['status'] !== 'Active') {
+    // status!=='Active' already covers archived/deleted accounts (both are
+    // forced to Inactive), but check deleted_at explicitly too — a
+    // permanently-deleted account must never authenticate even if some
+    // future code path left status alone.
+    if (!$user || $user['status'] !== 'Active' || $user['deleted_at'] !== null) {
         return null;
     }
     if (!password_verify($password, $user['password_hash'])) {
