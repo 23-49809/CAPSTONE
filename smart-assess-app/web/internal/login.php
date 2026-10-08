@@ -30,19 +30,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Internal Portal Log In';
 require __DIR__ . '/../includes/internal_header.php';
 ?>
-<div class="form-shell"><div class="form-col narrow">
-  <div class="login-card">
-    <h2>Municipal Assessor's Office</h2>
-    <p class="lead">Internal Portal &mdash; for Assessor's Staff, Admin, and Department Head only.</p>
-    <?php if ($error): ?><div class="flash error"><?= esc($error) ?></div><?php endif; ?>
-    <form method="post">
-      <?= csrf_field() ?>
-      <div class="field"><label>Username</label><input type="text" name="username" value="<?= esc($usernameValue) ?>"></div>
-      <div class="field"><label>Password</label><input type="password" name="password"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%"><?= icon_span('login') ?> Log In</button>
-    </form>
-    <div class="login-note">Demo accounts (seeded by database/schema.sql), password for all: <strong>Passw0rd!</strong><br>
-      <span class="mono">maricar.admin</span> (Admin) &middot; <span class="mono">jessica.staff</span> (Staff) &middot; <span class="mono">rodel.head</span> (Dept. Head)</div>
+<div class="login-shell"><div class="login-card fade-in">
+  <div class="login-brand">
+    <img src="/assets/seal.png" alt="Bayan ng Mabini seal">
+    <div><div class="lb-name">Smart Assess</div><div class="lb-tag">Municipal Assessor&rsquo;s Office &mdash; Internal Portal</div></div>
   </div>
+  <h2>Staff &amp; Management Login</h2>
+  <p class="sub">For Assessor Admin, Assessor Head, and Assessor Staff accounts only.</p>
+  <?php if ($error): ?><div class="login-error"><?= icon_span('alert', '16px') ?><span><?= esc($error) ?></span></div><?php endif; ?>
+  <form method="post">
+    <?= csrf_field() ?>
+    <div class="field"><label for="li-user">Username</label><input id="li-user" type="text" name="username" placeholder="e.g. jessica.staff" autocomplete="username" value="<?= esc($usernameValue) ?>" required></div>
+    <div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" type="password" name="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" id="loginPasswordToggle" aria-label="Show password" aria-pressed="false"><?= icon_span('eye', '19px') ?></button></div></div>
+    <button type="submit" class="btn btn-primary btn-block" style="width:100%"><?= icon_span('check', '18px') ?> Sign In</button>
+  </form>
 </div></div>
+<script>
+(function(){
+  var btn = document.getElementById('loginPasswordToggle');
+  var input = document.getElementById('li-pass');
+  if (!btn || !input) return;
+  btn.addEventListener('click', function(){
+    var showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.setAttribute('aria-pressed', String(!showing));
+  });
+})();
+</script>
 <?php require __DIR__ . '/../includes/internal_footer.php'; ?>
