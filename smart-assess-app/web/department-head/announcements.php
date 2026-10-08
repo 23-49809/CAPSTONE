@@ -172,13 +172,13 @@ require __DIR__ . '/../includes/internal_header.php';
         <tbody>
         <?php foreach ($announcements as $a): ?>
           <tr>
-            <td><?= esc($a['title']) ?></td>
-            <td><?= esc(announcement_audience_label($a['audience'])) ?></td>
-            <td><span class="badge <?= announcement_status_badge_class($a['status']) ?>"><?= esc($a['status']) ?></span></td>
-            <td class="mono"><?= fmt_datetime($a['published_at']) ?></td>
-            <td class="mono"><?= fmt_datetime($a['scheduled_at']) ?></td>
-            <td><?= esc($a['author']) ?></td>
-            <td><div class="table-actions">
+            <td data-label="Title"><?= esc($a['title']) ?></td>
+            <td data-label="Post To"><?= esc(announcement_audience_label($a['audience'])) ?></td>
+            <td data-label="Status"><span class="badge <?= announcement_status_badge_class($a['status']) ?>"><?= esc($a['status']) ?></span></td>
+            <td class="mono" data-label="Published"><?= fmt_datetime($a['published_at']) ?></td>
+            <td class="mono" data-label="Scheduled"><?= fmt_datetime($a['scheduled_at']) ?></td>
+            <td data-label="Created By"><?= esc($a['author']) ?></td>
+            <td class="actions-cell" data-label="Actions"><div class="table-actions">
               <a class="action-btn" href="/department-head/announcements.php?edit=<?= (int) $a['id'] ?>">Edit</a>
               <?php if (in_array($a['status'], ['Draft', 'Scheduled'], true)): ?>
                 <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="quick_update"><input type="hidden" name="id" value="<?= (int) $a['id'] ?>"><input type="hidden" name="new_status" value="Published"><button class="action-btn primary" type="submit">Publish Now</button></form>
