@@ -18,7 +18,7 @@ $pageTitle = 'Audit Logs';
 require __DIR__ . '/../includes/internal_header.php';
 ?>
 <div class="dash-shell">
-  <div class="dash-top"><div class="wrap"><h1>Audit Logs</h1><p>Logins, status changes, and account/role changes across both portals (most recent 300).</p></div></div>
+  <div class="dash-top"><div class="wrap"><h1>Audit Logs</h1><p>Logins, status changes, and account/role changes across both portals.</p></div></div>
   <div class="wrap">
     <div class="toolbar">
       <div class="seg">
@@ -37,15 +37,16 @@ require __DIR__ . '/../includes/internal_header.php';
         <tbody>
         <?php foreach ($logs as $l): ?>
           <tr>
-            <td class="mono"><?= fmt_datetime($l['created_at']) ?></td>
-            <td><?= esc($l['actor_name']) ?></td>
-            <td><span class="badge slate"><?= esc(ucfirst($l['actor_type'])) ?></span></td>
-            <td><?= esc($l['action']) ?></td>
-            <td class="mono" style="font-size:12px"><?= esc($l['target'] ?? '—') ?></td>
+            <td class="mono" data-label="When"><?= fmt_datetime($l['created_at']) ?></td>
+            <td data-label="Actor"><?= esc($l['actor_name']) ?></td>
+            <td data-label="Type"><span class="badge slate"><?= esc(ucfirst($l['actor_type'])) ?></span></td>
+            <td data-label="Action"><?= esc($l['action']) ?></td>
+            <td class="mono" style="font-size:12px" data-label="Target"><?= esc($l['target'] ?? '—') ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
       </table>
+      <?= render_pager($pageInfo) ?>
       <?php endif; ?>
     </div>
   </div>
