@@ -56,10 +56,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
           audit('admin', $me['id'], $me['name'], "Set role=$roleCode status=$status position=$positionTitle", "user #$uid");
           $flash = 'Account details saved.';
         }
+    } elseif ($action === 'archive_account') {
+        $uid = (int) ($_POST['user_id'] ?? 0);
+        if ($uid === (int) $me['id']) {
+            $flash = 'You cannot archive your own account while logged in.';
+            $flashType = 'error';
+        } elseif ($uid) {
+            $pdo->prepare("UPDATE users SET status = 'Inactive', archived_at = NOW(), archived_by = ? WHERE id = ? AND archived_at IS NULL AND deleted_at IS NULL")
+                ->execute([$me['id'], $uid]);
+            audit('admin', $me['id'], $me['name'], 'Archived staff account', "user #$uid");
+            $flash = 'Account archived.';
+        }
     }
 }
 
-$accounts = $pdo->query('SELECT * FROM users ORDER BY created_at')->fetchAll();
+$accounts = $pdo->query('SELECT * FROM users WHERE archived_at IS NULL AND deleted_at IS NULL ORDER BY created_at')->fetchAll();
+$archivedCount = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE archived_at IS NOT NULL AND deleted_at IS NULL')->fetchColumn();
 
 $pageTitle = 'Manage Users';
 require __DIR__ . '/../includes/internal_header.php';
