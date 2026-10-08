@@ -216,4 +216,4 @@ require __DIR__ . '/../includes/internal_header.php';
   sync();
 })();
 </script>
-<?php require __DIR__ . '/../includes/footer.php'; ?>
+<?php require __DIR__ . '/../includes/internal_footer.php'; ?>

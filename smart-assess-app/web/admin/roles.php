@@ -53,4 +53,4 @@ require __DIR__ . '/../includes/internal_header.php';
     <p class="field-hint" style="margin-top:14px">Roles themselves are fixed by design (see <span class="mono">database/schema.sql</span>) — this page is a reference view. To change what role an account has, use <a href="/admin/users.php">Manage Users</a>.</p>
   </div>
 </div>
-<?php require __DIR__ . '/../includes/footer.php'; ?>
+<?php require __DIR__ . '/../includes/internal_footer.php'; ?>
