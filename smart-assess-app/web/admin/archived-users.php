@@ -54,12 +54,12 @@ require __DIR__ . '/../includes/internal_header.php';
           <tr><td colspan="6"><div class="empty-state">No archived accounts.</div></td></tr>
         <?php else: foreach ($archived as $a): $roleCode = ROLE_ID_TO_CODE[(int) $a['role_id']] ?? 'staff'; ?>
           <tr>
-            <td><?= esc($a['name']) ?></td>
-            <td class="mono"><?= esc($a['username']) ?></td>
-            <td><?= esc(role_label($roleCode)) ?></td>
-            <td class="mono"><?= fmt_datetime($a['archived_at']) ?></td>
-            <td><?= esc($a['archived_by_name'] ?? '—') ?></td>
-            <td>
+            <td data-label="Name"><?= esc($a['name']) ?></td>
+            <td class="mono" data-label="Username"><?= esc($a['username']) ?></td>
+            <td data-label="Role"><?= esc(role_label($roleCode)) ?></td>
+            <td class="mono" data-label="Archived"><?= fmt_datetime($a['archived_at']) ?></td>
+            <td data-label="Archived By"><?= esc($a['archived_by_name'] ?? '—') ?></td>
+            <td data-label="Actions">
               <div class="table-actions">
                 <form method="post" onsubmit="return confirm('Restore <?= esc(addslashes($a['name'])) ?> to Active?');">
                   <?= csrf_field() ?>
