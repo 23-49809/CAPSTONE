@@ -77,7 +77,10 @@ $pageTitle = 'Manage Users';
 require __DIR__ . '/../includes/internal_header.php';
 ?>
 <div class="dash-shell">
-  <div class="dash-top"><div class="wrap"><h1>User Accounts</h1><p>Create and manage internal accounts for Assessor's Staff, Admin, and Department Head.</p></div></div>
+  <div class="dash-top"><div class="wrap">
+    <h1>User Accounts</h1><p>Create and manage internal accounts for Assessor's Staff, Admin, and Department Head.</p>
+    <div style="margin-top:12px"><a class="btn btn-ghost" href="/admin/archived-users.php"><?= icon_span('archive') ?> Archived Accounts<?= $archivedCount ? ' (' . $archivedCount . ')' : '' ?></a></div>
+  </div></div>
   <div class="wrap">
     <?php if ($flash): ?><div class="flash <?= esc($flashType) ?>"><?= esc($flash) ?></div><?php endif; ?>
     <form method="post" class="inline-add">
