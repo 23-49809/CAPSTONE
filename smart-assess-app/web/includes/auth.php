@@ -84,6 +84,25 @@ function internal_dashboard_path(?string $role): ?string
     };
 }
 
+function internal_profile_path(?string $role): string
+{
+    return match ($role) {
+        'admin' => '/admin/profile.php',
+        'head' => '/department-head/profile.php',
+        default => '/staff/profile.php',
+    };
+}
+
+/** Avatar-circle initials, same rule as the prototype's initials(). */
+function internal_initials(string $fullName): string
+{
+    $parts = preg_split('/\s+/', trim($fullName));
+    if (!$parts || $parts[0] === '') return '??';
+    $first = mb_substr($parts[0], 0, 1);
+    $last = count($parts) > 1 ? mb_substr($parts[count($parts) - 1], 0, 1) : '';
+    return mb_strtoupper($first . $last);
+}
+
 /**
  * Enforces access on every protected internal page. Two distinct denial
  * paths, per spec:
