@@ -101,11 +101,11 @@ require __DIR__ . '/../includes/internal_header.php';
         <tbody>
         <?php foreach ($accounts as $a): $roleCode = ROLE_ID_TO_CODE[(int)$a['role_id']] ?? 'staff'; $editFormId = 'edit-user-' . (int) $a['id']; ?>
           <tr>
-            <td><?= esc($a['name']) ?></td>
-            <td class="mono"><?= esc($a['username']) ?></td>
-            <td><?= internal_contact_control($a['contact_number'] ?? null, $editFormId, 'contact-' . (int) $a['id']) ?></td>
-            <td><?= internal_position_control($a['position_title'] ?? null, $editFormId) ?></td>
-            <td colspan="2">
+            <td data-label="Name"><?= esc($a['name']) ?></td>
+            <td class="mono" data-label="Username"><?= esc($a['username']) ?></td>
+            <td data-label="Contact Number"><?= internal_contact_control($a['contact_number'] ?? null, $editFormId, 'contact-' . (int) $a['id']) ?></td>
+            <td data-label="Position Title"><?= internal_position_control($a['position_title'] ?? null, $editFormId) ?></td>
+            <td colspan="2" data-label="Role &amp; Status">
               <form id="<?= esc($editFormId) ?>" method="post" class="user-row-edit">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="update_account">
