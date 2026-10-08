@@ -8,6 +8,13 @@ require_once __DIR__ . '/icons.php';
  * /department-head/*. Nothing in the public client portal links here;
  * this is reached only via its own direct URL. See includes/auth.php for
  * the server-side enforcement — this header is presentation only.
+ *
+ * Shell markup (header + sidebar + .main-content open tag) is ported
+ * verbatim from smart-assess-internal.html's shellChrome()/renderShell().
+ * It only renders once a $user is authenticated — the login page itself
+ * (no $user yet) gets no header/sidebar at all, matching the prototype's
+ * renderLogin(), which is a bare full-bleed screen with no chrome.
+ * includes/internal_footer.php closes whatever this file opens.
  */
 $pageTitle = $pageTitle ?? 'SMART ASSESS';
 $user = current_user();
@@ -17,25 +24,36 @@ $dashHref = internal_dashboard_path($user['role'] ?? null);
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= esc($pageTitle) ?> · SMART ASSESS Internal Portal</title>
+<title><?= esc($pageTitle) ?> &middot; SMART ASSESS Internal Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-<header class="site-header portal-header"><div class="wrap">
-  <a class="brand" href="<?= esc($dashHref ?? '/internal/login.php') ?>">
-    <?= brand_mark() ?>
-    <span><span class="brand-name">Mabini Assessor Office</span><span class="portal-tag">Internal Portal</span></span>
-  </a>
-  <div class="header-actions">
-    <?php if ($user): ?>
-      <span class="role-tag"><?= icon_span('key', '14px') ?> <?= esc(role_label($user['role'])) ?> &middot; <?= esc($user['name']) ?></span>
-      <a class="btn btn-ghost" href="<?= esc($dashHref) ?>"><?= icon_span('grid') ?> Dashboard</a>
-      <a class="btn btn-ghost" href="/internal/logout.php"><?= icon_span('logout') ?> Log Out</a>
-    <?php else: ?>
-      <span class="role-tag"><?= icon_span('id', '14px') ?> Internal Staff Access Only</span>
-      <a class="btn btn-ghost" href="/index.php"><?= icon_span('home', '14px') ?> View Public Site</a>
-    <?php endif; ?>
+<?php if ($user): ?>
+<header class="app-header"><div class="hd-inner">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button type="button" class="hd-menu-btn" id="sidebarToggle" aria-label="Open menu"><?= icon_span('menu', '19px') ?></button>
+    <a class="hd-brand" href="<?= esc($dashHref ?? '/internal/login.php') ?>">
+      <img src="/assets/seal.png" alt="Bayan ng Mabini seal">
+      <div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor&rsquo;s Office System</div></div>
+    </a>
+  </div>
+  <div class="hd-right">
+    <span class="role-tag"><?= icon_span('id', '14px') ?> <?= esc(role_label($user['role'])) ?></span>
+    <a class="hd-avatar" href="<?= esc(internal_profile_path($user['role'])) ?>">
+      <span class="avatar-circle"><?= esc(internal_initials($user['name'])) ?></span>
+      <span><span class="hd-name"><?= esc($user['name']) ?></span></span>
+    </a>
+    <a class="hd-logout" href="/internal/logout.php" title="Log Out" aria-label="Log Out"><?= icon_span('logout', '17px') ?></a>
   </div>
 </div></header>
+<div class="app-body">
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <aside class="sidebar" id="appSidebar">
+    <div class="sidebar-label">Menu</div>
+    <?php require __DIR__ . '/internal_sidebar.php'; ?>
+    <div class="sidebar-foot"><a class="side-link" href="/internal/logout.php"><?= icon_span('logout', '18px') ?><span>Logout</span></a></div>
+  </aside>
+  <main class="main-content">
+<?php endif; ?>
