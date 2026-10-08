@@ -462,15 +462,15 @@ function render_requests_table(array $requests, string $detailBase = '/staff/det
                 : $elapsed['days'] . 'd open')
             . '</div>';
         $rows .= '<tr>'
-            . '<td class="mono">' . esc($r['reference_no']) . '</td>'
-            . '<td>' . esc(trim($r['first_name'] . ' ' . $r['last_name'])) . '</td>'
-            . '<td>' . ($r['flow'] === 'docreq' ? 'Document Request' : 'Land Transfer') . '</td>'
-            . '<td>' . esc($r['document_type'] ?: $r['transfer_type']) . '</td>'
-            . '<td>' . esc($r['barangay']) . '</td>'
-            . '<td class="mono">' . $receivedCell . '</td>'
-            . '<td>' . $checkBadge . '</td>'
-            . '<td><span class="badge ' . status_badge_class($r['status']) . '">' . esc($r['status']) . '</span></td>'
-            . '<td><a class="icon-btn" href="' . esc($detailBase) . '?id=' . (int) $r['id'] . '">' . icon_span('eye', '14px') . ' View</a></td>'
+            . '<td class="mono" data-label="Reference No.">' . esc($r['reference_no']) . '</td>'
+            . '<td data-label="Applicant">' . esc(trim($r['first_name'] . ' ' . $r['last_name'])) . '</td>'
+            . '<td data-label="Service">' . ($r['flow'] === 'docreq' ? 'Document Request' : 'Land Transfer') . '</td>'
+            . '<td data-label="Type">' . esc($r['document_type'] ?: $r['transfer_type']) . '</td>'
+            . '<td data-label="Barangay">' . esc($r['barangay']) . '</td>'
+            . '<td class="mono" data-label="Received">' . $receivedCell . '</td>'
+            . '<td data-label="AI Check">' . $checkBadge . '</td>'
+            . '<td data-label="Status"><span class="badge ' . status_badge_class($r['status']) . '">' . esc($r['status']) . '</span></td>'
+            . '<td class="actions-cell" data-label="Actions"><a class="icon-btn" href="' . esc($detailBase) . '?id=' . (int) $r['id'] . '">' . icon_span('eye', '14px') . ' View</a></td>'
             . '</tr>';
     }
     return '<table><thead><tr><th>Reference No.</th><th>Applicant</th><th>Service</th><th>Type</th><th>Barangay</th><th>Received</th><th>AI Check</th><th>Status</th><th></th></tr></thead><tbody>' . $rows . '</tbody></table>';
