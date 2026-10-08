@@ -5,7 +5,12 @@ $me = require_role(['staff']);
 mark_overdue_requests(db());
 
 $flowFilter = in_array($_GET['flow'] ?? '', ['docreq', 'landtransfer'], true) ? $_GET['flow'] : '';
-$statusFilter = in_array($_GET['status'] ?? '', STATUS_FLOW, true) ? $_GET['status'] : '';
+// "Time Stamp Tracking" in the sidebar links here with ?status=overdue —
+// by the time mark_overdue_requests() above has run, every genuinely
+// overdue request already carries the real 'Timed Out' status, so this is
+// just a friendlier alias for that filter rather than a second code path.
+$requestedStatus = $_GET['status'] ?? '';
+$statusFilter = $requestedStatus === 'overdue' ? 'Timed Out' : (in_array($requestedStatus, STATUS_FLOW, true) ? $requestedStatus : '');
 
 $sql = 'SELECT requests.*, (SELECT MAX(created_at) FROM request_status_log WHERE request_id = requests.id) AS last_action_at FROM requests WHERE 1=1';
 $params = [];
