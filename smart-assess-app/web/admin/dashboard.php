@@ -29,6 +29,7 @@ require __DIR__ . '/../includes/internal_header.php';
       <h3><?= icon_span('grid','16px') ?> Quick Links</h3>
       <div class="action-row">
         <a class="action-btn primary" href="/admin/users.php"><?= icon_span('users','14px') ?> Manage Users</a>
+        <a class="action-btn" href="/admin/archived-users.php"><?= icon_span('archive','14px') ?> Archived Accounts</a>
         <a class="action-btn" href="/admin/roles.php"><?= icon_span('key','14px') ?> Roles</a>
         <a class="action-btn" href="/admin/settings.php"><?= icon_span('id','14px') ?> Settings</a>
         <a class="action-btn" href="/admin/audit-logs.php"><?= icon_span('checklist','14px') ?> Audit Logs</a>
