@@ -52,9 +52,24 @@ CREATE TABLE users (
   position_title VARCHAR(80) NULL,
   password_hash VARCHAR(255) NOT NULL,
   status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+  -- Active -> Archived -> Restored or Permanently Deleted. "Permanently
+  -- Deleted" is deliberately still a soft marker (deleted_at), not a real
+  -- row removal — see the archiving migration for why: a hard delete here
+  -- would cascade-destroy activity_logs history via its FK.
+  archived_at   DATETIME NULL,
+  archived_by   INT NULL,
+  restored_at   DATETIME NULL,
+  restored_by   INT NULL,
+  deleted_at    DATETIME NULL,
+  deleted_by    INT NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (role_id) REFERENCES roles(id),
-  CONSTRAINT chk_users_role CHECK (role_id IN (2,3,4))
+  FOREIGN KEY (archived_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (restored_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT chk_users_role CHECK (role_id IN (2,3,4)),
+  INDEX idx_archived_at (archived_at),
+  INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
