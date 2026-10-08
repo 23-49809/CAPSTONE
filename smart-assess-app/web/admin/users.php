@@ -97,7 +97,7 @@ require __DIR__ . '/../includes/internal_header.php';
     </form>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Name</th><th>Username</th><th>Contact Number</th><th>Position Title</th><th colspan="2">Role (Level of Access) &amp; Status</th></tr></thead>
+        <thead><tr><th>Name</th><th>Username</th><th>Contact Number</th><th>Position Title</th><th colspan="2">Role (Level of Access) &amp; Status</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($accounts as $a): $roleCode = ROLE_ID_TO_CODE[(int)$a['role_id']] ?? 'staff'; $editFormId = 'edit-user-' . (int) $a['id']; ?>
           <tr>
