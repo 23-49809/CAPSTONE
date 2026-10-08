@@ -30,11 +30,11 @@ require __DIR__ . '/../includes/internal_header.php';
         <tbody>
         <?php foreach ($requests as $r): ?>
           <tr>
-            <td class="mono"><?= esc($r['reference_no']) ?></td>
-            <td><?= esc(trim($r['first_name'] . ' ' . $r['last_name'])) ?></td>
-            <td><?php if ($r['requirement_complete']): ?><span class="badge green"><?= icon_span('check','12px') ?> Pass &mdash; Complete</span><?php else: ?><span class="badge amber"><?= icon_span('alert','12px') ?> Fail &mdash; Needs Review</span><?php endif; ?></td>
-            <td style="font-size:12.5px;color:var(--ink-soft)"><?= $r['flagged_items'] ? esc($r['flagged_items']) : '&mdash;' ?></td>
-            <td><a class="icon-btn" href="/staff/detail.php?id=<?= (int)$r['id'] ?>"><?= icon_span('eye','14px') ?> Review</a></td>
+            <td class="mono" data-label="Reference No."><?= esc($r['reference_no']) ?></td>
+            <td data-label="Applicant"><?= esc(trim($r['first_name'] . ' ' . $r['last_name'])) ?></td>
+            <td data-label="Result"><?php if ($r['requirement_complete']): ?><span class="badge green"><?= icon_span('check','12px') ?> Pass &mdash; Complete</span><?php else: ?><span class="badge amber"><?= icon_span('alert','12px') ?> Fail &mdash; Needs Review</span><?php endif; ?></td>
+            <td data-label="Flagged / Missing" style="font-size:12.5px;color:var(--ink-soft)"><?= $r['flagged_items'] ? esc($r['flagged_items']) : '&mdash;' ?></td>
+            <td data-label="Actions"><a class="icon-btn" href="/staff/detail.php?id=<?= (int)$r['id'] ?>"><?= icon_span('eye','14px') ?> Review</a></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
