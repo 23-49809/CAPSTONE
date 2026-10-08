@@ -122,6 +122,22 @@ require __DIR__ . '/../includes/internal_header.php';
                 <button type="submit" class="icon-btn">Save</button>
               </form>
             </td>
+            <td>
+              <?php if ((int) $a['id'] === (int) $me['id']): ?>
+                <button type="button" class="icon-btn" disabled title="You cannot archive your own account">
+                  <?= icon_span('archive', '14px') ?>
+                </button>
+              <?php else: ?>
+                <form method="post" onsubmit="return confirm('Archive <?= esc(addslashes($a['name'])) ?>? They will be moved out of Staff Accounts and can be restored later from Archived Accounts.');">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="action" value="archive_account">
+                  <input type="hidden" name="user_id" value="<?= (int) $a['id'] ?>">
+                  <button type="submit" class="icon-btn" aria-label="Archive <?= esc($a['name']) ?>" title="Archive">
+                    <?= icon_span('archive', '14px') ?>
+                  </button>
+                </form>
+              <?php endif; ?>
+            </td>
           </tr>
         <?php endforeach; ?>
         </tbody>
