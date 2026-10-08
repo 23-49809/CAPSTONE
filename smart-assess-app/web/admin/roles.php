@@ -33,10 +33,10 @@ require __DIR__ . '/../includes/internal_header.php';
         <tbody>
         <?php foreach ($roles as $r): ?>
           <tr>
-            <td class="mono"><?= (int)$r['id'] ?></td>
-            <td><strong><?= esc($r['name']) ?></strong></td>
-            <td class="mono"><?= $counts[$r['name']] ?? 0 ?></td>
-            <td style="font-size:13px;color:var(--ink-soft)">
+            <td class="mono" data-label="ID"><?= (int)$r['id'] ?></td>
+            <td data-label="Role"><strong><?= esc($r['name']) ?></strong></td>
+            <td class="mono" data-label="Accounts"><?= $counts[$r['name']] ?? 0 ?></td>
+            <td data-label="Access" style="font-size:13px;color:var(--ink-soft)">
               <?php if (!empty($permissionsByRole[(int) $r['id']])): ?>
                 <ul style="margin:0;padding-left:16px">
                   <?php foreach ($permissionsByRole[(int) $r['id']] as $desc): ?><li><?= esc($desc) ?></li><?php endforeach; ?>
