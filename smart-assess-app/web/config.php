@@ -11,10 +11,15 @@
 // clock agrees with MySQL's SYSTEM time zone instead of defaulting to UTC.
 date_default_timezone_set('Asia/Manila');
 
-define('DB_HOST', '127.0.0.1');
-define('DB_NAME', 'smart_assess');
-define('DB_USER', 'smart_assess_app');
-define('DB_PASS', getenv('SMART_ASSESS_DB_PASS') ?: 'change-me');
+// All DB_* values read from the environment first, falling back to the
+// current local-dev defaults — so nothing changes for local development
+// unless these are explicitly set, but a production deploy only needs to
+// set environment variables, never edit this file.
+define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_PORT', getenv('DB_PORT') ?: '3306');
+define('DB_NAME', getenv('DB_DATABASE') ?: 'smart_assess');
+define('DB_USER', getenv('DB_USERNAME') ?: 'smart_assess_app');
+define('DB_PASS', getenv('DB_PASSWORD') ?: (getenv('SMART_ASSESS_DB_PASS') ?: 'change-me'));
 
 // Internal AI Rule-Based Requirement Checker service (Django).
 define('AI_CHECKER_BASE_URL', 'http://127.0.0.1:8001/api');
