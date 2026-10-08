@@ -3,11 +3,14 @@ require_once __DIR__ . '/../includes/auth.php';
 $me = require_role(['admin']);
 
 $actorFilter = in_array($_GET['actor'] ?? '', ['client', 'staff', 'admin', 'head', 'system'], true) ? $_GET['actor'] : '';
-$sql = 'SELECT * FROM audit_log WHERE 1=1';
-$params = [];
-if ($actorFilter) { $sql .= ' AND actor_type = ?'; $params[] = $actorFilter; }
-$sql .= ' ORDER BY created_at DESC LIMIT 300';
-$stmt = db()->prepare($sql);
+$where = $actorFilter ? ' WHERE actor_type = ?' : '';
+$params = $actorFilter ? [$actorFilter] : [];
+
+$countStmt = db()->prepare('SELECT COUNT(*) FROM audit_log' . $where);
+$countStmt->execute($params);
+$pageInfo = paginate_info((int) $countStmt->fetchColumn(), 25);
+
+$stmt = db()->prepare('SELECT * FROM audit_log' . $where . ' ORDER BY created_at DESC LIMIT ' . $pageInfo['perPage'] . ' OFFSET ' . $pageInfo['offset']);
 $stmt->execute($params);
 $logs = $stmt->fetchAll();
 
