@@ -385,3 +385,88 @@ tbody tr:hover{ background:var(--surface-2); }
   #report-printable tr{ break-inside:avoid; }
   #report-printable .badge{ border:1px solid currentColor; background:none !important; }
 }
+
+/* ============================================================
+   Internal Interface shell — ported verbatim from
+   smart-assess-internal.html (sidebar + header), onto this file's
+   already-identical :root tokens. Replaces the old plain top-header-only
+   layout used by every page under /admin, /staff, /department-head. */
+:root{ --sidebar-w:248px; --header-h:76px; }
+
+.app-header{ position:sticky; top:0; z-index:50; background:var(--brand-900); border-bottom:1px solid var(--brand-800); height:var(--header-h); }
+.app-header .hd-inner{ height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 24px; gap:16px; }
+.hd-brand{ display:flex; align-items:center; gap:12px; min-width:0; text-decoration:none; }
+.hd-brand img{ width:38px; height:38px; object-fit:contain; flex-shrink:0; }
+.hd-brand .hb-name{ font-family:var(--font-display); font-weight:700; font-size:17px; color:#fff; white-space:nowrap; }
+.hd-brand .hb-tag{ font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:#8fd8ae; }
+.hd-menu-btn{ display:none; background:rgba(255,255,255,.12); border:none; color:#fff; width:38px; height:38px; border-radius:10px; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.hd-right{ display:flex; align-items:center; gap:14px; flex-shrink:0; }
+.app-header .role-tag{ display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#eafff3; background:rgba(255,255,255,.14); padding:8px 13px; border-radius:999px; white-space:nowrap; }
+.hd-avatar{ display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:5px 14px 5px 5px; cursor:pointer; text-decoration:none; }
+.avatar-circle{ width:30px; height:30px; border-radius:50%; background:var(--brand-500); color:#04241a; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12.5px; flex-shrink:0; }
+.hd-avatar .hd-name{ color:#fff; font-size:13px; font-weight:700; line-height:1.2; }
+.hd-avatar .hd-role{ color:#a9e8c3; font-size:11px; }
+.hd-logout{ background:transparent; border:1.5px solid rgba(255,255,255,.35); color:#eafff3; width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; text-decoration:none; }
+.hd-logout:hover{ background:rgba(255,255,255,.1); }
+
+.app-body{ flex:1; display:flex; align-items:stretch; }
+.sidebar{ width:var(--sidebar-w); flex-shrink:0; background:var(--surface); border-right:1px solid var(--line); position:sticky; top:var(--header-h); height:calc(100vh - var(--header-h)); overflow-y:auto; padding:22px 14px; display:flex; flex-direction:column; }
+.sidebar-label{ font-size:10.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-faint); padding:0 12px; margin-bottom:8px; }
+.sidebar nav{ display:flex; flex-direction:column; gap:3px; margin-bottom:22px; }
+.side-link{ display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; color:var(--ink-soft); background:none; border:none; cursor:pointer; text-align:left; width:100%; text-decoration:none; }
+.side-link:hover{ background:var(--surface-2); color:var(--ink); }
+.side-link.active{ background:var(--brand-700); color:#fff; }
+.side-link .icon{ width:18px; height:18px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; }
+.side-link .icon svg{ width:100%; height:100%; }
+.sidebar-foot{ margin-top:auto; padding-top:14px; border-top:1px solid var(--line); }
+.main-content{ flex:1; min-width:0; padding:28px 32px 60px; }
+@media (max-width:900px){
+  .sidebar{ position:fixed; left:0; top:var(--header-h); z-index:45; transform:translateX(-100%); transition:transform .22s ease; box-shadow:var(--shadow-lg); }
+  .sidebar.open{ transform:translateX(0); }
+  .hd-menu-btn{ display:flex; }
+  .main-content{ padding:22px 16px 50px; }
+  .sidebar-backdrop{ display:none; position:fixed; inset:var(--header-h) 0 0 0; background:rgba(10,19,14,.4); z-index:44; }
+  .sidebar-backdrop.open{ display:block; }
+}
+@media (max-width:640px){
+  .app-header .hd-inner{ padding:0 14px; gap:8px; }
+  .hd-brand .hb-tag{ display:none; }
+  .app-header .role-tag{ display:none; }
+  .hd-avatar{ padding:4px; gap:0; }
+  .hd-avatar .hd-name, .hd-avatar .hd-role, .hd-avatar br{ display:none; }
+  .main-content{ padding:18px 14px 44px; }
+}
+
+.two-col{ display:grid; grid-template-columns:1.4fr 1fr; gap:20px; align-items:start; }
+@media (max-width:980px){ .two-col{ grid-template-columns:1fr; } }
+
+.search-box{ position:relative; flex:1; min-width:200px; max-width:340px; }
+.search-box .icon{ position:absolute; left:12px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:var(--ink-faint); display:inline-flex; }
+.search-box .icon svg{ width:100%; height:100%; }
+.search-box input{ width:100%; font-family:inherit; font-size:13.5px; padding:10px 12px 10px 34px; border-radius:999px; border:1.5px solid var(--line-strong); background:var(--surface); color:var(--ink); }
+
+.pager{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; border-top:1px solid var(--line); font-size:12.5px; color:var(--ink-soft); flex-wrap:wrap; }
+.pager .pbtns{ display:flex; gap:6px; }
+.pager a, .pager button{ background:var(--surface); border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink); text-decoration:none; }
+.pager a[aria-disabled="true"]{ opacity:.4; cursor:default; pointer-events:none; }
+.pager .icon{ width:15px; height:15px; display:inline-flex; }
+.pager .icon svg{ width:100%; height:100%; }
+
+/* Responsive table-to-card collapse — ported verbatim from
+   smart-assess-internal.html. Every <td> that should carry a label when
+   collapsed needs a matching data-label="..." attribute. */
+@media (max-width:1340px){
+  .table-wrap{ overflow:hidden; border:0; background:transparent; }
+  .table-wrap table{ display:block; width:100%; min-width:0; table-layout:auto; border-collapse:separate; border-spacing:0; }
+  .table-wrap table thead{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+  .table-wrap table tbody{ display:grid; gap:10px; }
+  .table-wrap table tbody tr{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:14px; padding:10px 14px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); }
+  .table-wrap table tbody tr:hover{ background:var(--surface); }
+  .table-wrap table tbody td{ display:flex; align-items:flex-start; min-width:0; width:auto; padding:8px 0; border:0; white-space:normal; overflow-wrap:anywhere; }
+  .table-wrap table tbody td:not([colspan])::before{ content:attr(data-label); flex:0 0 112px; padding-right:8px; color:var(--ink-faint); font-size:10.5px; font-weight:800; line-height:1.4; text-transform:uppercase; white-space:normal; }
+  .table-wrap table tbody td[colspan]{ display:block; grid-column:1 / -1; }
+  .table-wrap table tbody td[colspan]::before{ content:none; }
+}
+@media (max-width:560px){
+  .table-wrap table tbody tr{ grid-template-columns:minmax(0,1fr); }
+}
