@@ -408,6 +408,42 @@ function call_ai_checker(array $payload): array
     return $decoded;
 }
 
+/**
+ * Pagination helper — given a total row count, clamps the current ?page=
+ * value to valid bounds and returns everything a caller needs to both
+ * build its LIMIT/OFFSET query and render the .pager control.
+ */
+function paginate_info(int $total, int $perPage = 25): array
+{
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    $page = max(1, min($totalPages, (int) ($_GET['page'] ?? 1)));
+    return [
+        'page' => $page, 'perPage' => $perPage, 'totalPages' => $totalPages,
+        'offset' => ($page - 1) * $perPage, 'total' => $total,
+    ];
+}
+
+/** Renders the shared .pager control (ported from smart-assess-internal.html's
+ *  pagerHtml()), preserving every existing query-string param except page. */
+function render_pager(array $info): string
+{
+    if ($info['total'] <= $info['perPage']) return '';
+    $linkFor = function (int $page): string {
+        $qs = $_GET;
+        $qs['page'] = $page;
+        return '?' . http_build_query($qs);
+    };
+    $from = $info['offset'] + 1;
+    $to = min($info['offset'] + $info['perPage'], $info['total']);
+    $prevDisabled = $info['page'] <= 1;
+    $nextDisabled = $info['page'] >= $info['totalPages'];
+    return '<div class="pager"><span>Showing ' . $from . '&ndash;' . $to . ' of ' . $info['total'] . '</span>'
+        . '<div class="pbtns">'
+        . '<a href="' . esc($linkFor(max(1, $info['page'] - 1))) . '" aria-disabled="' . ($prevDisabled ? 'true' : 'false') . '">' . icon_span('chevLeft', '15px') . '</a>'
+        . '<a href="' . esc($linkFor(min($info['totalPages'], $info['page'] + 1))) . '" aria-disabled="' . ($nextDisabled ? 'true' : 'false') . '">' . icon_span('chevRight', '15px') . '</a>'
+        . '</div></div>';
+}
+
 /** Shared <table> body used by every staff request-list page (dashboard,
  *  document-requests, land-transfers) so the markup only lives once. */
 function render_requests_table(array $requests, string $detailBase = '/staff/detail.php'): string
