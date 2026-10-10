@@ -9,7 +9,11 @@ $searchQuery = trim($_GET['q'] ?? '');
 $where = "WHERE flow = 'docreq'";
 $params = [];
 if ($statusFilter) { $where .= ' AND status = ?'; $params[] = $statusFilter; }
-if ($searchQuery !== '') { $where .= ' AND (reference_no LIKE ? OR first_name LIKE ? OR last_name LIKE ?)'; $params[] = $params[] = $params[] = "%$searchQuery%"; }
+if ($searchQuery !== '') {
+    $where .= ' AND (reference_no LIKE ? OR first_name LIKE ? OR last_name LIKE ?)';
+    $like = "%$searchQuery%";
+    array_push($params, $like, $like, $like);
+}
 
 $countStmt = db()->prepare("SELECT COUNT(*) FROM requests $where");
 $countStmt->execute($params);
