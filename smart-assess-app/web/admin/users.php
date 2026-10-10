@@ -149,7 +149,7 @@ require __DIR__ . '/../includes/internal_header.php';
                 <button type="submit" class="icon-btn">Save</button>
               </form>
             </td>
-            <td>
+            <td data-label="Actions">
               <?php if ((int) $a['id'] === (int) $me['id']): ?>
                 <button type="button" class="icon-btn" disabled title="You cannot archive your own account">
                   <?= icon_span('archive', '14px') ?>
@@ -169,6 +169,7 @@ require __DIR__ . '/../includes/internal_header.php';
         <?php endforeach; ?>
         </tbody>
       </table>
+      <?= render_pager($pageInfo) ?>
     </div>
   </div>
 </div>
