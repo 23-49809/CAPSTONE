@@ -6,14 +6,30 @@ mark_overdue_requests(db());
 
 // Every request together with what the AI Rule-Based Requirement Checker
 // flagged for it, so staff can triage without opening each one individually.
-$requests = db()->query(
+$searchQuery = trim($_GET['q'] ?? '');
+$searchWhere = '';
+$searchParams = [];
+if ($searchQuery !== '') {
+    $searchWhere = ' WHERE (r.reference_no LIKE ? OR r.first_name LIKE ? OR r.last_name LIKE ?)';
+    $like = "%$searchQuery%";
+    array_push($searchParams, $like, $like, $like);
+}
+$countStmt = db()->prepare("SELECT COUNT(*) FROM requests r$searchWhere");
+$countStmt->execute($searchParams);
+$pageInfo = paginate_info((int) $countStmt->fetchColumn(), 10);
+
+$stmt = db()->prepare(
     "SELECT r.*,
         GROUP_CONCAT(CASE WHEN d.file_status <> 'ok' THEN d.label END SEPARATOR ', ') AS flagged_items
      FROM requests r
      LEFT JOIN request_documents d ON d.request_id = r.id
+     $searchWhere
      GROUP BY r.id
-     ORDER BY r.requirement_complete ASC, r.created_at DESC"
-)->fetchAll();
+     ORDER BY r.requirement_complete ASC, r.created_at DESC
+     LIMIT {$pageInfo['perPage']} OFFSET {$pageInfo['offset']}"
+);
+$stmt->execute($searchParams);
+$requests = $stmt->fetchAll();
 
 $pageTitle = 'AI Checker Results';
 require __DIR__ . '/../includes/internal_header.php';
@@ -21,9 +37,15 @@ require __DIR__ . '/../includes/internal_header.php';
 <div class="dash-shell">
   <div class="dash-top"><div class="wrap"><h1>AI Rule-Based Requirement Checker Results</h1><p>Automated pass/fail verdict for every request's uploaded documents and IDs, worst first.</p></div></div>
   <div class="wrap">
+    <div class="toolbar">
+      <form method="get" class="search-box">
+        <?= icon_span('search') ?>
+        <input type="text" name="q" value="<?= esc($searchQuery) ?>" placeholder="Search reference or applicant&hellip;" onchange="this.form.submit()">
+      </form>
+    </div>
     <div class="table-wrap">
       <?php if (!$requests): ?>
-        <div class="empty-state">No requests yet.</div>
+        <div class="empty-state">No requests match &ldquo;<?= esc($searchQuery) ?>&rdquo;.</div>
       <?php else: ?>
       <table>
         <thead><tr><th>Reference No.</th><th>Applicant</th><th>Result</th><th>Flagged / Missing Items</th><th></th></tr></thead>
