@@ -29,12 +29,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
     }
 }
 
-$archived = $pdo->query(
+$searchQuery = trim($_GET['q'] ?? '');
+$where = 'WHERE u.archived_at IS NOT NULL AND u.deleted_at IS NULL';
+$params = [];
+if ($searchQuery !== '') {
+    $where .= ' AND (u.name LIKE ? OR u.username LIKE ?)';
+    $params[] = "%$searchQuery%";
+    $params[] = "%$searchQuery%";
+}
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM users u $where");
+$countStmt->execute($params);
+$pageInfo = paginate_info((int) $countStmt->fetchColumn(), 10);
+
+$stmt = $pdo->prepare(
     "SELECT u.*, a.name AS archived_by_name
      FROM users u LEFT JOIN users a ON a.id = u.archived_by
-     WHERE u.archived_at IS NOT NULL AND u.deleted_at IS NULL
-     ORDER BY u.archived_at DESC"
-)->fetchAll();
+     $where
+     ORDER BY u.archived_at DESC
+     LIMIT {$pageInfo['perPage']} OFFSET {$pageInfo['offset']}"
+);
+$stmt->execute($params);
+$archived = $stmt->fetchAll();
 
 $pageTitle = 'Archived Accounts';
 require __DIR__ . '/../includes/internal_header.php';
@@ -46,6 +61,12 @@ require __DIR__ . '/../includes/internal_header.php';
   </div></div>
   <div class="wrap">
     <?php if ($flash): ?><div class="flash <?= esc($flashType) ?>"><?= esc($flash) ?></div><?php endif; ?>
+    <div class="toolbar">
+      <form method="get" class="search-box">
+        <?= icon_span('search') ?>
+        <input type="text" name="q" value="<?= esc($searchQuery) ?>" placeholder="Search by name or username&hellip;" onchange="this.form.submit()">
+      </form>
+    </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Archived</th><th>Archived By</th><th></th></tr></thead>
