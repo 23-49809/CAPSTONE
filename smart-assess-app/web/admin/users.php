@@ -113,7 +113,13 @@ require __DIR__ . '/../includes/internal_header.php';
       </div>
       <button type="submit" class="btn btn-primary"><?= icon_span('users') ?> Add Account</button>
     </form>
-    <div class="table-wrap">
+    <div class="toolbar">
+      <form method="get" class="search-box">
+        <?= icon_span('search') ?>
+        <input type="text" name="q" value="<?= esc($searchQuery) ?>" placeholder="Search by name or username&hellip;" onchange="this.form.submit()">
+      </form>
+    </div>
+    <div class="table-wrap" id="staffAccountsTable">
       <table>
         <thead><tr><th>Name</th><th>Username</th><th>Contact Number</th><th>Position Title</th><th colspan="2">Role (Level of Access) &amp; Status</th><th></th></tr></thead>
         <tbody>
