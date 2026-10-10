@@ -70,7 +70,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
     }
 }
 
-$accounts = $pdo->query('SELECT * FROM users WHERE archived_at IS NULL AND deleted_at IS NULL ORDER BY created_at')->fetchAll();
+$totalActive = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE archived_at IS NULL AND deleted_at IS NULL')->fetchColumn();
+$pageInfo = paginate_info($totalActive, 10);
+$accounts = $pdo->query(
+    'SELECT * FROM users WHERE archived_at IS NULL AND deleted_at IS NULL ORDER BY created_at LIMIT ' . $pageInfo['perPage'] . ' OFFSET ' . $pageInfo['offset']
+)->fetchAll();
 $archivedCount = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE archived_at IS NOT NULL AND deleted_at IS NULL')->fetchColumn();
 
 $pageTitle = 'Manage Users';
