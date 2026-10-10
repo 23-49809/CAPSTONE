@@ -72,7 +72,7 @@ require __DIR__ . '/../includes/internal_header.php';
         <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Archived</th><th>Archived By</th><th></th></tr></thead>
         <tbody>
         <?php if (!$archived): ?>
-          <tr><td colspan="6"><div class="empty-state">No archived accounts.</div></td></tr>
+          <tr><td colspan="6"><div class="empty-state">No archived accounts<?= $searchQuery !== '' ? ' match &ldquo;' . esc($searchQuery) . '&rdquo;' : '' ?>.</div></td></tr>
         <?php else: foreach ($archived as $a): $roleCode = ROLE_ID_TO_CODE[(int) $a['role_id']] ?? 'staff'; ?>
           <tr>
             <td data-label="Name"><?= esc($a['name']) ?></td>
@@ -100,6 +100,7 @@ require __DIR__ . '/../includes/internal_header.php';
         <?php endforeach; endif; ?>
         </tbody>
       </table>
+      <?= render_pager($pageInfo) ?>
     </div>
   </div>
 </div>
