@@ -216,6 +216,7 @@ require __DIR__ . '/../includes/internal_header.php';
         <?php endforeach; ?>
         </tbody>
       </table>
+      <?= render_pager($pageInfo) ?>
     </div>
     <?php endif; ?>
   </div>
