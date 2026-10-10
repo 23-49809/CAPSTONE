@@ -70,11 +70,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
     }
 }
 
-$totalActive = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE archived_at IS NULL AND deleted_at IS NULL')->fetchColumn();
-$pageInfo = paginate_info($totalActive, 10);
-$accounts = $pdo->query(
-    'SELECT * FROM users WHERE archived_at IS NULL AND deleted_at IS NULL ORDER BY created_at LIMIT ' . $pageInfo['perPage'] . ' OFFSET ' . $pageInfo['offset']
-)->fetchAll();
+// Search is server-side (not the client-side table filter used elsewhere)
+// because it has to compose correctly with real pagination — a client-side
+// filter would only ever search whichever one page of rows is currently
+// rendered.
+$searchQuery = trim($_GET['q'] ?? '');
+$where = 'WHERE archived_at IS NULL AND deleted_at IS NULL';
+$params = [];
+if ($searchQuery !== '') {
+    $where .= ' AND (name LIKE ? OR username LIKE ?)';
+    $params[] = "%$searchQuery%";
+    $params[] = "%$searchQuery%";
+}
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM users $where");
+$countStmt->execute($params);
+$pageInfo = paginate_info((int) $countStmt->fetchColumn(), 10);
+
+$stmt = $pdo->prepare("SELECT * FROM users $where ORDER BY created_at LIMIT {$pageInfo['perPage']} OFFSET {$pageInfo['offset']}");
+$stmt->execute($params);
+$accounts = $stmt->fetchAll();
 $archivedCount = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE archived_at IS NOT NULL AND deleted_at IS NULL')->fetchColumn();
 
 $pageTitle = 'Manage Users';
