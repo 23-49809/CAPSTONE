@@ -123,6 +123,9 @@ require __DIR__ . '/../includes/internal_header.php';
       <table>
         <thead><tr><th>Name</th><th>Username</th><th>Contact Number</th><th>Position Title</th><th colspan="2">Role (Level of Access) &amp; Status</th><th></th></tr></thead>
         <tbody>
+        <?php if (!$accounts): ?>
+          <tr><td colspan="7"><div class="empty-state">No accounts match &ldquo;<?= esc($searchQuery) ?>&rdquo;.</div></td></tr>
+        <?php endif; ?>
         <?php foreach ($accounts as $a): $roleCode = ROLE_ID_TO_CODE[(int)$a['role_id']] ?? 'staff'; $editFormId = 'edit-user-' . (int) $a['id']; ?>
           <tr>
             <td data-label="Name"><?= esc($a['name']) ?></td>
