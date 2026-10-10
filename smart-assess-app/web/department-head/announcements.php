@@ -99,15 +99,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
     }
 }
 
-$announcements = $pdo->query('SELECT * FROM announcements ORDER BY created_at DESC')->fetchAll();
+// The edit target can be on any page, so it's looked up by its own
+// unfiltered/unpaginated query — the list below is independently searched
+// and paginated for display only.
 $editingId = (int) ($_GET['edit'] ?? 0);
 $editingAnnouncement = null;
-foreach ($announcements as $announcement) {
-    if ((int) $announcement['id'] === $editingId) {
-        $editingAnnouncement = $announcement;
-        break;
-    }
+if ($editingId) {
+    $editStmt = $pdo->prepare('SELECT * FROM announcements WHERE id = ?');
+    $editStmt->execute([$editingId]);
+    $editingAnnouncement = $editStmt->fetch() ?: null;
 }
+
+$searchQuery = trim($_GET['q'] ?? '');
+$listWhere = '';
+$listParams = [];
+if ($searchQuery !== '') {
+    $listWhere = ' WHERE title LIKE ?';
+    $listParams[] = "%$searchQuery%";
+}
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM announcements$listWhere");
+$countStmt->execute($listParams);
+$pageInfo = paginate_info((int) $countStmt->fetchColumn(), 10);
+$listStmt = $pdo->prepare("SELECT * FROM announcements$listWhere ORDER BY created_at DESC LIMIT {$pageInfo['perPage']} OFFSET {$pageInfo['offset']}");
+$listStmt->execute($listParams);
+$announcements = $listStmt->fetchAll();
 
 $editingPublishMode = ($editingAnnouncement && $editingAnnouncement['status'] === 'Scheduled') ? 'schedule' : 'now';
 $editingScheduleDate = '';
