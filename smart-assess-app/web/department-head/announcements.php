@@ -179,7 +179,13 @@ require __DIR__ . '/../includes/internal_header.php';
       </div>
     </form>
 
-    <?php if (!$announcements): ?><div class="empty-state">No announcements sent yet.</div>
+    <div class="toolbar">
+      <form method="get" class="search-box">
+        <?= icon_span('search') ?>
+        <input type="text" name="q" value="<?= esc($searchQuery) ?>" placeholder="Search by title&hellip;" onchange="this.form.submit()">
+      </form>
+    </div>
+    <?php if (!$announcements): ?><div class="empty-state">No announcements<?= $searchQuery !== '' ? ' match &ldquo;' . esc($searchQuery) . '&rdquo;' : ' sent yet' ?>.</div>
     <?php else: ?>
     <div class="table-wrap">
       <table>
