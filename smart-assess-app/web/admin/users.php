@@ -13,14 +13,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
         $username = trim($_POST['username'] ?? '');
         $roleCode = in_array($_POST['role'] ?? '', ['admin', 'staff', 'head'], true) ? $_POST['role'] : 'staff';
     $contactNumber = canonical_internal_contact($_POST['contact_number'] ?? '');
-    $positionTitle = $_POST['position_title'] ?? '';
+    // Position is optional — left blank it's stored as NULL ("Not assigned"),
+    // never invented or auto-filled. Only a non-empty submission is checked
+    // against the approved list, so a tampered/arbitrary value is rejected
+    // without forcing every account to have a position.
+    $positionTitleRaw = trim($_POST['position_title'] ?? '');
+    $positionTitle = $positionTitleRaw === '' ? null : $positionTitleRaw;
     if ($name === '' || $username === '') {
       $flash = 'Full name and username are required.';
       $flashType = 'error';
     } elseif ($contactNumber === null) {
       $flash = 'Contact number must contain exactly 10 digits after +63 and start with 9.';
       $flashType = 'error';
-    } elseif (!in_array($positionTitle, INTERNAL_POSITION_OPTIONS, true)) {
+    } elseif ($positionTitle !== null && !in_array($positionTitle, INTERNAL_POSITION_OPTIONS, true)) {
       $flash = 'Select a valid Assessor’s Office position.';
       $flashType = 'error';
     } else {
@@ -40,20 +45,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check()) {
         $roleCode = in_array($_POST['role'] ?? '', ['admin', 'staff', 'head'], true) ? $_POST['role'] : null;
         $status = in_array($_POST['status'] ?? '', ['Active', 'Inactive'], true) ? $_POST['status'] : null;
         $contactNumber = canonical_internal_contact($_POST['contact_number'] ?? '');
-        $positionTitle = $_POST['position_title'] ?? '';
+        $positionTitleRaw = trim($_POST['position_title'] ?? '');
+        $positionTitle = $positionTitleRaw === '' ? null : $positionTitleRaw;
         if (!$uid || !$roleCode || !$status) {
           $flash = 'Choose a valid role and account status.';
           $flashType = 'error';
         } elseif ($contactNumber === null) {
           $flash = 'Contact number must contain exactly 10 digits after +63 and start with 9.';
           $flashType = 'error';
-        } elseif (!in_array($positionTitle, INTERNAL_POSITION_OPTIONS, true)) {
+        } elseif ($positionTitle !== null && !in_array($positionTitle, INTERNAL_POSITION_OPTIONS, true)) {
           $flash = 'Select a valid Assessor’s Office position.';
           $flashType = 'error';
         } else {
           $pdo->prepare('UPDATE users SET role_id = ?, status = ?, contact_number = ?, position_title = ? WHERE id = ?')
             ->execute([ROLE_CODE_TO_ID[$roleCode], $status, $contactNumber, $positionTitle, $uid]);
-          audit('admin', $me['id'], $me['name'], "Set role=$roleCode status=$status position=$positionTitle", "user #$uid");
+          audit('admin', $me['id'], $me['name'], "Set role=$roleCode status=$status position=" . ($positionTitle ?? 'Not assigned'), "user #$uid");
           $flash = 'Account details saved.';
         }
     } elseif ($action === 'archive_account') {
@@ -131,7 +137,7 @@ require __DIR__ . '/../includes/internal_header.php';
             <td data-label="Name"><?= esc($a['name']) ?></td>
             <td class="mono" data-label="Username"><?= esc($a['username']) ?></td>
             <td data-label="Contact Number"><?= internal_contact_control($a['contact_number'] ?? null, $editFormId, 'contact-' . (int) $a['id']) ?></td>
-            <td data-label="Position Title"><?= internal_position_control($a['position_title'] ?? null, $editFormId) ?></td>
+            <td data-label="Position Title"><?= internal_position_control($a['position_title'] ?? null, $editFormId, 'Not assigned') ?></td>
             <td colspan="2" data-label="Role &amp; Status">
               <form id="<?= esc($editFormId) ?>" method="post" class="user-row-edit">
                 <?= csrf_field() ?>
