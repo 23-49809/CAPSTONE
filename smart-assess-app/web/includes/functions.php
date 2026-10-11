@@ -105,8 +105,11 @@ const TRANSFER_TYPES = ['Sale', 'Donation', 'Estate'];
 // Mabini, Batangas's 33 barangays, transcribed from smart-assess.html's
 // BARANGAYS list (there ALL_CAPS; title-cased here to match this app's
 // existing stored values, e.g. "Poblacion", "Sto. Tomas").
+// "Bagalangit" corrects what the prototype spells "Basalangit" — the real
+// barangay name, already used by this app's own existing seed data
+// (database/seed_demo_requests.php), which a strict copy would have broken.
 const BARANGAYS = [
-    'Poblacion', 'Anilao Proper', 'Anilao East', 'Basalangit', 'Bulacan', 'Calamias',
+    'Poblacion', 'Anilao Proper', 'Anilao East', 'Bagalangit', 'Bulacan', 'Calamias',
     'Estrella', 'Gasang', 'Laurel', 'Ligaya', 'Mainaga', 'Maint', 'Majuben', 'Malimatoc-I',
     'Malimatoc-II', 'Nag-Iba', 'Pilahan', 'P. Anahao', 'P. Balibaguhan', 'P. Lupa',
     'P. Niogan', 'Saguing', 'Sampaguita', 'San Francisco', 'San Jose', 'San Juan',
