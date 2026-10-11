@@ -1,12 +1,12 @@
 <?php
-require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/../auth/auth.php';
 require_once __DIR__ . '/icons.php';
 
 /**
  * Header for the INTERNAL MUNICIPAL OFFICE PORTAL only — used by
  * /internal/login.php and everything under /staff/*, /admin/*,
  * /department-head/*. Nothing in the public client portal links here;
- * this is reached only via its own direct URL. See includes/auth.php for
+ * this is reached only via its own direct URL. See auth/auth.php for
  * the server-side enforcement — this header is presentation only.
  *
  * Shell markup (header + sidebar + .main-content open tag) is ported

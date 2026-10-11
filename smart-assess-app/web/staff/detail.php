@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../auth/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 $me = require_role(['staff']);
 
@@ -63,7 +63,7 @@ require __DIR__ . '/../includes/internal_header.php';
       <?php // "Timed Out" is system-detected (see mark_overdue_requests()), not a
             // deliberate workflow step, so it's left out of the manual action row. ?>
       <?php foreach (array_diff(array_slice(STATUS_FLOW, 1), ['Timed Out']) as $s): ?>
-        <form method="post" action="update_status.php" style="display:inline">
+        <form method="post" action="/api/update-request-status.php" style="display:inline">
           <?= csrf_field() ?>
           <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
           <input type="hidden" name="status" value="<?= esc($s) ?>">

@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/icons.php';
 
 function esc(?string $s): string

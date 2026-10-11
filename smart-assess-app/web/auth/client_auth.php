@@ -1,15 +1,17 @@
 <?php
 /**
  * CLIENT authentication (Assessor's Clients / residents) only. Mirrors
- * includes/auth.php in shape but is entirely independent of it: separate
+ * auth/auth.php in shape but is entirely independent of it: separate
  * session key (`client`, not `internal_user`), separate table (`clients`,
  * not `users`), separate password set. A client session can never satisfy
  * require_role() on the internal side, and an internal session can never
  * satisfy require_client() here — there is no shared code path where a
- * bug could blur the two.
+ * bug could blur the two. The database itself also guarantees this: the
+ * `clients` table's role_id is CHECK-constrained to 1, and `users`' role_id
+ * is CHECK-constrained to (2,3,4) — see database/SCHEMA.md.
  */
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

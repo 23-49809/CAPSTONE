@@ -24,8 +24,9 @@ define('DB_PASS', getenv('DB_PASSWORD') ?: (getenv('SMART_ASSESS_DB_PASS') ?: 'c
 // Internal AI Rule-Based Requirement Checker service (Django).
 define('AI_CHECKER_BASE_URL', 'http://127.0.0.1:8001/api');
 
-// Where uploaded documents/IDs are stored, relative to this file.
-define('UPLOAD_DIR', __DIR__ . '/uploads');
+// Where uploaded documents/IDs are stored. This file now lives in config/,
+// one level deeper than the web root, so the path climbs back up to it.
+define('UPLOAD_DIR', __DIR__ . '/../uploads');
 define('MAX_UPLOAD_BYTES', 15 * 1024 * 1024); // 15 MB
 
 // Office info shown in the footer / SMS copy.

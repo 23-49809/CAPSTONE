@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../includes/client_auth.php';
+require_once __DIR__ . '/../auth/client_auth.php';
 $client = require_client();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check() && ($_POST['action'] ?? '') === 'mark_read') {

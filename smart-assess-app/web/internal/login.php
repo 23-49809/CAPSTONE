@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../auth/auth.php';
 
 if (current_user()) {
     header('Location: ' . internal_dashboard_path(current_user()['role']));

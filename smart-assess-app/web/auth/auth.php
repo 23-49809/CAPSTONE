@@ -2,14 +2,15 @@
 /**
  * INTERNAL authentication (Assessor's Staff / Admin / Department Head)
  * only. Authenticates exclusively against the `users` table — this file
- * has no knowledge of `clients` at all, and includes/client_auth.php has
+ * has no knowledge of `clients` at all, and auth/client_auth.php has
  * no knowledge of `users`. That separation is deliberate: it's what makes
  * "a client can never become staff/admin/head" a property of the code
  * (two different tables, two different session keys), not just a role
- * check that a future edit could accidentally weaken.
+ * check that a future edit could accidentally weaken — and it's backed by
+ * a database CHECK constraint on both tables too (database/SCHEMA.md).
  */
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/client_auth.php'; // only for the redirect-target check in require_role() below
 
 if (session_status() === PHP_SESSION_NONE) {
