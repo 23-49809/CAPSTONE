@@ -102,6 +102,18 @@ const PURPOSES = [
 
 const TRANSFER_TYPES = ['Sale', 'Donation', 'Estate'];
 
+// Mabini, Batangas's 33 barangays, transcribed from smart-assess.html's
+// BARANGAYS list (there ALL_CAPS; title-cased here to match this app's
+// existing stored values, e.g. "Poblacion", "Sto. Tomas").
+const BARANGAYS = [
+    'Poblacion', 'Anilao Proper', 'Anilao East', 'Basalangit', 'Bulacan', 'Calamias',
+    'Estrella', 'Gasang', 'Laurel', 'Ligaya', 'Mainaga', 'Maint', 'Majuben', 'Malimatoc-I',
+    'Malimatoc-II', 'Nag-Iba', 'Pilahan', 'P. Anahao', 'P. Balibaguhan', 'P. Lupa',
+    'P. Niogan', 'Saguing', 'Sampaguita', 'San Francisco', 'San Jose', 'San Juan',
+    'San Teodoro', 'Solo', 'Sta. Ana', 'Sta. Mesa', 'Sto. Nino', 'Sto. Tomas',
+    'Talaga Proper', 'Talaga East',
+];
+
 const LAND_TRANSFER_DOCS = [
     ['key' => 'ctcTdOrTitle', 'label' => 'Certified True Copy of Tax Declaration or Title'],
     ['key' => 'notarialDeed', 'label' => 'Notarial Deed of Sale or Donation'],
