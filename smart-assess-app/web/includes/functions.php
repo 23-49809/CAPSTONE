@@ -38,7 +38,14 @@ function internal_contact_control(?string $stored = null, ?string $formId = null
         . '</div><div class="field-error" data-contact-error hidden>Contact number must contain exactly 10 digits after +63 and start with 9.</div>';
 }
 
-function internal_position_control(?string $selected = null, ?string $formId = null): string
+/**
+ * Position is optional (see admin/users.php's add_account/update_account —
+ * an empty submission is stored as NULL, never invented or auto-assigned),
+ * so this is deliberately not `required`. $emptyLabel lets callers show
+ * "Not assigned" when displaying an existing, already-saved account vs.
+ * "Select Position" when prompting for a brand-new one.
+ */
+function internal_position_control(?string $selected = null, ?string $formId = null, string $emptyLabel = 'Select Position'): string
 {
     $form = $formId ? ' form="' . esc($formId) . '"' : '';
     $selected = $selected ?? '';
@@ -48,7 +55,7 @@ function internal_position_control(?string $selected = null, ?string $formId = n
     $options = array_map(static function (string $position) use ($selected): string {
         return '<option value="' . esc($position) . '"' . ($selected === $position ? ' selected' : '') . '>' . esc($position) . '</option>';
     }, INTERNAL_POSITION_OPTIONS);
-    return '<select name="position_title" aria-label="Position Title" required' . $form . '><option value=""' . ($selected === '' ? ' selected' : '') . '>Select Position</option>'
+    return '<select name="position_title" aria-label="Position Title"' . $form . '><option value=""' . ($selected === '' ? ' selected' : '') . '>' . esc($emptyLabel) . '</option>'
         . $legacy . implode('', $options) . '</select>';
 }
 
