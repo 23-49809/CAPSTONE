@@ -64,30 +64,28 @@ Expect one row: `smart_assess`.
 
 (Password intentionally omitted from these examples — `mysql`/`mysqladmin`
 will prompt for it interactively with a bare `-p`, which is safer than
-typing it inline. See `database/schema.sql`'s own setup notes / the
-project's existing `README.md` for the credential itself — this guide
-deliberately doesn't repeat it.)
+typing it inline. Store local credentials outside the repository.)
 
-## 4. Starting the PHP app on port 8923 with DB_PORT=3307 (Verified)
+## 4. Starting the PHP app on port 8923 with DB_PORT=3307
 
 ```bash
 cd /Users/hamy/Documents/CAPSTONE/smart-assess-app/web
-SMART_ASSESS_DB_PASS='<the real password>' DB_PORT='3307' \
-  php -S 127.0.0.1:8923 &
-disown
+DB_HOST=127.0.0.1 DB_PORT=3307 DB_NAME=smart_assess \
+DB_USER=smart_assess_app SMART_ASSESS_DB_PASS='<set your local DB password>' \
+  php -d upload_max_filesize=5M -d post_max_size=50M \
+  -S 127.0.0.1:8923
 ```
 
-Then open **http://127.0.0.1:8923/** (Verified — returns HTTP 200, confirmed
-with `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8923/index.php`).
+Open **http://127.0.0.1:8923/** for the public design and
+**http://127.0.0.1:8923/internal.php** for the internal login and interface.
+These entry points require valid database credentials; internal account
+management also requires applying
+`smart-assess-app/database/migrations/20261012_add_internal_account_email.sql`
+once to an existing database after taking a backup.
 
-Internal portal login: **http://127.0.0.1:8923/internal/login.php**
-
-Also start the AI requirement-checker service (separate terminal), needed
-for client document/land-transfer submissions:
-```bash
-cd /Users/hamy/Documents/CAPSTONE/smart-assess-app/ai_checker
-python3 manage.py runserver 127.0.0.1:8001
-```
+The replacement PHP UI does not yet connect to the AI requirement-checker
+service. Do not rely on that service for request review until the integration
+is implemented and tested.
 
 ## 5. Checking what's listening on 3306 / 3307 / 8923 (Verified)
 

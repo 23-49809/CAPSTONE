@@ -1,154 +1,78 @@
 <?php
-require_once __DIR__ . '/includes/functions.php';
-$pdo = db();
-publish_due_announcements($pdo);
-$today = date('Y-m-d');
-$announcementQuery = $pdo->prepare("SELECT * FROM announcements WHERE status = 'Published' AND audience IN ('client','both') AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC, created_at DESC");
-$announcementQuery->execute([$today, $today]);
-$announcements = $announcementQuery->fetchAll();
-$pageTitle = 'Home';
-require __DIR__ . '/includes/client_header.php';
-?>
-<section class="hero hero-slider" data-hero-slider aria-label="Assessor Office updates">
-  <div class="hero-slides">
-    <article class="hero-slide is-active"><div class="wrap"><div class="hero-inner hero-slide-copy">
-      <span class="eyebrow">Mabini Municipal Assessor&rsquo;s Office</span><h1>Welcome to SMART ASSESS</h1>
-      <p><em>Your Digital Gateway to Assessor Services</em></p>
-      <p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p>
-      <a class="btn btn-hero" href="#services">Explore Services <?= icon_span('arrowRight') ?></a>
-    </div></div></article>
-    <article class="hero-slide<?= !$announcements ? ' no-announcement' : '' ?>"><div class="wrap"><div class="hero-inner hero-slide-copy">
-      <span class="eyebrow">Announcements</span><h1>Announcements</h1>
-      <?php if ($announcements): foreach ($announcements as $announcement): ?>
-        <div class="hero-announcement"><h2><?= esc($announcement['title']) ?></h2><p><?= esc($announcement['body']) ?></p><time datetime="<?= esc($announcement['start_date']) ?>">Posted <?= esc(fmt_date($announcement['start_date'])) ?></time></div>
-      <?php endforeach; ?><a class="btn btn-hero" href="/announcement.php">View Announcement <?= icon_span('arrowRight') ?></a><?php else: ?><p>No current announcements.</p><?php endif; ?>
-    </div></div></article>
-  </div>
-  <button class="hero-slider-control prev" type="button" data-slider-prev aria-label="Previous slide"><?= icon_span('arrowLeft') ?></button>
-  <button class="hero-slider-control next" type="button" data-slider-next aria-label="Next slide"><?= icon_span('arrowRight') ?></button>
-  <div class="hero-slider-dots" role="tablist" aria-label="Hero slides"><button class="is-active" type="button" data-slide-to="0" aria-label="Welcome to SMART ASSESS slide"></button><button type="button" data-slide-to="1" aria-label="Announcements slide"></button></div>
-</section>
+declare(strict_types=1);
 
-<section class="requirements-strip" aria-label="General requirements">
-  <div class="wrap requirements-grid">
-    <details id="document-requirements"><summary>Document Request Requirements</summary><p>Prepare a valid government-issued ID, the accomplished request form, and any supporting property or authorization documents requested for your selected document.</p><a class="btn-link" href="/client/document-request.php">Start Document Request <?= icon_span('arrowRight','15px') ?></a></details>
-    <details id="land-transfer-requirements"><summary>Land Transfer Requirements</summary><p>Prepare the certified title or tax declaration, notarized deed, vicinity map, certification documents, and tax clearance before submitting.</p><a class="btn-link" href="/client/land-transfer.php">Start Land Transfer <?= icon_span('arrowRight','15px') ?></a></details>
-  </div>
-</section>
-<section class="section" id="services"><div class="wrap">
-  <div class="section-head"><h2>How Can We Help You?</h2>
-    <p>Choose the service that best matches your needs. We offer two main pathways to access municipal property assessment services:</p></div>
-  <div class="service-grid">
-    <div class="service-card"><div class="chip-icon"><?= icon('doc') ?></div>
-      <h3>Start Document Request</h3>
-      <p>Request for Certified True Copies of Tax Declarations, Certifications of Land Holdings, and more.</p>
-      <div class="service-actions">
-        <a class="btn-link" href="/client/document-request.php">Begin Application <?= icon_span('arrowRight','15px') ?></a>
-        <button class="btn-link" type="button" data-requirements="document">View Requirements <?= icon_span('arrowRight','15px') ?></button>
-      </div></div>
-    <div class="service-card"><div class="chip-icon"><?= icon('swap') ?></div>
-      <h3>Land Transfer</h3>
-      <p>Submit requirements for property transfer, consolidation, or subdivision of land records.</p>
-      <div class="service-actions">
-        <a class="btn-link" href="/client/land-transfer.php">Begin Land Transfer <?= icon_span('arrowRight','15px') ?></a>
-        <button class="btn-link" type="button" data-requirements="land">View Requirements <?= icon_span('arrowRight','15px') ?></button>
-      </div></div>
-  </div>
-</div></section>
+require_once __DIR__ . '/prototype.php';
 
-<section class="section section-alt"><div class="wrap">
-  <div class="section-head"><h2>Why Choose SMART ASSESS?</h2>
-    <p>Experience the future of municipal services with our digital platform designed for efficiency, transparency, and accessibility.</p></div>
-  <div class="feature-row">
-    <div><div class="chip-icon"><?= icon('shield') ?></div><h4>Secure &amp; Reliable</h4><p>Your data is protected with enterprise-grade security. All transactions are encrypted and monitored.</p></div>
-    <div><div class="chip-icon"><?= icon('clock') ?></div><h4>Fast Processing</h4><p>Streamlined workflows ensure your requests are processed quickly with real-time status updates.</p></div>
-    <div><div class="chip-icon"><?= icon('headset') ?></div><h4>24/7 Support</h4><p>Access our services anytime. Our support team is here to help with any questions or concerns.</p></div>
-  </div>
-</div></section>
-
-<dialog class="requirements-dialog" aria-labelledby="requirements-dialog-title">
-  <div class="requirements-dialog-content">
-    <div class="requirements-dialog-head">
-      <div><span class="eyebrow">Before You Apply</span><h2 id="requirements-dialog-title"></h2></div>
-      <button class="requirements-dialog-close" type="button" data-requirements-close aria-label="Close requirements">Close</button>
-    </div>
-    <p class="requirements-dialog-intro">Have these items ready before starting your request.</p>
-    <ul class="requirements-dialog-list"></ul>
-    <div class="requirements-dialog-actions">
-      <button class="btn btn-ghost" type="button" data-requirements-close>Close</button>
-      <a class="btn btn-primary" data-requirements-start href="/client/document-request.php">Start Request <?= icon_span('arrowRight') ?></a>
-    </div>
-  </div>
-</dialog>
-
-<?php require __DIR__ . '/includes/site_footer.php'; ?>
-<script>
-(function(){
-  const requirementsDialog = document.querySelector('.requirements-dialog');
-  const requirementSets = {
-    document: {
-      title: 'Document Request Requirements',
-      items: ['Valid government-issued ID', 'Completed request details', 'Property or tax declaration information', 'Authorization letter and representative ID, if filing for the owner'],
-      href: '/client/document-request.php',
-      action: 'Start Document Request'
-    },
-    land: {
-      title: 'Land Transfer Requirements',
-      items: ['Certified True Copy of Tax Declaration or Title', 'Notarial Deed of Sale or Donation', 'Vicinity Map', 'Certification of No Improvement', 'Tax Clearance', 'Valid government-issued ID'],
-      href: '/client/land-transfer.php',
-      action: 'Start Land Transfer'
+$publicData = sa_public_bootstrap();
+$toPublicRequest = static function (array $request): array {
+    $documents = sa_db()->prepare(
+        'SELECT rd.label, rd.file_status, dv.validation_status
+         FROM request_documents rd
+         LEFT JOIN document_validation dv ON dv.request_document_id = rd.id
+         WHERE rd.request_id = :request_id
+         ORDER BY rd.id'
+    );
+    $documents->execute(['request_id' => $request['id']]);
+    $missing = [];
+    foreach ($documents->fetchAll() as $document) {
+        if ($document['file_status'] === 'missing' || $document['file_status'] === 'flagged' ||
+            $document['validation_status'] === 'invalid') {
+            $missing[] = (string) $document['label'];
+        }
     }
-  };
-  const requirementTitle = requirementsDialog.querySelector('#requirements-dialog-title');
-  const requirementList = requirementsDialog.querySelector('.requirements-dialog-list');
-  const requirementStart = requirementsDialog.querySelector('[data-requirements-start]');
-  document.querySelectorAll('[data-requirements]').forEach(button => {
-    button.addEventListener('click', () => {
-      const requirements = requirementSets[button.dataset.requirements];
-      if (!requirements) return;
-      requirementTitle.textContent = requirements.title;
-      requirementList.replaceChildren(...requirements.items.map(item => {
-        const listItem = document.createElement('li');
-        listItem.textContent = item;
-        return listItem;
-      }));
-      requirementStart.href = requirements.href;
-      requirementStart.innerHTML = requirements.action + ' <?= icon_span('arrowRight') ?>';
-      requirementsDialog.showModal();
-    });
-  });
-  requirementsDialog.querySelectorAll('[data-requirements-close]').forEach(button => {
-    button.addEventListener('click', () => requirementsDialog.close());
-  });
-  requirementsDialog.addEventListener('click', event => {
-    if (event.target === requirementsDialog) requirementsDialog.close();
-  });
+    if (!$request['requirement_complete'] && $missing === []) {
+        $missing[] = 'Requirements pending review';
+    }
+    $timestamps = [];
+    foreach ($request['history'] ?? [] as $entry) {
+        $timestamps[(string) $entry['status']] = (string) $entry['created_at'];
+    }
+    return [
+        'id' => (string) $request['reference_no'],
+        'flow' => (string) $request['flow'],
+        'applicant' => trim((string) $request['first_name'] . ' ' . (string) $request['last_name']),
+        'docType' => (string) ($request['document_type'] ?? $request['transfer_type'] ?? ''),
+        'status' => (string) $request['status'],
+        'requirementComplete' => (bool) $request['requirement_complete'],
+        'missing' => $missing,
+        'timestamps' => $timestamps,
+        'submittedAt' => (string) $request['created_at'],
+    ];
+};
+$page = [
+    'view' => 'landing',
+    'lastSubmission' => null,
+    'track' => ['query' => '', 'result' => null, 'searched' => false],
+];
 
-  const slider = document.querySelector('[data-hero-slider]');
-  if (!slider) return;
-  const slides = Array.from(slider.querySelectorAll('.hero-slide'));
-  const dots = Array.from(slider.querySelectorAll('[data-slide-to]'));
-  let current = 0;
-  let timer;
-  let touchStartX = 0;
-  function show(index){
-    current = (index + slides.length) % slides.length;
-    slides.forEach((slide, i) => slide.classList.toggle('is-active', i === current));
-    dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
-  }
-  function restart(){ clearInterval(timer); timer = setInterval(() => show(current + 1), 5500); }
-  slider.querySelector('[data-slider-prev]').addEventListener('click', () => { show(current - 1); restart(); });
-  slider.querySelector('[data-slider-next]').addEventListener('click', () => { show(current + 1); restart(); });
-  dots.forEach(dot => dot.addEventListener('click', () => { show(Number(dot.dataset.slideTo)); restart(); }));
-  slider.addEventListener('mouseenter', () => clearInterval(timer));
-  slider.addEventListener('mouseleave', restart);
-  slider.addEventListener('touchstart', event => { touchStartX = event.changedTouches[0].clientX; clearInterval(timer); }, {passive:true});
-  slider.addEventListener('touchend', event => {
-    const distance = event.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(distance) > 45) show(distance < 0 ? current + 1 : current - 1);
-    restart();
-  }, {passive:true});
-  restart();
-})();
-</script>
-<?php require __DIR__ . '/includes/footer.php'; ?>
+$submittedReference = trim((string) ($_GET['submitted'] ?? ''));
+$trackingReference = trim((string) ($_GET['track'] ?? ''));
+if ($submittedReference !== '') {
+    $request = sa_track_request($submittedReference);
+    if ($request !== null) {
+        $page['view'] = 'confirmation';
+        $page['lastSubmission'] = $toPublicRequest($request);
+    }
+} elseif ($trackingReference !== '') {
+    $request = sa_track_request($trackingReference);
+    $page['view'] = 'track';
+    $page['track'] = [
+        'query' => strtoupper($trackingReference),
+        'result' => $request === null ? null : $toPublicRequest($request),
+        'searched' => true,
+    ];
+}
+$page['announcements'] = array_map(static function (array $announcement): array {
+    return [
+        'id' => (string) $announcement['id'],
+        'title' => (string) $announcement['title'],
+        'content' => (string) $announcement['body'],
+        'datePosted' => (string) $announcement['start_date'],
+        'postTo' => (string) $announcement['audience'],
+        'status' => 'Published',
+        'scheduledAt' => null,
+        'publishedAt' => $announcement['published_at'] ?? null,
+    ];
+}, $publicData['announcements'] ?? []);
+
+sa_emit_prototype('smart-assess.html', $page, 'client');

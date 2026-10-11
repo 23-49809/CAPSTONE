@@ -1,6 +1,5 @@
 {
     "sqltools.connections": [
-
         {
             "mysqlOptions": {
                 "authProtocol": "default",
@@ -8,13 +7,13 @@
             },
             "ssh": "Disabled",
             "previewLimit": 50,
-            "server": "localhost",
-            "port": 3306,
+            "server": "127.0.0.1",
+            "port": 3307,
             "driver": "MySQL",
             "name": "SMART ASSESS",
             "database": "smart_assess",
             "username": "root",
-            "password": "assessor"
+            "askForPassword": true
         }
     ]
 }

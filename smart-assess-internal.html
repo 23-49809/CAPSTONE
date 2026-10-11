@@ -490,19 +490,19 @@ function initials(name){ var parts=String(name||'').trim().split(/\s+/); if(!par
 
 /* ---------------- Seed data ---------------- */
 var SEED_ACCOUNTS = [
-  {id:'u1', fullName:'Maricar D. Santos', username:'maricar.admin', password:'Passw0rd!', email:'maricar.santos@mabini.gov.ph', contact:'+639172001145', position:'Assessor Admin', role:'admin', status:'active', dateCreated:'2025-01-06'},
-  {id:'u2', fullName:'Rodel P. Ilagan', username:'rodel.head', password:'Passw0rd!', email:'rodel.ilagan@mabini.gov.ph', contact:'+639172002290', position:'Assessor Head', role:'head', status:'active', dateCreated:'2025-01-06'},
-  {id:'u3', fullName:'Jessica Ann M. Reyes', username:'jessica.staff', password:'Passw0rd!', email:'jessica.reyes@mabini.gov.ph', contact:'+639172003317', position:'Assessment Clerk', role:'staff', status:'active', dateCreated:'2025-01-10'},
-  {id:'u4', fullName:'Mark Anthony V. Cruz', username:'mark.staff', password:'Passw0rd!', email:'mark.cruz@mabini.gov.ph', contact:'+639172004482', position:'Records Officer', role:'staff', status:'active', dateCreated:'2025-02-14'},
-  {id:'u5', fullName:'Liza D. Fernandez', username:'liza.staff', password:'Passw0rd!', email:'liza.fernandez@mabini.gov.ph', contact:'+639172005510', position:'Assessment Clerk', role:'staff', status:'inactive', dateCreated:'2025-03-02'}
+  {id:'u1', fullName:'Maricar D. Santos', username:'maricar.admin', email:'maricar.santos@mabini.gov.ph', contact:'+639172001145', position:'Assessor Admin', role:'admin', status:'active', dateCreated:'2025-01-06'},
+  {id:'u2', fullName:'Rodel P. Ilagan', username:'rodel.head', email:'rodel.ilagan@mabini.gov.ph', contact:'+639172002290', position:'Assessor Head', role:'head', status:'active', dateCreated:'2025-01-06'},
+  {id:'u3', fullName:'Jessica Ann M. Reyes', username:'jessica.staff', email:'jessica.reyes@mabini.gov.ph', contact:'+639172003317', position:'Assessment Clerk', role:'staff', status:'active', dateCreated:'2025-01-10'},
+  {id:'u4', fullName:'Mark Anthony V. Cruz', username:'mark.staff', email:'mark.cruz@mabini.gov.ph', contact:'+639172004482', position:'Records Officer', role:'staff', status:'active', dateCreated:'2025-02-14'},
+  {id:'u5', fullName:'Liza D. Fernandez', username:'liza.staff', email:'liza.fernandez@mabini.gov.ph', contact:'+639172005510', position:'Assessment Clerk', role:'staff', status:'inactive', dateCreated:'2025-03-02'}
 ];
 
-var STATUS_ORDER = ['Pending','Under Review','Requirements Incomplete','Requirements Complete','Processing','Ready for Release','Completed','Rejected'];
+var STATUS_ORDER = ['Received','Processing','Approved','Rejected','Out for Release','Timed Out'];
 var STATUS_META = {
-  'Pending':{cls:'slate'}, 'Under Review':{cls:'blue'}, 'Requirements Incomplete':{cls:'amber'},
-  'Requirements Complete':{cls:'green'}, 'Processing':{cls:'blue'}, 'Ready for Release':{cls:'green'},
-  'Completed':{cls:'green'}, 'Rejected':{cls:'red'}
+  'Received':{cls:'slate'}, 'Processing':{cls:'blue'}, 'Approved':{cls:'green'},
+  'Rejected':{cls:'red'}, 'Out for Release':{cls:'green'}, 'Timed Out':{cls:'amber'}
 };
+function statusLabel(status){ return status==='Received'?'Pending':status; }
 
 var SEED_DOC_REQUESTS = [
   {id:'DR-2026-0142', applicant:'Ramon C. Villareal', barangay:'POBLACION', docType:'Certified True Copy of Tax Declaration', purpose:'Bank Loan Application', submitted:'2026-08-28T09:14:00', status:'Under Review',
@@ -843,7 +843,7 @@ function renderLogin(){
       + '<div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">'+ic('eye','19px')+'</button></div></div>'
       + '<button type="submit" class="btn btn-primary btn-block">'+ic('check','18px')+' Sign In</button>'
     + '</form>'
-    + '<div class="login-note"><b>Demo accounts</b> (password <span class="mono">Passw0rd!</span> for all):<br>Admin — maricar.admin &middot; Head — rodel.head &middot; Staff — jessica.staff</div>'
+    + '<div class="login-note">Sign-in is restricted to authorized Assessor’s Office personnel.</div>'
   + '</div></div>';
 }
 
@@ -926,6 +926,9 @@ function renderAdminDashboard(acct){
   var activeN = state.accounts.filter(function(a){return a.status==='active';}).length;
   var inactiveN = total-activeN;
   var recent = state.accounts.slice().sort(function(a,b){ return b.dateCreated.localeCompare(a.dateCreated); }).slice(0,5);
+  var processingStats = state.adminProcessingStats || {};
+  var docProcessing = processingStats.documents || {};
+  var landProcessing = processingStats.landTransfers || {};
   return ''
   + '<div class="page-head"><div><div class="breadcrumb">Assessor Admin</div><h1>Admin Dashboard</h1><p>Manage Assessor’s Office staff accounts and access.</p></div>'
     + '<button class="btn btn-primary" data-action="nav" data-view="create-account">'+ic('userPlus','17px')+' Create Staff Account</button></div>'
@@ -942,6 +945,11 @@ function renderAdminDashboard(acct){
         + '<td data-label="Status"><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
         + '<td data-label="Date Created">'+fmtDate(a.dateCreated)+'</td></tr>';
     }).join('')
+    + '</tbody></table></div></div>'
+  + '<div class="panel-card"><h3>'+ic('timer')+'Request Processing Summary</h3>'
+    + '<div class="table-wrap"><table><thead><tr><th>Request Type</th><th>Completed</th><th>With Recorded Duration</th><th>Average Duration</th></tr></thead><tbody>'
+    + '<tr><td data-label="Request Type">Document Requests</td><td data-label="Completed">'+Number(docProcessing.completed||0)+'</td><td data-label="With Recorded Duration">'+Number(docProcessing.completedWithDuration||0)+'</td><td class="mono" data-label="Average Duration">'+(docProcessing.averageDurationSeconds==null?'—':formatDuration(docProcessing.averageDurationSeconds))+'</td></tr>'
+    + '<tr><td data-label="Request Type">Land Transfers</td><td data-label="Completed">'+Number(landProcessing.completed||0)+'</td><td data-label="With Recorded Duration">'+Number(landProcessing.completedWithDuration||0)+'</td><td class="mono" data-label="Average Duration">'+(landProcessing.averageDurationSeconds==null?'—':formatDuration(landProcessing.averageDurationSeconds))+'</td></tr>'
     + '</tbody></table></div></div>';
 }
 
@@ -991,12 +999,13 @@ function renderArchivedAccounts(){
 }
 
 function accountFormFields(a){
+  var isEdit = !!a;
   a = a||{fullName:'',username:'',password:'',email:'',contact:'',position:'',role:'staff',status:'active'};
   return ''
   + '<div class="field"><label>Full Name</label><input name="fullName" type="text" value="'+esc(a.fullName)+'" placeholder="e.g. Juan D. Dela Cruz" required></div>'
   + '<div class="field-row">'
     + '<div class="field"><label>Username</label><input name="username" type="text" value="'+esc(a.username)+'" placeholder="e.g. juan.staff" required></div>'
-    + '<div class="field"><label>Password</label><input name="password" type="text" value="'+esc(a.password)+'" placeholder="Temporary password" required></div>'
+    + '<div class="field"><label>Password</label><input name="password" type="password" value="'+esc(a.password)+'" placeholder="'+(isEdit?'Leave blank to keep current':'Temporary password')+'" minlength="10" '+(isEdit?'':'required')+' autocomplete="new-password"></div>'
   + '</div>'
   + '<div class="field-row">'
     + '<div class="field"><label>Email Address</label><input name="email" type="email" value="'+esc(a.email)+'" placeholder="name@mabini.gov.ph" required></div>'
@@ -1044,9 +1053,9 @@ function renderCreateAccount(acct){
 /* ---------------- Head views ---------------- */
 function renderHeadDashboard(acct){
   var docTotal = state.docRequests.length, landTotal = state.landRequests.length;
-  var pendingDoc = state.docRequests.filter(function(r){ return r.status!=='Completed' && r.status!=='Rejected'; }).length;
-  var pendingLand = state.landRequests.filter(function(r){ return r.status!=='Completed' && r.status!=='Rejected'; }).length;
-  var completedThisMonth = state.docRequests.filter(function(r){ return r.status==='Completed'; }).length + state.landRequests.filter(function(r){ return r.status==='Completed'; }).length;
+  var pendingDoc = state.docRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
+  var pendingLand = state.landRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
+  var completedThisMonth = state.docRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length + state.landRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length;
   var pubAnn = state.announcements.filter(function(a){ return a.status==='Published'; }).length;
   var recentReports = state.reports.slice(0,3);
   var recentAnn = state.announcements.slice(0,2);
@@ -1146,9 +1155,10 @@ function renderReports(acct){
 
 /* ---------------- Staff views ---------------- */
 function renderStaffDashboard(acct){
-  var docPending = state.docRequests.filter(function(r){ return r.status==='Pending'||r.status==='Under Review'; }).length;
-  var incomplete = state.docRequests.filter(function(r){ return r.status==='Requirements Incomplete'; }).length + state.landRequests.filter(function(r){ return r.status==='Requirements Incomplete'; }).length;
-  var readyRelease = state.docRequests.filter(function(r){ return r.status==='Ready for Release'; }).length;
+  var docPending = state.docRequests.filter(function(r){ return r.status==='Received'||r.status==='Processing'; }).length;
+  var hasMissingRequirements = function(r){ return r.checklist.some(function(item){ return item.submitted==='Missing'||item.validation==='Invalid'; }); };
+  var incomplete = state.docRequests.filter(hasMissingRequirements).length + state.landRequests.filter(hasMissingRequirements).length;
+  var readyRelease = state.docRequests.filter(function(r){ return r.status==='Out for Release'; }).length;
   var todayLog = state.timeLogs.filter(function(t){ return t.staffUsername===acct.username; }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
   var newestDocs = state.docRequests.slice().sort(function(a,b){return b.submitted.localeCompare(a.submitted);}).slice(0,4);
   var newestLand = state.landRequests.slice().sort(function(a,b){return b.submitted.localeCompare(a.submitted);}).slice(0,4);
@@ -1163,15 +1173,15 @@ function renderStaffDashboard(acct){
   + '<div class="two-col">'
     + '<div class="panel-card"><h3>'+ic('doc')+'Newest Document Requests</h3>'
       + newestDocs.map(function(r){
-          var m=STATUS_META[r.status];
-          return '<div class="review-row"><span class="k">'+esc(r.id)+' — '+esc(r.applicant)+'</span><span class="badge '+m.cls+'">'+r.status+'</span></div>';
+          var m=STATUS_META[r.status]||STATUS_META.Received;
+          return '<div class="review-row"><span class="k">'+esc(r.id)+' — '+esc(r.applicant)+' '+processingTimerHtml(r,true)+'</span><span class="badge '+m.cls+'">'+esc(statusLabel(r.status))+'</span></div>';
         }).join('')
       + '<div style="margin-top:14px;"><button class="btn btn-outline btn-sm" data-action="nav" data-view="document-requests">View All Document Requests</button></div>'
     + '</div>'
     + '<div class="panel-card"><h3>'+ic('swap')+'Newest Land Transfer Requests</h3>'
       + newestLand.map(function(r){
-          var m=STATUS_META[r.status];
-          return '<div class="review-row"><span class="k">'+esc(r.id)+' — '+esc(r.applicant)+'</span><span class="badge '+m.cls+'">'+r.status+'</span></div>';
+          var m=STATUS_META[r.status]||STATUS_META.Received;
+          return '<div class="review-row"><span class="k">'+esc(r.id)+' — '+esc(r.applicant)+' '+processingTimerHtml(r,true)+'</span><span class="badge '+m.cls+'">'+esc(statusLabel(r.status))+'</span></div>';
         }).join('')
       + '<div style="margin-top:14px;"><button class="btn btn-outline btn-sm" data-action="nav" data-view="land-transfer-requests">View All Land Transfer Requests</button></div>'
     + '</div>'
@@ -1214,14 +1224,55 @@ function renderTimestamp(acct){
   + '</tbody></table></div>';
 }
 
+function padTimer(value){ return value<10?'0'+value:String(value); }
+function formatDuration(seconds){
+  seconds = Math.max(0, Math.floor(Number(seconds)||0));
+  var hours = Math.floor(seconds/3600);
+  return padTimer(hours)+':'+padTimer(Math.floor(seconds%3600/60))+':'+padTimer(seconds%60);
+}
+function processingTimerHtml(r, inline){
+  if(r.processingStartedEpoch==null) return '';
+  var finalDuration = r.processingDurationSeconds==null ? '' : Number(r.processingDurationSeconds);
+  var initial = finalDuration==='' ? Math.max(0, Math.floor(Date.now()/1000-Number(r.processingStartedEpoch))) : finalDuration;
+  return (inline?'Elapsed: ':'<div class="cell-sub">Processing time: ')
+    + '<span class="mono processing-timer" data-processing-timer data-started-epoch="'+Number(r.processingStartedEpoch)+'" data-final-seconds="'+finalDuration+'">'+formatDuration(initial)+'</span>'
+    + (inline?'':'</div>');
+}
+function processingStaffHtml(r, inline){
+  if(!r.processingStaffId) return '';
+  var label = 'Assigned to: '+esc(r.processingStaffName||'Staff account #'+r.processingStaffId);
+  return inline ? label : '<div class="cell-sub">'+label+'</div>';
+}
+function updateProcessingTimers(){
+  var now = Math.floor(Date.now()/1000);
+  document.querySelectorAll('[data-processing-timer]').forEach(function(timer){
+    var finalDuration = timer.getAttribute('data-final-seconds');
+    var elapsed = finalDuration==='' ? now-Number(timer.getAttribute('data-started-epoch')) : Number(finalDuration);
+    timer.textContent = formatDuration(elapsed);
+  });
+}
+
+function reqProcessingActions(r){
+  var account = currentAccount();
+  if(!account || account.role!=='staff') return '';
+  var terminal = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
+  var actions = '';
+  if(!r.processingStaffId && !terminal){
+    actions += '<button type="button" class="icon-btn action-button" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','13px')+'Accept/Process Request</button>';
+  } else if(Number(r.processingStaffId)===Number(account.id) && r.processingStartedAt && !r.processingCompletedAt && !terminal){
+    actions += '<button type="button" class="icon-btn action-button" data-action="complete-processing" data-id="'+esc(r.id)+'">'+ic('check','13px')+'Complete Request</button>';
+  }
+  return actions;
+}
+
 function reqTableRow(r, kind){
-  var m = STATUS_META[r.status];
+  var m = STATUS_META[r.status] || STATUS_META.Received;
   var sub = kind==='doc' ? esc(r.docType) : esc(r.transferType)+' &middot; '+esc(r.tctNo);
   var applicantLabel = kind==='doc' ? 'Applicant / Document Type' : 'Applicant / Transfer Type';
-  return '<tr><td class="mono" data-label="Reference No.">'+r.id+'</td><td class="cell-name" data-label="'+applicantLabel+'">'+esc(r.applicant)+'<div class="cell-sub">'+sub+'</div></td>'
+  return '<tr><td class="mono" data-label="Reference No.">'+esc(r.id)+'</td><td class="cell-name" data-label="'+applicantLabel+'">'+esc(r.applicant)+'<div class="cell-sub">'+sub+'</div>'+processingStaffHtml(r)+processingTimerHtml(r)+'</td>'
     + '<td data-label="Barangay">'+esc(r.barangay)+'</td><td data-label="Date Submitted">'+fmtDate(r.submitted)+'</td>'
-    + '<td data-label="Status"><span class="badge '+m.cls+'">'+r.status+'</span></td>'
-    + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-'+kind+'-req" data-id="'+r.id+'">'+ic('eye','13px')+'Open</button></div></td></tr>';
+    + '<td data-label="Status"><span class="badge '+m.cls+'">'+esc(statusLabel(r.status))+'</span></td>'
+    + '<td class="actions-cell"><div class="actions-container">'+reqProcessingActions(r)+'<button class="icon-btn action-button" data-action="view-'+kind+'-req" data-id="'+esc(r.id)+'">'+ic('eye','13px')+'Open</button></div></td></tr>';
 }
 
 function renderDocRequests(acct){
@@ -1236,7 +1287,7 @@ function renderDocRequests(acct){
   + '<div class="page-head"><div><div class="breadcrumb">Assessor Staff</div><h1>Document Requests</h1><p>Review, check requirements, and update the status of submitted requests.</p></div></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docRequests)+'" data-input="search-doc"></div>'
-    + '<select data-input="filter-doc-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
+    + '<select data-input="filter-doc-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant / Document Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'doc'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('doc','30px')+'No document requests match your search.</div></td></tr>')
@@ -1255,7 +1306,7 @@ function renderLandRequests(acct){
   + '<div class="page-head"><div><div class="breadcrumb">Assessor Staff</div><h1>Land Transfer Requests</h1><p>Review documents, check requirements, and track land transfer transactions.</p></div></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.landRequests)+'" data-input="search-land"></div>'
-    + '<select data-input="filter-land-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
+    + '<select data-input="filter-land-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant / Transfer Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'land'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('swap','30px')+'No land transfer requests match your search.</div></td></tr>')
@@ -1326,7 +1377,8 @@ function renderProfile(acct){
         + '<div class="field"><label>Full Name</label><input name="fullName" type="text" value="'+esc(acct.fullName)+'" required></div>'
         + '<div class="field-row"><div class="field"><label>Email Address</label><input name="email" type="email" value="'+esc(acct.email)+'" required></div>'
         + contactNumberField(acct.contact)+'</div>'
-        + '<div class="field"><label>New Password (leave blank to keep current)</label><input name="password" type="text" placeholder="••••••••"></div>'
+        + '<div class="field"><label>Current Password (required to change password)</label><input name="current_password" type="password" autocomplete="current-password"></div>'
+        + '<div class="field"><label>New Password (leave blank to keep current)</label><input name="password" type="password" minlength="10" placeholder="••••••••" autocomplete="new-password"></div>'
         + '<button type="submit" class="btn btn-primary">'+ic('check','17px')+' Save Changes</button>'
       + '</form>'
     + '</div>'
@@ -1423,8 +1475,11 @@ function modalReportDetail(id){
   if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
   var s = r.stats;
   var rows = [];
+  var requestDetails = [];
   if(r.type==='document' || r.type==='land-transfer'){
-    rows = [['Total Requests', s.total], ['Completed', s.completed], ['Pending / In Progress', s.pending], ['Rejected', s.rejected]];
+    rows = [['Total Requests', s.total], ['Assigned to Staff', s.assigned], ['Awaiting Acceptance', s.unassigned], ['Completed', s.completed], ['Pending / In Progress', s.pending], ['Rejected', s.rejected], ['Timed Out', s.timedOut],
+      ['Completed With Recorded Duration', s.completedWithDuration], ['Average Processing Duration', s.averageDurationSeconds==null?'—':formatDuration(s.averageDurationSeconds)]];
+    requestDetails = s.requestDetails || [];
   } else if(r.type==='requirement'){
     rows = [['Total Checked', s.checked], ['Complete', s.complete], ['Incomplete', s.incomplete], ['Invalid', s.invalid]];
   } else {
@@ -1443,6 +1498,17 @@ function modalReportDetail(id){
         + metaRows.map(function(row){ return '<div class="review-row"><span class="k">'+row[0]+'</span><span class="v">'+row[1]+'</span></div>'; }).join('')
         + rows.map(function(row){ return '<div class="review-row"><span class="k">'+row[0]+'</span><span class="v">'+row[1]+'</span></div>'; }).join('')
       + '</div>'
+      + (requestDetails.length?'<div class="modal-section-title">'+ic('users','15px')+'Request Processor Accountability</div>'
+        + '<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Applicant</th><th>Status</th><th>Assigned Processor</th><th>Started</th><th>Completed</th><th>Duration</th></tr></thead><tbody>'
+        + requestDetails.map(function(item){
+          return '<tr><td class="mono" data-label="Reference">'+esc(item.reference)+'</td>'
+            + '<td data-label="Applicant">'+esc(item.applicant)+'</td>'
+            + '<td data-label="Status">'+esc(statusLabel(item.status))+'</td>'
+            + '<td data-label="Assigned Processor">'+(item.assignedProcessor?esc(item.assignedProcessor)+' (ID: '+esc(item.assignedProcessorId)+')':'Unassigned')+'</td>'
+            + '<td data-label="Started">'+(item.startedAt?fmtDateTime(item.startedAt):'—')+'</td>'
+            + '<td data-label="Completed">'+(item.completedAt?fmtDateTime(item.completedAt):'—')+'</td>'
+            + '<td class="mono" data-label="Duration">'+(item.durationSeconds==null?'—':formatDuration(item.durationSeconds))+'</td></tr>';
+        }).join('')+'</tbody></table></div>':'')
     + '</div>'
     + '<div class="modal-foot no-print"><button class="btn btn-outline" data-action="close-modal">Close</button><button class="btn btn-primary" data-action="print-report">'+ic('printIcon','16px')+' Print Report</button></div>';
 }
@@ -1466,23 +1532,47 @@ function modalReqDetail(id, kind){
     ? ('<div class="review-row"><span class="k">Document Type</span><span class="v">'+esc(r.docType)+'</span></div><div class="review-row"><span class="k">Purpose</span><span class="v">'+esc(r.purpose)+'</span></div>')
     : ('<div class="review-row"><span class="k">Transfer Type</span><span class="v">'+esc(r.transferType)+'</span></div><div class="review-row"><span class="k">TCT / OCT No.</span><span class="v mono">'+esc(r.tctNo)+'</span></div>');
   var historyHtml = '';
-  if(kind==='land' && r.history){
-    historyHtml = '<div class="modal-section-title">'+ic('timer','15px')+'Land Transfer Transaction History</div>'
-      + '<ul class="timeline">'+r.history.map(function(h){ return '<li><span class="t-dot"></span><div><div class="t-status">'+h.status+'</div><div class="t-when">'+fmtDateTime(h.when)+'</div></div></li>'; }).join('')+'</ul>';
+  if(r.history && r.history.length){
+    historyHtml = '<div class="modal-section-title">'+ic('timer','15px')+'Request History</div>'
+      + '<ul class="timeline">'+r.history.map(function(h){
+        return '<li><span class="t-dot"></span><div><div class="t-status">'+esc(h.message||statusLabel(h.status))+'</div><div class="t-when">'+fmtDateTime(h.when)+'</div></div></li>';
+      }).join('')+'</ul>';
   }
-  return '<div class="modal-head"><div><h3>'+r.id+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
+  var account = currentAccount();
+  var canProcess = account && account.role==='staff';
+  var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
+  var terminalStatus = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
+  var processingActionHtml = '';
+  if(canProcess && !r.processingStaffId && !terminalStatus){
+    processingActionHtml = '<button type="button" class="btn btn-primary" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','16px')+' Accept/Process Request</button>';
+  }
+  if(r.processingStartedAt){
+    processingActionHtml = processingTimerHtml(r, true);
+    if(canProcess && !r.processingStaffId && !terminalStatus){
+      processingActionHtml += ' <button type="button" class="btn btn-primary" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','16px')+' Accept/Process Request</button>';
+    } else if(isAssignedStaff && !r.processingCompletedAt && !terminalStatus){
+      processingActionHtml += '<button type="button" class="btn btn-primary" data-action="complete-processing" data-id="'+esc(r.id)+'">'+ic('check','16px')+' Complete Request</button>';
+    }
+  }
+  return '<div class="modal-head"><div><h3>'+esc(r.id)+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
     + '<div class="check-banner '+bannerCls+'">'+ic(res==='Complete'?'check':(res==='Incomplete'?'alert':'x'),'18px')+'<span>Requirement Checker result: <b>'+res+'</b> — '+missingCount(r.checklist)+' item(s) missing.</span></div>'
-    + '<div class="review-card">'+subInfo+'<div class="review-row"><span class="k">Date Submitted</span><span class="v">'+fmtDateTime(r.submitted)+'</span></div><div class="review-row"><span class="k">Current Status</span><span class="v"><span class="badge '+STATUS_META[r.status].cls+'">'+r.status+'</span></span></div></div>'
+    + '<div class="review-card">'+subInfo+'<div class="review-row"><span class="k">Date Submitted</span><span class="v">'+fmtDateTime(r.submitted)+'</span></div><div class="review-row"><span class="k">Current Status</span><span class="v"><span class="badge '+(STATUS_META[r.status]||STATUS_META.Received).cls+'">'+esc(statusLabel(r.status))+'</span></span></div>'
+    + (r.processingStartedAt?'<div class="review-row"><span class="k">Processing Started</span><span class="v">'+fmtDateTime(r.processingStartedAt)+'</span></div>':'')
+    + (r.processingCompletedAt?'<div class="review-row"><span class="k">Processing Completed</span><span class="v">'+fmtDateTime(r.processingCompletedAt)+'</span></div>':'')
+    + '<div class="review-row"><span class="k">Assigned Processor</span><span class="v">'+(r.processingStaffId?esc(r.processingStaffName||'Staff account #'+r.processingStaffId)+' <span class="cell-sub">(Staff ID: '+esc(r.processingStaffId)+')</span>':'Unassigned')+'</span></div>'
+    + (r.processingDurationSeconds!=null?'<div class="review-row"><span class="k">Final Processing Duration</span><span class="v mono">'+formatDuration(r.processingDurationSeconds)+'</span></div>':'')
+    + (processingActionHtml?'<div class="review-row"><span class="k">Processing Time</span><span class="v">'+processingActionHtml+'</span></div>':'')
+    + '</div>'
     + '<div class="modal-section-title">'+ic('checklistIcon','15px')+'Requirement Checklist'+'</div>'
     + checklistHtml(r.checklist)
     + historyHtml
-    + '<div class="modal-section-title">'+ic('edit','15px')+'Update Status</div>'
+    + (isAssignedStaff?'<div class="modal-section-title">'+ic('edit','15px')+'Update Status</div>'
     + '<form data-form="update-status" data-kind="'+kind+'" data-id="'+r.id+'">'
       + '<div class="field-row" style="align-items:end;">'
-        + '<div class="field" style="margin-bottom:0;"><select name="status">'+STATUS_ORDER.map(function(s){ return '<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+s+'</option>'; }).join('')+'</select></div>'
+        + '<div class="field" style="margin-bottom:0;"><select name="status">'+STATUS_ORDER.map(function(s){ return '<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+statusLabel(s)+'</option>'; }).join('')+'</select></div>'
         + '<button type="submit" class="btn btn-primary" style="margin-bottom:0;">'+ic('check','16px')+' Update Status</button>'
       + '</div>'
-    + '</form>'
+    + '</form>':'')
     + '<div class="action-row">'
       + '<button class="action-btn info" data-action="nav-notify" data-ref="'+r.id+'">'+ic('sms','14px')+' Send Notification</button>'
       + '<button class="action-btn" data-action="close-modal">Close</button>'
@@ -2235,6 +2325,8 @@ function bindEvents(){
 /* ---------------- Init ---------------- */
 function init(){
   render();
+  updateProcessingTimers();
+  setInterval(updateProcessingTimers, 1000);
   // Passive check so a Scheduled announcement still goes live on its own
   // even if the head leaves this tab idle on some other screen.
   setInterval(function(){ if(publishDueAnnouncements()) render(); }, 15000);
