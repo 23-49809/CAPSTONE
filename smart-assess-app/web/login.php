@@ -40,7 +40,6 @@ require __DIR__ . '/includes/client_header.php';
       <div class="field"><label>Password</label><input type="password" name="password"></div>
       <button type="submit" class="btn btn-primary" style="width:100%"><?= icon_span('login') ?> Log In</button>
     </form>
-    <div class="login-note">Demo account: <span class="mono">r.villareal@example.com</span> &middot; password <strong>Passw0rd!</strong></div>
     <a class="login-back" href="/register.php">Don't have an account? Create one</a>
     <a class="login-back" href="/client/track-request.php">Or track a request without logging in &rarr;</a>
   </div>
