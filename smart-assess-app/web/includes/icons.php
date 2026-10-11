@@ -70,11 +70,3 @@ function icon_span(string $name, string $size = '17px'): string
     return '<span style="display:inline-flex;width:' . $size . ';height:' . $size . ';vertical-align:-3px">'
         . icon($name) . '</span>';
 }
-
-function brand_mark(): string
-{
-    return '<svg class="brand-mark" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="var(--brand-700)"/>'
-        . '<circle cx="20" cy="20" r="18" fill="none" stroke="var(--mark-accent)" stroke-width="1.4"/>'
-        . '<circle cx="20" cy="20" r="13" fill="none" stroke="var(--mark-accent)" stroke-width="1"/>'
-        . '<path d="M20 11l2.3 5.2 5.7.5-4.3 3.8 1.3 5.6-4.9-3-4.9 3 1.3-5.6-4.3-3.8 5.7-.5z" fill="var(--mark-accent)"/></svg>';
-}

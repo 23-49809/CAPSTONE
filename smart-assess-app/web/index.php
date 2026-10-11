@@ -12,19 +12,13 @@ require __DIR__ . '/includes/client_header.php';
 <section class="hero hero-slider" data-hero-slider aria-label="Assessor Office updates">
   <div class="hero-slides">
     <article class="hero-slide is-active"><div class="wrap"><div class="hero-inner hero-slide-copy">
-      <span class="eyebrow">Public Service Guide</span><h1>Document Request</h1>
-      <p>Prepare the required documents before submitting your request.</p>
-      <p class="hero-requirements">Valid government-issued ID, completed request details, and property or authorization documents when applicable.</p>
-      <button class="btn btn-hero" type="button" data-requirements="document">View Requirements <?= icon_span('arrowRight') ?></button>
-    </div></div></article>
-    <article class="hero-slide"><div class="wrap"><div class="hero-inner hero-slide-copy">
-      <span class="eyebrow">Property Transaction Guide</span><h1>Land Transfer</h1>
-      <p>Make sure you have all required documents before processing your land transfer.</p>
-      <p class="hero-requirements">Certified title or tax declaration, notarized deed, vicinity map, certifications, tax clearance, and valid ID.</p>
-      <button class="btn btn-hero" type="button" data-requirements="land">View Requirements <?= icon_span('arrowRight') ?></button>
+      <span class="eyebrow">Mabini Municipal Assessor&rsquo;s Office</span><h1>Welcome to SMART ASSESS</h1>
+      <p><em>Your Digital Gateway to Assessor Services</em></p>
+      <p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p>
+      <a class="btn btn-hero" href="#services">Explore Services <?= icon_span('arrowRight') ?></a>
     </div></div></article>
     <article class="hero-slide<?= !$announcements ? ' no-announcement' : '' ?>"><div class="wrap"><div class="hero-inner hero-slide-copy">
-      <span class="eyebrow">Important Notice</span><h1>Office Announcement</h1>
+      <span class="eyebrow">Announcements</span><h1>Announcements</h1>
       <?php if ($announcements): foreach ($announcements as $announcement): ?>
         <div class="hero-announcement"><h2><?= esc($announcement['title']) ?></h2><p><?= esc($announcement['body']) ?></p><time datetime="<?= esc($announcement['start_date']) ?>">Posted <?= esc(fmt_date($announcement['start_date'])) ?></time></div>
       <?php endforeach; ?><a class="btn btn-hero" href="/announcement.php">View Announcement <?= icon_span('arrowRight') ?></a><?php else: ?><p>No current announcements.</p><?php endif; ?>
@@ -32,7 +26,7 @@ require __DIR__ . '/includes/client_header.php';
   </div>
   <button class="hero-slider-control prev" type="button" data-slider-prev aria-label="Previous slide"><?= icon_span('arrowLeft') ?></button>
   <button class="hero-slider-control next" type="button" data-slider-next aria-label="Next slide"><?= icon_span('arrowRight') ?></button>
-  <div class="hero-slider-dots" role="tablist" aria-label="Hero slides"><button class="is-active" type="button" data-slide-to="0" aria-label="Document request slide"></button><button type="button" data-slide-to="1" aria-label="Land transfer slide"></button><button type="button" data-slide-to="2" aria-label="Announcement slide"></button></div>
+  <div class="hero-slider-dots" role="tablist" aria-label="Hero slides"><button class="is-active" type="button" data-slide-to="0" aria-label="Welcome to SMART ASSESS slide"></button><button type="button" data-slide-to="1" aria-label="Announcements slide"></button></div>
 </section>
 
 <section class="requirements-strip" aria-label="General requirements">
@@ -48,11 +42,17 @@ require __DIR__ . '/includes/client_header.php';
     <div class="service-card"><div class="chip-icon"><?= icon('doc') ?></div>
       <h3>Start Document Request</h3>
       <p>Request for Certified True Copies of Tax Declarations, Certifications of Land Holdings, and more.</p>
-      <a class="btn-link" href="/client/document-request.php">Begin Application <?= icon_span('arrowRight','15px') ?></a></div>
+      <div class="service-actions">
+        <a class="btn-link" href="/client/document-request.php">Begin Application <?= icon_span('arrowRight','15px') ?></a>
+        <button class="btn-link" type="button" data-requirements="document">View Requirements <?= icon_span('arrowRight','15px') ?></button>
+      </div></div>
     <div class="service-card"><div class="chip-icon"><?= icon('swap') ?></div>
       <h3>Land Transfer</h3>
       <p>Submit requirements for property transfer, consolidation, or subdivision of land records.</p>
-      <a class="btn-link" href="/client/land-transfer.php">Land Transfer <?= icon_span('arrowRight','15px') ?></a></div>
+      <div class="service-actions">
+        <a class="btn-link" href="/client/land-transfer.php">Begin Land Transfer <?= icon_span('arrowRight','15px') ?></a>
+        <button class="btn-link" type="button" data-requirements="land">View Requirements <?= icon_span('arrowRight','15px') ?></button>
+      </div></div>
   </div>
 </div></section>
 
