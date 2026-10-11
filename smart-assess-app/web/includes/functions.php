@@ -338,7 +338,7 @@ function validate_property_common(array $p, bool $requiresPurpose = true, bool $
     if ($arp === '') $errors['arp_number'] = 'ARP / Tax Declaration number is required.';
     elseif (!preg_match('/^14-\d{4}-\d{5}$/', $arp)) $errors['arp_number'] = 'ARP / Tax Declaration number must be in the format 14-XXXX-XXXXX.';
     if ($requiresPropertyAddress && trim($p['property_address'] ?? '') === '') $errors['property_address'] = 'Property address is required.';
-    if (trim($p['barangay'] ?? '') === '') $errors['barangay'] = 'Barangay is required.';
+    if (!in_array($p['barangay'] ?? '', BARANGAYS, true)) $errors['barangay'] = 'Please select a barangay.';
     return $errors;
 }
 
