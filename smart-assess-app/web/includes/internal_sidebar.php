@@ -10,39 +10,44 @@
  * labels, not two separate pages). "Time Stamp Tracking" is intentionally
  * repointed at the existing overdue-request filter rather than a staff
  * attendance clock in/out feature, which this port does not build.
+ *
+ * 4th tuple element = eligible for "active" highlighting. Without this,
+ * "Staff Accounts" / "Create Account" (an anchor into the same page) /
+ * "Staff Information" all resolve to the same script path and would all
+ * light up simultaneously — only one item should ever look active.
  */
 $__navItems = match ($user['role'] ?? null) {
     'admin' => [
-        ['/admin/dashboard.php', 'Dashboard', 'grid'],
-        ['/admin/users.php', 'Staff Accounts', 'users'],
-        ['/admin/archived-users.php', 'Archived Accounts', 'archive'],
-        ['/admin/users.php#create-account', 'Create Account', 'userPlus'],
-        ['/admin/users.php', 'Staff Information', 'idCard'],
-        ['/admin/profile.php', 'Profile', 'user'],
+        ['/admin/dashboard.php', 'Dashboard', 'grid', true],
+        ['/admin/users.php', 'Staff Accounts', 'users', true],
+        ['/admin/archived-users.php', 'Archived Accounts', 'archive', true],
+        ['/admin/users.php#create-account', 'Create Account', 'userPlus', false],
+        ['/admin/users.php', 'Staff Information', 'idCard', false],
+        ['/admin/profile.php', 'Profile', 'user', true],
     ],
     'head' => [
-        ['/department-head/dashboard.php', 'Dashboard', 'grid'],
-        ['/department-head/announcements.php', 'Announcements', 'megaphone'],
-        ['/department-head/reports.php', 'Generated Reports', 'fileBar'],
-        ['/department-head/profile.php', 'Profile', 'user'],
+        ['/department-head/dashboard.php', 'Dashboard', 'grid', true],
+        ['/department-head/announcements.php', 'Announcements', 'megaphone', true],
+        ['/department-head/reports.php', 'Generated Reports', 'fileBar', true],
+        ['/department-head/profile.php', 'Profile', 'user', true],
     ],
     'staff' => [
-        ['/staff/dashboard.php', 'Dashboard', 'grid'],
-        ['/staff/requests.php?status=overdue', 'Time Stamp Tracking', 'timer'],
-        ['/staff/document-requests.php', 'Document Requests', 'doc'],
-        ['/staff/land-transfers.php', 'Land Transfer Requests', 'swap'],
-        ['/staff/ai-checker.php', 'Requirement Checking Results', 'checklist'],
-        ['/staff/notifications.php', 'Notifications', 'sms'],
-        ['/staff/profile.php', 'Profile', 'user'],
+        ['/staff/dashboard.php', 'Dashboard', 'grid', true],
+        ['/staff/requests.php?status=overdue', 'Time Stamp Tracking', 'timer', true],
+        ['/staff/document-requests.php', 'Document Requests', 'doc', true],
+        ['/staff/land-transfers.php', 'Land Transfer Requests', 'swap', true],
+        ['/staff/ai-checker.php', 'Requirement Checking Results', 'checklist', true],
+        ['/staff/notifications.php', 'Notifications', 'sms', true],
+        ['/staff/profile.php', 'Profile', 'user', true],
     ],
     default => [],
 };
 $__currentScript = $_SERVER['SCRIPT_NAME'] ?? '';
 ?>
 <nav>
-<?php foreach ($__navItems as [$href, $label, $icon]):
+<?php foreach ($__navItems as [$href, $label, $icon, $trackActive]):
     $hrefPath = strtok($href, '#?');
-    $isActive = $hrefPath === $__currentScript;
+    $isActive = $trackActive && $hrefPath === $__currentScript;
 ?>
   <a class="side-link<?= $isActive ? ' active' : '' ?>" href="<?= esc($href) ?>"><?= icon_span($icon, '18px') ?><span><?= esc($label) ?></span></a>
 <?php endforeach; ?>

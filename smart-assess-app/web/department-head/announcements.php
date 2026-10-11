@@ -137,9 +137,9 @@ require __DIR__ . '/../includes/internal_header.php';
 ?>
 <div class="dash-shell">
   <div class="dash-top"><div class="wrap"><h1>Announcements</h1><p>Send office-wide notices to the Client Interface, the Staff Interface, or both.</p></div></div>
-  <div class="wrap" style="max-width:720px">
+  <div class="wrap">
     <?php if ($flash): ?><div class="flash <?= esc($flashType) ?>"><?= esc($flash) ?></div><?php endif; ?>
-    <form method="post" class="compose-form">
+    <form method="post" class="compose-form" style="max-width:720px">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="save">
       <input type="hidden" name="id" value="<?= $editingAnnouncement ? (int) $editingAnnouncement['id'] : 0 ?>">
