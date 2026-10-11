@@ -23,7 +23,7 @@ $client = current_client();
 </head>
 <body>
 <header class="site-header"><div class="wrap">
-  <a class="brand" href="/index.php"><?= brand_mark() ?><span class="brand-name">Mabini Assessor Office</span></a>
+  <a class="brand" href="/index.php"><img class="brand-mark" src="/assets/seal.png" alt="Bayan ng Mabini seal"><span class="brand-name">Smart Assess</span></a>
   <div class="header-actions">
     <a class="btn btn-ghost" href="/client/track-request.php"><?= icon_span('search') ?> Track Request</a>
     <?php if ($client): ?>
