@@ -6,6 +6,7 @@ ai_checker/**/*.pyc
 # PHP / uploads
 web/uploads/*
 !web/uploads/.gitkeep
+/private_uploads/
 
 # OS
 .DS_Store
