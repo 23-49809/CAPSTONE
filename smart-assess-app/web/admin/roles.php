@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../auth/auth.php';
 $me = require_role(['admin']);
 
 $roles = db()->query('SELECT * FROM roles ORDER BY id')->fetchAll();
@@ -11,7 +11,7 @@ foreach (db()->query('SELECT role_id, COUNT(*) n FROM users GROUP BY role_id') a
 }
 // Pulled live from permissions/role_permissions — not a hardcoded string —
 // so this page reflects the actual data-backed grant, not prose that could
-// drift from it. See includes/auth.php's user_can() for the runtime check.
+// drift from it. See auth/auth.php's user_can() for the runtime check.
 $permissionsByRole = [];
 foreach (db()->query(
     "SELECT rp.role_id, p.description FROM role_permissions rp

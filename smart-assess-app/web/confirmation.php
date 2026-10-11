@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/client_auth.php';
+require_once __DIR__ . '/auth/client_auth.php';
 
 mark_overdue_requests(db());
 

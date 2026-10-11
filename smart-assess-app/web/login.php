@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/client_auth.php';
+require_once __DIR__ . '/auth/client_auth.php';
 
 // Client login NEVER redirects anywhere but the client dashboard — there is
 // no role selector here, and this file never touches the `users` table.

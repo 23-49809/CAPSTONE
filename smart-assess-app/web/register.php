@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/client_auth.php';
+require_once __DIR__ . '/auth/client_auth.php';
 
 if (current_client()) {
     header('Location: /client/dashboard.php');

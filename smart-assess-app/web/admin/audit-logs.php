@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../auth/auth.php';
 $me = require_role(['admin']);
 
 $actorFilter = in_array($_GET['actor'] ?? '', ['client', 'staff', 'admin', 'head', 'system'], true) ? $_GET['actor'] : '';

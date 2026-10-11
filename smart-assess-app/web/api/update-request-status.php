@@ -1,5 +1,11 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+/**
+ * Dedicated handler for staff request-status updates. No view of its own —
+ * POST-only, CSRF-checked, role-checked, then redirects back to the request
+ * detail page. Moved here verbatim from staff/update_status.php as part of
+ * the architecture rebuild; logic unchanged.
+ */
+require_once __DIR__ . '/../auth/auth.php';
 $me = require_role(['staff']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check()) {
