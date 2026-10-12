@@ -1,5 +1,12 @@
 {
-    "require": {
-        "google/apiclient": "^2.15"
-    }
+    "name": "smart-assess/app",
+    "description": "SMART ASSESS application",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Jyeana",
+            "email": "jyeanamauhay@gmail.com"
+        }
+    ],
+    "require": {}
 }
