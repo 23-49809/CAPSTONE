@@ -159,6 +159,17 @@
   table{ width:100%; border-collapse:collapse; table-layout:fixed; min-width:0; }
   .table-wrap table.has-actions{ min-width:0; }
   .table-wrap table.has-actions th.actions-cell, .table-wrap table.has-actions td.actions-cell{ width:420px; min-width:420px; }
+  .table-wrap table.staff-request-table{ table-layout:fixed; }
+  .staff-request-table col.request-reference-col{ width:13%; }
+  .staff-request-table col.request-applicant-col{ width:23%; }
+  .staff-request-table col.request-barangay-col{ width:12%; }
+  .staff-request-table col.request-date-col{ width:14%; }
+  .staff-request-table col.request-status-col{ width:13%; }
+  .staff-request-table col.request-actions-col{ width:25%; }
+  .staff-request-table th{ white-space:normal; overflow-wrap:anywhere; vertical-align:bottom; line-height:1.35; }
+  .table-wrap table.has-actions.staff-request-table th.actions-cell,
+  .table-wrap table.has-actions.staff-request-table td.actions-cell{ width:auto; min-width:0; }
+  .staff-request-table .actions-container{ flex-wrap:wrap; }
   .table-wrap table td:not([colspan]):not(.actions-cell){ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .table-wrap table td.cell-name, .table-wrap table td .cell-sub{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   thead th{ text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); padding:13px 16px; border-bottom:1px solid var(--line); white-space:nowrap; }
@@ -1289,7 +1300,7 @@ function renderDocRequests(acct){
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docRequests)+'" data-input="search-doc"></div>'
     + '<select data-input="filter-doc-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
   + '</div>'
-  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant / Document Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="has-actions staff-request-table"><colgroup><col class="request-reference-col"><col class="request-applicant-col"><col class="request-barangay-col"><col class="request-date-col"><col class="request-status-col"><col class="request-actions-col"></colgroup><thead><tr><th>Reference No.</th><th>Applicant / Document Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'doc'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('doc','30px')+'No document requests match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('docRequests', pg)+'</div>';
 }
@@ -1308,7 +1319,7 @@ function renderLandRequests(acct){
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.landRequests)+'" data-input="search-land"></div>'
     + '<select data-input="filter-land-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
   + '</div>'
-  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Reference No.</th><th>Applicant / Transfer Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="has-actions staff-request-table"><colgroup><col class="request-reference-col"><col class="request-applicant-col"><col class="request-barangay-col"><col class="request-date-col"><col class="request-status-col"><col class="request-actions-col"></colgroup><thead><tr><th>Reference No.</th><th>Applicant / Transfer Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'land'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('swap','30px')+'No land transfer requests match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('landRequests', pg)+'</div>';
 }
