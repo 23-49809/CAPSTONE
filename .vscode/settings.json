@@ -13,7 +13,7 @@
             "name": "SMART ASSESS",
             "database": "smart_assess",
             "username": "root",
-            "askForPassword": true
+            "password": "assessor"
         }
     ]
 }
