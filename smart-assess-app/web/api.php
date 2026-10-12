@@ -596,6 +596,25 @@ function sa_submit_request(array $data): array
             ]);
         }
         $pdo->commit();
+
+        // Send confirmation after the database transaction succeeds.
+        // Email failures must not invalidate a saved request.
+        try {
+            $sendConfirmation = require dirname(__DIR__) . '/gmail-mailer.php';
+            $sendConfirmation([
+                'email' => $values['email'],
+                'first_name' => $values['first_name'],
+                'last_name' => $values['last_name'],
+                'flow' => $flow,
+                'reference_no' => $reference,
+            ]);
+        } catch (Throwable $emailException) {
+            error_log(
+                '[SMART_ASSESS] Confirmation email failed for '
+                . $reference . ': ' . $emailException->getMessage()
+            );
+        }
+
         return ['reference_no' => $reference, 'status' => 'Received'];
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
