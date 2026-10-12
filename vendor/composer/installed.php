@@ -37,6 +37,15 @@
             'aliases' => array(),
             'dev_requirement' => false,
         ),
+        'google/apiclient-services' => array(
+            'pretty_version' => 'v0.463.0',
+            'version' => '0.463.0.0',
+            'reference' => '8d90378cf95bd7ed1b8a5e3b8a0985f3557a3756',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../google/apiclient-services',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'google/auth' => array(
             'pretty_version' => 'v1.55.1',
             'version' => '1.55.1.0',
