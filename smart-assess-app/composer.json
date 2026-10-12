@@ -8,5 +8,7 @@
             "email": "jyeanamauhay@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "google/apiclient": "^2.15"
+    }
 }

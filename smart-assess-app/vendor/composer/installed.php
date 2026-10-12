@@ -1,24 +1,15 @@
 <?php return array(
     'root' => array(
-        'name' => '__root__',
+        'name' => 'smart-assess/app',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'e478d967f6c4134809ef7c904640fbc7c69606c0',
-        'type' => 'library',
+        'reference' => '657c7559efcb5e2172f8833f4d4c6abc478d7461',
+        'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        '__root__' => array(
-            'pretty_version' => 'dev-main',
-            'version' => 'dev-main',
-            'reference' => 'e478d967f6c4134809ef7c904640fbc7c69606c0',
-            'type' => 'library',
-            'install_path' => __DIR__ . '/../../',
-            'aliases' => array(),
-            'dev_requirement' => false,
-        ),
         'firebase/php-jwt' => array(
             'pretty_version' => 'v7.2.1',
             'version' => '7.2.1.0',
@@ -159,6 +150,15 @@
             'provided' => array(
                 0 => '3.0.0',
             ),
+        ),
+        'smart-assess/app' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '657c7559efcb5e2172f8833f4d4c6abc478d7461',
+            'type' => 'project',
+            'install_path' => __DIR__ . '/../../',
+            'aliases' => array(),
+            'dev_requirement' => false,
         ),
         'symfony/polyfill-php80' => array(
             'pretty_version' => 'v1.43.0',
