@@ -5,7 +5,7 @@ final class IprogSmsService
 {
     private const ENDPOINT = 'https://www.iprogsms.com/api/v1/sms_messages';
 
-    public function __construct(private readonly string $apiToken)
+    private function __construct(private readonly string $apiToken)
     {
         if ($this->apiToken === '') {
             throw new RuntimeException('IPROG_API_TOKEN is not configured.');
