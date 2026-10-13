@@ -55,8 +55,8 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
 
     if ($portal === 'internal') {
         $html = str_replace(
-            '<style>',
-            '<style>' . "\n  @import url(\"/assets/internal-tables.css\");",
+            '</style>',
+            '</style>' . "\n<style>\n  @import url(\"/assets/internal-tables.css\");\n</style>",
             $html,
             $styleMatches
         );
