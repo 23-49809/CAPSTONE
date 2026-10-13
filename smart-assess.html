@@ -72,12 +72,14 @@
   @media (max-width:768px){ .wrap{ padding:0 20px; } }
 
   /* ============ Header ============ */
-  .site-header{ position:sticky; top:0; z-index:40; background:var(--surface); border-bottom:1px solid var(--line); }
+  .site-header{ position:sticky; top:0; z-index:40; background:var(--brand-900); border-bottom:1px solid rgba(255,255,255,.16); }
   .site-header .wrap{ display:flex; align-items:center; justify-content:space-between; min-height:88px; padding-top:12px; padding-bottom:12px; gap:16px; flex-wrap:wrap; }
   .brand{ display:flex; align-items:center; gap:14px; cursor:pointer; background:none; border:none; padding:0; }
   .brand-mark{ width:42px; height:42px; object-fit:contain; display:block; }
-  .brand-name{ font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--brand-700); letter-spacing:-.01em; }
+  .brand-name{ font-family:var(--font-display); font-weight:700; font-size:22px; color:#fff; letter-spacing:-.01em; }
   .header-actions{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .site-header .btn-ghost{ color:#fff; border-color:rgba(255,255,255,.65); }
+  .site-header .btn-ghost:hover{ background:rgba(255,255,255,.12); }
 
   /* ============ Buttons ============ */
   /* Two sizes only: primary/hero actions at 52-60px tall, the lighter
