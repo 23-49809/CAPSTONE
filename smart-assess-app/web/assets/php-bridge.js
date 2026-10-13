@@ -4,6 +4,7 @@
   var config = window.SMART_ASSESS_CONFIG || {};
   var selectedFiles = Object.create(null);
   var formValues = Object.create(null);
+  var internalRowActions = Object.create(null);
   var isOwner = true;
 
   window.SMART_ASSESS_SET_FILE = function (key, file) {
@@ -201,7 +202,7 @@
       return;
     }
 
-    var requestRow = event.target.closest('tr.request-clickable-row');
+    var requestRow = event.target.closest('tr.record-clickable-row');
     if (requestRow) {
       var rowControl = event.target.closest('a,button,input,select,textarea,label,[contenteditable="true"]');
       var rowAction = event.target.closest('[data-action]');
@@ -214,7 +215,11 @@
     var internalAction = event.target.closest('[data-action]');
     if (!internalAction) return;
     var actionName = internalAction.getAttribute('data-action');
-    if (actionName === 'logout') {
+    if (actionName === 'view-archived-staff') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openArchivedAccountDetails(internalAction.getAttribute('data-id'));
+    } else if (actionName === 'logout') {
       event.preventDefault();
       event.stopImmediatePropagation();
       internalSuccess('internal_logout', {});
@@ -255,49 +260,199 @@
     }
   }, true);
 
-  function enhanceInternalRequestRows(root) {
+  function rowActionDetails(actionCell) {
+    var actions = Array.prototype.slice.call(actionCell.querySelectorAll('[data-action]')).map(function (control) {
+      return {
+        action: control.getAttribute('data-action'),
+        id: control.getAttribute('data-id') || '',
+        label: (control.textContent || '').trim()
+      };
+    });
+    var names = actions.map(function (item) { return item.action; });
+    var detailAction = null;
+    if (names.indexOf('view-doc-req') !== -1) detailAction = 'view-doc-req';
+    else if (names.indexOf('view-land-req') !== -1) detailAction = 'view-land-req';
+    else if (names.indexOf('view-staff') !== -1) detailAction = 'view-staff';
+    else if (names.indexOf('restore-staff') !== -1 || names.indexOf('delete-archived-staff') !== -1) detailAction = 'view-archived-staff';
+    else if (names.indexOf('view-report') !== -1) detailAction = 'view-report';
+    else if (names.indexOf('view-req-result') !== -1) detailAction = 'view-req-result';
+    else if (names.indexOf('edit-ann') !== -1) detailAction = 'edit-ann';
+    if (!detailAction) return null;
+
+    var detail = actions.find(function (item) { return item.action === detailAction; });
+    if (detailAction === 'view-archived-staff') {
+      detail = actions.find(function (item) { return item.action === 'restore-staff' || item.action === 'delete-archived-staff'; });
+    }
+    if (!detail) return null;
+    return { action: detailAction, id: detail.id, controls: actions };
+  }
+
+  function openArchivedAccountDetails(id) {
+    var row = document.querySelector('.table-wrap tr.record-clickable-row[data-action="view-archived-staff"][data-id="' + CSS.escape(id) + '"]');
+    if (!row || !internalApp) return;
+    var existing = internalApp.querySelector('[data-archived-account-detail]');
+    if (existing) existing.remove();
+
+    var details = rowActionDetails(row.querySelector('.actions-cell'));
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.setAttribute('data-action', 'close-modal');
+    overlay.setAttribute('data-archived-account-detail', '');
+    var modal = document.createElement('div');
+    modal.className = 'modal fade-in';
+    var head = document.createElement('div');
+    head.className = 'modal-head';
+    var heading = document.createElement('h3');
+    heading.textContent = row.querySelector('[data-label="Full Name"]')?.textContent.trim() || row.cells[0]?.textContent.trim() || 'Archived Account';
+    head.appendChild(heading);
+    var close = document.createElement('button');
+    close.className = 'modal-close';
+    close.type = 'button';
+    close.setAttribute('data-action', 'close-modal');
+    close.setAttribute('aria-label', 'Close');
+    close.textContent = '×';
+    head.appendChild(close);
+    modal.appendChild(head);
+
+    var card = document.createElement('div');
+    card.className = 'review-card';
+    Array.prototype.slice.call(row.cells).forEach(function (cell) {
+      if (cell.classList.contains('actions-cell')) return;
+      var item = document.createElement('div');
+      item.className = 'review-row';
+      var label = document.createElement('span');
+      label.className = 'k';
+      label.textContent = cell.getAttribute('data-label') || '';
+      var value = document.createElement('span');
+      value.className = 'v';
+      value.textContent = cell.textContent.trim();
+      item.appendChild(label);
+      item.appendChild(value);
+      card.appendChild(item);
+    });
+    modal.appendChild(card);
+
+    var footer = document.createElement('div');
+    footer.className = 'modal-foot';
+    (details ? details.controls : []).forEach(function (control) {
+      if (control.action !== 'restore-staff' && control.action !== 'delete-archived-staff') return;
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = control.action === 'delete-archived-staff' ? 'btn btn-outline danger' : 'btn btn-primary';
+      button.setAttribute('data-action', control.action);
+      button.setAttribute('data-id', id);
+      button.textContent = control.label;
+      footer.appendChild(button);
+    });
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    internalApp.appendChild(overlay);
+  }
+
+  function enhanceInternalDetails(root) {
+    root.querySelectorAll('.modal').forEach(function (modal) {
+      if (modal.dataset.rowActionsEnhanced === 'true') return;
+      var staffHeading = modal.querySelector('.modal-head p');
+      var editStaff = modal.querySelector('.modal-foot [data-action="edit-staff"]');
+      if (staffHeading && staffHeading.textContent.trim() === 'Staff Information' && editStaff) {
+        var staffId = editStaff.getAttribute('data-id');
+        var staffActions = internalRowActions['view-staff:' + staffId] || [];
+        var footer = modal.querySelector('.modal-foot');
+        staffActions.forEach(function (control) {
+          if (control.action !== 'toggle-staff-status' && control.action !== 'archive-staff') return;
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'btn btn-outline';
+          button.setAttribute('data-action', control.action);
+          button.setAttribute('data-id', staffId);
+          button.textContent = control.label;
+          footer.insertBefore(button, editStaff);
+        });
+        modal.dataset.rowActionsEnhanced = 'true';
+        return;
+      }
+
+      var announcementForm = modal.querySelector('form[data-form="save-ann"]');
+      if (announcementForm) {
+        var announcementId = announcementForm.getAttribute('data-id');
+        var announcementActions = internalRowActions['edit-ann:' + announcementId] || [];
+        var announcementFooter = announcementForm.querySelector('.modal-foot');
+        announcementActions.forEach(function (control) {
+          if (control.action === 'edit-ann') return;
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.className = control.action === 'delete-ann' ? 'btn btn-outline danger' : 'btn btn-outline';
+          button.setAttribute('data-action', control.action);
+          button.setAttribute('data-id', announcementId);
+          button.textContent = control.label;
+          announcementFooter.insertBefore(button, announcementFooter.firstChild);
+        });
+        modal.dataset.rowActionsEnhanced = 'true';
+      }
+    });
+  }
+
+  function enhanceInternalTables(root) {
     if (config.portal !== 'internal') return;
 
-    root.querySelectorAll('.table-wrap table.staff-request-table tbody tr').forEach(function (row) {
-      if (row.dataset.requestRowEnhanced === 'true') return;
-      var detailsButton = row.querySelector('[data-action="view-doc-req"],[data-action="view-land-req"]');
-      if (!detailsButton) return;
+    root.querySelectorAll('.table-wrap table').forEach(function (table) {
+      if (table.dataset.actionsColumnRemoved === 'true') return;
+      var headerRow = table.querySelector('thead tr');
+      if (!headerRow) return;
+      var headers = Array.prototype.slice.call(headerRow.children);
+      var actionsIndex = headers.findIndex(function (header) {
+        return header.classList.contains('actions-cell') || header.textContent.trim().toLowerCase() === 'actions';
+      });
+      if (actionsIndex === -1) return;
 
-      var detailAction = detailsButton.getAttribute('data-action');
-      var requestId = detailsButton.getAttribute('data-id');
-      row.dataset.requestRowEnhanced = 'true';
-      row.dataset.requestClickable = 'true';
-      row.classList.add('request-clickable-row');
-      row.setAttribute('data-action', detailAction);
-      row.setAttribute('data-id', requestId);
-      row.setAttribute('tabindex', '0');
-      row.setAttribute('aria-label', 'Open request details for ' + requestId);
-      row.setAttribute('aria-keyshortcuts', 'Enter Space');
-
-      var referenceCell = row.querySelector('td[data-label="Reference No."]');
-      if (referenceCell) referenceCell.classList.add('request-reference-cell');
-
-      detailsButton.remove();
-      row.querySelectorAll('[data-action="start-processing"]').forEach(function (button) {
-        button.remove();
+      var header = headers[actionsIndex];
+      var labels = headers.map(function (cell) { return cell.textContent.trim(); });
+      Array.prototype.slice.call(table.querySelectorAll('tbody tr')).forEach(function (row) {
+        var cells = Array.prototype.slice.call(row.children);
+        var actionCell = cells[actionsIndex];
+        if (actionCell && actionCell.tagName === 'TD' && !actionCell.hasAttribute('colspan')) {
+          var detail = rowActionDetails(actionCell);
+          if (detail) {
+            var actionKey = detail.action + ':' + detail.id;
+            internalRowActions[actionKey] = detail.controls;
+            row.classList.add('record-clickable-row');
+            if (detail.action === 'view-doc-req' || detail.action === 'view-land-req') row.classList.add('request-clickable-row');
+            row.setAttribute('data-action', detail.action);
+            row.setAttribute('data-id', detail.id);
+            row.setAttribute('tabindex', '0');
+            row.setAttribute('aria-label', 'Open ' + (labels[0] || 'record') + ' details for ' + detail.id);
+            row.setAttribute('aria-keyshortcuts', 'Enter Space');
+            row.dataset.rowActionsEnhanced = 'true';
+            row.addEventListener('keydown', function (event) {
+              if (event.target !== row || (event.key !== 'Enter' && event.key !== ' ')) return;
+              event.preventDefault();
+              row.click();
+            });
+          }
+          actionCell.remove();
+        } else if (actionCell && actionCell.tagName === 'TD' && actionCell.hasAttribute('colspan')) {
+          var oldSpan = Number(actionCell.getAttribute('colspan'));
+          if (oldSpan > 1) actionCell.setAttribute('colspan', String(oldSpan - 1));
+        }
       });
 
-      row.addEventListener('keydown', function (event) {
-        if (event.target !== row || (event.key !== 'Enter' && event.key !== ' ')) return;
-        event.preventDefault();
-        row.click();
-      });
+      header.remove();
+      var colgroup = table.querySelector('colgroup');
+      if (colgroup && colgroup.children[actionsIndex]) colgroup.children[actionsIndex].remove();
+      table.classList.remove('has-actions');
+      table.dataset.actionsColumnRemoved = 'true';
     });
+    enhanceInternalDetails(root);
   }
 
   if (config.portal === 'internal') {
     var internalApp = document.getElementById('app');
     if (internalApp) {
-      var requestRowsObserver = new MutationObserver(function () {
-        enhanceInternalRequestRows(internalApp);
+      var internalRowsObserver = new MutationObserver(function () {
+        enhanceInternalTables(internalApp);
       });
-      requestRowsObserver.observe(internalApp, { childList: true, subtree: true });
-      enhanceInternalRequestRows(internalApp);
+      internalRowsObserver.observe(internalApp, { childList: true, subtree: true });
+      enhanceInternalTables(internalApp);
     }
   }
 
