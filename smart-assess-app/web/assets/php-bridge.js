@@ -51,10 +51,15 @@
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(data)
     }).then(function (response) {
-      return response.json().then(function (body) {
+      return response.json().catch(function () {
+        // A non-JSON reply means the server failed before answering properly.
+        throw new Error('The server could not process this request (HTTP ' + response.status + '). Please try again; if it keeps happening, contact the system administrator.');
+      }).then(function (body) {
         if (!response.ok || !body.ok) throw new Error(body.error || 'The request could not be completed.');
         return body;
       });
+    }, function () {
+      throw new Error('Could not reach the server. Check your connection and try again.');
     });
   }
 
@@ -662,8 +667,10 @@
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (type === 'edit-staff' || type === 'update-status') {
+    if (type === 'edit-staff' || type === 'update-status' || type === 'save-ann') {
+      // save-ann: without the id an edit was saved as a brand-new announcement.
       data.id = form.getAttribute('data-id') || '';
+      if (type === 'save-ann' && !data.id) delete data.id;
     }
     if (type === 'update-status') {
       data.kind = form.getAttribute('data-kind') || '';
