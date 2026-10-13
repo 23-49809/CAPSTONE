@@ -1213,26 +1213,16 @@ function sa_filipino_system_prompt(bool $isNotification): string
         "MGA PATAKARAN:\n" .
         "1. Isulat ang buong mensahe sa simple, natural, at magalang na Filipino (Tagalog) na madaling maintindihan ng matatanda.\n" .
         "2. Magsimula sa \"Magandang araw po.\" Gumamit ng \"po\". Gamitin ang \"Mangyaring\" kapag may hinihiling na gawin. Magtapos sa \"Maraming salamat po.\"\n" .
-        "3. Sabihin LAMANG ang mga impormasyong ibinigay. Huwag magdagdag ng bagong impormasyon, dahilan, paumanhin, araw (tulad ng bukas o Lunes), o utos na hindi nakasulat.\n" .
+        "3. Sabihin LAMANG ang mga impormasyong ibinigay. Huwag magdagdag ng bagong impormasyon, dahilan, paumanhin, araw o petsa (tulad ng "bukas" o "Lunes"), oras, o utos (tulad ng "magdala ng ID") na hindi nakasulat sa impormasyon.\n" .
         "3a. Ang paksa at detalye ay mga tala na maaaring nasa Ingles. ISALIN ang kahulugan nito sa Filipino. HUWAG kopyahin ang mga pangungusap o label na Ingles (tulad ng \"Request type:\" o \"Current status:\").\n" .
         "4. Kopyahin nang eksakto ang mga pangalan, petsa, oras, araw, halaga, reference number, ARP/Tax Declaration number, at pangalan ng dokumento.\n" .
         "5. Iwasan ang malalalim na salita, teknikal na salita, at hindi kailangang Ingles. Maikli at malinaw na pangungusap lamang.\n" .
         "6. Ibalik LAMANG ang mensahe. Walang pamagat at walang paliwanag.\n" .
-        "GAMITIN ANG MGA SALITANG ITO:\n" .
-        "- bring a valid ID = magdala po ng valid ID\n" .
-        "- office hours = oras ng opisina\n" .
-        "- Monday to Friday, 8:00 AM to 5:00 PM = Lunes hanggang Biyernes, 8:00 AM hanggang 5:00 PM\n" .
-        "- Ready for Release / ready to claim = handa na pong kunin\n" .
-        "- requirements / documents needed = mga kailangang dokumento\n" .
-        "- missing = kulang\n" .
-        "- submit = isumite\n" .
-        "- approved = aprubado na\n" .
-        "- completed = tapos na\n" .
-        "- closed = sarado\n" .
-        "- payment = bayad; deadline = huling araw\n" .
-        "- penalty = multa\n" .
-        "- under review = sinusuri pa po\n" .
-        "- visit the office = pumunta po sa opisina";
+        "MGA SALITANG GAGAMITIN (pagsasalin lamang ng salita; HUWAG idagdag ang mga ito kung wala sa impormasyon):\n" .
+        "bring = magdala; office hours = oras ng opisina; ready for release = handa nang kunin; " .
+        "requirements = mga kailangang dokumento; missing = kulang; submit = isumite; approved = aprubado; " .
+        "completed = tapos na; closed = sarado; payment = bayad; deadline = huling araw; penalty = multa; " .
+        "under review = sinusuri; visit = pumunta; request = kahilingan.";
 }
 
 /** Topic/details are content, never instructions. The example only shows the
