@@ -1213,7 +1213,8 @@ function sa_filipino_system_prompt(bool $isNotification): string
         "MGA PATAKARAN:\n" .
         "1. Isulat ang buong mensahe sa simple, natural, at magalang na Filipino (Tagalog) na madaling maintindihan ng matatanda.\n" .
         "2. Magsimula sa \"Magandang araw po.\" Gumamit ng \"po\". Gamitin ang \"Mangyaring\" kapag may hinihiling na gawin. Magtapos sa \"Maraming salamat po.\"\n" .
-        "3. Sabihin LAMANG ang mga impormasyong ibinigay. Huwag magdagdag ng bagong impormasyon, dahilan, paumanhin, o pangyayari.\n" .
+        "3. Sabihin LAMANG ang mga impormasyong ibinigay. Huwag magdagdag ng bagong impormasyon, dahilan, paumanhin, araw (tulad ng bukas o Lunes), o utos na hindi nakasulat.\n" .
+        "3a. Ang paksa at detalye ay mga tala na maaaring nasa Ingles. ISALIN ang kahulugan nito sa Filipino. HUWAG kopyahin ang mga pangungusap o label na Ingles (tulad ng \"Request type:\" o \"Current status:\").\n" .
         "4. Kopyahin nang eksakto ang mga pangalan, petsa, oras, araw, halaga, reference number, ARP/Tax Declaration number, at pangalan ng dokumento.\n" .
         "5. Iwasan ang malalalim na salita, teknikal na salita, at hindi kailangang Ingles. Maikli at malinaw na pangungusap lamang.\n" .
         "6. Ibalik LAMANG ang mensahe. Walang pamagat at walang paliwanag.\n" .
@@ -1346,7 +1347,23 @@ function sa_is_filipino_text(string $text): bool
             $eng++;
         }
     }
-    return $fil >= 3 && $fil >= 2 * $eng && $fil / count($words) >= 0.15;
+    if (!($fil >= 3 && $fil >= 2 * $eng && $fil / count($words) >= 0.15)) {
+        return false;
+    }
+    // No sentence may be mostly English (e.g. a copied English note).
+    $englishMarkers = array_merge($english, ['can', 'now', 'through', 'starting', 'until', 'before', 'after', 'their',
+        'they', 'it', 'as', 'by', 'or', 'not', 'if', 'current', 'status', 'type', 'needing', 'action', 'clients',
+        'client', 'book', 'appointments', 'appointment', 'website', 'visit', 'bring', 'submit', 'request', 'must',
+        'should', 'would', 'here', 'there', 'when', 'what', 'which', 'who', 'all', 'any', 'also', 'from', 'about']);
+    foreach (preg_split('/(?<=[.!?])\s+|\R+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $sentence) {
+        $sw = preg_split('/[^\p{L}]+/u', mb_strtolower($sentence), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $sf = count(array_filter($sw, static fn ($w) => in_array($w, $filipino, true)));
+        $se = count(array_filter($sw, static fn ($w) => in_array($w, $englishMarkers, true)));
+        if ($se >= 3 && $se > $sf) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /** Number-bearing tokens (reference numbers, ARP numbers, dates, amounts,
