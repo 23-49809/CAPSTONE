@@ -264,7 +264,7 @@ function sa_internal_bootstrap(): array
         ];
     }
 
-    $data['notifications'] = $pdo->query(
+    $notificationsQuery = $pdo->prepare(
         'SELECT l.id, l.request_id, l.status, l.actor, l.sms_body AS message,
                 l.created_at, r.reference_no,
                 NULLIF(TRIM(CONCAT_WS(
@@ -274,6 +274,8 @@ function sa_internal_bootstrap(): array
          LEFT JOIN requests r ON r.id = l.request_id
          LEFT JOIN clients c ON c.id = r.client_id
          ORDER BY l.created_at DESC, l.id DESC LIMIT 200'
-    )->fetchAll();
+    );
+    $notificationsQuery->execute();
+    $data['notifications'] = $notificationsQuery->fetchAll();
     return $data;
 }
