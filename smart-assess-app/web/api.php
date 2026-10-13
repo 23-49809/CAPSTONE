@@ -1482,6 +1482,24 @@ function sa_announcement_change(array $data, string $action): array
 
 function sa_announcement_save(array $data): array
 {
+    // Create/edit + publish/schedule is one unit: a rejected schedule must
+    // not leave a half-saved draft behind.
+    $pdo = sa_db();
+    $pdo->beginTransaction();
+    try {
+        $saved = sa_announcement_save_steps($data);
+        $pdo->commit();
+        return $saved;
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
+
+function sa_announcement_save_steps(array $data): array
+{
     $id = filter_var($data['announcement_id'] ?? null, FILTER_VALIDATE_INT);
     $result = sa_announcement_change($data, $id ? 'edit' : 'create');
     $id = (int) $result['announcement_id'];
