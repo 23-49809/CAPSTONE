@@ -221,7 +221,7 @@ $page['notifs'] = array_map(static function (array $notification): array {
         'id' => (string) ($notification['id'] ?? ''),
         'requestRef' => (string) ($notification['reference_no'] ?? ''),
         'clientName' => $clientName !== '' ? $clientName : 'Client information unavailable',
-        'category' => 'Request Status Update',
+        'category' => trim((string) ($notification['sms_category'] ?? '')) ?: 'Request Status Update',
         'message' => (string) ($notification['message'] ?? ''),
         'sentBy' => (string) ($notification['actor'] ?? 'system'),
         'sentAt' => (string) ($notification['created_at'] ?? ''),
