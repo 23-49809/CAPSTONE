@@ -1065,6 +1065,10 @@ function sa_generate_ai_message(array $data): array
     $message = is_array($decoded) ? trim((string) ($decoded['response'] ?? '')) : '';
     $message = preg_replace('/^\s*(?:subject|title)\s*:[^\r\n]*(?:\r?\n)+/iu', '', $message, 1) ?? $message;
     $message = trim($message);
+    if (preg_match('/^([^\r\n]{1,120})\R{2,}/u', $message, $heading) &&
+        !preg_match('/[.!?][\'")\]]?$/u', trim($heading[1]))) {
+        $message = trim(substr($message, strlen($heading[0])));
+    }
     $maximumLength = $generationType === 'notification' ? 2000 : 6000;
     if ($message === '' || strlen($message) > $maximumLength) {
         throw new SaHttpException(503, 'AI message generation returned no usable text. You can enter the message manually.');
