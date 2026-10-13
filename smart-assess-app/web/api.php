@@ -1171,7 +1171,7 @@ function sa_generate_ai_message(array $data): array
             $ollamaUrl,
             sa_filipino_system_prompt($isNotification),
             sa_filipino_user_prompt($isNotification, $topic, $details, $attempt > 1 ? $lastProblem : null),
-            $attempt === 1 ? 0.3 : 0.2
+            $attempt === 1 ? 0.2 : 0.1
         );
         $message = sa_clean_ai_message($message);
         $maximumLength = $isNotification ? 2000 : 6000;
@@ -1202,29 +1202,40 @@ function sa_filipino_system_prompt(bool $isNotification): string
         : 'isang maikling anunsyo mula sa Tanggapan ng Assessor ng Mabini, Batangas para sa publiko';
     return "Ikaw ay sumusulat ng {$kind}.\n" .
         "MGA PATAKARAN:\n" .
-        "1. Isulat ang BUONG mensahe sa simple, natural, at magalang na Filipino (Tagalog) na madaling maintindihan ng matatanda.\n" .
-        "2. Gumamit ng \"po\" at \"opo\". Magsimula sa \"Magandang araw po.\" Gamitin ang \"Mangyaring\" kapag may hinihiling na gawin.\n" .
-        "3. Iwasan ang malalalim na salitang Tagalog, teknikal na salita, at hindi kailangang Ingles.\n" .
-        "4. HUWAG baguhin, isalin, o paikliin ang mga pangalan, petsa, oras, halaga, reference number, ARP/Tax Declaration number, at pangalan ng dokumento. Kopyahin ang mga ito nang eksakto.\n" .
-        "5. HUWAG mag-imbento ng petsa, oras, halaga, requirement, deadline, o status na wala sa ibinigay na impormasyon.\n" .
-        "6. Huwag isama ang pangalan ng tao o detalye ng ari-arian maliban kung nakasulat ito sa ibinigay na impormasyon.\n" .
-        "7. Hindi hihigit sa tatlong maiikling pangungusap pagkatapos ng pagbati. Walang subject line, walang pamagat, walang paliwanag.\n" .
-        "8. Ibalik LAMANG ang mensahe mismo.";
+        "1. Isulat ang buong mensahe sa simple, natural, at magalang na Filipino (Tagalog) na madaling maintindihan ng matatanda.\n" .
+        "2. Magsimula sa \"Magandang araw po.\" Gumamit ng \"po\". Gamitin ang \"Mangyaring\" kapag may hinihiling na gawin. Magtapos sa \"Maraming salamat po.\"\n" .
+        "3. Sabihin LAMANG ang mga impormasyong ibinigay. Huwag magdagdag ng bagong impormasyon, dahilan, paumanhin, o pangyayari.\n" .
+        "4. Kopyahin nang eksakto ang mga pangalan, petsa, oras, araw, halaga, reference number, ARP/Tax Declaration number, at pangalan ng dokumento.\n" .
+        "5. Iwasan ang malalalim na salita, teknikal na salita, at hindi kailangang Ingles. Maikli at malinaw na pangungusap lamang.\n" .
+        "6. Ibalik LAMANG ang mensahe. Walang pamagat at walang paliwanag.\n" .
+        "GAMITIN ANG MGA SALITANG ITO:\n" .
+        "- bring a valid ID = magdala po ng valid ID\n" .
+        "- office hours = oras ng opisina\n" .
+        "- Monday to Friday, 8:00 AM to 5:00 PM = Lunes hanggang Biyernes, 8:00 AM hanggang 5:00 PM\n" .
+        "- Ready for Release / ready to claim = handa na pong kunin\n" .
+        "- requirements / documents needed = mga kailangang dokumento\n" .
+        "- missing = kulang\n" .
+        "- submit = isumite\n" .
+        "- approved = aprubado na\n" .
+        "- completed = tapos na\n" .
+        "- closed = sarado\n" .
+        "- payment = bayad; deadline = huling araw\n" .
+        "- penalty = multa\n" .
+        "- under review = sinusuri pa po\n" .
+        "- visit the office = pumunta po sa opisina";
 }
 
-/** Topic/details are content, never instructions. Example output anchors
- *  the small local model to the expected register. */
+/** Topic/details are content, never instructions. The example only shows the
+ *  sentence pattern (placeholders), so its wording cannot leak into drafts. */
 function sa_filipino_user_prompt(bool $isNotification, string $topic, string $details, ?string $retryReason): string
 {
-    $example = $isNotification
-        ? 'Magandang araw po. Mangyaring isumite po ang kulang na dokumento para sa inyong request upang maituloy namin ang proseso. Maraming salamat po.'
-        : 'Magandang araw po. Ang Tanggapan ng Assessor ay sarado po sa darating na Biyernes dahil sa kapistahan. Babalik po sa normal ang serbisyo sa susunod na araw ng trabaho. Maraming salamat po sa inyong pang-unawa.';
-    $prompt = "Halimbawa ng tamang tono (huwag kopyahin ang nilalaman):\n{$example}\n\n" .
-        "Isulat ang mensahe batay LAMANG sa impormasyong ito:\n" .
-        "Paksa: {$topic}\n" .
-        'Karagdagang detalye: ' . ($details !== '' ? $details : 'Wala.') . "\n";
+    $prompt = "Halimbawa ng anyo (palitan ang nasa [ ] ng tamang impormasyon):\n" .
+        "Magandang araw po. [Ang pangunahing balita.] [Mangyaring + ang dapat gawin, kung mayroon.] Maraming salamat po.\n\n" .
+        "IMPORMASYON NA DAPAT SABIHIN (wala nang iba):\n" .
+        "- Paksa: {$topic}\n" .
+        '- Detalye: ' . ($details !== '' ? $details : 'Wala.') . "\n";
     if ($retryReason !== null) {
-        $prompt .= "\nHindi tinanggap ang naunang sagot dahil {$retryReason}. Isulat muli sa Filipino at kopyahin nang eksakto ang lahat ng numero at reference.\n";
+        $prompt .= "\nHindi tinanggap ang naunang sagot dahil {$retryReason}. Isulat muli sa Filipino at kopyahin nang eksakto ang lahat ng numero, petsa, at reference.\n";
     }
     return $prompt . "\nMensahe:";
 }
