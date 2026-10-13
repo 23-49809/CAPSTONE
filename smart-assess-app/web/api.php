@@ -1195,6 +1195,14 @@ function sa_generate_ai_message(array $data): array
         // Small models like to add "bukas" before the day staff gave ("bukas,
         // Biyernes"); drop just that word and keep the real day.
         $message = preg_replace('/\b(?:bukas|mamaya)\s*[,(]?\s*(?=(?:Lunes|Martes|Miyerkules|Miyerkoles|Huwebes|Biyernes|Sabado|Linggo)\b)/iu', '', $message) ?? $message;
+        // ...or to write "bukas" in place of the one day staff gave.
+        $givenDays = array_values(array_filter(sa_time_word_hints($topic . ' ' . $details),
+            static fn ($f) => in_array($f, ['Lunes', 'Martes', 'Miyerkules', 'Huwebes', 'Biyernes', 'Sabado', 'Linggo'], true)));
+        if (count($givenDays) === 1 && !preg_match('/\btomorrow\b/i', $topic . ' ' . $details) &&
+            !preg_match('/\b' . $givenDays[0] . '\b/iu', $message)) {
+            $message = preg_replace('/\bbukas\b/iu', 'sa ' . $givenDays[0], $message, 1) ?? $message;
+            $message = preg_replace('/\bsa sa\b/iu', 'sa', $message) ?? $message;
+        }
         $invented = sa_invented_time_words($message, $topic . ' ' . $details);
         if ($invented !== []) {
             $lastProblem = 'it added days or dates that were not given: ' . implode(', ', $invented);
@@ -1235,6 +1243,23 @@ function sa_filipino_system_prompt(bool $isNotification): string
 
 /** Topic/details are content, never instructions. The example only shows the
  *  sentence pattern (placeholders), so its wording cannot leak into drafts. */
+/** English day/month names in staff's input mapped to their Filipino names. */
+function sa_time_word_hints(string $source): array
+{
+    $map = ['monday' => 'Lunes', 'tuesday' => 'Martes', 'wednesday' => 'Miyerkules', 'thursday' => 'Huwebes',
+        'friday' => 'Biyernes', 'saturday' => 'Sabado', 'sunday' => 'Linggo', 'january' => 'Enero',
+        'february' => 'Pebrero', 'march' => 'Marso', 'april' => 'Abril', 'june' => 'Hunyo', 'july' => 'Hulyo',
+        'august' => 'Agosto', 'september' => 'Setyembre', 'october' => 'Oktubre', 'november' => 'Nobyembre',
+        'december' => 'Disyembre'];
+    $hints = [];
+    foreach ($map as $english => $filipino) {
+        if (preg_match('/\b' . $english . '\b/i', $source)) {
+            $hints[ucfirst($english)] = $filipino;
+        }
+    }
+    return $hints;
+}
+
 function sa_filipino_user_prompt(bool $isNotification, string $topic, string $details, ?string $retryReason): string
 {
     $prompt = "Anyo ng mensahe: magsimula sa \"Magandang araw po.\", sabihin ang balita, idagdag ang \"Mangyaring ...\" " .
@@ -1242,6 +1267,14 @@ function sa_filipino_user_prompt(bool $isNotification, string $topic, string $de
         "IMPORMASYON NA DAPAT SABIHIN (wala nang iba):\n" .
         "- Paksa: {$topic}\n" .
         '- Detalye: ' . ($details !== '' ? $details : 'Wala.') . "\n";
+    $hints = sa_time_word_hints($topic . ' ' . $details);
+    if ($hints !== []) {
+        $pairs = [];
+        foreach ($hints as $english => $filipino) {
+            $pairs[] = "{$english} = {$filipino}";
+        }
+        $prompt .= '- Mga araw/buwan (gamitin ang Filipino; ang "Friday" ay "Biyernes", HINDI "bukas"): ' . implode(', ', $pairs) . "\n";
+    }
     if ($retryReason !== null) {
         $prompt .= "\nHindi tinanggap ang naunang sagot dahil {$retryReason}. Isulat muli sa Filipino at kopyahin nang eksakto ang lahat ng numero, petsa, at reference.\n";
     }
