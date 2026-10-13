@@ -148,13 +148,18 @@ final class IprogSmsService
             '+' . $normalizedPhoneNumber,
             $message,
         ];
+        $encodedSensitiveValues = [];
         foreach ($sensitiveValues as $value) {
             $encodedValue = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if (is_string($encodedValue)) {
-                $sensitiveValues[] = substr($encodedValue, 1, -1);
+                $encodedSensitiveValues[] = substr($encodedValue, 1, -1);
             }
         }
-        $safeMessage = str_replace($sensitiveValues, '[redacted]', $providerMessage);
+        $safeMessage = str_replace(
+            array_merge($sensitiveValues, $encodedSensitiveValues),
+            '[redacted]',
+            $providerMessage
+        );
         $safeMessage = preg_replace(
             [
                 '/(?<![A-Za-z0-9])(?:\+?63[\s().-]*|0)9(?:[\s().-]*\d){9}(?!\d)/',
