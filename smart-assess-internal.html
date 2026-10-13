@@ -857,7 +857,7 @@
   .sr-detail-head .search-box{ max-width:260px; flex:0 1 260px; }
   .sr-detail-head .search-box input{ border-radius:8px; }
   .sr-table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
-  .sr-table{ width:100%; border-collapse:collapse; min-width:760px; }
+  .sr-table{ width:100%; border-collapse:collapse; min-width:820px; table-layout:auto; }
   .sr-table thead th{ background:var(--surface-2); color:var(--ink-soft); font-size:12px; font-weight:600; text-transform:none; letter-spacing:0; padding:10px 12px; border:0; text-align:left; }
   .sr-table tbody td{ padding:10px 12px; font-size:13px; color:var(--ink); border-top:1px solid var(--line); white-space:nowrap; }
   .sr-table tbody tr:nth-child(even){ background:var(--row-alt); }
@@ -1698,7 +1698,7 @@ function srChart(list, f){
   });
   var max = Math.max(1, Math.max.apply(null, buckets.map(function(b){ return b.doc+b.land; })));
   var tickStep = max<=5 ? 1 : max<=10 ? 2 : max<=25 ? 5 : max<=50 ? 10 : Math.ceil(max/50)*10;
-  var top = Math.ceil(max/tickStep)*tickStep;
+  var top = Math.max(5, Math.ceil(max/tickStep)*tickStep);
   var W = 680, H = 210, L = 30, B = 22, T = 8, plotW = W-L-6, plotH = H-B-T;
   var bw = plotW / buckets.length, barW = Math.max(3, Math.min(22, bw*0.62));
   var y = function(v){ return T + plotH - v/top*plotH; };
