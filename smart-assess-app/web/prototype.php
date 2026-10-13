@@ -28,8 +28,8 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
     }
 
     $html = str_replace(
-        ['bg MAO.jpg', 'LOGO.png', 'ID CLear.png', 'Blurry ID.png', 'close.png'],
-        ['assets/bg%20MAO.jpg', 'assets/LOGO.png', 'assets/ID%20CLear.png', 'assets/Blurry%20ID.png', 'assets/close.png'],
+        ['bg MAO.jpg', 'hero-mao.jpg', 'sidebar-mao.jpg', 'LOGO.png', 'ID CLear.png', 'Blurry ID.png', 'close.png'],
+        ['assets/bg%20MAO.jpg', 'assets/hero-mao.jpg', 'assets/sidebar-mao.jpg', 'assets/LOGO.png', 'assets/ID%20CLear.png', 'assets/Blurry%20ID.png', 'assets/close.png'],
         $html
     );
 

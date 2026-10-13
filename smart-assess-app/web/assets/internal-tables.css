@@ -49,6 +49,87 @@
   display: none;
 }
 
+.hd-avatar {
+  max-width: min(280px, calc(100vw - 190px));
+  min-width: 0;
+  gap: 0;
+  overflow: hidden;
+  transition: max-width 300ms ease, padding 300ms ease, background-color 200ms ease;
+}
+
+.hd-avatar .avatar-circle {
+  flex: 0 0 30px;
+}
+
+.hd-avatar-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  opacity: 0;
+  white-space: nowrap;
+  transition: max-width 300ms ease, margin-left 300ms ease, opacity 180ms ease;
+}
+
+.hd-avatar.is-expanded {
+  gap: 0;
+}
+
+.hd-avatar.is-expanded .hd-avatar-copy {
+  max-width: 220px;
+  margin-left: 10px;
+  opacity: 1;
+}
+
+.hd-avatar .hd-name,
+.hd-avatar .hd-role {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hd-avatar br {
+  display: none;
+}
+
+.hd-avatar:focus-visible {
+  outline: 2px solid #a7f3d0;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .hd-avatar {
+    max-width: calc(100vw - 246px);
+    padding: 4px;
+  }
+
+  .hd-avatar.is-expanded .hd-avatar-copy {
+    max-width: calc(100vw - 288px);
+  }
+
+  .hd-avatar.is-expanded .hd-name {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .hd-avatar .hd-role {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hd-avatar,
+  .hd-avatar-copy {
+    transition-duration: 0.01ms;
+  }
+}
+
 .sent-notifications-accordion {
   border-top: 1px solid var(--line);
 }
@@ -121,6 +202,33 @@
   font-weight: 600;
 }
 
+.notification-reference-owner-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.owner-name-display {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.owner-name-display:empty {
+  color: var(--ink-faint);
+}
+
 .ai-generation-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -153,6 +261,11 @@
 }
 
 @media (max-width: 560px) {
+  .notification-reference-owner-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
   .ai-generation-fields {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
