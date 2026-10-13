@@ -141,11 +141,20 @@ final class IprogSmsService
             $providerMessage = 'No provider message supplied.';
         }
 
-        $safeMessage = str_replace(
-            [$this->apiToken, $phoneNumber, $normalizedPhoneNumber, '+' . $normalizedPhoneNumber, $message],
-            '[redacted]',
-            $providerMessage
-        );
+        $sensitiveValues = [
+            $this->apiToken,
+            $phoneNumber,
+            $normalizedPhoneNumber,
+            '+' . $normalizedPhoneNumber,
+            $message,
+        ];
+        foreach ($sensitiveValues as $value) {
+            $encodedValue = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (is_string($encodedValue)) {
+                $sensitiveValues[] = substr($encodedValue, 1, -1);
+            }
+        }
+        $safeMessage = str_replace($sensitiveValues, '[redacted]', $providerMessage);
         $safeMessage = preg_replace(
             [
                 '/(?<![A-Za-z0-9])(?:\+?63[\s().-]*|0)9(?:[\s().-]*\d){9}(?!\d)/',
