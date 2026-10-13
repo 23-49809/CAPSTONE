@@ -1188,6 +1188,11 @@ function sa_generate_ai_message(array $data): array
             $lastProblem = 'it changed or invented these numbers/references: ' . implode(', ', $changed);
             continue;
         }
+        $missing = sa_changed_identifiers($topic . ' ' . $details, $message, true);
+        if ($missing !== []) {
+            $lastProblem = 'it left out these dates/numbers/references: ' . implode(', ', $missing);
+            continue;
+        }
         return ['message' => $message];
     }
     error_log('[SMART_ASSESS] AI generation rejected after 3 attempts: ' . $lastProblem);
@@ -1243,8 +1248,9 @@ function sa_filipino_user_prompt(bool $isNotification, string $topic, string $de
 /** One non-streaming Ollama completion. */
 function sa_ollama_generate(string $ollamaUrl, string $system, string $prompt, float $temperature): string
 {
+    $model = trim((string) getenv('SMART_ASSESS_OLLAMA_MODEL'));
     $payload = json_encode([
-        'model' => 'llama3.2:3b',
+        'model' => preg_match('/^[A-Za-z0-9._:\/-]{1,100}$/', $model) ? $model : 'llama3.2:3b',
         'system' => $system,
         'prompt' => $prompt,
         'stream' => false,
@@ -1332,7 +1338,7 @@ function sa_is_filipino_text(string $text): bool
 
 /** Number-bearing tokens (reference numbers, ARP numbers, dates, amounts,
  *  times) in the draft that do not appear verbatim in staff's input. */
-function sa_changed_identifiers(string $message, string $source): array
+function sa_changed_identifiers(string $message, string $source, bool $ignoreOrdinals = false): array
 {
     preg_match_all('/[\p{L}\d]*\d[\p{L}\d\-\/.,:]*/u', $message, $matches);
     $normalizedSource = mb_strtolower($source);
@@ -1340,6 +1346,10 @@ function sa_changed_identifiers(string $message, string $source): array
     foreach ($matches[0] as $token) {
         $token = rtrim($token, '.,:-/');
         if ($token === '' || mb_strlen($token) < 2) {
+            continue;
+        }
+        // "1st quarter" may correctly become "unang quarter" in Filipino.
+        if ($ignoreOrdinals && preg_match('/^\d+(?:st|nd|rd|th)$/i', $token)) {
             continue;
         }
         if (!str_contains($normalizedSource, mb_strtolower($token))) {
