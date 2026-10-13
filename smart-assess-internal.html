@@ -653,7 +653,6 @@
   .sent-tools .search-box{ max-width:none; min-width:0; }
   .sent-tools .search-box input{ border-radius:9px; border:1px solid var(--line-strong); padding:11px 12px 11px 36px; }
   .sent-filters{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px 10px; }
-  .sent-filters .sf-category{ grid-column:1 / -1; }
   .sent-filter-bar{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12.5px; color:var(--ink-soft); }
   .sent-filters select, .sent-date input{ width:100%; height:42px; font-family:inherit; font-size:13px; font-weight:600; padding:0 12px; border-radius:9px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); }
   .sent-date{ position:relative; display:block; margin:0; }
@@ -1748,18 +1747,17 @@ function renderNotifications(acct){
   var all = state.notifs.slice().sort(function(a,b){ return sentTime(b.sentAt) - sentTime(a.sentAt); });
   var allRefs = state.docRequests.map(function(r){return r.id;}).concat(state.landRequests.map(function(r){return r.id;}));
   var q = String((state.search && state.search.sentNotifs) || '').toLowerCase();
-  var catF = (state.filters && state.filters.sentCategory) || 'all';
   var fromF = (state.filters && state.filters.sentFrom) || '';
   var toF = (state.filters && state.filters.sentTo) || '';
-  if(fromF && toF && fromF > toF){ var swap = fromF; fromF = toF; toF = swap; }
-  var filtersActive = !!(q || catF!=='all' || fromF || toF);
+  // One date picks that day; two dates pick the inclusive range (either order).
+  var lo = fromF || toF, hi = toF || fromF;
+  if(lo && hi && lo > hi){ var swap = lo; lo = hi; hi = swap; }
+  var filtersActive = !!(q || lo);
   var list = all.filter(function(n){
     var name = n.clientName || n.applicant || '';
     var hay = [n.requestRef, name, n.category, n.message].join(' ').toLowerCase();
     var day = sentDateKey(n.sentAt);
-    return (!q || hay.indexOf(q)>-1)
-      && (catF==='all' || notifCategoryName(n.category)===catF)
-      && (!fromF || day >= fromF) && (!toF || day <= toF);
+    return (!q || hay.indexOf(q)>-1) && (!lo || (day >= lo && day <= hi));
   });
   var perPage = 5;
   var pg = paginate(list, 'sentNotifs', perPage);
@@ -1803,9 +1801,8 @@ function renderNotifications(acct){
       + '<div class="nc-head"><div><h3 id="sent-notifs-title">SMS Notification History</h3><p>View your previously sent notifications.</p></div></div>'
       + '<div class="sent-tools"><div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by reference number, client name…" value="'+esc((state.search && state.search.sentNotifs)||'')+'" data-input="search-sent-notifs" aria-label="Search SMS notification history"></div>'
         + '<div class="sent-filters">'
-          + '<select class="sf-category" data-input="filter-sent-category" aria-label="Filter by category"><option value="all">All Categories</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'"'+(catF===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select>'
-          + '<label class="sent-date"><span>Sent from</span><input type="date" data-input="filter-sent-from" value="'+esc(fromF)+'"'+(toF?' max="'+esc(toF)+'"':'')+' aria-label="Sent from date"></label>'
-          + '<label class="sent-date"><span>Sent to</span><input type="date" data-input="filter-sent-to" value="'+esc(toF)+'"'+(fromF?' min="'+esc(fromF)+'"':'')+' aria-label="Sent to date"></label>'
+          + '<label class="sent-date"><span>Sent date</span><input type="date" data-input="filter-sent-from" value="'+esc(fromF)+'" aria-label="Sent date, or start of a date range"></label>'
+          + '<label class="sent-date"><span>To (optional)</span><input type="date" data-input="filter-sent-to" value="'+esc(toF)+'" aria-label="End of the sent date range (optional)"></label>'
         + '</div>'
         + (filtersActive ? '<div class="sent-filter-bar"><span>'+pg.total+' matching record'+(pg.total===1?'':'s')+'</span><button type="button" class="dash-link" data-action="clear-sent-filters">Clear filters</button></div>' : '')
       + '</div>'
@@ -2593,7 +2590,6 @@ function bindEvents(){
       render();
     } else if(action==='clear-sent-filters'){
       state.search.sentNotifs = '';
-      state.filters.sentCategory = 'all';
       state.filters.sentFrom = '';
       state.filters.sentTo = '';
       setPage('sentNotifs', 1);
@@ -2671,7 +2667,6 @@ function bindEvents(){
     else if(key==='filter-doc-status') state.filters.docStatus = el.value;
     else if(key==='filter-land-status') state.filters.landStatus = el.value;
     else if(key==='filter-report-type') state.filters.reportType = el.value;
-    else if(key==='filter-sent-category'){ state.filters.sentCategory = el.value; setPage('sentNotifs',1); }
     else if(key==='filter-sent-from'){ state.filters.sentFrom = el.value; setPage('sentNotifs',1); }
     else if(key==='filter-sent-to'){ state.filters.sentTo = el.value; setPage('sentNotifs',1); }
     else return;
