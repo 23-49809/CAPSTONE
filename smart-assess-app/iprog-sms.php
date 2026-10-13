@@ -1,4 +1,4 @@
-<?php
+curl_close($handle);<?php
 declare(strict_types=1);
 
 final class IprogSmsService
@@ -73,7 +73,7 @@ final class IprogSmsService
         $body = curl_exec($handle);
         $httpStatus = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         $curlError = curl_errno($handle);
-        curl_close($handle);
+        
 
         if ($body === false || $curlError !== 0) {
             error_log('[IPROG_SMS] Transport failure; cURL error code ' . $curlError . '.');
@@ -97,7 +97,9 @@ final class IprogSmsService
                 $httpStatus,
                 preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? ''
             ));
-            throw new RuntimeException('IPROG SMS did not accept the message.');
+            
+            $providerMessage = (string) ($response['message'] ?? 'No error message provided');
+error_log('[IPROG_SMS] Provider message: ' . substr($providerMessage, 0, 300));
         }
 
         error_log(sprintf(
