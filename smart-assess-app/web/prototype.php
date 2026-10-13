@@ -55,12 +55,12 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
 
     if ($portal === 'internal') {
         $html = str_replace(
-            '</head>',
-            '<link rel="stylesheet" href="/assets/internal-tables.css">' . "\n</head>",
+            '<style>',
+            '<style>' . "\n  @import url(\"/assets/internal-tables.css\");",
             $html,
-            $headMatches
+            $styleMatches
         );
-        if ($headMatches !== 1) {
+        if ($styleMatches !== 1) {
             http_response_code(500);
             exit('The internal table styles could not be initialized.');
         }
