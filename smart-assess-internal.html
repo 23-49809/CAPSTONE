@@ -717,17 +717,6 @@
   .composer-ai-body label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:6px; }
   .composer-ai-body textarea{ width:100%; min-height:64px; resize:vertical; border:1px solid var(--line-strong); border-radius:8px; padding:10px 12px; font-family:inherit; font-size:13.5px; background:var(--surface); color:var(--ink); }
   .composer-ai-body .ai-privacy-hint{ margin:6px 0 8px; }
-  .composer-schedule{ margin:10px 24px 0; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); }
-  .composer-schedule-toggle{ display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:var(--ink); cursor:pointer; }
-  .composer-schedule-toggle .icon{ width:18px; height:18px; color:var(--brand-700); }
-  .composer-schedule-toggle input{ position:absolute; opacity:0; width:1px; height:1px; }
-  .composer-schedule-toggle .switch{ margin-left:auto; width:38px; height:22px; border-radius:999px; background:var(--line-strong); position:relative; transition:background-color .15s ease; flex:0 0 38px; }
-  .composer-schedule-toggle .switch::after{ content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .15s ease; box-shadow:0 1px 2px rgba(0,0,0,.25); }
-  .composer-schedule-toggle input:checked ~ .switch{ background:var(--brand-600); }
-  .composer-schedule-toggle input:checked ~ .switch::after{ transform:translateX(16px); }
-  .composer-schedule-toggle input:focus-visible ~ .switch{ outline:3px solid var(--brand-500); outline-offset:2px; }
-  .composer-schedule .schedule-fields{ margin-top:12px; }
-  .composer-schedule .schedule-fields .field{ margin-bottom:0; }
   .composer-error{ margin:10px 24px 0; }
   .composer-actions{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:16px 0 0; padding:14px 24px 18px; border-top:1px solid var(--line); }
   .composer-actions .btn .icon{ width:16px; height:16px; }
@@ -750,10 +739,51 @@
   .btn-ghost-text:hover{ background:var(--surface-2); color:var(--ink); }
   @media (max-width:560px){
     .composer-row{ padding:4px 16px; } .composer-row label{ flex-basis:54px; }
-    .composer-body{ padding:14px 16px 6px; } .composer-schedule, .composer-error{ margin-left:16px; margin-right:16px; }
+    .composer-body{ padding:14px 16px 6px; } .composer-error{ margin-left:16px; margin-right:16px; }
     .composer-actions{ padding:12px 16px 16px; }
     .composer-actions .composer-draft{ padding:10px 14px; }
   }
+
+  /* Gmail-style schedule menu + picker */
+  .send-menu{ min-width:300px; padding:6px 0 8px; }
+  .send-menu-title{ padding:8px 16px 6px; font-size:13px; font-weight:700; color:var(--ink); }
+  .send-menu-title span{ font-weight:400; color:var(--ink-faint); font-size:12px; }
+  .send-menu button{ justify-content:flex-start; gap:12px; padding:9px 16px; }
+  .send-menu button .when{ margin-left:auto; color:var(--ink-faint); font-size:13px; white-space:nowrap; }
+  .send-menu-sep{ height:1px; background:var(--line); margin:6px 0; }
+  .sched-chip{ display:inline-flex; align-items:center; border:1px solid #c2d5f5; background:#eef3fd; color:#0b57d0; border-radius:999px; font-size:13px; font-weight:600; overflow:hidden; }
+  .sched-chip-text{ display:inline-flex; align-items:center; gap:6px; padding:7px 4px 7px 12px; border:0; background:none; color:inherit; font:inherit; cursor:pointer; }
+  .sched-chip-x{ display:flex; align-items:center; justify-content:center; width:28px; height:28px; margin-right:4px; border:0; border-radius:50%; background:none; color:inherit; cursor:pointer; }
+  .sched-chip-x:hover, .sched-chip-text:hover{ background:rgba(11,87,208,.08); }
+  .sched-chip .icon{ width:15px; height:15px; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .sched-chip{ background:#16253c; border-color:#2b4670; color:#a8c7fa; } }
+  :root[data-theme="dark"] .sched-chip{ background:#16253c; border-color:#2b4670; color:#a8c7fa; }
+  .sched-picker{ position:fixed; inset:0; z-index:95; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(10,19,14,.35); }
+  .sched-card{ width:min(560px,100%); max-height:calc(100vh - 32px); overflow:auto; background:var(--surface); border-radius:16px; box-shadow:var(--shadow-lg); padding:22px 24px 18px; }
+  .sched-card h4{ font-family:var(--font-body); font-size:18px; font-weight:600; color:var(--ink); margin-bottom:16px; }
+  .sched-cols{ display:grid; grid-template-columns:minmax(0,1fr) 200px; gap:24px; align-items:start; }
+  .sched-cal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:14px; font-weight:600; color:var(--ink); }
+  .sched-cal-head button{ width:32px; height:32px; border:0; border-radius:50%; background:none; color:var(--ink-soft); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .sched-cal-head button:hover{ background:var(--surface-2); }
+  .sched-cal-head .icon{ width:18px; height:18px; }
+  .sched-dow, .sched-grid{ display:grid; grid-template-columns:repeat(7,1fr); text-align:center; }
+  .sched-dow span{ font-size:11.5px; font-weight:600; color:var(--ink-faint); padding:4px 0; }
+  .sched-grid button{ aspect-ratio:1; max-width:36px; width:100%; margin:1px auto; border:0; border-radius:50%; background:none; color:var(--ink); font:inherit; font-size:13px; cursor:pointer; }
+  .sched-grid button:hover:not(:disabled){ background:var(--surface-2); }
+  .sched-grid button.other{ color:var(--ink-faint); }
+  .sched-grid button.today{ color:#0b57d0; font-weight:700; }
+  .sched-grid button.selected{ background:#0b57d0; color:#fff; font-weight:600; }
+  .sched-grid button:disabled{ color:var(--line-strong); cursor:default; }
+  .sched-fields{ display:flex; flex-direction:column; gap:14px; padding-top:38px; }
+  .sched-fields label{ position:relative; display:block; }
+  .sched-fields label span{ position:absolute; top:-7px; left:10px; padding:0 4px; background:var(--surface); font-size:11.5px; color:var(--ink-soft); }
+  .sched-fields input{ width:100%; height:44px; padding:0 12px; border:1px solid var(--line-strong); border-radius:6px; background:var(--surface); color:var(--ink); font:inherit; font-size:14px; }
+  .sched-fields input:focus{ outline:none; border:2px solid #0b57d0; padding:0 11px; }
+  .sched-tz{ font-size:12px; color:var(--ink-faint); }
+  .sched-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .sched-confirm{ min-height:40px; padding:0 22px; border:0; border-radius:999px; background:#0b57d0; color:#fff; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .sched-confirm:hover{ background:#0a4ab3; }
+  @media (max-width:560px){ .sched-cols{ grid-template-columns:minmax(0,1fr); } .sched-fields{ padding-top:0; } }
 </style>
 
 <div id="app"></div>
@@ -1982,15 +2012,50 @@ function modalEditStaff(id){
     + '</form>';
 }
 
+/* ---- Philippine Standard Time (UTC+8, no DST) helpers for scheduling ---- */
+var PH_OFFSET_MS = 8*3600*1000;
+function phNowParts(){ var d = new Date(Date.now()+PH_OFFSET_MS), iso = d.toISOString(); return {date:iso.slice(0,10), time:iso.slice(11,16)}; }
+function phToday(){ return phNowParts().date; }
+function phAddDays(key, n){ var d = new Date(key+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function phWeekday(key){ return new Date(key+'T00:00:00Z').getUTCDay(); }
+function phInstant(key, hhmm){ return new Date(key+'T'+hhmm+':00+08:00'); }
+function phIsFuture(key, hhmm){ var d = phInstant(key, hhmm); return !isNaN(d.getTime()) && d.getTime() > Date.now(); }
+function phFormatDate(key){ return new Date(key+'T00:00:00Z').toLocaleDateString('en-US',{month:'short', day:'numeric', year:'numeric', timeZone:'UTC'}); }
+function phFormatTime(hhmm){ var h = +hhmm.slice(0,2), m = hhmm.slice(3,5); return ((h%12)||12)+':'+m+' '+(h<12?'AM':'PM'); }
+function phFormat(key, hhmm, withWeekday){
+  var d = new Date(key+'T00:00:00Z');
+  return d.toLocaleDateString('en-US',{weekday:withWeekday?'short':undefined, month:'short', day:'numeric', timeZone:'UTC'})+', '+phFormatTime(hhmm);
+}
+function phParseDate(text){
+  var t = String(text||'').trim(); if(!t) return '';
+  var iso = /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : '';
+  if(!iso){ var d = new Date(t+' 12:00 UTC'); if(isNaN(d.getTime())) return ''; iso = d.toISOString().slice(0,10); }
+  return isNaN(new Date(iso+'T00:00:00Z').getTime()) ? '' : iso;
+}
+function phParseTime(text){
+  var m = String(text||'').trim().toUpperCase().match(/^(\d{1,2})(?::(\d{2}))?\s*([AP])\.?M?\.?$|^(\d{1,2}):(\d{2})$/);
+  if(!m) return '';
+  var h, min;
+  if(m[4]!==undefined){ h = +m[4]; min = +m[5]; if(h>23) return ''; }
+  else { h = +m[1]; min = m[2]?+m[2]:0; if(h<1||h>12) return ''; h = h%12 + (m[3]==='P'?12:0); }
+  if(min>59) return '';
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+}
+/* Split a stored schedule into Philippine date + HH:MM. The PHP app stores a
+   PH wall-clock "YYYY-MM-DD HH:MM:SS"; the demo data stores ISO instants. */
+function phPartsFromStored(value){
+  var str = String(value||''); if(!str) return {date:'', time:''};
+  if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(str)) return {date:str.slice(0,10), time:str.slice(11,16)};
+  var d = new Date(str); if(isNaN(d.getTime())) return {date:'', time:''};
+  var iso = new Date(d.getTime()+PH_OFFSET_MS).toISOString();
+  return {date:iso.slice(0,10), time:iso.slice(11,16)};
+}
+
 function modalAnnEdit(id){
   var a = id ? findAnn(id) : {title:'',content:'',postTo:'',status:'Draft',scheduledAt:null};
   var scheduled = a.status==='Scheduled';
-  var schedDate = '', schedTime = '';
-  if(a.scheduledAt){
-    var d = new Date(a.scheduledAt);
-    schedDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    schedTime = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-  }
+  var ph = scheduled ? phPartsFromStored(a.scheduledAt) : {date:'', time:''};
+  var schedDate = ph.date, schedTime = ph.time;
   var primaryLabel = id && a.status==='Published' ? 'Save Changes' : 'Publish Now';
   return '<div class="composer-head"><h3>'+(id?'Edit Announcement':'New Announcement')+'</h3>'
       + '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','16px')+'</button></div>'
@@ -2007,27 +2072,28 @@ function modalAnnEdit(id){
           + '<div class="ai-message-heading"><span></span><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="announcement">'+ic('sparkles','15px')+' Generate with AI</button></div></div>'
         + '</details>'
       + '</div>'
-      + '<div class="composer-schedule" data-schedule-block'+(scheduled?'':' hidden')+'>'
-        + '<label class="composer-schedule-toggle"><span class="icon">'+ICONS.calendar+'</span><span>Scheduled send</span><input type="checkbox" data-schedule-toggle'+(scheduled?' checked':'')+'><span class="switch" aria-hidden="true"></span></label>'
-        + '<div class="schedule-fields" data-schedule-fields'+(scheduled?'':' hidden')+'>'
-          + '<div class="field-row">'
-            + '<div class="field"><label>Date</label>'+dtPickerField('date','scheduleDate',schedDate)+'</div>'
-            + '<div class="field"><label>Time</label>'+dtPickerField('time','scheduleTime',schedTime,{pairDate:'scheduleDate'})+'</div>'
-          + '</div>'
-          + '<div class="schedule-summary" data-schedule-summary hidden></div>'
-          + '<div class="field-error" data-schedule-error hidden>Please select a future date and time.</div>'
+      + '<input type="hidden" name="scheduleDate" value="'+esc(schedDate)+'"><input type="hidden" name="scheduleTime" value="'+esc(schedTime)+'">'
+      + '<div class="sched-picker" data-schedule-picker role="dialog" aria-modal="true" aria-labelledby="sched-picker-title" hidden><div class="sched-card">'
+        + '<h4 id="sched-picker-title">Pick date &amp; time</h4>'
+        + '<div class="sched-cols">'
+          + '<div class="sched-cal"><div class="sched-cal-head"><span data-cal-title></span><div><button type="button" data-cal-prev aria-label="Previous month">'+ic('chevLeft','18px')+'</button><button type="button" data-cal-next aria-label="Next month">'+ic('chevRight','18px')+'</button></div></div>'
+            + '<div class="sched-dow" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>'
+            + '<div class="sched-grid" data-cal-grid></div></div>'
+          + '<div class="sched-fields"><label><span>Date</span><input type="text" data-pick-date autocomplete="off"></label>'
+            + '<label><span>Time</span><input type="text" data-pick-time autocomplete="off" placeholder="9:05 PM"></label>'
+            + '<p class="sched-tz">Philippine Standard Time (GMT+8)</p>'
+            + '<p class="field-error" data-pick-error hidden></p></div>'
         + '</div>'
-      + '</div>'
+        + '<div class="sched-actions"><button type="button" class="btn btn-ghost-text" data-pick-cancel>Cancel</button><button type="button" class="sched-confirm" data-pick-confirm>Schedule send</button></div>'
+      + '</div></div>'
       + '<div class="field-error composer-error" data-composer-error hidden></div>'
       + '<div class="modal-foot composer-actions">'
         + '<div class="send-split">'
           + '<button type="submit" name="saveMode" value="'+(scheduled?'schedule':'publish')+'" class="send-main" data-send-main data-publish-label="'+esc(primaryLabel==='Publish Now'?'Send':primaryLabel)+'">'+ic('send','16px')+'<span data-send-label>'+(scheduled?'Schedule send':(primaryLabel==='Publish Now'?'Send':esc(primaryLabel)))+'</span></button>'
           + '<button type="button" class="send-more" data-send-more aria-haspopup="menu" aria-expanded="false" aria-label="More send options" title="More send options">'+ic('chevDown','16px')+'</button>'
-          + '<div class="send-menu" role="menu" data-send-menu hidden>'
-            + '<button type="button" role="menuitem" data-send-option="schedule">'+ic('calendar','16px')+'<span>Schedule send</span></button>'
-            + '<button type="button" role="menuitem" data-send-option="now" hidden>'+ic('send','16px')+'<span>Send now</span></button>'
-          + '</div>'
+          + '<div class="send-menu" role="menu" aria-label="Schedule send" data-send-menu hidden></div>'
         + '</div>'
+        + '<span class="sched-chip" data-schedule-chip hidden><button type="button" class="sched-chip-text" data-chip-edit title="Change schedule">'+ic('clock','15px')+'<span data-chip-text></span></button><button type="button" class="sched-chip-x" data-chip-clear aria-label="Remove schedule" title="Remove schedule">'+ic('x','14px')+'</button></span>'
         + '<button type="submit" name="saveMode" value="draft" class="btn btn-outline composer-draft">'+ic('doc','16px')+' Save Draft</button>'
         + '<button type="button" class="composer-discard" data-action="close-modal" aria-label="Discard" title="Discard">'+ic('trash','18px')+'</button>'
       + '</div>'
@@ -2551,119 +2617,133 @@ function bindEvents(){
   });
 
   (function(){
-    var schedWrap = app.querySelector('[data-schedule-fields]');
-    var toggle = app.querySelector('[data-schedule-toggle]');
-    if(!schedWrap || !toggle) return;
-    var form = schedWrap.closest('form');
+    var form = app.querySelector('form[data-form="save-ann"]');
+    if(!form) return;
+    var dateIn = form.elements.scheduleDate, timeIn = form.elements.scheduleTime;
+    var sendMain = form.querySelector('[data-send-main]');
+    var sendLabel = sendMain.querySelector('[data-send-label]');
+    var more = form.querySelector('[data-send-more]');
+    var menu = form.querySelector('[data-send-menu]');
+    var chip = form.querySelector('[data-schedule-chip]');
+    var picker = form.querySelector('[data-schedule-picker]');
+    var composerErr = form.querySelector('[data-composer-error]');
 
-    var dateWrap = schedWrap.querySelector('[data-datepicker]');
-    var timeWrap = schedWrap.querySelector('[data-timepicker]');
-    var dateHidden = dateWrap && dateWrap.querySelector('[data-dt-input]');
-    var timeHidden = timeWrap && timeWrap.querySelector('[data-dt-input]');
-    var errEl = schedWrap.querySelector('[data-schedule-error]');
-    var sumEl = schedWrap.querySelector('[data-schedule-summary]');
+    function scheduled(){ return !!(dateIn.value && timeIn.value); }
+    function syncMode(){
+      var on = scheduled();
+      sendMain.value = on ? 'schedule' : 'publish';
+      sendLabel.textContent = on ? 'Schedule send' : sendMain.getAttribute('data-publish-label');
+      chip.hidden = !on;
+      if(on) chip.querySelector('[data-chip-text]').textContent = 'Scheduled for '+phFormat(dateIn.value, timeIn.value, true);
+    }
+    function setSchedule(d, t){ dateIn.value = d||''; timeIn.value = t||''; syncMode(); }
 
-    if(dateWrap) initDatePicker(dateWrap);
-    if(timeWrap){
-      var pairName = timeWrap.getAttribute('data-pair-date');
-      initTimePicker(timeWrap, {
-        isToday: function(){
-          var pairInput = pairName ? schedWrap.querySelector('[name="'+pairName+'"]') : null;
-          return !!(pairInput && pairInput.value === todayISO());
-        }
-      });
+    // ---- Quick options menu (computed from today's Philippine date) ----
+    function buildMenu(){
+      var today = phToday(), tomorrow = phAddDays(today, 1);
+      var dow = phWeekday(today), toMonday = ((8 - dow) % 7) || 7;
+      var monday = phAddDays(today, toMonday);
+      var opts = [['Tomorrow morning', tomorrow, '08:00'], ['Tomorrow afternoon', tomorrow, '13:00']];
+      if(monday !== tomorrow) opts.push(['Monday morning', monday, '08:00']);
+      var html = '<div class="send-menu-title">Schedule send <span>(Philippine Standard Time)</span></div>'
+        + opts.map(function(o){ return '<button type="button" role="menuitem" data-quick-date="'+o[1]+'" data-quick-time="'+o[2]+'"><span>'+o[0]+'</span><span class="when">'+phFormat(o[1], o[2], false)+'</span></button>'; }).join('')
+        + '<div class="send-menu-sep"></div>'
+        + '<button type="button" role="menuitem" data-pick-schedule>'+ic('calendar','16px')+'<span>Pick date &amp; time</span></button>'
+        + (scheduled() ? '<button type="button" role="menuitem" data-send-now>'+ic('send','16px')+'<span>Send now instead</span></button>' : '');
+      menu.innerHTML = html;
     }
-
-    function isScheduleMode(){ return toggle.checked; }
-    function refreshSummary(){
-      if(!dateHidden || !timeHidden) return;
-      var dIso = dateHidden.value, tHHMM = timeHidden.value;
-      var valid = false;
-      if(dIso && tHHMM){
-        var when = new Date(dIso+'T'+tHHMM+':00');
-        valid = !isNaN(when.getTime()) && when.getTime() > Date.now();
-      }
-      if(dIso && tHHMM && valid){
-        if(sumEl){ sumEl.hidden=false; sumEl.innerHTML = 'Scheduled for<br><b>'+esc(formatDateLongWeekday(dIso))+' at '+esc(formatTime12(tHHMM))+'</b>'; }
-        if(errEl) errEl.hidden = true;
-        if(dateWrap) dateWrap.classList.remove('invalid');
-        if(timeWrap) timeWrap.classList.remove('invalid');
-      } else {
-        if(sumEl) sumEl.hidden = true;
-        // Only flag the red/error state once both fields have a value —
-        // don't shout "invalid" at someone who just hasn't picked yet.
-        var bothSet = !!(dIso && tHHMM);
-        if(errEl) errEl.hidden = !bothSet;
-        if(dateWrap) dateWrap.classList.toggle('invalid', bothSet);
-        if(timeWrap) timeWrap.classList.toggle('invalid', bothSet);
-      }
-      // The date flipping between today/a future day changes which times
-      // are valid, so keep the time picker's own chip-disabling in sync.
-      if(timeWrap && timeWrap._timePickerRefresh) timeWrap._timePickerRefresh();
-    }
-    var block = form && form.querySelector('[data-schedule-block]');
-    var sendMain = form && form.querySelector('[data-send-main]');
-    var sendLabel = sendMain && sendMain.querySelector('[data-send-label]');
-    var menu = form && form.querySelector('[data-send-menu]');
-    var more = form && form.querySelector('[data-send-more]');
-    function sync(){
-      var on = isScheduleMode();
-      schedWrap.hidden = !on;
-      if(block) block.hidden = !on;
-      if(sendMain){ sendMain.value = on ? 'schedule' : 'publish'; sendLabel.textContent = on ? 'Schedule send' : sendMain.getAttribute('data-publish-label'); }
-      if(menu){
-        menu.querySelector('[data-send-option="schedule"]').hidden = on;
-        menu.querySelector('[data-send-option="now"]').hidden = !on;
-      }
-      if(on) refreshSummary();
-    }
-    function closeMenu(){ if(menu){ menu.hidden = true; more.setAttribute('aria-expanded','false'); } }
-    if(more) more.addEventListener('click', function(e){
+    function closeMenu(){ menu.hidden = true; more.setAttribute('aria-expanded','false'); }
+    more.addEventListener('click', function(e){
       e.stopPropagation();
-      var open = menu.hidden;
-      menu.hidden = !open; more.setAttribute('aria-expanded', String(open));
-      if(open){ var first = menu.querySelector('button:not([hidden])'); if(first) first.focus(); }
+      if(!menu.hidden){ closeMenu(); return; }
+      buildMenu(); menu.hidden = false; more.setAttribute('aria-expanded','true');
+      var first = menu.querySelector('button'); if(first) first.focus();
     });
-    if(menu) menu.addEventListener('click', function(e){
-      var opt = e.target.closest('[data-send-option]'); if(!opt) return;
-      e.stopPropagation();
-      toggle.checked = opt.getAttribute('data-send-option')==='schedule';
-      sync(); closeMenu();
-      if(toggle.checked){ var trig = dateWrap && dateWrap.querySelector('[data-dt-trigger]'); if(trig) trig.click(); }
-      else if(sendMain) sendMain.focus();
+    menu.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      e.stopPropagation(); closeMenu();
+      if(b.hasAttribute('data-quick-date')){
+        // Like Gmail: picking a quick option schedules right away.
+        setSchedule(b.getAttribute('data-quick-date'), b.getAttribute('data-quick-time'));
+        sendMain.click();
+      } else if(b.hasAttribute('data-pick-schedule')){
+        openPicker();
+      } else if(b.hasAttribute('data-send-now')){
+        setSchedule('', ''); sendMain.focus();
+      }
     });
-    if(form) form.addEventListener('keydown', function(e){ if(e.key==='Escape' && menu && !menu.hidden){ e.stopPropagation(); closeMenu(); more.focus(); } });
-    if(form) form.addEventListener('click', function(e){ if(menu && !menu.hidden && !e.target.closest('.send-split')) closeMenu(); });
-    toggle.addEventListener('change', sync);
-    schedWrap.addEventListener('change', refreshSummary);
-    sync();
+    chip.querySelector('[data-chip-clear]').addEventListener('click', function(){ setSchedule('', ''); sendMain.focus(); });
+    chip.querySelector('[data-chip-edit]').addEventListener('click', openPicker);
 
-    // Validate on click, before the submit event (the PHP bridge handles
-    // submit in the capture phase, so this is the last client-side check).
-    var composerErr = form && form.querySelector('[data-composer-error]');
-    function fail(msg, field){
-      if(composerErr){ composerErr.textContent = msg; composerErr.hidden = false; }
-      if(field) field.focus();
+    // ---- Pick date & time panel ----
+    var view = {y:0, m:0}, sel = '';
+    var calTitle = picker.querySelector('[data-cal-title]'), calGrid = picker.querySelector('[data-cal-grid]');
+    var dateField = picker.querySelector('[data-pick-date]'), timeField = picker.querySelector('[data-pick-time]');
+    var pickErr = picker.querySelector('[data-pick-error]');
+    function renderCal(){
+      var first = new Date(Date.UTC(view.y, view.m, 1));
+      calTitle.textContent = first.toLocaleString('en-US', {month:'long', year:'numeric', timeZone:'UTC'});
+      var start = phAddDays(first.toISOString().slice(0,10), -first.getUTCDay());
+      var today = phToday(), cells = '';
+      for(var i=0;i<42;i++){
+        var key = phAddDays(start, i), d = new Date(key+'T00:00:00Z');
+        var cls = [];
+        if(d.getUTCMonth()!==view.m) cls.push('other');
+        if(key===today) cls.push('today');
+        if(key===sel) cls.push('selected');
+        var past = key < today;
+        cells += '<button type="button" class="'+cls.join(' ')+'" data-day="'+key+'"'+(past?' disabled':'')+' aria-label="'+esc(phFormatDate(key))+'"'+(key===sel?' aria-pressed="true"':'')+'>'+d.getUTCDate()+'</button>';
+      }
+      calGrid.innerHTML = cells;
     }
-    if(form) form.querySelectorAll('button[type="submit"]').forEach(function(btn){
+    function selectDay(key){
+      sel = key; var d = new Date(key+'T00:00:00Z'); view.y = d.getUTCFullYear(); view.m = d.getUTCMonth();
+      dateField.value = phFormatDate(key); renderCal();
+    }
+    function openPicker(){
+      pickErr.hidden = true;
+      var nowParts = phNowParts();
+      var d = dateIn.value || phToday();
+      var t = timeIn.value || nowParts.time;
+      selectDay(d);
+      timeField.value = phFormatTime(t);
+      picker.hidden = false;
+      var selBtn = calGrid.querySelector('.selected'); if(selBtn) selBtn.focus();
+    }
+    function closePicker(){ picker.hidden = true; sendMain.focus(); }
+    picker.querySelector('[data-cal-prev]').addEventListener('click', function(){ view.m--; if(view.m<0){ view.m=11; view.y--; } renderCal(); });
+    picker.querySelector('[data-cal-next]').addEventListener('click', function(){ view.m++; if(view.m>11){ view.m=0; view.y++; } renderCal(); });
+    calGrid.addEventListener('click', function(e){ var b = e.target.closest('[data-day]'); if(b && !b.disabled){ selectDay(b.getAttribute('data-day')); pickErr.hidden = true; } });
+    dateField.addEventListener('change', function(){ var k = phParseDate(dateField.value); if(k){ selectDay(k); pickErr.hidden = true; } else { pickErr.textContent = 'Enter a date like '+phFormatDate(phToday())+'.'; pickErr.hidden = false; } });
+    timeField.addEventListener('change', function(){ var t = phParseTime(timeField.value); if(t){ timeField.value = phFormatTime(t); pickErr.hidden = true; } else { pickErr.textContent = 'Enter a time like 9:05 PM.'; pickErr.hidden = false; } });
+    picker.querySelector('[data-pick-cancel]').addEventListener('click', closePicker);
+    picker.querySelector('[data-pick-confirm]').addEventListener('click', function(){
+      var k = phParseDate(dateField.value), t = phParseTime(timeField.value);
+      if(!k || !t){ pickErr.textContent = !k ? 'Enter a valid date.' : 'Enter a time like 9:05 PM.'; pickErr.hidden = false; return; }
+      if(!phIsFuture(k, t)){ pickErr.textContent = 'Choose a date and time in the future (Philippine time).'; pickErr.hidden = false; return; }
+      setSchedule(k, t);
+      picker.hidden = true;
+      sendMain.click();
+    });
+    picker.addEventListener('keydown', function(e){ if(e.key==='Escape'){ e.stopPropagation(); closePicker(); } });
+    form.addEventListener('keydown', function(e){ if(e.key==='Escape' && !menu.hidden){ e.stopPropagation(); closeMenu(); more.focus(); } });
+    form.addEventListener('click', function(e){ if(!menu.hidden && !e.target.closest('.send-split')) closeMenu(); });
+
+    // ---- Validate on click, before the submit event (the PHP bridge
+    // handles submit in the capture phase, so this is the last check). ----
+    function fail(msg, field){ composerErr.textContent = msg; composerErr.hidden = false; if(field) field.focus(); }
+    form.querySelectorAll('button[type="submit"]').forEach(function(btn){
       btn.addEventListener('click', function(e){
-        if(composerErr) composerErr.hidden = true;
-        var mode = btn.value;
+        composerErr.hidden = true;
         if(!form.elements.postTo.value){ e.preventDefault(); fail('Choose who should receive this announcement.', form.elements.postTo); return; }
         if(!form.elements.title.value.trim()){ e.preventDefault(); fail('Add a subject.', form.elements.title); return; }
         if(!form.elements.content.value.trim()){ e.preventDefault(); fail('Write a message.', form.elements.content); return; }
-        if(mode==='schedule'){
-          if(!toggle.checked){ toggle.checked = true; sync(); }
-          var dIso = dateHidden ? dateHidden.value : '', tHHMM = timeHidden ? timeHidden.value : '';
-          var when = dIso && tHHMM ? new Date(dIso+'T'+tHHMM+':00') : null;
-          if(!when || isNaN(when.getTime()) || when.getTime() <= Date.now()){
-            e.preventDefault();
-            if(errEl) errEl.hidden = false;
-            if(dateWrap && !dIso){ var trig = dateWrap.querySelector('[data-dt-trigger]'); if(trig) trig.focus(); }
-          }
+        if(btn.value==='schedule' && !(scheduled() && phIsFuture(dateIn.value, timeIn.value))){
+          e.preventDefault(); fail('That scheduled time has passed. Pick a new date and time.'); openPicker();
         }
       });
     });
+    syncMode();
   })();
 
   app.onclick = function(ev){
@@ -2916,7 +2996,7 @@ function bindEvents(){
         annStatus = 'Draft';
       } else if(saveMode==='schedule'){
         var schedDateVal = fd.get('scheduleDate')||'', schedTimeVal = fd.get('scheduleTime')||'';
-        var when = schedDateVal && schedTimeVal ? new Date(schedDateVal+'T'+schedTimeVal+':00') : null;
+        var when = schedDateVal && schedTimeVal ? phInstant(schedDateVal, schedTimeVal) : null;
         if(!when || isNaN(when.getTime()) || when.getTime() <= Date.now()){
           // The picker's own inline error is already kept in sync live as
           // the user interacts with it (see bindEvents) — just make sure
