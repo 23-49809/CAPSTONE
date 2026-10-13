@@ -1345,7 +1345,7 @@ function renderHeadDashboard(acct){
   var recentAnn = state.announcements.slice(0,4);
   return ''
   + '<div class="page-head"><div><h1>Head Dashboard</h1><p>Overview of office activity, generated reports, and announcements.</p></div>'
-    + '<button class="btn btn-primary" data-action="open-ann-modal">'+ic('megaphone','17px')+' New Announcement</button></div>'
+    + '<button class="btn btn-primary" data-action="open-ann-modal">New Announcement</button></div>'
   + '<div class="dash-stats cols-4">'
     + dashStatCard('', docTotal, 'Document Requests', pendingDoc+' pending action', 'reports')
     + dashStatCard('', landTotal, 'Land Transfer Requests', pendingLand+' pending action', 'reports')
@@ -1385,7 +1385,7 @@ function renderAnnouncements(acct){
   var STATUS_TABS = ['all','Draft','Scheduled','Published','Cancelled'];
   return ''
   + '<div class="page-head"><div><h1>Announcements</h1><p>Post updates to the Client Interface, the Staff Interface, or both.</p></div>'
-    + '<button class="btn btn-primary" data-action="open-ann-modal">'+ic('megaphone','17px')+' Create Announcement</button></div>'
+    + '<button class="btn btn-primary" data-action="open-ann-modal">Create Announcement</button></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search announcements" value="'+esc(state.search.announcements)+'" data-input="search-announcements"></div>'
     + '<div class="seg">'
@@ -1396,7 +1396,7 @@ function renderAnnouncements(acct){
   + (list.length ? list.map(function(a){
       var actions = '<button class="icon-btn action-button" data-action="edit-ann" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>';
       if(a.status==='Draft' || a.status==='Scheduled'){
-        actions += '<button class="icon-btn action-button" data-action="ann-publish-now" data-id="'+a.id+'">'+ic('megaphone','13px')+'Publish Now</button>';
+        actions += '<button class="icon-btn action-button" data-action="ann-publish-now" data-id="'+a.id+'">Publish Now</button>';
       }
       if(a.status==='Published'){
         actions += '<button class="icon-btn action-button" data-action="ann-unpublish" data-id="'+a.id+'">'+ic('power','13px')+'Unpublish</button>';
@@ -1411,7 +1411,7 @@ function renderAnnouncements(acct){
         + '<td data-label="Published / Scheduled">'+annDateCell(a)+'</td>'
         + '<td data-label="Created By">'+esc(a.postedBy)+'</td>'
         + '<td class="actions-cell"><div class="actions-container">'+actions+'</div></td></tr>';
-    }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('megaphone','30px')+'No announcements match your search.</div></td></tr>')
+    }).join('') : '<tr><td colspan="6"><div class="empty-state">No announcements match your search.</div></td></tr>')
   + '</tbody></table></div>';
 }
 
