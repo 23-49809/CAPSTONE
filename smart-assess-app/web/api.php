@@ -974,6 +974,94 @@ function sa_send_notification(array $data): array
     return ['request_id' => (int) $requestId, 'notification_id' => $notificationId];
 }
 
+function sa_generate_ai_message(array $data): array
+{
+    $generationType = (string) ($data['generation_type'] ?? '');
+    if ($generationType === 'notification') {
+        sa_internal_or_fail(['STAFF']);
+    } elseif ($generationType === 'announcement') {
+        sa_internal_or_fail(['DEPARTMENT_HEAD']);
+    } else {
+        throw new SaHttpException(422, 'Choose a supported message type.');
+    }
+
+    $topic = sa_text($data, 'topic', 200, true);
+    $details = sa_text($data, 'details', 1000) ?? '';
+    $ollamaUrl = getenv('SMART_ASSESS_OLLAMA_URL');
+    $ollamaUrl = $ollamaUrl === false || trim($ollamaUrl) === ''
+        ? 'http://127.0.0.1:11434'
+        : rtrim(trim($ollamaUrl), '/');
+    $urlParts = parse_url($ollamaUrl);
+    if (!is_array($urlParts) ||
+        !in_array(strtolower((string) ($urlParts['scheme'] ?? '')), ['http', 'https'], true) ||
+        empty($urlParts['host']) ||
+        isset($urlParts['user']) || isset($urlParts['pass']) ||
+        isset($urlParts['query']) || isset($urlParts['fragment']) ||
+        (isset($urlParts['path']) && $urlParts['path'] !== '' && $urlParts['path'] !== '/')) {
+        throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
+    }
+    if (!function_exists('curl_init')) {
+        throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
+    }
+
+    $purpose = $generationType === 'notification'
+        ? 'a concise notification to a client about an assessor office matter'
+        : 'a concise announcement from the Assessor Office of Mabini';
+    $prompt = "Write {$purpose} in a professional, clear, respectful tone. " .
+        "Use only the non-sensitive topic and details below. Do not invent facts, " .
+        "include personal or property identifiers, add a subject line, or claim that " .
+        "an action has occurred unless the details say so. Return only the message text.\n\n" .
+        "Topic: {$topic}\n" .
+        'Relevant non-sensitive details: ' . ($details !== '' ? $details : 'None provided.');
+    $payload = json_encode([
+        'model' => 'llama3.2:3b',
+        'prompt' => $prompt,
+        'stream' => false,
+        'options' => ['temperature' => 0.4],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+    $responseBody = '';
+    $curl = curl_init($ollamaUrl . '/api/generate');
+    if ($curl === false) {
+        throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
+    }
+    curl_setopt_array($curl, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+        CURLOPT_RETURNTRANSFER => false,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$responseBody): int {
+            if (strlen($responseBody) + strlen($chunk) > 1_048_576) {
+                return 0;
+            }
+            $responseBody .= $chunk;
+            return strlen($chunk);
+        },
+    ]);
+    $result = curl_exec($curl);
+    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    curl_close($curl);
+    if ($result === false || $status < 200 || $status >= 300) {
+        throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
+    }
+
+    try {
+        $decoded = json_decode($responseBody, true, 16, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        throw new SaHttpException(503, 'AI message generation returned an invalid response. You can enter the message manually.');
+    }
+    $message = is_array($decoded) ? trim((string) ($decoded['response'] ?? '')) : '';
+    if ($message === '' || strlen($message) > 6000) {
+        throw new SaHttpException(503, 'AI message generation returned no usable text. You can enter the message manually.');
+    }
+    return ['message' => $message];
+}
+
 function sa_admin_user_change(array $data, string $action): array
 {
     $actor = sa_internal_or_fail(['ADMIN']);
@@ -1430,6 +1518,7 @@ try {
         'start_processing' => sa_start_request_processing($data),
         'complete_processing' => sa_complete_request_processing($data),
         'send_notification' => sa_send_notification($data),
+        'generate_ai_message' => sa_generate_ai_message($data),
         'admin_create_user' => sa_admin_user_change($data, 'create'),
         'admin_edit_user' => sa_admin_user_change($data, 'edit'),
         'admin_user_status' => sa_admin_user_change($data, 'status'),
@@ -1457,7 +1546,7 @@ try {
     sa_json_response($response);
 } catch (SaHttpException $exception) {
     error_log(sprintf('[SMART_ASSESS] HTTP %d: %s', $exception->statusCode, $exception->getMessage()));
-    $message = $exception->statusCode === 422 &&
+    $message = in_array($exception->statusCode, [422, 503], true) &&
         $exception->getMessage() !== 'Request could not be completed.'
         ? $exception->getMessage()
         : 'Request could not be completed.';
