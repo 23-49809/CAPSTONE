@@ -36,6 +36,36 @@ The public HTML is served by `web/index.php`; internal pages are served by
 documents are stored under `smart-assess-app/private_uploads/`, outside the
 web document root; that directory is git-ignored.
 
+## Internal AI message generation
+
+The internal notification and Department Head announcement forms can request
+draft wording from Ollama. The browser sends only the selected feature, topic,
+and user-entered non-sensitive context to the PHP API; PHP enforces the staff
+or Department Head role and calls Ollama server-to-server. The result only
+fills the editable message field. It does not send a notification, save a
+draft, or publish an announcement. Do not enter client names, property
+details, request references, uploaded-document contents, credentials, or other
+identifying information in AI context fields.
+
+For local development, keep Ollama bound to loopback and use its default local
+endpoint. The application defaults to `http://127.0.0.1:11434`; if PHP and
+Ollama run in different network namespaces, set `SMART_ASSESS_OLLAMA_URL` to
+the private endpoint reachable by PHP. Do not expose port `11434` to the
+public internet or call it directly from a browser.
+
+### Production configuration
+
+Do not assume `localhost` points to Ollama after deployment. Configure
+`SMART_ASSESS_OLLAMA_URL` on the application server to an HTTPS Ollama endpoint
+reachable only over the deployment's private network. Restrict inbound access
+to that endpoint to the application server, require TLS, and use the
+organization's approved private-network and authentication controls. Do not
+publish port `11434` or place endpoint credentials in source code or browser
+configuration. If the production Ollama gateway requires request
+authentication, add server-side credential handling through the deployment's
+secret manager before enabling generation. Without this configuration, the
+application should remain usable with manual message entry.
+
 ## Database setup
 
 The application expects the existing `smart_assess` schema and uses PDO

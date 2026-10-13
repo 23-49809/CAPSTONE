@@ -992,13 +992,18 @@ function sa_generate_ai_message(array $data): array
         ? 'http://127.0.0.1:11434'
         : rtrim(trim($ollamaUrl), '/');
     $urlParts = parse_url($ollamaUrl);
+    $ollamaHost = strtolower(trim((string) ($urlParts['host'] ?? ''), '[]'));
     if (!is_array($urlParts) ||
         !in_array(strtolower((string) ($urlParts['scheme'] ?? '')), ['http', 'https'], true) ||
-        empty($urlParts['host']) ||
+        $ollamaHost === '' ||
         isset($urlParts['user']) || isset($urlParts['pass']) ||
         isset($urlParts['query']) || isset($urlParts['fragment']) ||
         (isset($urlParts['path']) && $urlParts['path'] !== '' && $urlParts['path'] !== '/')) {
         throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
+    }
+    if (strtolower((string) ($urlParts['scheme'] ?? '')) === 'http' &&
+        !in_array($ollamaHost, ['127.0.0.1', 'localhost', '::1'], true)) {
+        throw new SaHttpException(503, 'AI message generation requires HTTPS for non-local endpoints. You can enter the message manually.');
     }
     if (!function_exists('curl_init')) {
         throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
