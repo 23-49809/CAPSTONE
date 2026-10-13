@@ -266,8 +266,13 @@ function sa_internal_bootstrap(): array
 
     $data['notifications'] = $pdo->query(
         'SELECT l.id, l.request_id, l.status, l.actor, l.sms_body AS message,
-                l.created_at, r.reference_no
-         FROM request_status_log l JOIN requests r ON r.id = l.request_id
+                l.created_at, r.reference_no,
+                NULLIF(TRIM(CONCAT_WS(
+                    \' \', NULLIF(c.first_name, \'\'), NULLIF(c.last_name, \'\')
+                )), \'\') AS client_name
+         FROM request_status_log l
+         LEFT JOIN requests r ON r.id = l.request_id
+         LEFT JOIN clients c ON c.id = r.client_id
          ORDER BY l.created_at DESC, l.id DESC LIMIT 200'
     )->fetchAll();
     return $data;

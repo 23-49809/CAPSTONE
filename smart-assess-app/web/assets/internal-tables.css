@@ -48,3 +48,75 @@
 .sidebar nav .side-link[data-view="requirement-results"] {
   display: none;
 }
+
+.sent-notifications-accordion {
+  border-top: 1px solid var(--line);
+}
+
+.sent-notifications-summary {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sent-notifications-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sent-notifications-summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--brand-700);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sent-notifications-accordion[open] .sent-notifications-summary::after {
+  content: "\2212";
+}
+
+.sent-notifications-summary h3 {
+  margin: 0;
+}
+
+.sent-notifications-list {
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  padding-top: 8px;
+}
+
+.sent-notifications-list .notif-item {
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+
+.notification-reference {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-700);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notification-reference:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.notification-reference:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+.notification-client-name {
+  display: block;
+  margin: 4px 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+}

@@ -215,12 +215,12 @@ $page['adminProcessingStats'] = [
     'landTransfers' => $reportStats($landRequests),
 ];
 $page['timeLogs'] = [];
-$page['notifs'] = array_map(static function (array $notification) use ($requestByReference): array {
-    $reference = (string) ($notification['reference_no'] ?? '');
+$page['notifs'] = array_map(static function (array $notification): array {
+    $clientName = trim((string) ($notification['client_name'] ?? ''));
     return [
         'id' => (string) ($notification['id'] ?? ''),
-        'requestRef' => $reference,
-        'applicant' => (string) ($requestByReference[$reference]['applicant'] ?? ''),
+        'requestRef' => (string) ($notification['reference_no'] ?? ''),
+        'clientName' => $clientName !== '' ? $clientName : 'Client information unavailable',
         'category' => 'Request Status Update',
         'message' => (string) ($notification['message'] ?? ''),
         'sentBy' => (string) ($notification['actor'] ?? 'system'),
