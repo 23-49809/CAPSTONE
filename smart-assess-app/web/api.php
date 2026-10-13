@@ -974,6 +974,46 @@ function sa_send_notification(array $data): array
     return ['request_id' => (int) $requestId, 'notification_id' => $notificationId];
 }
 
+function sa_lookup_request_owner(array $data): array
+{
+    sa_internal_or_fail(['STAFF']);
+    $reference = strtoupper((string) sa_text($data, 'reference', 30, true));
+    $stmt = sa_db()->prepare(
+        'SELECT r.is_owner, r.first_name, r.middle_name, r.last_name,
+                c.first_name AS client_first_name, c.last_name AS client_last_name
+         FROM requests r
+         LEFT JOIN clients c ON c.id = r.client_id
+         WHERE r.reference_no = :reference
+         LIMIT 1'
+    );
+    $stmt->execute(['reference' => $reference]);
+    $request = $stmt->fetch();
+    if (!$request) {
+        return ['ownerName' => 'Owner name unavailable', 'ownerType' => null];
+    }
+
+    $isOwner = filter_var($request['is_owner'], FILTER_VALIDATE_BOOLEAN);
+    if ($isOwner) {
+        $ownerName = trim(implode(' ', array_filter([
+            trim((string) ($request['first_name'] ?? '')),
+            trim((string) ($request['middle_name'] ?? '')),
+            trim((string) ($request['last_name'] ?? '')),
+        ], static fn(string $part): bool => $part !== '')));
+        if ($ownerName !== '') {
+            return ['ownerName' => $ownerName, 'ownerType' => 'Property owner'];
+        }
+    } else {
+        $clientName = trim(implode(' ', array_filter([
+            trim((string) ($request['client_first_name'] ?? '')),
+            trim((string) ($request['client_last_name'] ?? '')),
+        ], static fn(string $part): bool => $part !== '')));
+        if ($clientName !== '') {
+            return ['ownerName' => $clientName, 'ownerType' => 'Client'];
+        }
+    }
+    return ['ownerName' => 'Owner name unavailable', 'ownerType' => null];
+}
+
 function sa_generate_ai_message(array $data): array
 {
     $generationType = (string) ($data['generation_type'] ?? '');
@@ -1532,6 +1572,7 @@ try {
         'start_processing' => sa_start_request_processing($data),
         'complete_processing' => sa_complete_request_processing($data),
         'send_notification' => sa_send_notification($data),
+        'lookup_request_owner' => sa_lookup_request_owner($data),
         'generate_ai_message' => sa_generate_ai_message($data),
         'admin_create_user' => sa_admin_user_change($data, 'create'),
         'admin_edit_user' => sa_admin_user_change($data, 'edit'),

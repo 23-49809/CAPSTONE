@@ -100,33 +100,49 @@
   .btn-link .icon{ width:16px; height:16px; }
 
   /* ============ Hero ============ */
-  .hero{ position:relative; overflow:hidden; color:#fff;
-    background: linear-gradient(90deg, rgba(4,53,39,.68) 0%, rgba(6,78,59,.62) 47%, rgba(6,78,59,.52) 100%),
-      url("bg MAO.jpg") center / cover no-repeat; }
-  .hero::after{ content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg, rgba(4,53,39,.12), rgba(4,53,39,.28)); }
-  .hero .wrap{ z-index:1; }
-  .hero-inner{ position:relative; padding:96px 0 88px; max-width:780px; }
+  /* Light, split hero: copy on the paper colour at left, the real Mabini
+     Assessor's Office photo at right fading into it, and a green wave
+     anchoring the bottom-left corner. */
+  :root{ --hero-ink:var(--brand-900); --hero-text:#33403a; --hero-accent:var(--brand-800); --hero-wave-light:#cfe5d4; --hero-scrim:246,247,243; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --hero-ink:#e3f4e8; --hero-text:#b9c8be; --hero-accent:#8fdcb1; --hero-wave-light:#1d3a28; --hero-scrim:10,19,14; } }
+  :root[data-theme="dark"]{ --hero-ink:#e3f4e8; --hero-text:#b9c8be; --hero-accent:#8fdcb1; --hero-wave-light:#1d3a28; --hero-scrim:10,19,14; }
+
+  .hero{ position:relative; overflow:hidden; background:var(--paper); color:var(--hero-ink); }
+  .hero-photo{ position:absolute; inset:0; background:url("hero-mao.jpg") 58% 42% / cover no-repeat; }
+  /* Light scrim only behind the copy column so the photo stays vivid. */
+  .hero-photo::after{ content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg, rgba(var(--hero-scrim),.78) 0%, rgba(var(--hero-scrim),.6) 32%, rgba(var(--hero-scrim),.18) 52%, rgba(var(--hero-scrim),0) 66%); }
+  .hero .home-slide-inner p, .hero .eyebrow{ text-shadow:0 0 12px rgba(var(--hero-scrim),.9), 0 0 2px rgba(var(--hero-scrim),.7); }
+  .hero-wave{ position:absolute; left:0; bottom:0; width:min(760px,62%); height:auto; pointer-events:none; }
+  .hero-wave .wave-light{ fill:var(--hero-wave-light); }
+  .hero-wave .wave-dark{ fill:var(--brand-900); }
+  .hero .wrap{ position:relative; z-index:1; height:100%; }
+  .hero-inner{ position:relative; padding:96px 0 88px; max-width:620px; }
   .eyebrow{ font-size:14px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#c3ecd4; margin-bottom:22px; display:block; }
-  .hero h1{ color:#fff; font-size:clamp(36px,5.4vw,58px); line-height:1.15; letter-spacing:-.01em; margin-bottom:24px; }
-  .hero p.lede{ font-size:20px; line-height:1.6; color:#f1f9f3; max-width:600px; margin-bottom:38px; }
+  .hero .eyebrow{ color:var(--hero-text); margin-bottom:0; }
+  .hero .eyebrow::after{ content:""; display:block; width:56px; height:3px; margin-top:16px; border-radius:2px; background:var(--hero-accent); }
+  .hero h1{ color:var(--hero-ink); font-size:clamp(40px,5.6vw,68px); line-height:1.05; letter-spacing:-.015em; font-weight:700; margin-bottom:22px; }
+  .hero p.lede{ font-size:20px; line-height:1.6; color:var(--hero-text); max-width:600px; margin-bottom:38px; }
   @media (max-width:768px){ .hero-inner{ padding:64px 0 56px; } }
 
-  .home-slider{ position:relative; height:620px; min-height:620px; overflow:hidden; color:#fff; }
+  .home-slider{ position:relative; height:620px; min-height:620px; overflow:hidden; }
   .home-slide{ position:absolute; inset:0; display:none; height:100%; overflow:hidden; }
   .home-slide.active{ display:block; animation:homeSlideIn .35s ease both; }
-  .home-slide .home-slide-inner{ max-width:760px; height:100%; padding:74px 70px 84px 0; }
-  .home-slide h1{ color:#fff; font-size:clamp(36px,5.4vw,58px); line-height:1.15; margin:10px 0 18px; }
-  .home-slide p{ color:#effaf3; font-size:19px; max-width:610px; margin-bottom:28px; }
-  .home-slide .hero-requirements{ font-size:16px; color:#d6f1df; margin-top:-16px; }
+  .home-slide .home-slide-inner{ max-width:560px; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:40px 0 110px; }
+  .home-slide h1{ margin:22px 0 14px; }
+  .home-slide p{ color:var(--hero-text); font-size:18px; max-width:520px; margin-bottom:28px; }
+  .home-slide .hero-tagline{ font-family:var(--font-body); font-style:italic; font-weight:700; font-size:22px; color:var(--hero-accent); margin-bottom:16px; }
+  .home-slide .hero-requirements{ font-size:16px; color:var(--hero-text); margin-top:-16px; }
   .home-slide .announcement-copy{ margin-bottom:24px; }
-  .home-slide .announcement-copy h3{ color:#fff; font-size:24px; margin-bottom:7px; }
-  .home-slide .announcement-copy time{ color:#bce9cd; font-size:14px; }
-  .home-slide-control{ position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.45); border-radius:50%; background:rgba(0,0,0,.16); color:#fff; cursor:pointer; }
-  .home-slide-control:hover{ background:rgba(0,0,0,.32); }
+  .home-slide .announcement-copy h3{ color:var(--hero-ink); font-size:24px; margin-bottom:7px; }
+  .home-slide .announcement-copy time{ color:var(--hero-text); font-size:14px; }
+  .home-slide-control{ position:absolute; z-index:2; top:50%; transform:translateY(-50%); width:48px; height:48px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.7); border-radius:50%; background:rgba(6,78,59,.55); color:#fff; cursor:pointer; backdrop-filter:blur(4px); }
+  .home-slide-control:hover{ background:rgba(6,78,59,.8); }
   .home-slide-control.prev{ left:20px; } .home-slide-control.next{ right:20px; }
-  .home-slide-dots{ position:absolute; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:9px; }
+  .home-slide-dots{ position:absolute; z-index:2; bottom:22px; left:50%; transform:translateX(-50%); display:flex; gap:9px; padding:6px 10px; border-radius:999px; background:rgba(6,78,59,.45); }
   .home-slide-dots button{ width:10px; height:10px; padding:0; border:1px solid #fff; border-radius:50%; background:transparent; cursor:pointer; }
   .home-slide-dots button.active{ background:#fff; }
+  @media (min-width:769px) and (max-width:1280px){ .home-slide .home-slide-inner{ padding-left:56px; } }
   .requirements-modal{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(10,19,14,.58); }
   .requirements-modal-card{ width:min(560px,100%); max-height:min(88vh,720px); overflow:auto; padding:clamp(20px,5vw,30px); border-radius:var(--radius-md); background:var(--surface); color:var(--ink); box-shadow:var(--shadow-lg); }
   .requirements-modal-card h3{ font-size:25px; margin-bottom:12px; }
@@ -152,7 +168,7 @@
   .announcement-detail-note strong{ color:var(--ink); }
   .announcement-detail-note p{ margin-top:5px; }
   @keyframes homeSlideIn{ from{ opacity:0; transform:translateX(15px); } to{ opacity:1; transform:none; } }
-  @media (max-width:768px){ .home-slider{ height:700px; min-height:700px; } .home-slide .home-slide-inner{ padding:76px 50px 92px 20px; } .home-slide p{ font-size:17px; } .home-slide-control{ width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
+  @media (max-width:768px){ .home-slider{ height:840px; min-height:840px; } .hero-photo{ background-position:60% 50%; } .hero-photo::after{ background:linear-gradient(180deg, rgba(var(--hero-scrim),0) 0%, rgba(var(--hero-scrim),0) 28%, rgba(var(--hero-scrim),.62) 40%, rgba(var(--hero-scrim),.7) 100%); } .hero-wave{ width:90%; } .home-slide .home-slide-inner{ justify-content:flex-start; padding:300px 0 92px; } .home-slide p{ font-size:17px; } .home-slide .hero-tagline{ font-size:19px; } .home-slide-control{ top:150px; width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
 
   /* ============ Services / cards ============ */
   .section{ padding:88px 0; }
@@ -785,7 +801,9 @@ function renderLanding(){
   const announcement = currentPublicAnnouncement();
   return renderHeader()
   + '<section class="hero home-slider" data-home-slider aria-label="Assessor Office updates">'
-    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">MABINI MUNICIPAL ASSESSOR’S OFFICE</span><h1>Welcome to SMART ASSESS</h1><p><em>Your Digital Gateway to Assessor Services</em></p><p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p><button class="btn btn-hero" data-action="get-started">Explore Services '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="hero-photo" role="img" aria-label="Mabini Municipal Assessor’s Office building"></div>'
+    + '<svg class="hero-wave" viewBox="0 0 760 200" preserveAspectRatio="none" aria-hidden="true"><path class="wave-light" d="M0 40 C 180 110, 360 190, 760 200 L0 200 Z"/><path class="wave-dark" d="M0 95 C 160 150, 300 192, 540 200 L0 200 Z"/></svg>'
+    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">MABINI MUNICIPAL ASSESSOR’S OFFICE</span><h1>Welcome to<br>SMART ASSESS</h1><p class="hero-tagline">Your Digital Gateway to Assessor Services</p><p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p><button class="btn btn-hero" data-action="get-started">Explore Services '+ic('arrowRight')+'</button></div></div></div>'
     + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Announcements</span><h1>Announcements</h1><div class="announcement-copy"><h3>'+esc(announcement ? announcement.title : 'No published announcements')+'</h3><p>'+esc(announcement ? announcement.content : 'There are no current announcements from the Assessor’s Office.')+'</p><time>'+(announcement ? esc(fmtDateTime(announcement.publishedAt || announcement.datePosted)) : '')+'</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
     + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
     + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Welcome to SMART ASSESS slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Announcements slide"></button></div>'
@@ -818,7 +836,7 @@ function renderLanding(){
   + renderAnnouncementModal()
   + '<footer class="site-footer"><div class="wrap"><div class="footer-grid">'
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
-    + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: assessor@mabini.gov.ph</p></div>'
+    + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: mao.smartassess@gmail.com</p></div>'
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
 }

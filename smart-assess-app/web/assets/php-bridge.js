@@ -6,6 +6,7 @@
   var formValues = Object.create(null);
   var internalRowActions = Object.create(null);
   var isOwner = true;
+  var ownerLookupSequence = 0;
 
   window.SMART_ASSESS_SET_FILE = function (key, file) {
     selectedFiles[key] = file;
@@ -196,8 +197,39 @@
     });
   }
 
+  function updateNotificationOwner(select) {
+    var form = select.closest('form[data-form="send-notif"]');
+    var nameDisplay = form && form.querySelector('#notification-owner-name');
+    var reference = select.value;
+    var sequence = ++ownerLookupSequence;
+    if (!nameDisplay) return;
+    if (!reference) {
+      nameDisplay.textContent = 'Select a reference number';
+      nameDisplay.removeAttribute('title');
+      return;
+    }
+    nameDisplay.textContent = 'Loading…';
+    nameDisplay.removeAttribute('title');
+    jsonRequest('lookup_request_owner', { reference: reference }).then(function (result) {
+      if (sequence !== ownerLookupSequence || select.value !== reference) return;
+      var ownerName = result.data.ownerName || 'Owner name unavailable';
+      var ownerType = result.data.ownerType;
+      nameDisplay.textContent = ownerName;
+      nameDisplay.classList.toggle('is-empty', ownerName === 'Owner name unavailable');
+      nameDisplay.title = ownerType && ownerName !== 'Owner name unavailable' ? ownerType + ': ' + ownerName : ownerName;
+    }).catch(function () {
+      if (sequence !== ownerLookupSequence || select.value !== reference) return;
+      nameDisplay.textContent = 'Owner name unavailable';
+      nameDisplay.removeAttribute('title');
+      notice('Could not load the owner/client name. You can still continue with the notification.');
+    });
+  }
+
   document.addEventListener('change', function (event) {
     var input = event.target;
+    if (config.portal === 'internal' && input && input.matches('form[data-form="send-notif"] select[name="requestRef"]')) {
+      updateNotificationOwner(input);
+    }
     if (input && input.matches('[data-file-input]') && input.files && input.files[0]) {
       selectedFiles[input.getAttribute('data-file-input')] = input.files[0];
     }
@@ -553,9 +585,37 @@
     enhanceSentNotifications(root);
   }
 
+  function enhanceProfileAvatar(root) {
+    if (config.portal !== 'internal') return;
+    var avatar = root.querySelector('.app-header .hd-avatar');
+    if (!avatar) return;
+    var name = avatar.querySelector('.hd-name');
+    var copy = name && name.parentElement;
+    if (!name || !copy) return;
+
+    copy.classList.add('hd-avatar-copy');
+    avatar.type = 'button';
+    avatar.setAttribute('aria-expanded', String(avatar.classList.contains('is-expanded')));
+    avatar.setAttribute('aria-label', (avatar.classList.contains('is-expanded') ? 'Hide' : 'Show') +
+      ' full name for ' + name.textContent.trim());
+    avatar.removeAttribute('data-action');
+    avatar.removeAttribute('data-view');
+  }
+
   if (config.portal === 'internal') {
     var internalApp = document.getElementById('app');
     if (internalApp) {
+      internalApp.addEventListener('click', function (event) {
+        var avatar = event.target.closest('.app-header .hd-avatar');
+        if (!avatar) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        var expanded = avatar.classList.toggle('is-expanded');
+        avatar.setAttribute('aria-expanded', String(expanded));
+        var name = avatar.querySelector('.hd-name');
+        avatar.setAttribute('aria-label', (expanded ? 'Hide' : 'Show') +
+          ' full name for ' + (name ? name.textContent.trim() : 'your account'));
+      }, true);
       internalApp.addEventListener('click', function (event) {
         var row = event.target.closest('tr.record-clickable-row');
         if (!row) return;
@@ -565,9 +625,11 @@
         if (!controlAction || controlAction === row) event.stopImmediatePropagation();
       });
       var internalRowsObserver = new MutationObserver(function () {
+        enhanceProfileAvatar(internalApp);
         enhanceInternalTables(internalApp);
       });
       internalRowsObserver.observe(internalApp, { childList: true, subtree: true });
+      enhanceProfileAvatar(internalApp);
       enhanceInternalTables(internalApp);
     }
   }
