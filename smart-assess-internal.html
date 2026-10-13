@@ -481,8 +481,6 @@
     background:url("sidebar-mao.jpg") 60% 70% / cover no-repeat; mix-blend-mode:luminosity; opacity:.34;
     -webkit-mask-image:linear-gradient(to top, transparent 0%, #000 20%, #000 55%, transparent 100%);
             mask-image:linear-gradient(to top, transparent 0%, #000 20%, #000 55%, transparent 100%); }
-  .sidebar-accent{ position:absolute !important; z-index:0 !important; right:0; bottom:80px; width:140px; height:84px; pointer-events:none; }
-  @media (max-height:620px){ .sidebar-art, .sidebar-accent{ display:none; } }
 
   /* Static sidebar: always visible. Below 900px it sits above the content
      as a full-width block instead of an off-canvas drawer. */
@@ -494,7 +492,6 @@
     .sidebar .side-link{ width:auto; padding:9px 12px; font-size:14px; gap:8px; }
     .sidebar .side-link .icon{ width:18px; height:18px; }
     .sidebar-foot{ margin-top:0; padding-top:10px; }
-    .sidebar-art, .sidebar-accent{ display:none; }
     .sidebar-backdrop{ display:none !important; }
   }
 
@@ -527,21 +524,23 @@
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --navy:#edf3ee; --accent:#6ee7b7; --dot-amber:#d9a456; --dot-blue:#8dbbe0; --row-alt:#152219; --row-hover:#1c2d22; --head-green:#0b5a44; } }
   :root[data-theme="dark"]{ --navy:#edf3ee; --accent:#6ee7b7; --dot-amber:#d9a456; --dot-blue:#8dbbe0; --row-alt:#152219; --row-hover:#1c2d22; --head-green:#0b5a44; }
 
-  /* Staff pages: 1px divider above every page heading. It bleeds through
+  /* All internal pages: 1px divider above every page heading. It bleeds through
      .main-content's side padding so it spans the content column edge to
      edge; the heading sits 18px below it. */
-  .role-staff .page-head{ padding-top:18px; margin-bottom:28px; }
-  .role-staff .page-head::before{ content:""; position:absolute; left:calc(-1 * var(--main-pad-x)); right:calc(-1 * var(--main-pad-x)); top:0; height:1px; background:#2b2f2d; pointer-events:none; }
-  /* One heading style for every staff page (taken from "Staff Dashboard"). */
-  .role-staff .page-head > div{ margin:0; padding:0; }
-  .role-staff .page-head h1{ font-family:var(--font-display); font-weight:600; font-size:clamp(26px,2.6vw,32px); line-height:1; margin:0; padding:0; color:var(--navy); text-box:trim-start cap alphabetic; }
-  .role-staff .page-head p, .role-staff .page-head .dash-welcome{ margin-top:6px; color:var(--ink-soft); font-size:14.5px; }
-  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .role-staff .page-head::before{ background:#55615a; } }
-  :root[data-theme="dark"] .role-staff .page-head::before{ background:#55615a; }
+  .main-content .page-head{ padding-top:18px; margin-bottom:28px; }
+  .main-content .page-head::before{ content:""; position:absolute; left:calc(-1 * var(--main-pad-x)); right:calc(-1 * var(--main-pad-x)); top:0; height:1px; background:#2b2f2d; pointer-events:none; }
+  /* One heading style for every internal page (taken from "Staff Dashboard"). */
+  .main-content .page-head > div{ margin:0; padding:0; }
+  .main-content .page-head h1{ font-family:var(--font-display); font-weight:600; font-size:clamp(26px,2.6vw,32px); line-height:1; margin:0; padding:0; color:var(--navy); text-box:trim-start cap alphabetic; }
+  .main-content .page-head p, .main-content .page-head .dash-welcome{ margin-top:6px; color:var(--ink-soft); font-size:14.5px; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .main-content .page-head::before{ background:#55615a; } }
+  :root[data-theme="dark"] .main-content .page-head::before{ background:#55615a; }
 
   .dash-stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; margin-bottom:28px; }
   @media (max-width:1100px){ .dash-stats{ gap:14px; } .dash-stat{ padding:16px 18px; } }
-  @media (max-width:640px){ .dash-stats{ grid-template-columns:minmax(0,1fr); } }
+  .dash-stats.cols-4{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+  @media (max-width:1100px){ .dash-stats.cols-4{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:640px){ .dash-stats, .dash-stats.cols-4{ grid-template-columns:minmax(0,1fr); } }
   .dash-stat{ display:flex; flex-direction:column; gap:2px; padding:20px 22px; background:var(--surface); border:1px solid var(--line); border-radius:10px; color:inherit; text-align:left; font:inherit; cursor:pointer; transition:border-color .15s ease; }
   .dash-stat:hover{ border-color:var(--line-strong); }
   .dash-stat:hover .dash-stat-label{ color:var(--accent); }
@@ -687,10 +686,10 @@
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .sent-arrow{ color:var(--ink); } }
   :root[data-theme="dark"] .sent-arrow{ color:var(--ink); }
 
-  /* Staff sidebar branding: uppercase title, smaller readable subtitle. */
-  .sidebar-staff .sb-brand{ align-items:center; }
-  .sidebar-staff .sb-brand .hb-name{ font-size:19px; letter-spacing:.03em; text-transform:uppercase; line-height:1.1; }
-  .sidebar-staff .sb-brand .hb-tag{ margin-top:4px; font-size:11px; font-weight:500; letter-spacing:.02em; text-transform:none; color:#c7e3d2; line-height:1.3; white-space:normal; overflow:visible; text-overflow:clip; }
+  /* Sidebar branding (all roles): uppercase title, smaller readable subtitle. */
+  .sidebar .sb-brand{ align-items:center; }
+  .sidebar .sb-brand .hb-name{ font-size:19px; letter-spacing:.03em; text-transform:uppercase; line-height:1.1; }
+  .sidebar .sb-brand .hb-tag{ margin-top:4px; font-size:11px; font-weight:500; letter-spacing:.02em; text-transform:none; color:#c7e3d2; line-height:1.3; white-space:normal; overflow:visible; text-overflow:clip; }
 </style>
 
 <div id="app"></div>
@@ -1117,8 +1116,6 @@ function renderLogin(){
 }
 
 var SIDEBAR_ART = '<div class="sidebar-art" aria-hidden="true"></div>';
-/* Gold diagonal stroke above Logout — not shown on Staff pages. */
-var SIDEBAR_ACCENT = '<svg class="sidebar-accent" viewBox="0 0 140 84" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M140 0V84H44Z" fill="rgba(255,255,255,.05)"/><path d="M140 6L50 84H60L140 16Z" fill="var(--gold)"/></svg>';
 
 function shellChrome(acct, innerHtml){
   var nav = NAV[acct.role];
@@ -1129,8 +1126,8 @@ function shellChrome(acct, innerHtml){
   }).join('');
   return ''
   + '<div class="app-body">'
-    + '<aside class="sidebar'+(acct.role==='staff'?' sidebar-staff':'')+'" id="app-sidebar" aria-label="Main navigation">'
-      + SIDEBAR_ART + (acct.role==='staff' ? '' : SIDEBAR_ACCENT)
+    + '<aside class="sidebar" id="app-sidebar" aria-label="Main navigation">'
+      + SIDEBAR_ART
       + '<div class="sb-brand"><img src="data:image/png;base64,'+LOGO_B64+'" alt="Bayan ng Mabini seal"><div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor’s Office System</div></div></div>'
       + '<div class="sidebar-label">Menu</div><nav>'+navHtml+'</nav>'
       + '<div class="sidebar-foot"><button class="side-link" data-action="logout">'+ic('logout','18px')+'<span>Logout</span></button></div>'
@@ -1200,32 +1197,42 @@ function renderAdminDashboard(acct){
   var total = state.accounts.length;
   var activeN = state.accounts.filter(function(a){return a.status==='active';}).length;
   var inactiveN = total-activeN;
+  var staffN = state.accounts.filter(function(a){return a.role==='staff';}).length;
   var recent = state.accounts.slice().sort(function(a,b){ return b.dateCreated.localeCompare(a.dateCreated); }).slice(0,5);
   var processingStats = state.adminProcessingStats || {};
   var docProcessing = processingStats.documents || {};
   var landProcessing = processingStats.landTransfers || {};
+  function summaryRow(label, p){
+    return '<tr><td>'+label+'</td><td>'+Number(p.completed||0)+'</td><td>'+Number(p.completedWithDuration||0)+'</td><td>'+(p.averageDurationSeconds==null?'—':formatDuration(p.averageDurationSeconds))+'</td></tr>';
+  }
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Admin</div><h1>Admin Dashboard</h1><p>Manage Assessor’s Office staff accounts and access.</p></div>'
+  + '<div class="page-head"><div><h1>Admin Dashboard</h1><p>Manage Assessor’s Office staff accounts and access.</p></div>'
     + '<button class="btn btn-primary" data-action="nav" data-view="create-account">'+ic('userPlus','17px')+' Create Staff Account</button></div>'
-  + '<div class="stat-row">'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Total Accounts</span>'+ic('users')+'</div><div class="num">'+total+'</div><div class="lbl">All internal roles</div></div>'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Active</span>'+ic('check')+'</div><div class="num">'+activeN+'</div><div class="lbl">Can currently log in</div></div>'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Deactivated</span>'+ic('power')+'</div><div class="num">'+inactiveN+'</div><div class="lbl">Access disabled</div></div>'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Assessor Staff</span>'+ic('idCard')+'</div><div class="num">'+state.accounts.filter(function(a){return a.role==='staff';}).length+'</div><div class="lbl">Front-line processors</div></div>'
+  + '<div class="dash-stats cols-4">'
+    + dashStatCard('', total, 'Total Accounts', 'All internal roles', 'staff-accounts')
+    + dashStatCard('blue', activeN, 'Active', 'Can currently log in', 'staff-accounts')
+    + dashStatCard('amber', inactiveN, 'Deactivated', 'Access disabled', 'staff-accounts')
+    + dashStatCard('', staffN, 'Assessor Staff', 'Front-line processors', 'staff-accounts')
   + '</div>'
-  + '<div class="panel-card"><h3>'+ic('users')+'Recently Added Accounts</h3>'
-    + '<div class="table-wrap"><table><thead><tr><th>Full Name</th><th>Username</th><th>Position</th><th>Status</th><th>Date Created</th></tr></thead><tbody>'
-    + recent.map(function(a){
-      return '<tr><td class="cell-name" data-label="Full Name">'+esc(a.fullName)+'</td><td class="mono" data-label="Username">'+esc(a.username)+'</td><td data-label="Position">'+esc(a.position)+'</td>'
-        + '<td data-label="Status"><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
-        + '<td data-label="Date Created">'+fmtDate(a.dateCreated)+'</td></tr>';
-    }).join('')
-    + '</tbody></table></div></div>'
-  + '<div class="panel-card"><h3>'+ic('timer')+'Request Processing Summary</h3>'
-    + '<div class="table-wrap"><table><thead><tr><th>Request Type</th><th>Completed</th><th>With Recorded Duration</th><th>Average Duration</th></tr></thead><tbody>'
-    + '<tr><td data-label="Request Type">Document Requests</td><td data-label="Completed">'+Number(docProcessing.completed||0)+'</td><td data-label="With Recorded Duration">'+Number(docProcessing.completedWithDuration||0)+'</td><td class="mono" data-label="Average Duration">'+(docProcessing.averageDurationSeconds==null?'—':formatDuration(docProcessing.averageDurationSeconds))+'</td></tr>'
-    + '<tr><td data-label="Request Type">Land Transfers</td><td data-label="Completed">'+Number(landProcessing.completed||0)+'</td><td data-label="With Recorded Duration">'+Number(landProcessing.completedWithDuration||0)+'</td><td class="mono" data-label="Average Duration">'+(landProcessing.averageDurationSeconds==null?'—':formatDuration(landProcessing.averageDurationSeconds))+'</td></tr>'
-    + '</tbody></table></div></div>';
+  + '<div class="staff-dash"><div class="staff-dash-main">'
+    + '<section class="dash-panel">'
+      + '<div class="dash-panel-head"><h3>Recently Added Accounts</h3><button class="dash-link" data-action="nav" data-view="staff-accounts">View all</button></div>'
+      + '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Full Name</th><th>Username</th><th>Position</th><th>Status</th><th>Date Created</th></tr></thead><tbody>'
+      + (recent.length ? recent.map(function(a){
+          return '<tr class="dash-row" data-action="view-staff" data-id="'+esc(a.id)+'" tabindex="0" aria-label="View account '+esc(a.fullName)+'">'
+            + '<td title="'+esc(a.fullName)+'">'+esc(a.fullName)+'</td><td>'+esc(a.username)+'</td><td>'+esc(a.position)+'</td>'
+            + '<td class="dash-status"><span class="badge '+(a.status==='active'?'green':'slate')+'">'+(a.status==='active'?'Active':'Inactive')+'</span></td>'
+            + '<td class="dash-date">'+esc(fmtDate(a.dateCreated))+'</td></tr>';
+        }).join('') : '<tr><td colspan="5"><div class="empty-state">No accounts yet.</div></td></tr>')
+      + '</tbody></table></div>'
+    + '</section>'
+    + '<section class="dash-panel">'
+      + '<div class="dash-panel-head"><h3>Request Processing Summary</h3></div>'
+      + '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Request Type</th><th>Completed</th><th>With Recorded Duration</th><th>Average Duration</th></tr></thead><tbody>'
+        + summaryRow('Document Requests', docProcessing) + summaryRow('Land Transfers', landProcessing)
+      + '</tbody></table></div>'
+    + '</section>'
+  + '</div></div>';
 }
 
 function renderStaffAccounts(acct, jumpToInfo){
@@ -1238,7 +1245,7 @@ function renderStaffAccounts(acct, jumpToInfo){
   });
   var pg = paginate(list, 'staffAccounts');
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Admin</div><h1>'+(jumpToInfo?'Staff Information':'Manage Staff Accounts')+'</h1><p>View, edit, and control access for every Assessor’s Office account.</p></div>'
+  + '<div class="page-head"><div><h1>'+(jumpToInfo?'Staff Information':'Manage Staff Accounts')+'</h1><p>View, edit, and control access for every Assessor’s Office account.</p></div>'
     + '<button class="btn btn-primary" data-action="nav" data-view="create-account">'+ic('userPlus','17px')+' Create Account</button></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by name, username, or email" value="'+esc(state.search.staffAccounts)+'" data-input="search-staff"></div>'
@@ -1262,7 +1269,7 @@ function renderStaffAccounts(acct, jumpToInfo){
 function renderArchivedAccounts(){
   var archived = state.archivedAccounts || [];
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Admin</div><h1>Archived Accounts</h1><p>Archived staff accounts are inactive and can be restored or permanently deleted.</p></div></div>'
+  + '<div class="page-head"><div><h1>Archived Accounts</h1><p>Archived staff accounts are inactive and can be restored or permanently deleted.</p></div></div>'
   + (archived.length ? '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Position</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
     + archived.map(function(a){
       return '<tr><td class="cell-name">'+esc(a.fullName)+'<div class="cell-sub">'+esc(ROLE_LABEL[a.role])+'</div></td>'
@@ -1313,7 +1320,7 @@ function positionTitleField(value){
 
 function renderCreateAccount(acct){
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Admin</div><h1>Create Staff Account</h1><p>Set up login access for a new Assessor’s Office employee.</p></div></div>'
+  + '<div class="page-head"><div><h1>Create Staff Account</h1><p>Set up login access for a new Assessor’s Office employee.</p></div></div>'
   + '<div class="panel-card" style="max-width:640px;">'
     + '<form data-form="create-account">'
       + accountFormFields()
@@ -1332,31 +1339,37 @@ function renderHeadDashboard(acct){
   var pendingLand = state.landRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
   var completedThisMonth = state.docRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length + state.landRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length;
   var pubAnn = state.announcements.filter(function(a){ return a.status==='Published'; }).length;
-  var recentReports = state.reports.slice(0,3);
-  var recentAnn = state.announcements.slice(0,2);
+  var recentReports = state.reports.slice(0,4);
+  var recentAnn = state.announcements.slice(0,4);
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Head</div><h1>Head Dashboard</h1><p>Overview of office activity, generated reports, and announcements.</p></div>'
+  + '<div class="page-head"><div><h1>Head Dashboard</h1><p>Overview of office activity, generated reports, and announcements.</p></div>'
     + '<button class="btn btn-primary" data-action="open-ann-modal">'+ic('megaphone','17px')+' New Announcement</button></div>'
-  + '<div class="stat-row">'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Document Requests</span>'+ic('doc')+'</div><div class="num">'+docTotal+'</div><div class="lbl">'+pendingDoc+' pending action</div></div>'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Land Transfer Requests</span>'+ic('swap')+'</div><div class="num">'+landTotal+'</div><div class="lbl">'+pendingLand+' pending action</div></div>'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Completed</span>'+ic('check')+'</div><div class="num">'+completedThisMonth+'</div><div class="lbl">Across both request types</div></div>'
-    + '<div class="stat-card"><div class="stat-top"><span class="lbl">Published Announcements</span>'+ic('megaphone')+'</div><div class="num">'+pubAnn+'</div><div class="lbl">Visible to staff</div></div>'
+  + '<div class="dash-stats cols-4">'
+    + dashStatCard('', docTotal, 'Document Requests', pendingDoc+' pending action', 'reports')
+    + dashStatCard('', landTotal, 'Land Transfer Requests', pendingLand+' pending action', 'reports')
+    + dashStatCard('blue', completedThisMonth, 'Completed', 'Across both request types', 'reports')
+    + dashStatCard('amber', pubAnn, 'Published Announcements', 'Visible to staff', 'announcements')
   + '</div>'
-  + '<div class="two-col">'
-    + '<div class="panel-card"><h3>'+ic('fileBar')+'Recent Generated Reports</h3>'
-      + recentReports.map(function(r){
-          return '<div class="review-row review-action-row"><span class="k">'+esc(r.title)+'</span><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View</button></div></div>';
-        }).join('')
-      + '<div style="margin-top:14px;"><button class="btn btn-outline btn-sm" data-action="nav" data-view="reports">See All Reports</button></div>'
-    + '</div>'
-    + '<div class="panel-card"><h3>'+ic('megaphone')+'Recent Announcements</h3>'
-      + recentAnn.map(function(a){
-          return '<div class="announcement-card"><h4>'+esc(a.title)+'</h4><div class="ac-meta">'+audienceLabel(a.postTo)+' &middot; '+esc(a.postedBy)+' &middot; <span class="badge '+annBadgeClass(a.status)+'">'+a.status+'</span></div></div>';
-        }).join('')
-      + '<div style="margin-top:2px;"><button class="btn btn-outline btn-sm" data-action="nav" data-view="announcements">See All Announcements</button></div>'
-    + '</div>'
-  + '</div>';
+  + '<div class="staff-dash"><div class="staff-dash-grid">'
+    + '<div class="staff-dash-main"><section class="dash-panel">'
+      + '<div class="dash-panel-head"><h3>Recent Generated Reports</h3><button class="dash-link" data-action="nav" data-view="reports">View all</button></div>'
+      + '<div class="dash-table-wrap"><table class="dash-table"><colgroup><col><col style="width:30%"><col style="width:26%"></colgroup><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th></tr></thead><tbody>'
+      + (recentReports.length ? recentReports.map(function(r){
+          return '<tr class="dash-row" data-action="view-report" data-id="'+esc(r.id)+'" tabindex="0" aria-label="View report '+esc(r.title)+'">'
+            + '<td title="'+esc(r.title)+'">'+esc(r.title)+'</td><td>'+esc(REPORT_TYPE_LABEL[r.type]||r.type)+'</td><td class="dash-date">'+esc(fmtDate(r.dateGenerated))+'</td></tr>';
+        }).join('') : '<tr><td colspan="3"><div class="empty-state">No reports generated yet.</div></td></tr>')
+      + '</tbody></table></div>'
+    + '</section></div>'
+    + '<div class="staff-dash-side"><section class="dash-panel" aria-labelledby="head-ann-title">'
+      + '<div class="dash-panel-head"><h3 id="head-ann-title">Recent Announcements</h3><button class="dash-link" data-action="nav" data-view="announcements">View all</button></div>'
+      + '<div class="dash-ann-list">'
+      + (recentAnn.length ? recentAnn.map(function(a){
+          return '<article class="dash-ann">'
+            + '<div class="dash-ann-meta"><strong>'+esc(audienceLabel(a.postTo))+'</strong> &middot; '+esc(a.postedBy)+' &middot; <span class="badge '+annBadgeClass(a.status)+'">'+esc(a.status)+'</span></div>'
+            + '<h4>'+esc(a.title)+'</h4>'+(a.content?'<p>'+esc(a.content)+'</p><button class="dash-link dash-ann-toggle" type="button" data-action="dash-ann-toggle" aria-expanded="false">Read more</button>':'')+'</article>';
+        }).join('') : '<div class="empty-state">No announcements yet.</div>')
+      + '</div></section></div>'
+  + '</div></div>';
 }
 
 function renderAnnouncements(acct){
@@ -1369,7 +1382,7 @@ function renderAnnouncements(acct){
   });
   var STATUS_TABS = ['all','Draft','Scheduled','Published','Cancelled'];
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Head</div><h1>Announcements</h1><p>Post updates to the Client Interface, the Staff Interface, or both.</p></div>'
+  + '<div class="page-head"><div><h1>Announcements</h1><p>Post updates to the Client Interface, the Staff Interface, or both.</p></div>'
     + '<button class="btn btn-primary" data-action="open-ann-modal">'+ic('megaphone','17px')+' Create Announcement</button></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search announcements" value="'+esc(state.search.announcements)+'" data-input="search-announcements"></div>'
@@ -1409,7 +1422,7 @@ function renderReports(acct){
     return matchQ && matchT;
   });
   return ''
-  + '<div class="page-head"><div><div class="breadcrumb">Assessor Head</div><h1>Generated Reports</h1><p>Reports on document requests, land transfers, and requirement checking outcomes.</p></div></div>'
+  + '<div class="page-head"><div><h1>Generated Reports</h1><p>Reports on document requests, land transfers, and requirement checking outcomes.</p></div></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search reports" value="'+esc(state.search.reports)+'" data-input="search-reports"></div>'
     + '<select data-input="filter-report-type">'
@@ -1837,7 +1850,7 @@ function renderNotifications(acct){
 
 function renderProfile(acct){
   return ''
-  + '<div class="page-head"><div>'+(acct.role==='staff'?'':'<div class="breadcrumb">'+esc(ROLE_LABEL[acct.role])+'</div>')+'<h1>My Profile</h1><p>Your account information for the Assessor’s Office system.</p></div></div>'
+  + '<div class="page-head"><div><h1>My Profile</h1><p>Your account information for the Assessor’s Office system.</p></div></div>'
   + '<div class="two-col">'
     + '<div class="panel-card"><h3>'+ic('user')+'Account Details</h3>'
       + '<form data-form="update-profile">'
