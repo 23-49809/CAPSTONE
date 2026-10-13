@@ -1508,32 +1508,202 @@ function renderAnnouncements(acct){
   + '</tbody></table></div>';
 }
 
-function renderReports(acct){
-  var q = (state.search.reports||'').toLowerCase();
-  var typeF = state.filters.reportType;
-  var list = state.reports.filter(function(r){
-    var matchQ = !q || r.title.toLowerCase().indexOf(q)>-1;
-    var matchT = typeF==='all' || r.type===typeF;
-    return matchQ && matchT;
+/* ---------------- Head: System Report ---------------- */
+var SR_COMPLETED = ['Approved', 'Out for Release', 'Completed'];
+var SR_OVERDUE = ['Timed Out'];
+var SR_CLOSED = ['Rejected'];
+function srBucket(status){
+  if(SR_COMPLETED.indexOf(status)>-1) return 'completed';
+  if(SR_OVERDUE.indexOf(status)>-1) return 'overdue';
+  if(SR_CLOSED.indexOf(status)>-1) return 'closed';
+  return 'progress';
+}
+function srMonthStart(){ return phToday().slice(0,8)+'01'; }
+function srState(){
+  if(!state.sysReport){
+    var from = srMonthStart(), to = phToday();
+    state.sysReport = { draft:{from:from, to:to, type:'all', brgy:'all'}, applied:{from:from, to:to, type:'all', brgy:'all'}, generatedAt:new Date().toISOString(), q:'', page:1 };
+  }
+  return state.sysReport;
+}
+function srAllRequests(){
+  return state.docRequests.map(function(r){ return {r:r, kind:'doc'}; })
+    .concat(state.landRequests.map(function(r){ return {r:r, kind:'land'}; }))
+    .map(function(x){ x.day = phPartsFromStored(x.r.submitted).date; return x; });
+}
+function srFilter(list, f, from, to){
+  return list.filter(function(x){
+    return x.day && x.day >= from && x.day <= to
+      && (f.type==='all' || f.type===x.kind)
+      && (f.brgy==='all' || String(x.r.barangay||'').toUpperCase()===f.brgy);
   });
+}
+function srDays(from, to){ return Math.round((new Date(to+'T00:00:00Z') - new Date(from+'T00:00:00Z'))/86400000) + 1; }
+function srCounts(list){
+  var c = {total:list.length, progress:0, completed:0, overdue:0};
+  list.forEach(function(x){ var b = srBucket(x.r.status); if(c[b]!=null) c[b]++; });
+  return c;
+}
+function srHumanDuration(seconds){
+  if(seconds==null || !isFinite(seconds)) return '—';
+  seconds = Math.max(0, Number(seconds));
+  var d = Math.floor(seconds/86400), h = Math.floor(seconds%86400/3600), m = Math.floor(seconds%3600/60);
+  if(d>0) return d+' day'+(d===1?'':'s')+(h?' '+h+' hr':'');
+  if(h>0) return h+' hr'+(m?' '+m+' min':'');
+  return Math.max(1,m)+' min';
+}
+function srProcessing(r){
+  if(r.processingDurationSeconds!=null) return srHumanDuration(r.processingDurationSeconds);
+  if(r.processingStartedEpoch!=null) return srHumanDuration(Date.now()/1000 - Number(r.processingStartedEpoch)) + ' (ongoing)';
+  return '—';
+}
+function srRangeLabel(f){ return phFormatDate(f.from)+' – '+phFormatDate(f.to); }
+
+function srStatCard(label, value, prev, tone, worseIsUp){
+  var delta = '';
+  if(prev>0){
+    var pct = Math.round((value-prev)/prev*100);
+    var up = pct>0, bad = worseIsUp ? up : (pct<0);
+    delta = '<span class="sr-delta '+(pct===0?'flat':(bad?'bad':'good'))+'">'+(pct===0?'→':(up?'↗':'↘'))+' '+Math.abs(pct)+'%</span>';
+  } else if(value>0){
+    delta = '<span class="sr-delta flat">new</span>';
+  }
+  return '<div class="sr-stat '+tone+'"><div class="sr-stat-label">'+esc(label)+'</div>'
+    + '<div class="sr-stat-row"><span class="sr-stat-num">'+value+'</span>'+delta+'</div>'
+    + '<div class="sr-stat-sub">vs. previous period</div></div>';
+}
+
+/* Stacked daily (or weekly, for long ranges) bars: Document Requests below,
+   Land Transfer Requests above. Hover/focus a bar for exact counts. */
+function srChart(list, f){
+  var days = srDays(f.from, f.to), step = days > 62 ? 7 : 1;
+  var buckets = [];
+  for(var i=0;i<days;i+=step){
+    var start = phAddDays(f.from, i), end = phAddDays(f.from, Math.min(i+step-1, days-1));
+    buckets.push({start:start, end:end, doc:0, land:0});
+  }
+  list.forEach(function(x){
+    var idx = Math.floor(srDays(f.from, x.day)-1) ; idx = Math.floor(idx/step);
+    if(buckets[idx]) buckets[idx][x.kind]++;
+  });
+  var max = Math.max(1, Math.max.apply(null, buckets.map(function(b){ return b.doc+b.land; })));
+  var tickStep = max<=5 ? 1 : max<=10 ? 2 : max<=25 ? 5 : max<=50 ? 10 : Math.ceil(max/50)*10;
+  var top = Math.ceil(max/tickStep)*tickStep;
+  var W = 680, H = 210, L = 30, B = 22, T = 8, plotW = W-L-6, plotH = H-B-T;
+  var bw = plotW / buckets.length, barW = Math.max(3, Math.min(22, bw*0.62));
+  var y = function(v){ return T + plotH - v/top*plotH; };
+  var svg = '<svg class="sr-chart-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Requests per '+(step===7?'week':'day')+', '+esc(srRangeLabel(f))+'">';
+  for(var t=0;t<=top;t+=tickStep){
+    svg += '<line class="sr-grid" x1="'+L+'" x2="'+(W-6)+'" y1="'+y(t)+'" y2="'+y(t)+'"/>'
+      + '<text class="sr-axis" x="'+(L-6)+'" y="'+(y(t)+3.5)+'" text-anchor="end">'+t+'</text>';
+  }
+  var labelEvery = Math.max(1, Math.ceil(buckets.length/6));
+  buckets.forEach(function(b, i){
+    var cx = L + bw*i + bw/2, x = cx - barW/2, total = b.doc + b.land;
+    var hDoc = b.doc/top*plotH, hLand = b.land/top*plotH, gap = (b.doc && b.land) ? 2 : 0;
+    var when = step===7 ? phFormatDate(b.start)+' – '+phFormatDate(b.end) : phFormatDate(b.start);
+    svg += '<g class="sr-bar" tabindex="0" data-tip="'+esc(when)+'|'+b.doc+'|'+b.land+'" aria-label="'+esc(when)+': '+b.doc+' document, '+b.land+' land transfer">'
+      + '<rect class="sr-hit" x="'+(L+bw*i)+'" y="'+T+'" width="'+bw+'" height="'+plotH+'"/>';
+    if(b.doc) svg += '<path class="sr-doc" d="'+srBarPath(x, y(0), barW, hDoc, !b.land)+'"/>';
+    if(b.land) svg += '<path class="sr-land" d="'+srBarPath(x, y(0)-hDoc-gap, barW, Math.max(0,hLand-(b.doc?0:0)), true)+'"/>';
+    if(total===0) svg += '<rect class="sr-zero" x="'+x+'" y="'+(y(0)-1)+'" width="'+barW+'" height="1"/>';
+    svg += '</g>';
+    if(i % labelEvery === 0) svg += '<text class="sr-axis" x="'+cx+'" y="'+(H-6)+'" text-anchor="middle">'+esc(phFormatDate(b.start).replace(/, \d{4}$/,''))+'</text>';
+  });
+  svg += '<line class="sr-baseline" x1="'+L+'" x2="'+(W-6)+'" y1="'+y(0)+'" y2="'+y(0)+'"/></svg>';
+  return svg;
+}
+/* Bar rising from baseline y0 with height h; 4px rounded top when roundTop. */
+function srBarPath(x, y0, w, h, roundTop){
+  if(h<=0) return '';
+  var r = roundTop ? Math.min(4, w/2, h) : 0, yt = y0 - h;
+  return 'M'+x+','+y0+'V'+(yt+r)+(r?'Q'+x+','+yt+' '+(x+r)+','+yt:'')+'H'+(x+w-r)+(r?'Q'+(x+w)+','+yt+' '+(x+w)+','+(yt+r):'')+'V'+y0+'Z';
+}
+
+function renderReports(acct){
+  var sr = srState(), f = sr.applied, d = sr.draft;
+  var all = srAllRequests();
+  var list = srFilter(all, f, f.from, f.to);
+  var span = srDays(f.from, f.to);
+  var prev = srFilter(all, f, phAddDays(f.from, -span), phAddDays(f.from, -1));
+  var c = srCounts(list), p = srCounts(prev);
+  var barangays = all.map(function(x){ return String(x.r.barangay||'').toUpperCase(); }).filter(function(b,i,a){ return b && a.indexOf(b)===i; }).sort();
+  var typeLabel = {all:'All Requests', doc:'Document Requests', land:'Land Transfer Requests'};
+  // detailed table: search + pagination (5 per page, newest first)
+  var q = String(sr.q||'').toLowerCase();
+  var rows = list.filter(function(x){ return !q || (x.r.id+' '+x.r.applicant).toLowerCase().indexOf(q)>-1; })
+    .sort(function(a,b){ return String(b.r.submitted).localeCompare(String(a.r.submitted)); });
+  var per = 5, pages = Math.max(1, Math.ceil(rows.length/per)); if(sr.page>pages) sr.page = pages;
+  var pageRows = rows.slice((sr.page-1)*per, sr.page*per);
+  var pager = '';
+  if(rows.length > per){
+    var nums = '';
+    for(var n=1;n<=pages;n++) nums += '<button type="button" class="'+(n===sr.page?'active':'')+'" data-action="sr-page" data-page="'+n+'"'+(n===sr.page?' aria-current="page"':'')+'>'+n+'</button>';
+    pager = '<div class="sr-pager-btns"><button type="button" data-action="sr-page" data-page="'+(sr.page-1)+'" aria-label="Previous page"'+(sr.page<=1?' disabled':'')+'>'+ic('chevLeft','15px')+'</button>'+nums
+      + '<button type="button" data-action="sr-page" data-page="'+(sr.page+1)+'" aria-label="Next page"'+(sr.page>=pages?' disabled':'')+'>'+ic('chevRight','15px')+'</button></div>';
+  }
+  var generated = new Date(sr.generatedAt||Date.now());
+  var genParts = phPartsFromStored(generated.toISOString());
+  var summaryRows = [
+    ['Report Type', typeLabel[f.type] + (f.brgy!=='all' ? ' · Barangay '+f.brgy : '')],
+    ['Date Range', srRangeLabel(f)],
+    ['Generated By', acct.fullName+' ('+(acct.position||ROLE_LABEL[acct.role])+')'],
+    ['Generated On', phFormatDate(genParts.date)+', '+phFormatTime(genParts.time)]
+  ];
+  // Saved reports (existing feature) keep their table + View Details.
+  var saved = state.reports.slice().sort(function(a,b){ return String(b.dateGenerated).localeCompare(String(a.dateGenerated)); });
   return ''
-  + '<div class="page-head"><div><h1>Generated Reports</h1><p>Reports on document requests, land transfers, and requirement checking outcomes.</p></div></div>'
-  + '<div class="toolbar">'
-    + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search reports" value="'+esc(state.search.reports)+'" data-input="search-reports"></div>'
-    + '<select data-input="filter-report-type">'
-      + '<option value="all"'+(typeF==='all'?' selected':'')+'>All Types</option>'
-      + '<option value="document"'+(typeF==='document'?' selected':'')+'>Document Requests</option>'
-      + '<option value="land-transfer"'+(typeF==='land-transfer'?' selected':'')+'>Land Transfer</option>'
-      + '<option value="requirement"'+(typeF==='requirement'?' selected':'')+'>Requirement Checker</option>'
-      + '<option value="summary"'+(typeF==='summary'?' selected':'')+'>Summary</option>'
-    + '</select>'
+  + '<div class="page-head"><div><h1>System Report</h1><p>View and manage system reports based on your access level.</p></div></div>'
+  + '<div class="sysreport" id="sysreport">'
+  + '<section class="sr-card sr-filters" aria-label="Report filters">'
+    + '<div class="sr-filter"><label>'+ic('calendar','16px')+'<span>Date Range</span></label><div class="sr-range"><input type="date" data-sr-draft="from" value="'+esc(d.from)+'" aria-label="Start date"><span>–</span><input type="date" data-sr-draft="to" value="'+esc(d.to)+'" aria-label="End date"></div></div>'
+    + '<div class="sr-filter"><label for="sr-type">'+ic('doc','16px')+'<span>Report Type</span></label><select id="sr-type" data-sr-draft="type">'
+      + ['all','doc','land'].map(function(k){ return '<option value="'+k+'"'+(d.type===k?' selected':'')+'>'+typeLabel[k]+'</option>'; }).join('')+'</select></div>'
+    + '<div class="sr-filter"><label for="sr-brgy">'+ic('building','16px')+'<span>Barangay</span></label><select id="sr-brgy" data-sr-draft="brgy"><option value="all">All Barangays</option>'
+      + barangays.map(function(b){ return '<option value="'+esc(b)+'"'+(d.brgy===b?' selected':'')+'>'+esc(b)+'</option>'; }).join('')+'</select></div>'
+    + '<button type="button" class="btn btn-primary sr-generate" data-action="sr-generate">'+ic('fileBar','17px')+' Generate Report</button>'
+    + '<p class="field-error sr-range-error" data-sr-error hidden></p>'
+  + '</section>'
+  + '<div class="sr-stats">'
+    + srStatCard('Total Requests', c.total, p.total, 'tone-green', false)
+    + srStatCard('In Progress', c.progress, p.progress, 'tone-gray', false)
+    + srStatCard('Completed', c.completed, p.completed, 'tone-green', false)
+    + srStatCard('Overdue', c.overdue, p.overdue, 'tone-red', true)
   + '</div>'
-  + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
-  + (list.length ? list.map(function(r){
-      return '<tr><td class="cell-name" data-label="Report Title">'+esc(r.title)+'</td><td data-label="Type"><span class="badge blue">'+REPORT_TYPE_LABEL[r.type]+'</span></td><td data-label="Date Generated">'+fmtDate(r.dateGenerated)+'</td>'
-        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></div></td></tr>';
-    }).join('') : '<tr><td colspan="4"><div class="empty-state">'+ic('fileBar','30px')+'No reports match your search.</div></td></tr>')
-  + '</tbody></table></div>';
+  + '<div class="sr-mid">'
+    + '<section class="sr-card sr-overview"><h3>'+ic('fileBar','18px')+'Requests Overview</h3>'
+      + '<div class="sr-chart" data-sr-chart>'+srChart(list, f)+'<div class="sr-tip" data-sr-tip hidden></div></div>'
+      + '<div class="sr-legend"><span><i class="sr-key doc"></i>Document Requests</span><span><i class="sr-key land"></i>Land Transfer Requests</span></div>'
+    + '</section>'
+    + '<section class="sr-card sr-summary"><h3>'+ic('doc','18px')+'Report Summary</h3>'
+      + '<dl>'+summaryRows.map(function(r){ return '<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>'; }).join('')+'</dl>'
+      + '<div class="sr-summary-actions"><button type="button" class="btn btn-outline" data-action="sr-view">'+ic('eye','16px')+' View Report</button>'
+      + '<button type="button" class="btn btn-primary" data-action="sr-pdf">'+ic('printIcon','16px')+' Download PDF</button></div>'
+    + '</section>'
+  + '</div>'
+  + '<section class="sr-card sr-detail" id="sr-detail" tabindex="-1"><div class="sr-detail-head"><h3>'+ic('doc','18px')+'Detailed Report</h3>'
+      + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search request ID, client name…" value="'+esc(sr.q)+'" data-input="sr-search" aria-label="Search detailed report"></div></div>'
+    + '<div class="sr-table-wrap"><table class="sr-table"><thead><tr><th>Request ID</th><th>Client Name</th><th>Type</th><th>Status</th><th>Date Submitted</th><th>Processing Time</th><th>Assigned To</th></tr></thead><tbody>'
+    + (pageRows.length ? pageRows.map(function(x){
+        var r = x.r, m = STATUS_META[r.status] || {cls:'slate'};
+        return '<tr class="sr-row" data-action="view-'+x.kind+'-req" data-id="'+esc(r.id)+'" tabindex="0" aria-label="Open request '+esc(r.id)+'">'
+          + '<td>'+esc(r.id)+'</td><td>'+esc(r.applicant)+'</td><td>'+(x.kind==='doc'?'Document Request':'Land Transfer')+'</td>'
+          + '<td><span class="badge '+(srBucket(r.status)==='overdue'?'red':m.cls)+'">'+esc(statusLabel(r.status))+'</span></td>'
+          + '<td>'+esc(fmtDateTime(r.submitted))+'</td><td>'+esc(srProcessing(r))+'</td>'
+          + '<td>'+esc(r.processingStaffName || 'Unassigned')+'</td></tr>';
+      }).join('') : '<tr><td colspan="7"><div class="empty-state">No requests in this period'+(q?' match your search':'')+'.</div></td></tr>')
+    + '</tbody></table></div>'
+    + '<div class="sr-pager"><span>'+(rows.length ? 'Showing '+((sr.page-1)*per+1)+'–'+Math.min(sr.page*per, rows.length)+' of '+rows.length : 'Showing 0 of 0')+'</span>'+pager+'</div>'
+  + '</section>'
+  + '</div>'
+  + '<section class="sr-card sr-saved"><h3>'+ic('fileBar','18px')+'Saved Reports</h3>'
+    + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
+    + (saved.length ? saved.map(function(r){
+        return '<tr><td class="cell-name" data-label="Report Title">'+esc(r.title)+'</td><td data-label="Type"><span class="badge blue">'+REPORT_TYPE_LABEL[r.type]+'</span></td><td data-label="Date Generated">'+fmtDate(r.dateGenerated)+'</td>'
+          + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></div></td></tr>';
+      }).join('') : '<tr><td colspan="4"><div class="empty-state">No saved reports yet.</div></td></tr>')
+    + '</tbody></table></div>'
+  + '</section>';
 }
 
 /* ---------------- Staff views ---------------- */
