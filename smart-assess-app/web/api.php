@@ -1249,12 +1249,17 @@ function sa_filipino_user_prompt(bool $isNotification, string $topic, string $de
     return $prompt . "\nMensahe:";
 }
 
-/** One non-streaming Ollama completion. */
-function sa_ollama_generate(string $ollamaUrl, string $system, string $prompt, float $temperature): string
+/** One non-streaming Ollama completion. Uses SMART_ASSESS_OLLAMA_MODEL, else
+ *  gemma2:9b (much better Filipino); falls back to llama3.2:3b if the chosen
+ *  model is not installed. */
+function sa_ollama_generate(string $ollamaUrl, string $system, string $prompt, float $temperature, ?string $model = null): string
 {
-    $model = trim((string) getenv('SMART_ASSESS_OLLAMA_MODEL'));
+    if ($model === null) {
+        $configured = trim((string) getenv('SMART_ASSESS_OLLAMA_MODEL'));
+        $model = preg_match('/^[A-Za-z0-9._:\/-]{1,100}$/', $configured) ? $configured : 'gemma2:9b';
+    }
     $payload = json_encode([
-        'model' => preg_match('/^[A-Za-z0-9._:\/-]{1,100}$/', $model) ? $model : 'llama3.2:3b',
+        'model' => $model,
         'system' => $system,
         'prompt' => $prompt,
         'stream' => false,
@@ -1272,7 +1277,7 @@ function sa_ollama_generate(string $ollamaUrl, string $system, string $prompt, f
         CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
         CURLOPT_RETURNTRANSFER => false,
         CURLOPT_CONNECTTIMEOUT => 3,
-        CURLOPT_TIMEOUT => 60,
+        CURLOPT_TIMEOUT => 120,
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
@@ -1286,6 +1291,10 @@ function sa_ollama_generate(string $ollamaUrl, string $system, string $prompt, f
     ]);
     $result = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    if ($status === 404 && $model !== 'llama3.2:3b') {
+        error_log('[SMART_ASSESS] Ollama model ' . $model . ' is not installed; falling back to llama3.2:3b.');
+        return sa_ollama_generate($ollamaUrl, $system, $prompt, $temperature, 'llama3.2:3b');
+    }
     if ($result === false || $status < 200 || $status >= 300) {
         throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
     }
