@@ -262,7 +262,11 @@
   .arp-input:focus-within{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); }
   .arp-input.invalid{ border-color:var(--danger); }
   .arp-input > span{ padding:12px 0 12px 14px; background:var(--surface); color:var(--ink-soft); font-size:14.5px; font-weight:600; }
-  .arp-input > input{ min-width:0; flex:1; border:0; border-radius:0; box-shadow:none; }
+  .arp-input > input{ min-width:0; flex:1; border:0; border-radius:0; box-shadow:none; padding-left:2px; letter-spacing:.04em; }
+  .arp-input > span + span{ padding-left:0; }
+  .arp-input .arp-code{ padding:12px 0; color:var(--brand-700); font-weight:700; letter-spacing:.04em; }
+  .arp-input .arp-code.empty{ color:var(--ink-faint); font-weight:600; }
+  .barangay-option .barangay-code{ margin-left:auto; font-size:12px; font-weight:600; color:var(--ink-faint); font-variant-numeric:tabular-nums; }
   .field .arp-input > input:focus{ border:0; box-shadow:none; outline:none; }
   .field input::placeholder{ color:var(--ink-faint); }
   .field input:focus, .field select:focus{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); outline:none; }
@@ -568,6 +572,34 @@ const BARANGAYS = [
   'SAN TEODORO','SOLO','STA. ANA','STA. MESA','STO. NINO','STO. TOMAS',
   'TALAGA PROPER','TALAGA EAST'
 ];
+/* ARP barangay codes 0001-0034: the 34 barangays of Mabini, Batangas numbered
+   in the order of the PSA Philippine Standard Geographic Code list
+   (PSGC 0401016001-0401016035; the PSGC itself skips 013). Keys are the
+   dropdown values above; the PSA name is kept for reference. */
+const BARANGAY_CODES = {
+  'ANILAO PROPER':['0001','Anilao Proper'], 'ANILAO EAST':['0002','Anilao East'],
+  'BAGALANGIT':['0003','Bagalangit'], 'BULACAN':['0004','Bulacan'],
+  'CALAMIAS':['0005','Calamias'], 'ESTRELLA':['0006','Estrella'],
+  'GASANG':['0007','Gasang'], 'LAUREL':['0008','Laurel'],
+  'LIGAYA':['0009','Ligaya'], 'MAINAGA':['0010','Mainaga'],
+  'MAINIT':['0011','Mainit'], 'MAJUBEN':['0012','Majuben'],
+  'MALIMATOC-I':['0013','Malimatoc I'], 'MALIMATOC-II':['0014','Malimatoc II'],
+  'NAG-IBA':['0015','Nag-Iba'], 'PILAHAN':['0016','Pilahan'],
+  'POBLACION':['0017','Poblacion'], 'P. LUPA':['0018','Pulang Lupa'],
+  'P. ANAHAO':['0019','Pulong Anahao'], 'P. BALIBAGUHAN':['0020','Pulong Balibaguhan'],
+  'P. NIOGAN':['0021','Pulong Niogan'], 'SAGUING':['0022','Saguing'],
+  'SAMPAGUITA':['0023','Sampaguita'], 'SAN FRANCISCO':['0024','San Francisco'],
+  'SAN JOSE':['0025','San Jose'], 'SAN JUAN':['0026','San Juan'],
+  'SAN TEODORO':['0027','San Teodoro'], 'STA. ANA':['0028','Santa Ana'],
+  'STA. MESA':['0029','Santa Mesa'], 'STO. NINO':['0030','Santo Niño'],
+  'STO. TOMAS':['0031','Santo Tomas'], 'SOLO':['0032','Solo'],
+  'TALAGA PROPER':['0033','Talaga Proper'], 'TALAGA EAST':['0034','Talaga East']
+};
+function barangayCode(name){ const e = BARANGAY_CODES[name]; return e ? e[0] : ''; }
+/* The user-entered last segment (up to 5 digits) of a stored ARP. */
+function arpSerial(arp){ const m = String(arp||'').match(/^14-\d{0,4}-?(\d{0,5})$/); return m ? m[1] : String(arp||'').replace(/\D/g,'').slice(-5); }
+/* Full ARP from the selected barangay and the serial: 14-BBBB-NNNNN. */
+function buildArp(barangay, serial){ const code = barangayCode(barangay); return code ? '14-'+code+'-'+String(serial||'').replace(/\D/g,'').slice(0,5) : ''; }
 
 function fileMetaFromFile(f, preview){ return { name:f.name, size:f.size, type:f.type, valid: VALID_FILE_RE.test(f.type) && f.size>0 && f.size < 15*1024*1024, preview: preview || null }; }
 function processUploadedFile(key, file){
@@ -610,8 +642,10 @@ function validateStep2(flow, fd, errors){
     if(!fd.documentType) errors.documentType = 'Please select a document type.';
     if(fd.documentType && !fd.purpose) errors.purpose = 'Please select a purpose.';
   } else if(!fd.transferType) errors.transferType = 'Please select a transfer type.';
-  if(!fd.arp.trim()) errors.arp = 'ARP / Tax Declaration number is required.';
-  else if(!ARP_RE.test(fd.arp.trim())) errors.arp = 'Use format 14-XXXX-XXXXX.';
+  const arpCode = barangayCode(fd.barangay);
+  if(!arpCode) errors.arp = 'Select the property barangay to fill in its ARP code.';
+  else if(!arpSerial(fd.arp)) errors.arp = 'ARP / Tax Declaration number is required.';
+  else if(!ARP_RE.test(fd.arp.trim()) || fd.arp.slice(3,7)!==arpCode) errors.arp = 'Enter the last 5 digits (format 14-'+arpCode+'-XXXXX).';
   if(!fd.barangay.trim()) errors.barangay = 'Barangay is required.';
 }
 function requiredIdKeys(fd){ return fd.isOwner ? ['ownerId'] : ['requesterId','ownerId','authLetter']; }
@@ -864,7 +898,7 @@ function barangaySelect(fd){
       + '<span>'+esc(selectedLabel)+'</span><span class="barangay-chevron" aria-hidden="true"></span>'
     + '</button>'
     + '<div class="barangay-menu" role="listbox" hidden data-barangay-menu aria-label="Barangay">'
-      + BARANGAYS.map(function(b){ return '<button type="button" class="barangay-option'+(selected===b?' selected':'')+'" role="option" aria-selected="'+(selected===b?'true':'false')+'" data-barangay-option="'+esc(b)+'"><span>'+esc(b)+'</span><span class="barangay-check" aria-hidden="true">&#10003;</span></button>'; }).join('')
+      + BARANGAYS.map(function(b){ return '<button type="button" class="barangay-option'+(selected===b?' selected':'')+'" role="option" aria-selected="'+(selected===b?'true':'false')+'" data-barangay-option="'+esc(b)+'"><span>'+esc(b)+'</span><span class="barangay-code">'+barangayCode(b)+'</span><span class="barangay-check" aria-hidden="true">&#10003;</span></button>'; }).join('')
     + '</div>'
     + '<select id="f-barangay" class="barangay-native-select" data-bind-select="barangay" tabindex="-1" aria-hidden="true"><option value="">Select a barangay</option>'
       + BARANGAYS.map(function(b){ return '<option value="'+esc(b)+'" '+(selected===b?'selected':'')+'>'+esc(b)+'</option>'; }).join('')
@@ -872,9 +906,13 @@ function barangaySelect(fd){
   + '</div>';
 }
 function arpField(fd){
-  const remainder = fd.arp.replace(/^14-/, '').replace(/\D/g,'').slice(0,9);
-  const displayValue = remainder.length > 4 ? remainder.slice(0,4)+'-'+remainder.slice(4) : remainder;
-  return '<div class="field"><label>ARP / Tax Declaration Number<span class="req">*</span></label><div class="arp-input'+(inv('arp')?' invalid':'')+'"><span>14-</span><input id="f-arp" type="text" value="'+esc(displayValue)+'" data-bind="arp" inputmode="numeric" maxlength="10" placeholder="XXXX-XXXXX"></div>' + fieldError('arp') + '</div>';
+  const code = barangayCode(fd.barangay);
+  const serial = arpSerial(fd.arp);
+  return '<div class="field"><label for="f-arp-serial">ARP / Tax Declaration Number<span class="req">*</span></label>'
+    + '<div class="arp-input'+(inv('arp')?' invalid':'')+'"><span>14-</span><span class="arp-code'+(code?'':' empty')+'" data-arp-code title="Barangay code (set from the Barangay field)">'+(code||'XXXX')+'</span><span>-</span>'
+    + '<input id="f-arp-serial" type="text" value="'+esc(serial)+'" data-arp-serial inputmode="numeric" maxlength="5" placeholder="XXXXX" autocomplete="off" aria-describedby="arp-hint"></div>'
+    + '<div class="field-hint" id="arp-hint">'+(code?'Barangay code '+code+' is filled in from the selected barangay. Enter the last 5 digits.':'Select the property barangay below to fill in its code.')+'</div>'
+    + fieldError('arp') + '</div>';
 }
 
 function renderStep1(){
@@ -1308,8 +1346,17 @@ function render(){
   else if(state.view==='wizard') html = renderWizard();
   else if(state.view==='confirmation') html = renderConfirmation();
   else if(state.view==='track') html = renderTrack();
-  app.innerHTML = html;
+  app.innerHTML = html + (state.view==='wizard' ? '<input type="hidden" id="f-arp" data-bind="arp-full" value="'+esc(state.formData.arp||'')+'">' : '');
   bindEvents(app);
+  publishArp();
+}
+/* The PHP bridge records [data-bind] values from input events; announce the
+   full ARP whenever it may have changed (typing or a barangay change). */
+function publishArp(){
+  const el = document.getElementById('f-arp');
+  if(!el) return;
+  el.value = state.formData.arp || '';
+  el.dispatchEvent(new Event('input', {bubbles:true}));
 }
 
 function bindEvents(root){
@@ -1491,10 +1538,20 @@ function bindEvents(root){
       clearFieldError(key);
     });
   });
+  root.querySelectorAll('[data-arp-serial]').forEach(function(el){
+    el.addEventListener('input', function(){
+      const digits = el.value.replace(/\D/g,'').slice(0,5);
+      if(el.value !== digits) el.value = digits;
+      state.formData.arp = buildArp(state.formData.barangay, digits);
+      publishArp();
+      clearFieldError('arp');
+    });
+  });
   root.querySelectorAll('[data-bind-select]').forEach(function(el){
     el.addEventListener('change', function(){
       const key = el.getAttribute('data-bind-select');
       state.formData[key] = el.value;
+      if(key==='barangay') state.formData.arp = buildArp(el.value, arpSerial(state.formData.arp));
       if(key==='documentType' || key==='transferType') state.formData.purpose='';
       delete state.errors[key];
       render();
