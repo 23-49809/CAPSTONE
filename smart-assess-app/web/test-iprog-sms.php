@@ -9,7 +9,7 @@ try {
 
     // Replace with YOUR OWN Philippine mobile number.
     $result = $sms->send(
-        '09XXXXXXXXX',
+        '09104127461',
         'SMART ASSESS - Mabini: This is a test SMS.'
     );
 
