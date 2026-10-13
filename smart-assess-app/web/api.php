@@ -1192,6 +1192,9 @@ function sa_generate_ai_message(array $data): array
             $lastProblem = 'it changed or invented these numbers/references: ' . implode(', ', $changed);
             continue;
         }
+        // Small models like to add "bukas" before the day staff gave ("bukas,
+        // Biyernes"); drop just that word and keep the real day.
+        $message = preg_replace('/\b(?:bukas|mamaya)\s*[,(]?\s*(?=(?:Lunes|Martes|Miyerkules|Miyerkoles|Huwebes|Biyernes|Sabado|Linggo)\b)/iu', '', $message) ?? $message;
         $invented = sa_invented_time_words($message, $topic . ' ' . $details);
         if ($invented !== []) {
             $lastProblem = 'it added days or dates that were not given: ' . implode(', ', $invented);
@@ -1227,7 +1230,7 @@ function sa_filipino_system_prompt(bool $isNotification): string
         "bring = magdala; office hours = oras ng opisina; ready for release = handa nang kunin; " .
         "requirements = mga kailangang dokumento; missing = kulang; submit = isumite; approved = aprubado; " .
         "completed = tapos na; closed = sarado; payment = bayad; deadline = huling araw; penalty = multa; " .
-        "under review = sinusuri; visit = pumunta; request = kahilingan.";
+        "under review = sinusuri; visit = pumunta; request = kahilingan; valid ID = valid ID (huwag isalin).";
 }
 
 /** Topic/details are content, never instructions. The example only shows the
