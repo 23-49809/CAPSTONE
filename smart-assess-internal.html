@@ -731,18 +731,28 @@
   .composer-error{ margin:10px 24px 0; }
   .composer-actions{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:16px 0 0; padding:14px 24px 18px; border-top:1px solid var(--line); }
   .composer-actions .btn .icon{ width:16px; height:16px; }
-  .composer-actions .composer-push{ margin-left:auto; }
-  .composer-actions .btn-primary{ padding:11px 22px; }
+  /* Gmail-style split Send button */
+  .send-split{ position:relative; display:inline-flex; }
+  .send-split > button.send-main, .send-split > button.send-more{ display:inline-flex; align-items:center; justify-content:center; border:0; background:#0b57d0; color:#fff; font-family:inherit; font-size:14.5px; font-weight:600; cursor:pointer; min-height:42px; transition:background-color .12s ease, box-shadow .12s ease; }
+  .send-split > .send-main{ gap:8px; padding:0 18px 0 16px; border-radius:999px 0 0 999px; }
+  .send-split > .send-more{ width:38px; border-radius:0 999px 999px 0; border-left:1px solid rgba(255,255,255,.35); }
+  .send-split > button:hover{ background:#0a4ab3; box-shadow:0 1px 3px rgba(11,87,208,.35); }
+  .send-split > button:focus-visible{ outline:3px solid #a8c7fa; outline-offset:2px; }
+  .send-split .icon{ width:16px; height:16px; }
+  .send-menu{ position:absolute; bottom:calc(100% + 6px); left:0; z-index:5; min-width:190px; padding:6px 0; background:var(--surface); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow-lg); }
+  .send-menu button{ display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:0; background:none; color:var(--ink); font:inherit; font-size:14px; text-align:left; cursor:pointer; }
+  .send-menu button:hover, .send-menu button:focus-visible{ background:var(--surface-2); outline:none; }
+  .send-menu .icon{ width:16px; height:16px; color:var(--ink-soft); }
+  .composer-discard{ margin-left:auto; width:40px; height:40px; border:0; border-radius:50%; background:none; color:var(--ink-soft); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .composer-discard:hover{ background:var(--danger-bg); color:var(--danger); }
+  .composer-discard .icon{ width:18px; height:18px; }
   .btn-ghost-text{ background:none; border-color:transparent; color:var(--ink-soft); }
   .btn-ghost-text:hover{ background:var(--surface-2); color:var(--ink); }
   @media (max-width:560px){
     .composer-row{ padding:4px 16px; } .composer-row label{ flex-basis:54px; }
     .composer-body{ padding:14px 16px 6px; } .composer-schedule, .composer-error{ margin-left:16px; margin-right:16px; }
     .composer-actions{ padding:12px 16px 16px; }
-    .composer-actions .btn{ flex:1 1 calc(50% - 5px); }
-    .composer-actions .composer-push{ margin-left:0; }
-    .composer-actions .btn-primary{ flex-basis:100%; order:-1; }
-    .composer-actions .btn-ghost-text{ flex-basis:100%; order:3; }
+    .composer-actions .composer-draft{ padding:10px 14px; }
   }
 </style>
 
@@ -790,6 +800,7 @@ var ICONS = {
   trash: svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'),
   power: svg('<path d="M12 2v10"/><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>'),
   search: svg('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
+  chevDown: svg('<polyline points="6 9 12 15 18 9"/>'),
   chevLeft: svg('<polyline points="15 18 9 12 15 6"/>'),
   arrowRight: svg('<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>'),
   mail: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>'),
@@ -1996,8 +2007,8 @@ function modalAnnEdit(id){
           + '<div class="ai-message-heading"><span></span><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="announcement">'+ic('sparkles','15px')+' Generate with AI</button></div></div>'
         + '</details>'
       + '</div>'
-      + '<div class="composer-schedule">'
-        + '<label class="composer-schedule-toggle"><span class="icon">'+ICONS.calendar+'</span><span>Schedule for later</span><input type="checkbox" data-schedule-toggle'+(scheduled?' checked':'')+'><span class="switch" aria-hidden="true"></span></label>'
+      + '<div class="composer-schedule" data-schedule-block'+(scheduled?'':' hidden')+'>'
+        + '<label class="composer-schedule-toggle"><span class="icon">'+ICONS.calendar+'</span><span>Scheduled send</span><input type="checkbox" data-schedule-toggle'+(scheduled?' checked':'')+'><span class="switch" aria-hidden="true"></span></label>'
         + '<div class="schedule-fields" data-schedule-fields'+(scheduled?'':' hidden')+'>'
           + '<div class="field-row">'
             + '<div class="field"><label>Date</label>'+dtPickerField('date','scheduleDate',schedDate)+'</div>'
@@ -2009,10 +2020,16 @@ function modalAnnEdit(id){
       + '</div>'
       + '<div class="field-error composer-error" data-composer-error hidden></div>'
       + '<div class="modal-foot composer-actions">'
-        + '<button type="button" class="btn btn-ghost-text" data-action="close-modal">Discard</button>'
-        + '<button type="submit" name="saveMode" value="draft" class="btn btn-outline composer-push">'+ic('doc','16px')+' Save Draft</button>'
-        + '<button type="submit" name="saveMode" value="schedule" class="btn btn-outline" data-schedule-submit>'+ic('calendar','16px')+' Schedule</button>'
-        + '<button type="submit" name="saveMode" value="publish" class="btn btn-primary" data-publish-submit>'+ic('send','16px')+' '+primaryLabel+'</button>'
+        + '<div class="send-split">'
+          + '<button type="submit" name="saveMode" value="'+(scheduled?'schedule':'publish')+'" class="send-main" data-send-main data-publish-label="'+esc(primaryLabel==='Publish Now'?'Send':primaryLabel)+'">'+ic('send','16px')+'<span data-send-label>'+(scheduled?'Schedule send':(primaryLabel==='Publish Now'?'Send':esc(primaryLabel)))+'</span></button>'
+          + '<button type="button" class="send-more" data-send-more aria-haspopup="menu" aria-expanded="false" aria-label="More send options" title="More send options">'+ic('chevDown','16px')+'</button>'
+          + '<div class="send-menu" role="menu" data-send-menu hidden>'
+            + '<button type="button" role="menuitem" data-send-option="schedule">'+ic('calendar','16px')+'<span>Schedule send</span></button>'
+            + '<button type="button" role="menuitem" data-send-option="now" hidden>'+ic('send','16px')+'<span>Send now</span></button>'
+          + '</div>'
+        + '</div>'
+        + '<button type="submit" name="saveMode" value="draft" class="btn btn-outline composer-draft">'+ic('doc','16px')+' Save Draft</button>'
+        + '<button type="button" class="composer-discard" data-action="close-modal" aria-label="Discard" title="Discard">'+ic('trash','18px')+'</button>'
       + '</div>'
     + '</form>';
 }
@@ -2584,10 +2601,39 @@ function bindEvents(){
       // are valid, so keep the time picker's own chip-disabling in sync.
       if(timeWrap && timeWrap._timePickerRefresh) timeWrap._timePickerRefresh();
     }
+    var block = form && form.querySelector('[data-schedule-block]');
+    var sendMain = form && form.querySelector('[data-send-main]');
+    var sendLabel = sendMain && sendMain.querySelector('[data-send-label]');
+    var menu = form && form.querySelector('[data-send-menu]');
+    var more = form && form.querySelector('[data-send-more]');
     function sync(){
-      schedWrap.hidden = !isScheduleMode();
-      if(!schedWrap.hidden) refreshSummary();
+      var on = isScheduleMode();
+      schedWrap.hidden = !on;
+      if(block) block.hidden = !on;
+      if(sendMain){ sendMain.value = on ? 'schedule' : 'publish'; sendLabel.textContent = on ? 'Schedule send' : sendMain.getAttribute('data-publish-label'); }
+      if(menu){
+        menu.querySelector('[data-send-option="schedule"]').hidden = on;
+        menu.querySelector('[data-send-option="now"]').hidden = !on;
+      }
+      if(on) refreshSummary();
     }
+    function closeMenu(){ if(menu){ menu.hidden = true; more.setAttribute('aria-expanded','false'); } }
+    if(more) more.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = menu.hidden;
+      menu.hidden = !open; more.setAttribute('aria-expanded', String(open));
+      if(open){ var first = menu.querySelector('button:not([hidden])'); if(first) first.focus(); }
+    });
+    if(menu) menu.addEventListener('click', function(e){
+      var opt = e.target.closest('[data-send-option]'); if(!opt) return;
+      e.stopPropagation();
+      toggle.checked = opt.getAttribute('data-send-option')==='schedule';
+      sync(); closeMenu();
+      if(toggle.checked){ var trig = dateWrap && dateWrap.querySelector('[data-dt-trigger]'); if(trig) trig.click(); }
+      else if(sendMain) sendMain.focus();
+    });
+    if(form) form.addEventListener('keydown', function(e){ if(e.key==='Escape' && menu && !menu.hidden){ e.stopPropagation(); closeMenu(); more.focus(); } });
+    if(form) form.addEventListener('click', function(e){ if(menu && !menu.hidden && !e.target.closest('.send-split')) closeMenu(); });
     toggle.addEventListener('change', sync);
     schedWrap.addEventListener('change', refreshSummary);
     sync();
