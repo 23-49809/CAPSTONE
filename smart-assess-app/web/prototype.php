@@ -53,6 +53,19 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
         }
     }
 
+    if ($portal === 'internal') {
+        $html = str_replace(
+            '</head>',
+            '<link rel="stylesheet" href="/assets/internal-tables.css">' . "\n</head>",
+            $html,
+            $headMatches
+        );
+        if ($headMatches !== 1) {
+            http_response_code(500);
+            exit('The internal table styles could not be initialized.');
+        }
+    }
+
     $config = [
         'portal' => $portal,
         'csrf' => sa_csrf_token(),

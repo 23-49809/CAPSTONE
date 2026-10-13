@@ -1,0 +1,32 @@
+.table-wrap table thead th {
+  color: #fff;
+  background-color: #064e3b;
+  border: 1px solid #0a5b45;
+}
+
+.table-wrap table tbody tr {
+  background-color: #fff;
+}
+
+.table-wrap table tbody tr:nth-child(even) {
+  background-color: #f2f5f3;
+}
+
+.table-wrap table tbody tr:hover {
+  background-color: #e4e9e6;
+}
+
+.table-wrap table tbody td {
+  color: #1d2922;
+  border: 1px solid #dfe4e1;
+}
+
+.table-wrap table tbody td .cell-sub {
+  color: #5b665e;
+}
+
+@media (max-width: 1340px) {
+  .table-wrap table tbody tr:hover {
+    background-color: #e4e9e6;
+  }
+}
