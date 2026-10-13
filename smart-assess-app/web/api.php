@@ -1179,6 +1179,10 @@ function sa_generate_ai_message(array $data): array
             $lastProblem = 'no usable text';
             continue;
         }
+        if (preg_match('/\[[^\]]{1,60}\]|\{[^}]{1,60}\}|<[^>]{1,60}>/u', $message)) {
+            $lastProblem = 'it contained placeholder text in brackets instead of real information';
+            continue;
+        }
         if (!sa_is_filipino_text($message)) {
             $lastProblem = 'it was not written in Filipino';
             continue;
