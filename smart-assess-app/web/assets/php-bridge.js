@@ -201,6 +201,16 @@
       return;
     }
 
+    var requestRow = event.target.closest('tr.request-clickable-row');
+    if (requestRow) {
+      var rowControl = event.target.closest('a,button,input,select,textarea,label,[contenteditable="true"]');
+      var rowAction = event.target.closest('[data-action]');
+      if (rowControl && rowControl !== requestRow && (!rowAction || rowAction === requestRow)) {
+        event.stopPropagation();
+        return;
+      }
+    }
+
     var internalAction = event.target.closest('[data-action]');
     if (!internalAction) return;
     var actionName = internalAction.getAttribute('data-action');
@@ -244,6 +254,51 @@
       }
     }
   }, true);
+
+  function enhanceInternalRequestRows(root) {
+    if (config.portal !== 'internal') return;
+
+    root.querySelectorAll('.table-wrap table.staff-request-table tbody tr').forEach(function (row) {
+      if (row.dataset.requestRowEnhanced === 'true') return;
+      var detailsButton = row.querySelector('[data-action="view-doc-req"],[data-action="view-land-req"]');
+      if (!detailsButton) return;
+
+      var detailAction = detailsButton.getAttribute('data-action');
+      var requestId = detailsButton.getAttribute('data-id');
+      row.dataset.requestRowEnhanced = 'true';
+      row.dataset.requestClickable = 'true';
+      row.setAttribute('data-action', detailAction);
+      row.setAttribute('data-id', requestId);
+      row.setAttribute('tabindex', '0');
+      row.setAttribute('aria-label', 'Open request details for ' + requestId);
+      row.setAttribute('aria-keyshortcuts', 'Enter Space');
+
+      var referenceCell = row.querySelector('td[data-label="Reference No."]');
+      if (referenceCell) referenceCell.classList.add('request-reference-cell');
+
+      detailsButton.remove();
+      row.querySelectorAll('[data-action="start-processing"]').forEach(function (button) {
+        button.remove();
+      });
+
+      row.addEventListener('keydown', function (event) {
+        if (event.target !== row || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        row.click();
+      });
+    });
+  }
+
+  if (config.portal === 'internal') {
+    var internalApp = document.getElementById('app');
+    if (internalApp) {
+      var requestRowsObserver = new MutationObserver(function () {
+        enhanceInternalRequestRows(internalApp);
+      });
+      requestRowsObserver.observe(internalApp, { childList: true, subtree: true });
+      enhanceInternalRequestRows(internalApp);
+    }
+  }
 
   document.addEventListener('submit', function (event) {
     var form = event.target.closest('form[data-form]');
