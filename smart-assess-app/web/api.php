@@ -1238,8 +1238,8 @@ function sa_filipino_system_prompt(bool $isNotification): string
  *  sentence pattern (placeholders), so its wording cannot leak into drafts. */
 function sa_filipino_user_prompt(bool $isNotification, string $topic, string $details, ?string $retryReason): string
 {
-    $prompt = "Halimbawa ng anyo (palitan ang nasa [ ] ng tamang impormasyon):\n" .
-        "Magandang araw po. [Ang pangunahing balita.] [Mangyaring + ang dapat gawin, kung mayroon.] Maraming salamat po.\n\n" .
+    $prompt = "Anyo ng mensahe: magsimula sa \"Magandang araw po.\", sabihin ang balita, idagdag ang \"Mangyaring ...\" " .
+        "kung may dapat gawin, at magtapos sa \"Maraming salamat po.\"\n\n" .
         "IMPORMASYON NA DAPAT SABIHIN (wala nang iba):\n" .
         "- Paksa: {$topic}\n" .
         '- Detalye: ' . ($details !== '' ? $details : 'Wala.') . "\n";
