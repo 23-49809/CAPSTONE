@@ -619,7 +619,9 @@
   @container notifpage (max-width:980px){ .notif-grid{ grid-template-columns:minmax(0,1fr); } }
   .notif-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 26px -24px rgba(12,33,23,.45); padding:20px 22px 22px; min-width:0; }
   .nc-head{ display:flex; align-items:center; gap:14px; margin-bottom:18px; }
-  .notif-send .nc-head{ padding-bottom:18px; border-bottom:1px solid var(--line); }
+  /* Green accent: top border of each card and the line under each title. */
+  .notif-card{ border-top:4px solid var(--brand-700); }
+  .notif-card .nc-head{ padding-bottom:16px; border-bottom:2px solid var(--brand-700); }
   .nc-head h3{ font-size:19px; color:var(--brand-900); }
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .nc-head h3{ color:var(--tone-green); } }
   :root[data-theme="dark"] .nc-head h3{ color:var(--tone-green); }
@@ -650,7 +652,9 @@
   .sent-tools{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
   .sent-tools .search-box{ max-width:none; min-width:0; }
   .sent-tools .search-box input{ border-radius:9px; border:1px solid var(--line-strong); padding:11px 12px 11px 36px; }
-  .sent-filters{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+  .sent-filters{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px 10px; }
+  .sent-filters .sf-category{ grid-column:1 / -1; }
+  .sent-filter-bar{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12.5px; color:var(--ink-soft); }
   .sent-filters select, .sent-date input{ width:100%; height:42px; font-family:inherit; font-size:13px; font-weight:600; padding:0 12px; border-radius:9px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); }
   .sent-date{ position:relative; display:block; margin:0; }
   .sent-date span{ position:absolute; top:-7px; left:10px; padding:0 4px; font-size:10.5px; font-weight:700; color:var(--ink-faint); background:var(--surface); line-height:1.2; pointer-events:none; }
@@ -1724,6 +1728,10 @@ function onNotifReferenceChange(select){
 
 /* Local calendar date (YYYY-MM-DD) a notification was sent, for the date filter.
    Handles both ISO strings and MySQL "YYYY-MM-DD HH:MM:SS" timestamps. */
+/* Older records used plural names; map them onto the current categories. */
+function notifCategoryName(c){
+  return ({'Missing Documents':'Missing Document','Other Instructions':'Other Instruction'})[c] || c || '';
+}
 function sentDateKey(value){
   var str = String(value||'');
   var d = new Date(str.indexOf('T')===-1 ? str.replace(' ','T') : str);
@@ -1736,12 +1744,17 @@ function renderNotifications(acct){
   var allRefs = state.docRequests.map(function(r){return r.id;}).concat(state.landRequests.map(function(r){return r.id;}));
   var q = String((state.search && state.search.sentNotifs) || '').toLowerCase();
   var catF = (state.filters && state.filters.sentCategory) || 'all';
-  var dateF = (state.filters && state.filters.sentDate) || '';
-  var categories = all.map(function(n){ return n.category; }).filter(function(c,i,arr){ return c && arr.indexOf(c)===i; });
+  var fromF = (state.filters && state.filters.sentFrom) || '';
+  var toF = (state.filters && state.filters.sentTo) || '';
+  if(fromF && toF && fromF > toF){ var swap = fromF; fromF = toF; toF = swap; }
+  var filtersActive = !!(q || catF!=='all' || fromF || toF);
   var list = all.filter(function(n){
     var name = n.clientName || n.applicant || '';
     var hay = [n.requestRef, name, n.category, n.message].join(' ').toLowerCase();
-    return (!q || hay.indexOf(q)>-1) && (catF==='all' || n.category===catF) && (!dateF || sentDateKey(n.sentAt)===dateF);
+    var day = sentDateKey(n.sentAt);
+    return (!q || hay.indexOf(q)>-1)
+      && (catF==='all' || notifCategoryName(n.category)===catF)
+      && (!fromF || day >= fromF) && (!toF || day <= toF);
   });
   var perPage = 5;
   var pg = paginate(list, 'sentNotifs', perPage);
@@ -1749,7 +1762,7 @@ function renderNotifications(acct){
     var name = n.clientName || n.applicant || 'Client information unavailable';
     var status = n.deliveryStatus || 'Sent';
     return '<div class="sent-item" role="button" tabindex="0" aria-expanded="false" data-action="toggle-sent-item">'
-      + '<div class="si-main"><div class="si-title">'+esc(n.category||'Notification')+'</div>'
+      + '<div class="si-main"><div class="si-title">'+esc(notifCategoryName(n.category)||'Notification')+'</div>'
         + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')</div>'
         + '<div class="si-msg">'+esc(n.message)+'</div>'
         + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div></div>'
@@ -1784,8 +1797,13 @@ function renderNotifications(acct){
     + '<section class="notif-card notif-sent" aria-labelledby="sent-notifs-title">'
       + '<div class="nc-head"><div><h3 id="sent-notifs-title">SMS Notification History</h3><p>View your previously sent notifications.</p></div></div>'
       + '<div class="sent-tools"><div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by reference number, client name…" value="'+esc((state.search && state.search.sentNotifs)||'')+'" data-input="search-sent-notifs" aria-label="Search SMS notification history"></div>'
-        + '<div class="sent-filters"><select data-input="filter-sent-category" aria-label="Filter by category"><option value="all">All Categories</option>'+categories.map(function(c){ return '<option value="'+esc(c)+'"'+(catF===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select>'
-        + '<label class="sent-date"><span>Sent date</span><input type="date" data-input="filter-sent-date" value="'+esc(dateF)+'" aria-label="Filter by sent date"></label></div></div>'
+        + '<div class="sent-filters">'
+          + '<select class="sf-category" data-input="filter-sent-category" aria-label="Filter by category"><option value="all">All Categories</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'"'+(catF===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select>'
+          + '<label class="sent-date"><span>Sent from</span><input type="date" data-input="filter-sent-from" value="'+esc(fromF)+'"'+(toF?' max="'+esc(toF)+'"':'')+' aria-label="Sent from date"></label>'
+          + '<label class="sent-date"><span>Sent to</span><input type="date" data-input="filter-sent-to" value="'+esc(toF)+'"'+(fromF?' min="'+esc(fromF)+'"':'')+' aria-label="Sent to date"></label>'
+        + '</div>'
+        + (filtersActive ? '<div class="sent-filter-bar"><span>'+pg.total+' matching record'+(pg.total===1?'':'s')+'</span><button type="button" class="dash-link" data-action="clear-sent-filters">Clear filters</button></div>' : '')
+      + '</div>'
       + '<div class="sent-list">'+(items || '<div class="empty-state">'+ic('sms','30px')+(all.length?'No notifications match your search or filters.':'No notifications sent yet.')+'</div>')+'</div>'
       + pager
     + '</section>'
@@ -2568,6 +2586,13 @@ function bindEvents(){
       var cur = pageOf(key);
       setPage(key, dir==='next'?cur+1:Math.max(1,cur-1));
       render();
+    } else if(action==='clear-sent-filters'){
+      state.search.sentNotifs = '';
+      state.filters.sentCategory = 'all';
+      state.filters.sentFrom = '';
+      state.filters.sentTo = '';
+      setPage('sentNotifs', 1);
+      render();
     } else if(action==='toggle-sent-item'){
       var sentOpen = el.classList.toggle('expanded');
       el.setAttribute('aria-expanded', String(sentOpen));
@@ -2642,7 +2667,8 @@ function bindEvents(){
     else if(key==='filter-land-status') state.filters.landStatus = el.value;
     else if(key==='filter-report-type') state.filters.reportType = el.value;
     else if(key==='filter-sent-category'){ state.filters.sentCategory = el.value; setPage('sentNotifs',1); }
-    else if(key==='filter-sent-date'){ state.filters.sentDate = el.value; setPage('sentNotifs',1); }
+    else if(key==='filter-sent-from'){ state.filters.sentFrom = el.value; setPage('sentNotifs',1); }
+    else if(key==='filter-sent-to'){ state.filters.sentTo = el.value; setPage('sentNotifs',1); }
     else return;
     render();
   };
