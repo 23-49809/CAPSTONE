@@ -47,6 +47,16 @@ draft, or publish an announcement. Do not enter client names, property
 details, request references, uploaded-document contents, credentials, or other
 identifying information in AI context fields.
 
+Generated drafts are written in simple, respectful Filipino (Tagalog) for
+older clients. PHP checks every draft before returning it: it must be Filipino,
+contain no placeholder text, and repeat every date, time, amount, and reference
+from the staff's input exactly (nothing changed, invented, or left out). A
+draft that fails is regenerated up to three times; otherwise the form shows an
+error and the message can be typed manually. User-typed messages are never
+translated. The model defaults to `gemma2:9b` (install it with
+`ollama pull gemma2:9b`) and falls back to `llama3.2:3b` if it is missing; set
+`SMART_ASSESS_OLLAMA_MODEL` to use another installed model.
+
 For local development, keep Ollama bound to loopback and use its default local
 endpoint. The application defaults to `http://127.0.0.1:11434`; if PHP and
 Ollama run in different network namespaces, set `SMART_ASSESS_OLLAMA_URL` to
