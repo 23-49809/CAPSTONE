@@ -205,7 +205,14 @@
     var internalAction = event.target.closest('[data-action]');
     if (!internalAction) return;
     var actionName = internalAction.getAttribute('data-action');
-    if (actionName === 'view-archived-staff') {
+    if (actionName === 'toggle-notification-client') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      var clientName = internalAction.nextElementSibling;
+      if (!clientName || !clientName.classList.contains('notification-client-name')) return;
+      clientName.hidden = !clientName.hidden;
+      internalAction.setAttribute('aria-expanded', String(!clientName.hidden));
+    } else if (actionName === 'view-archived-staff') {
       event.preventDefault();
       event.stopImmediatePropagation();
       openArchivedAccountDetails(internalAction.getAttribute('data-id'));
