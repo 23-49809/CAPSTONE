@@ -27,6 +27,23 @@ function sa_start_session(): void
 
 sa_start_session();
 
+/** True when $table has $column (cached per request). Lets new code work
+ *  before and after an additive migration has been applied. */
+function sa_has_column(string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (!array_key_exists($key, $cache)) {
+        $stmt = sa_db()->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c'
+        );
+        $stmt->execute(['t' => $table, 'c' => $column]);
+        $cache[$key] = (int) $stmt->fetchColumn() > 0;
+    }
+    return $cache[$key];
+}
+
 function sa_db(): PDO
 {
     static $pdo = null;
@@ -264,9 +281,10 @@ function sa_internal_bootstrap(): array
         ];
     }
 
+    $smsCategory = sa_has_column('request_status_log', 'sms_category') ? 'l.sms_category' : 'NULL';
     $notificationsQuery = $pdo->prepare(
         'SELECT l.id, l.request_id, l.status, l.actor, l.sms_body AS message,
-                l.created_at, r.reference_no,
+                ' . $smsCategory . ' AS sms_category, l.created_at, r.reference_no,
                 NULLIF(TRIM(CONCAT_WS(
                     \' \', NULLIF(c.first_name, \'\'), NULLIF(c.last_name, \'\')
                 )), \'\') AS client_name

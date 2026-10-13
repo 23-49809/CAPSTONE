@@ -41,6 +41,28 @@ function sa_request_data(): array
     return $decoded;
 }
 
+const SA_NOTIFICATION_CATEGORIES = [
+    'Missing Document',
+    'Additional Requirements',
+    'Request Status Update',
+    'Land Transfer Status',
+    'Completion / Approval',
+    'Other Instruction',
+];
+
+/** The SMS category staff picked, or null when none was sent. */
+function sa_notification_category(array $data): ?string
+{
+    $value = trim((string) ($data['category'] ?? ''));
+    if ($value === '') {
+        return null;
+    }
+    if (!in_array($value, SA_NOTIFICATION_CATEGORIES, true)) {
+        throw new SaHttpException(422);
+    }
+    return $value;
+}
+
 function sa_text(array $data, string $key, int $max, bool $required = false): ?string
 {
     $value = trim((string) ($data[$key] ?? ''));
@@ -946,6 +968,7 @@ function sa_send_notification(array $data): array
         $requestId = filter_var($lookup->fetchColumn(), FILTER_VALIDATE_INT);
     }
     $message = sa_text($data, 'message', 2000, true);
+    $category = sa_notification_category($data);
     if (!$requestId) {
         throw new SaHttpException(422);
     }
@@ -965,11 +988,19 @@ function sa_send_notification(array $data): array
         $insert->execute(['client' => $request['client_id'], 'request' => $requestId, 'message' => $message]);
         $notificationId = (int) $pdo->lastInsertId();
     }
-    $log = $pdo->prepare(
-        "INSERT INTO request_status_log (request_id, status, actor, sms_body)
-         SELECT id, status, 'staff', :message FROM requests WHERE id = :request_id"
-    );
-    $log->execute(['message' => $message, 'request_id' => $requestId]);
+    if ($category !== null && sa_has_column('request_status_log', 'sms_category')) {
+        $log = $pdo->prepare(
+            "INSERT INTO request_status_log (request_id, status, actor, sms_body, sms_category)
+             SELECT id, status, 'staff', :message, :category FROM requests WHERE id = :request_id"
+        );
+        $log->execute(['message' => $message, 'category' => $category, 'request_id' => $requestId]);
+    } else {
+        $log = $pdo->prepare(
+            "INSERT INTO request_status_log (request_id, status, actor, sms_body)
+             SELECT id, status, 'staff', :message FROM requests WHERE id = :request_id"
+        );
+        $log->execute(['message' => $message, 'request_id' => $requestId]);
+    }
     sa_audit('staff', (int) $user['id'], (string) $user['name'], 'Client notification sent', (string) $requestId);
     return ['request_id' => (int) $requestId, 'notification_id' => $notificationId];
 }
