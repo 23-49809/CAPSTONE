@@ -686,6 +686,11 @@
   .sent-arrow .icon{ width:18px; height:18px; }
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .sent-arrow{ color:var(--ink); } }
   :root[data-theme="dark"] .sent-arrow{ color:var(--ink); }
+
+  /* Staff sidebar branding: uppercase title, smaller readable subtitle. */
+  .sidebar-staff .sb-brand{ align-items:center; }
+  .sidebar-staff .sb-brand .hb-name{ font-size:19px; letter-spacing:.03em; text-transform:uppercase; line-height:1.1; }
+  .sidebar-staff .sb-brand .hb-tag{ margin-top:4px; font-size:11px; font-weight:500; letter-spacing:.02em; text-transform:none; color:#c7e3d2; line-height:1.3; white-space:normal; overflow:visible; text-overflow:clip; }
 </style>
 
 <div id="app"></div>
@@ -1124,7 +1129,7 @@ function shellChrome(acct, innerHtml){
   }).join('');
   return ''
   + '<div class="app-body">'
-    + '<aside class="sidebar" id="app-sidebar" aria-label="Main navigation">'
+    + '<aside class="sidebar'+(acct.role==='staff'?' sidebar-staff':'')+'" id="app-sidebar" aria-label="Main navigation">'
       + SIDEBAR_ART + (acct.role==='staff' ? '' : SIDEBAR_ACCENT)
       + '<div class="sb-brand"><img src="data:image/png;base64,'+LOGO_B64+'" alt="Bayan ng Mabini seal"><div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor’s Office System</div></div></div>'
       + '<div class="sidebar-label">Menu</div><nav>'+navHtml+'</nav>'
