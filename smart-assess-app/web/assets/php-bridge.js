@@ -336,7 +336,7 @@
 
     var footer = document.createElement('div');
     footer.className = 'modal-foot';
-    (details ? details.controls : []).forEach(function (control) {
+    (details || []).forEach(function (control) {
       if (control.action !== 'restore-staff' && control.action !== 'delete-archived-staff') return;
       var button = document.createElement('button');
       button.type = 'button';
