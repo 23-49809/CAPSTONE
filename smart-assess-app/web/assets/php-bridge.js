@@ -267,6 +267,7 @@
       var requestId = detailsButton.getAttribute('data-id');
       row.dataset.requestRowEnhanced = 'true';
       row.dataset.requestClickable = 'true';
+      row.classList.add('request-clickable-row');
       row.setAttribute('data-action', detailAction);
       row.setAttribute('data-id', requestId);
       row.setAttribute('tabindex', '0');
