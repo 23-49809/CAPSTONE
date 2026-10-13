@@ -599,7 +599,12 @@ function barangayCode(name){ const e = BARANGAY_CODES[name]; return e ? e[0] : '
 /* The user-entered last segment (up to 5 digits) of a stored ARP. */
 function arpSerial(arp){ const m = String(arp||'').match(/^14-\d{0,4}-?(\d{0,5})$/); return m ? m[1] : String(arp||'').replace(/\D/g,'').slice(-5); }
 /* Full ARP from the selected barangay and the serial: 14-BBBB-NNNNN. */
-function buildArp(barangay, serial){ const code = barangayCode(barangay); return code ? '14-'+code+'-'+String(serial||'').replace(/\D/g,'').slice(0,5) : ''; }
+function buildArp(barangay, serial){
+  const digits = String(serial||'').replace(/\D/g,'').slice(0,5);
+  const code = barangayCode(barangay);
+  // Without a barangay the serial is kept (as "14--NNNNN") until one is chosen.
+  return code ? '14-'+code+'-'+digits : (digits ? '14--'+digits : '');
+}
 
 function fileMetaFromFile(f, preview){ return { name:f.name, size:f.size, type:f.type, valid: VALID_FILE_RE.test(f.type) && f.size>0 && f.size < 15*1024*1024, preview: preview || null }; }
 function processUploadedFile(key, file){
