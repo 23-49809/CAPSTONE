@@ -91,8 +91,18 @@ final class IprogSmsService
         $messageId = $response['message_id'] ?? $data['message_id'] ?? null;
         $messageId = is_scalar($messageId) ? (string) $messageId : null;
 
-        ```php
-if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== 'success') {
+        if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== 'success') {
+            error_log(sprintf(
+                '[IPROG_SMS] Provider rejected request; HTTP %d, status %s.',
+                $httpStatus,
+                preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? ''
+            ));
+            
+            $providerMessage = (string) ($response['message'] ?? 'No error message provided');
+error_log('[IPROG_SMS] Provider message: ' . substr($providerMessage, 0, 300));
+        }
+
+       if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== 'success') {
     error_log(sprintf(
         '[IPROG_SMS] Provider rejected request; HTTP %d, status %s.',
         $httpStatus,
@@ -104,23 +114,6 @@ if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== '
 
     throw new RuntimeException('IPROG SMS did not accept the message.');
 }
-```
-            error_log(sprintf(
-                '[IPROG_SMS] Provider rejected request; HTTP %d, status %s.',
-                $httpStatus,
-                preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? ''
-            ));
-            
-            $providerMessage = (string) ($response['message'] ?? 'No error message provided');
-error_log('[IPROG_SMS] Provider message: ' . substr($providerMessage, 0, 300));
-        }
-
-        error_log(sprintf(
-            '[IPROG_SMS] Provider accepted request; HTTP %d, status %s, message ID %s.',
-            $httpStatus,
-            preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? '',
-            $messageId !== null ? preg_replace('/[^A-Za-z0-9_-]/', '', $messageId) : 'unavailable'
-        ));
 
         return [
             'http_status' => $httpStatus,
