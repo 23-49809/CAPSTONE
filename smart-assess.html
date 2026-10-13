@@ -1346,7 +1346,7 @@ function render(){
   else if(state.view==='wizard') html = renderWizard();
   else if(state.view==='confirmation') html = renderConfirmation();
   else if(state.view==='track') html = renderTrack();
-  app.innerHTML = html + (state.view==='wizard' ? '<input type="hidden" id="f-arp" data-bind="arp-full" value="'+esc(state.formData.arp||'')+'">' : '');
+  app.innerHTML = html + (state.view==='wizard' ? '<input type="hidden" id="f-arp" data-bind="arp" value="'+esc(state.formData.arp||'')+'">' : '');
   bindEvents(app);
   publishArp();
 }
@@ -1524,10 +1524,7 @@ function bindEvents(root){
       if(key==='contact'){
         state.formData[key] = '+63'+el.value.replace(/\D/g,'').slice(0,10);
       } else if(key==='arp'){
-        const digits = el.value.replace(/\D/g,'').slice(0,9);
-        const formatted = digits.length > 4 ? digits.slice(0,4)+'-'+digits.slice(4) : digits;
-        el.value = formatted;
-        state.formData[key] = '14-'+formatted;
+        return; // hidden mirror of state.formData.arp (see publishArp)
       } else if(key==='email'){
         const value = String(el.value || '').replace(/\s+/g,'');
         state.formData[key] = value;
