@@ -124,17 +124,38 @@ function sa_notification_category(array $data): ?string
     return $value;
 }
 
+/** Human label for a request field, used in validation messages. */
+function sa_field_label(string $key): string
+{
+    return [
+        'topic' => 'Subject (used as the AI topic)',
+        'details' => 'Context details',
+        'title' => 'Subject',
+        'body' => 'Message',
+        'message' => 'Message',
+        'image_url' => 'Image link',
+        'scheduled_at' => 'Schedule date and time',
+    ][$key] ?? ucfirst(str_replace('_', ' ', $key));
+}
+
+/** Trimmed text field. Limits count characters, matching the form's
+ *  maxlength: “smart quotes”, ñ and — are 2-3 bytes each, so a byte limit
+ *  rejected text the form itself allowed. A 65,535-byte ceiling (a MySQL
+ *  TEXT column) still guards storage. */
 function sa_text(array $data, string $key, int $max, bool $required = false): ?string
 {
     $value = trim((string) ($data[$key] ?? ''));
     if ($required && $value === '') {
-        throw new SaHttpException(422);
+        throw new SaHttpException(422, 'Fill in the ' . sa_field_label($key) . '.');
     }
     if ($value === '') {
         return null;
     }
-    if (strlen($value) > $max || str_contains($value, "\0")) {
-        throw new SaHttpException(422);
+    if (!mb_check_encoding($value, 'UTF-8') || str_contains($value, "\0")) {
+        throw new SaHttpException(422, sa_field_label($key) . ' contains characters that cannot be saved. Retype it and try again.');
+    }
+    if (mb_strlen($value, 'UTF-8') > $max || strlen($value) > 65535) {
+        throw new SaHttpException(422, sa_field_label($key) . ' must be ' . number_format($max) . ' characters or fewer.');
     }
     return $value;
 }
