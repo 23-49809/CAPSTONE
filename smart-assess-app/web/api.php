@@ -1731,14 +1731,16 @@ try {
     }
     sa_json_response($response);
 } catch (SaHttpException $exception) {
-    $failedAction = isset($action) ? (string) $action : (string) ($_GET['action'] ?? '');
+    $failedAction = isset($action) ? (string) $action
+        : (string) ((isset($data) && is_array($data) ? ($data['action'] ?? '') : '') ?: ($_GET['action'] ?? ''));
     sa_log_api_failure($exception->statusCode, $failedAction, $exception, isset($data) && is_array($data) ? $data : null);
     $message = $exception->getMessage() !== 'Request could not be completed.'
         ? $exception->getMessage()
         : sa_default_error_message($exception->statusCode);
     sa_json_response(['error' => $message . ' (Ref: ' . sa_request_ref() . ')', 'ref' => sa_request_ref()], $exception->statusCode);
 } catch (Throwable $exception) {
-    $failedAction = isset($action) ? (string) $action : (string) ($_GET['action'] ?? '');
+    $failedAction = isset($action) ? (string) $action
+        : (string) ((isset($data) && is_array($data) ? ($data['action'] ?? '') : '') ?: ($_GET['action'] ?? ''));
     sa_log_api_failure(500, $failedAction, $exception, isset($data) && is_array($data) ? $data : null);
     sa_json_response([
         'error' => 'The server hit an unexpected problem and nothing was saved. Please try again; if it keeps happening, report reference '
