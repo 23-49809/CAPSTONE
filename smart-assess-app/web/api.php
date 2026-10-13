@@ -1192,6 +1192,11 @@ function sa_generate_ai_message(array $data): array
             $lastProblem = 'it changed or invented these numbers/references: ' . implode(', ', $changed);
             continue;
         }
+        $invented = sa_invented_time_words($message, $topic . ' ' . $details);
+        if ($invented !== []) {
+            $lastProblem = 'it added days or dates that were not given: ' . implode(', ', $invented);
+            continue;
+        }
         $missing = sa_changed_identifiers($topic . ' ' . $details, $message, true);
         if ($missing !== []) {
             $lastProblem = 'it left out these dates/numbers/references: ' . implode(', ', $missing);
@@ -1354,6 +1359,43 @@ function sa_is_filipino_text(string $text): bool
         }
     }
     return true;
+}
+
+/** Day/month/relative-day words in the draft (Filipino or English) whose
+ *  meaning is not present in staff's input, e.g. "bukas" for "on Friday". */
+function sa_invented_time_words(string $message, string $source): array
+{
+    $groups = [
+        ['bukas', 'tomorrow'], ['kahapon', 'yesterday'], ['mamaya', 'later today', 'tonight'],
+        ['lunes', 'monday'], ['martes', 'tuesday'], ['miyerkules', 'miyerkoles', 'wednesday'],
+        ['huwebes', 'thursday'], ['biyernes', 'friday'], ['sabado', 'saturday'], ['linggo', 'sunday'],
+        ['enero', 'january'], ['pebrero', 'february'], ['marso', 'march'], ['abril', 'april'],
+        ['mayo', 'may'], ['hunyo', 'june'], ['hulyo', 'july'], ['agosto', 'august'],
+        ['setyembre', 'september'], ['oktubre', 'october'], ['nobyembre', 'november'], ['disyembre', 'december'],
+    ];
+    $msg = ' ' . mb_strtolower(preg_replace('/[^\p{L}\s]+/u', ' ', $message) ?? '') . ' ';
+    $src = ' ' . mb_strtolower(preg_replace('/[^\p{L}\s]+/u', ' ', $source) ?? '') . ' ';
+    $invented = [];
+    foreach ($groups as $group) {
+        foreach ($group as $word) {
+            // "may" is also a common Filipino word ("there is"); only check it as a month next to a number.
+            if ($word === 'may' || $word === 'linggo') {
+                continue;
+            }
+            if (str_contains($msg, ' ' . $word . ' ')) {
+                $present = false;
+                foreach ($group as $alt) {
+                    if (str_contains($src, ' ' . $alt . ' ')) {
+                        $present = true;
+                    }
+                }
+                if (!$present) {
+                    $invented[] = $word;
+                }
+            }
+        }
+    }
+    return array_values(array_unique($invented));
 }
 
 /** Number-bearing tokens (reference numbers, ARP numbers, dates, amounts,
