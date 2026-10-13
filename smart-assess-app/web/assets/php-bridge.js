@@ -202,18 +202,10 @@
       return;
     }
 
-    var requestRow = event.target.closest('tr.record-clickable-row');
-    if (requestRow) {
-      var rowControl = event.target.closest('a,button,input,select,textarea,label,[contenteditable="true"]');
-      var rowAction = event.target.closest('[data-action]');
-      if (rowControl && rowControl !== requestRow && (!rowAction || rowAction === requestRow)) {
-        event.stopPropagation();
-        return;
-      }
-    }
-
     var internalAction = event.target.closest('[data-action]');
     if (!internalAction) return;
+    if (internalAction.matches('tr.record-clickable-row')
+      && event.target.closest('a,button,input,select,textarea,label,[contenteditable="true"]')) return;
     var actionName = internalAction.getAttribute('data-action');
     if (actionName === 'view-archived-staff') {
       event.preventDefault();
