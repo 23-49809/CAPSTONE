@@ -1,4 +1,4 @@
-curl_close($handle);<?php
+<?php
 declare(strict_types=1);
 
 final class IprogSmsService
