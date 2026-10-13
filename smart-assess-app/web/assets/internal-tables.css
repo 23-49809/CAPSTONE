@@ -43,3 +43,8 @@
 .table-wrap table tbody td .cell-sub {
   color: #5b665e;
 }
+
+.sidebar nav .side-link[data-view="timestamp"],
+.sidebar nav .side-link[data-view="requirement-results"] {
+  display: none;
+}
