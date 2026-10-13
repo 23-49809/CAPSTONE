@@ -435,7 +435,7 @@
 
           var clientName = document.createElement('span');
           clientName.className = 'notification-client-name';
-          clientName.hidden = true;
+          clientName.hidden = Boolean(reference);
           clientName.textContent = notification.clientName || 'Client information unavailable';
 
           var tail = reference && referenceLine.textContent.indexOf(reference) === 0
