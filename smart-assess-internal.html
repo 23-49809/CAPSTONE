@@ -481,6 +481,7 @@
     background:url("sidebar-mao.jpg") 60% 70% / cover no-repeat; mix-blend-mode:luminosity; opacity:.34;
     -webkit-mask-image:linear-gradient(to top, transparent 0%, #000 20%, #000 55%, transparent 100%);
             mask-image:linear-gradient(to top, transparent 0%, #000 20%, #000 55%, transparent 100%); }
+  @media (max-height:620px){ .sidebar-art{ display:none; } }
 
   /* Static sidebar: always visible. Below 900px it sits above the content
      as a full-width block instead of an off-canvas drawer. */
@@ -492,6 +493,7 @@
     .sidebar .side-link{ width:auto; padding:9px 12px; font-size:14px; gap:8px; }
     .sidebar .side-link .icon{ width:18px; height:18px; }
     .sidebar-foot{ margin-top:0; padding-top:10px; }
+    .sidebar-art{ display:none; }
     .sidebar-backdrop{ display:none !important; }
   }
 
