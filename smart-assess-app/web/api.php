@@ -225,7 +225,7 @@ function sa_normalize_bridge_request(array $data): array
             default => throw new SaHttpException(422),
         };
         if ($data['announcement_mode'] === 'schedule' && !isset($data['scheduled_at'])) {
-            throw new SaHttpException(422);
+            throw new SaHttpException(422, 'Pick a date and time to schedule this announcement.');
         }
     }
     if ($data['action'] === 'head_announcement_transition') {
@@ -253,10 +253,10 @@ function sa_internal_or_fail(array $roles): array
 {
     $user = sa_current_internal();
     if (!$user) {
-        throw new SaHttpException(401);
+        throw new SaHttpException(401, 'Your session has ended. Reload the page and sign in again.');
     }
     if (!in_array((string) $user['role'], $roles, true)) {
-        throw new SaHttpException(403);
+        throw new SaHttpException(403, 'Your account does not have permission to do this. If you switched accounts in another tab, reload this page.');
     }
     return $user;
 }
@@ -1371,8 +1371,27 @@ function sa_announcement_change(array $data, string $action): array
     $pdo = sa_db();
     $id = filter_var($data['announcement_id'] ?? null, FILTER_VALIDATE_INT);
     $needsContent = in_array($action, ['create', 'edit'], true);
-    $title = sa_text($data, 'title', 200, $needsContent);
-    $body = sa_text($data, 'body', 60000, $needsContent);
+    if ($needsContent) {
+        $rawTitle = trim((string) ($data['title'] ?? ''));
+        $rawBody = trim((string) ($data['body'] ?? ''));
+        if ($rawTitle === '') {
+            throw new SaHttpException(422, 'Add a subject for the announcement.');
+        }
+        if (mb_strlen($rawTitle) > 200 || str_contains($rawTitle, "\0")) {
+            throw new SaHttpException(422, 'The subject must be 200 characters or fewer.');
+        }
+        if ($rawBody === '') {
+            throw new SaHttpException(422, 'Write a message for the announcement.');
+        }
+        if (strlen($rawBody) > 60000 || str_contains($rawBody, "\0")) {
+            throw new SaHttpException(422, 'The message is too long. Shorten it and try again.');
+        }
+        if (!in_array((string) ($data['audience'] ?? 'both'), ['client', 'staff', 'both'], true)) {
+            throw new SaHttpException(422, 'Choose who should receive this announcement.');
+        }
+    }
+    $title = $needsContent ? trim((string) $data['title']) : sa_text($data, 'title', 200);
+    $body = $needsContent ? trim((string) $data['body']) : sa_text($data, 'body', 60000);
     $audience = (string) ($data['audience'] ?? 'both');
     $startDate = (string) ($data['start_date'] ?? date('Y-m-d'));
     $endDate = sa_text($data, 'end_date', 10);
@@ -1446,9 +1465,11 @@ function sa_announcement_change(array $data, string $action): array
     } elseif ($action === 'schedule') {
         $scheduledAt = sa_text($data, 'scheduled_at', 19, true);
         $date = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $scheduledAt, sa_schedule_timezone());
-        if (!$date || $date->format('Y-m-d H:i:s') !== $scheduledAt ||
-            $date <= new DateTimeImmutable('now', sa_schedule_timezone())) {
-            throw new SaHttpException(422);
+        if (!$date || $date->format('Y-m-d H:i:s') !== $scheduledAt) {
+            throw new SaHttpException(422, 'Choose a valid schedule date and time.');
+        }
+        if ($date <= new DateTimeImmutable('now', sa_schedule_timezone())) {
+            throw new SaHttpException(422, 'The scheduled time has already passed. Pick a future date and time (Philippine time).');
         }
         $pdo->prepare(
             "UPDATE announcements SET status = 'Scheduled', scheduled_at = :scheduled, published_at = NULL
@@ -1632,8 +1653,14 @@ try {
     }
     sa_json_response($response);
 } catch (SaHttpException $exception) {
-    error_log(sprintf('[SMART_ASSESS] HTTP %d: %s', $exception->statusCode, $exception->getMessage()));
-    $message = in_array($exception->statusCode, [422, 503], true) &&
+    error_log(sprintf(
+        '[SMART_ASSESS] HTTP %d on %s (internal user %s): %s',
+        $exception->statusCode,
+        isset($action) ? (string) $action : 'unknown action',
+        isset($_SESSION['sa_internal_id']) ? (string) (int) $_SESSION['sa_internal_id'] : 'none',
+        $exception->getMessage()
+    ));
+    $message = in_array($exception->statusCode, [401, 403, 422, 503], true) &&
         $exception->getMessage() !== 'Request could not be completed.'
         ? $exception->getMessage()
         : 'Request could not be completed.';
