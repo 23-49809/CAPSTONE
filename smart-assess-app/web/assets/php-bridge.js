@@ -159,6 +159,43 @@
     });
   }
 
+  function generateAiMessage(button) {
+    var form = button.closest('form');
+    var generationType = button.getAttribute('data-ai-type');
+    if (!form || (generationType !== 'notification' && generationType !== 'announcement')) return;
+
+    var topicField = generationType === 'announcement'
+      ? form.elements.namedItem('title')
+      : form.elements.namedItem('aiTopic');
+    var detailsField = form.elements.namedItem('aiDetails');
+    var messageField = form.elements.namedItem(generationType === 'announcement' ? 'content' : 'message');
+    if (!topicField || !messageField || !topicField.value.trim()) {
+      notice('Enter a topic before generating a message.');
+      if (topicField) topicField.focus();
+      return;
+    }
+
+    var originalContent = button.innerHTML;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = 'Generating…';
+    jsonRequest('generate_ai_message', {
+      generation_type: generationType,
+      topic: topicField.value.trim(),
+      details: detailsField ? detailsField.value.trim() : ''
+    }).then(function (result) {
+      messageField.value = result.data.message;
+      messageField.dispatchEvent(new Event('input', { bubbles: true }));
+      messageField.focus();
+    }).catch(function (error) {
+      notice(error.message || 'AI message generation is unavailable. You can enter the message manually.');
+    }).finally(function () {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.innerHTML = originalContent;
+    });
+  }
+
   document.addEventListener('change', function (event) {
     var input = event.target;
     if (input && input.matches('[data-file-input]') && input.files && input.files[0]) {
@@ -205,7 +242,11 @@
     var internalAction = event.target.closest('[data-action]');
     if (!internalAction) return;
     var actionName = internalAction.getAttribute('data-action');
-    if (actionName === 'toggle-notification-client') {
+    if (actionName === 'generate-ai-message') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      generateAiMessage(internalAction);
+    } else if (actionName === 'toggle-notification-client') {
       event.preventDefault();
       event.stopImmediatePropagation();
       var clientName = internalAction.nextElementSibling;
@@ -536,6 +577,12 @@
     if (!form || config.portal !== 'internal') return;
     var type = form.getAttribute('data-form');
     var data = Object.fromEntries(new FormData(form).entries());
+    if (type === 'send-notif') {
+      delete data.aiTopic;
+      delete data.aiDetails;
+    } else if (type === 'save-ann') {
+      delete data.aiDetails;
+    }
     if (event.submitter && event.submitter.name) {
       data[event.submitter.name] = event.submitter.value;
       if (event.submitter.name === 'saveMode') data.publishMode = event.submitter.value;
