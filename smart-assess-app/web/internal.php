@@ -113,6 +113,7 @@ $page['announcements'] = array_map(static function (array $announcement): array 
     ];
 }, $page['announcements'] ?? []);
 if ($user && (int) $user['role_id'] !== 4) {
+    sa_publish_due_announcements();
     $page['announcements'] = array_map(static function (array $announcement): array {
         return [
             'id' => (string) $announcement['id'],

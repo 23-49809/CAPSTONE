@@ -156,9 +156,20 @@ function sa_current_client(): ?array
     return $client;
 }
 
+/** Publish scheduled announcements whose time has come. Uses PHP's clock,
+ *  the same one that validated the schedule when it was saved. */
+function sa_publish_due_announcements(): void
+{
+    sa_db()->prepare(
+        "UPDATE announcements SET status = 'Published', published_at = scheduled_at, scheduled_at = NULL
+         WHERE status = 'Scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= :now"
+    )->execute(['now' => (new DateTimeImmutable())->format('Y-m-d H:i:s')]);
+}
+
 function sa_public_bootstrap(): array
 {
     $pdo = sa_db();
+    sa_publish_due_announcements();
     $settings = [];
     foreach ($pdo->query('SELECT setting_key, setting_value FROM settings')->fetchAll() as $row) {
         $settings[$row['setting_key']] = $row['setting_value'];
@@ -264,6 +275,7 @@ function sa_internal_bootstrap(): array
     }
 
     if ($roleId === 4) {
+        sa_publish_due_announcements();
         $data['announcements'] = $pdo->query(
             'SELECT id, title, body, author, audience, start_date, end_date, image_url,
                     status, scheduled_at, published_at, created_at
