@@ -2602,7 +2602,7 @@ function bindEvents(){
       btn.addEventListener('click', function(e){
         if(composerErr) composerErr.hidden = true;
         var mode = btn.value;
-        if(!form.elements.postTo.value && mode!=='draft'){ e.preventDefault(); fail('Choose who should receive this announcement.', form.elements.postTo); return; }
+        if(!form.elements.postTo.value){ e.preventDefault(); fail('Choose who should receive this announcement.', form.elements.postTo); return; }
         if(!form.elements.title.value.trim()){ e.preventDefault(); fail('Add a subject.', form.elements.title); return; }
         if(!form.elements.content.value.trim()){ e.preventDefault(); fail('Write a message.', form.elements.content); return; }
         if(mode==='schedule'){
