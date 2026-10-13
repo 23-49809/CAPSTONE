@@ -16,22 +16,22 @@
   background-color: #e4e9e6;
 }
 
-.table-wrap table tbody tr.request-clickable-row {
+.table-wrap table tbody tr.record-clickable-row {
   cursor: pointer;
 }
 
-.table-wrap table tbody tr.request-clickable-row:focus-visible {
+.table-wrap table tbody tr.record-clickable-row:focus-visible {
   outline: 2px solid #059669;
   outline-offset: -2px;
 }
 
-.table-wrap table tbody tr.request-clickable-row .request-reference-cell {
+.table-wrap table tbody tr.record-clickable-row td:first-child {
   text-decoration: underline;
   text-decoration-color: transparent;
   text-underline-offset: 3px;
 }
 
-.table-wrap table tbody tr.request-clickable-row:hover .request-reference-cell {
+.table-wrap table tbody tr.record-clickable-row:hover td:first-child {
   text-decoration-color: currentColor;
 }
 
