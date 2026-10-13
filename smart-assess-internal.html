@@ -1371,7 +1371,7 @@ function renderNotifications(acct){
         + '<div class="field"><label>Relevant Details (optional)</label><textarea name="aiDetails" maxlength="1000" placeholder="Add only general, non-sensitive details"></textarea></div>'
       + '</div>'
       + '<p class="field-hint ai-privacy-hint">Do not include client names, property details, reference numbers, uploaded documents, or other identifying information.</p>'
-      + '<div class="field"><div class="ai-message-heading"><label for="notification-message">Message</label><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="notification">'+ic('sparkles','15px')+' Generate with AI</button></div><textarea id="notification-message" name="message" placeholder="Type the message for the applicant…" required></textarea></div>'
+      + '<div class="field"><div class="ai-message-heading"><label for="notification-message">Message</label><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="notification">'+ic('check','15px')+' Generate with AI</button></div><textarea id="notification-message" name="message" placeholder="Type the message for the applicant…" required></textarea></div>'
       + '<button type="submit" class="btn btn-primary">'+ic('send','17px')+' Send Notification</button>'
     + '</form>'
   + '</div>'
@@ -1467,7 +1467,7 @@ function modalAnnEdit(id){
       + '<div class="field"><label>Title</label><input name="title" type="text" value="'+esc(a.title)+'" required></div>'
       + '<div class="field"><label>AI Context Details (optional)</label><textarea name="aiDetails" maxlength="1000" placeholder="Add general details to include in the announcement"></textarea></div>'
       + '<p class="field-hint ai-privacy-hint">Do not include client names, property details, reference numbers, uploaded documents, or other identifying information.</p>'
-      + '<div class="field"><div class="ai-message-heading"><label for="announcement-message">Message</label><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="announcement">'+ic('sparkles','15px')+' Generate with AI</button></div><textarea id="announcement-message" name="content" required>'+esc(a.content)+'</textarea></div>'
+      + '<div class="field"><div class="ai-message-heading"><label for="announcement-message">Message</label><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="announcement">'+ic('check','15px')+' Generate with AI</button></div><textarea id="announcement-message" name="content" required>'+esc(a.content)+'</textarea></div>'
       + '<div class="field"><label>Post To</label><select name="postTo" required>'
         + '<option value=""'+(a.postTo?'':' selected')+'>Select Audience</option>'
         + Object.keys(ANNOUNCEMENT_AUDIENCES).map(function(k){ return '<option value="'+k+'"'+(a.postTo===k?' selected':'')+'>'+ANNOUNCEMENT_AUDIENCES[k]+'</option>'; }).join('')
