@@ -293,7 +293,7 @@
     var existing = internalApp.querySelector('[data-archived-account-detail]');
     if (existing) existing.remove();
 
-    var details = rowActionDetails(row.querySelector('.actions-cell'));
+    var details = internalRowActions['view-archived-staff:' + id];
     var overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.setAttribute('data-action', 'close-modal');
@@ -410,6 +410,11 @@
       Array.prototype.slice.call(table.querySelectorAll('tbody tr')).forEach(function (row) {
         var cells = Array.prototype.slice.call(row.children);
         var actionCell = cells[actionsIndex];
+        var emptyCell = row.querySelector('td[colspan]');
+        if (emptyCell && cells.length === 1) {
+          var oldSpan = Number(emptyCell.getAttribute('colspan'));
+          if (oldSpan > 1) emptyCell.setAttribute('colspan', String(oldSpan - 1));
+        }
         if (actionCell && actionCell.tagName === 'TD' && !actionCell.hasAttribute('colspan')) {
           var detail = rowActionDetails(actionCell);
           if (detail) {
