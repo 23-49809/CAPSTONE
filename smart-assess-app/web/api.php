@@ -1213,7 +1213,7 @@ function sa_filipino_system_prompt(bool $isNotification): string
         "MGA PATAKARAN:\n" .
         "1. Isulat ang buong mensahe sa simple, natural, at magalang na Filipino (Tagalog) na madaling maintindihan ng matatanda.\n" .
         "2. Magsimula sa \"Magandang araw po.\" Gumamit ng \"po\". Gamitin ang \"Mangyaring\" kapag may hinihiling na gawin. Magtapos sa \"Maraming salamat po.\"\n" .
-        "3. Sabihin LAMANG ang mga impormasyong ibinigay. Huwag magdagdag ng bagong impormasyon, dahilan, paumanhin, araw o petsa (tulad ng "bukas" o "Lunes"), oras, o utos (tulad ng "magdala ng ID") na hindi nakasulat sa impormasyon.\n" .
+        "3. Sabihin LAMANG ang mga impormasyong ibinigay. Huwag magdagdag ng bagong impormasyon, dahilan, paumanhin, araw o petsa (tulad ng \"bukas\" o \"Lunes\"), oras, o utos (tulad ng \"magdala ng ID\") na hindi nakasulat sa impormasyon.\n" .
         "3a. Ang paksa at detalye ay mga tala na maaaring nasa Ingles. ISALIN ang kahulugan nito sa Filipino. HUWAG kopyahin ang mga pangungusap o label na Ingles (tulad ng \"Request type:\" o \"Current status:\").\n" .
         "4. Kopyahin nang eksakto ang mga pangalan, petsa, oras, araw, halaga, reference number, ARP/Tax Declaration number, at pangalan ng dokumento.\n" .
         "5. Iwasan ang malalalim na salita, teknikal na salita, at hindi kailangang Ingles. Maikli at malinaw na pangungusap lamang.\n" .
