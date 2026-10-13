@@ -24,9 +24,3 @@
 .table-wrap table tbody td .cell-sub {
   color: #5b665e;
 }
-
-@media (max-width: 1340px) {
-  .table-wrap table tbody tr:hover {
-    background-color: #e4e9e6;
-  }
-}
