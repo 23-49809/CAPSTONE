@@ -3,6 +3,67 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
+/** Short random reference shown to the user and written to the log, so a
+ *  reported error can be matched to its diagnostic entry. */
+function sa_request_ref(): string
+{
+    static $ref = null;
+    return $ref ??= strtoupper(bin2hex(random_bytes(3)));
+}
+
+/** Append one JSON line per failed API call to logs/api-errors.log (outside
+ *  the web root). Records field NAMES only; never values, tokens or passwords. */
+function sa_log_api_failure(int $status, string $action, Throwable $exception, ?array $data): void
+{
+    $cookieName = session_name();
+    $cookieSid = (string) ($_COOKIE[$cookieName] ?? '');
+    $entry = [
+        'time' => (new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d H:i:s'),
+        'ref' => sa_request_ref(),
+        'status' => $status,
+        'action' => $action !== '' ? $action : 'unknown',
+        'error' => $exception->getMessage(),
+        'session' => [
+            'cookie_sent' => $cookieSid !== '',
+            'cookie_matches_session' => $cookieSid !== '' && $cookieSid === session_id(),
+            'internal_user_id' => isset($_SESSION['sa_internal_id']) ? (int) $_SESSION['sa_internal_id'] : null,
+            'client_user_id' => isset($_SESSION['sa_client_id']) ? (int) $_SESSION['sa_client_id'] : null,
+            'csrf_sent' => is_array($data) && isset($data['csrf']) && $data['csrf'] !== '',
+        ],
+        'fields' => is_array($data) ? array_values(array_diff(array_keys($data), ['csrf', 'password'])) : [],
+    ];
+    if (!($exception instanceof SaHttpException)) {
+        $entry['exception'] = get_class($exception);
+        $entry['where'] = basename($exception->getFile()) . ':' . $exception->getLine();
+        if ($exception instanceof PDOException) {
+            $entry['sqlstate'] = (string) $exception->getCode();
+        }
+    }
+    $line = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    $dir = dirname(__DIR__) . '/logs';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0700, true);
+    }
+    if ($line === false || @file_put_contents($dir . '/api-errors.log', $line . PHP_EOL, FILE_APPEND | LOCK_EX) === false) {
+        error_log('[SMART_ASSESS] ' . ($line ?: 'unloggable API failure'));
+    }
+}
+
+/** Safe, actionable text for exceptions that carry no specific message. */
+function sa_default_error_message(int $status): string
+{
+    return match ($status) {
+        400 => 'The request was not sent correctly. Reload the page and try again.',
+        401 => 'Sign-in failed or your session has ended. Check your details and sign in again.',
+        403 => 'You are not allowed to do this, or this page is out of date. Reload the page and try again.',
+        404 => 'That item no longer exists or this action is not available. Reload the page and try again.',
+        405 => 'The request was not sent correctly. Reload the page and try again.',
+        413 => 'The upload is too large.',
+        422 => 'Some information is missing or invalid. Check the form and try again.',
+        default => 'The server could not complete this request.',
+    };
+}
+
 function sa_request_data(): array
 {
     $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -191,7 +252,7 @@ function sa_normalize_bridge_request(array $data): array
             if (preg_match('/^\d{1,2}:\d{2}\s*[AP]M$/i', $time)) {
                 $parsedTime = DateTimeImmutable::createFromFormat('!g:i A', strtoupper($time));
                 if (!$parsedTime) {
-                    throw new SaHttpException(422);
+                    throw new SaHttpException(422, 'Enter the schedule time like 9:05 PM.');
                 }
                 $time = $parsedTime->format('H:i:s');
             } elseif (strlen($time) === 5) {
@@ -222,7 +283,7 @@ function sa_normalize_bridge_request(array $data): array
             'publish', 'publish now', 'publish_now', 'publish immediately', 'now', 'published' => 'publish',
             'schedule', 'scheduled', 'schedule for later' => 'schedule',
             'draft', 'save draft', 'save' => 'draft',
-            default => throw new SaHttpException(422),
+            default => throw new SaHttpException(422, 'Choose Send, Schedule send, or Save Draft.'),
         };
         if ($data['announcement_mode'] === 'schedule' && !isset($data['scheduled_at'])) {
             throw new SaHttpException(422, 'Pick a date and time to schedule this announcement.');
@@ -1123,7 +1184,6 @@ function sa_generate_ai_message(array $data): array
     ]);
     $result = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-    curl_close($curl);
     if ($result === false || $status < 200 || $status >= 300) {
         throw new SaHttpException(503, 'AI message generation is unavailable. You can enter the message manually.');
     }
@@ -1527,7 +1587,7 @@ function sa_announcement_transition(array $data): array
     $transition = (string) ($data['transition'] ?? '');
     $statuses = ['publish' => 'Published', 'unpublish' => 'Draft', 'cancel' => 'Cancelled'];
     if (!$id || $id < 1 || !isset($statuses[$transition])) {
-        throw new SaHttpException(422);
+        throw new SaHttpException(422, 'That announcement action is not valid. Reload the page and try again.');
     }
     $pdo = sa_db();
     $stmt = $pdo->prepare(
@@ -1671,24 +1731,18 @@ try {
     }
     sa_json_response($response);
 } catch (SaHttpException $exception) {
-    error_log(sprintf(
-        '[SMART_ASSESS] HTTP %d on %s (internal user %s): %s',
-        $exception->statusCode,
-        isset($action) ? (string) $action : 'unknown action',
-        isset($_SESSION['sa_internal_id']) ? (string) (int) $_SESSION['sa_internal_id'] : 'none',
-        $exception->getMessage()
-    ));
-    $message = in_array($exception->statusCode, [401, 403, 422, 503], true) &&
-        $exception->getMessage() !== 'Request could not be completed.'
+    $failedAction = isset($action) ? (string) $action : (string) ($_GET['action'] ?? '');
+    sa_log_api_failure($exception->statusCode, $failedAction, $exception, isset($data) && is_array($data) ? $data : null);
+    $message = $exception->getMessage() !== 'Request could not be completed.'
         ? $exception->getMessage()
-        : 'Request could not be completed.';
-    sa_json_response(['error' => $message], $exception->statusCode);
+        : sa_default_error_message($exception->statusCode);
+    sa_json_response(['error' => $message . ' (Ref: ' . sa_request_ref() . ')', 'ref' => sa_request_ref()], $exception->statusCode);
 } catch (Throwable $exception) {
-    error_log(sprintf(
-        '[SMART_ASSESS] %s in %s:%d',
-        $exception->getMessage(),
-        $exception->getFile(),
-        $exception->getLine()
-    ));
-    sa_json_response(['error' => 'Request could not be completed.'], 500);
+    $failedAction = isset($action) ? (string) $action : (string) ($_GET['action'] ?? '');
+    sa_log_api_failure(500, $failedAction, $exception, isset($data) && is_array($data) ? $data : null);
+    sa_json_response([
+        'error' => 'The server hit an unexpected problem and nothing was saved. Please try again; if it keeps happening, report reference '
+            . sa_request_ref() . ' to the system administrator.',
+        'ref' => sa_request_ref(),
+    ], 500);
 }

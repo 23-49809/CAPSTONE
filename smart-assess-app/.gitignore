@@ -10,3 +10,6 @@ web/uploads/*
 
 # OS
 .DS_Store
+
+# Server-side API diagnostics (no secrets, but keep local)
+/logs/
