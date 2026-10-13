@@ -692,6 +692,57 @@
   .sidebar .sb-brand{ align-items:center; }
   .sidebar .sb-brand .hb-name{ font-size:19px; letter-spacing:.03em; text-transform:uppercase; line-height:1.1; }
   .sidebar .sb-brand .hb-tag{ margin-top:4px; font-size:11px; font-weight:500; letter-spacing:.02em; text-transform:none; color:#c7e3d2; line-height:1.3; white-space:normal; overflow:visible; text-overflow:clip; }
+
+  /* ============ Announcement composer (Head) ============ */
+  .modal.composer-modal{ max-width:720px; padding:0; display:flex; flex-direction:column; }
+  .composer-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px 14px 24px; border-bottom:2px solid var(--brand-700); }
+  .composer-head h3{ font-size:19px; color:var(--brand-900); }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .composer-head h3{ color:var(--tone-green); } }
+  :root[data-theme="dark"] .composer-head h3{ color:var(--tone-green); }
+  .composer-head .modal-close{ width:34px; height:34px; }
+  .composer{ display:flex; flex-direction:column; }
+  .composer-row{ display:flex; align-items:center; gap:12px; padding:4px 24px; border-bottom:1px solid var(--line); }
+  .composer-row label{ flex:0 0 64px; font-size:13.5px; font-weight:600; color:var(--ink-soft); }
+  .composer-row select, .composer-row input{ flex:1; min-width:0; min-height:44px; border:0; background:transparent; color:var(--ink); font-family:inherit; font-size:14.5px; padding:8px 4px; outline:none; }
+  .composer-row input{ font-weight:600; }
+  .composer-row:focus-within{ box-shadow:inset 3px 0 0 var(--brand-600); }
+  .composer-body{ padding:16px 24px 6px; }
+  .composer-body > textarea{ width:100%; min-height:220px; resize:vertical; border:1px solid var(--line-strong); border-radius:10px; padding:14px 16px; font-family:inherit; font-size:14.5px; line-height:1.6; color:var(--ink); background:var(--surface); }
+  .composer-body > textarea:focus{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); outline:none; }
+  .composer-ai{ margin-top:10px; border:1px solid var(--line); border-radius:10px; }
+  .composer-ai summary{ display:flex; align-items:center; gap:8px; padding:9px 12px; font-size:13.5px; font-weight:600; color:var(--brand-700); cursor:pointer; list-style:none; }
+  .composer-ai summary::-webkit-details-marker{ display:none; }
+  .composer-ai summary .icon{ width:15px; height:15px; }
+  .composer-ai-body{ padding:0 12px 12px; }
+  .composer-ai-body label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:6px; }
+  .composer-ai-body textarea{ width:100%; min-height:64px; resize:vertical; border:1px solid var(--line-strong); border-radius:8px; padding:10px 12px; font-family:inherit; font-size:13.5px; background:var(--surface); color:var(--ink); }
+  .composer-ai-body .ai-privacy-hint{ margin:6px 0 8px; }
+  .composer-schedule{ margin:10px 24px 0; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); }
+  .composer-schedule-toggle{ display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:var(--ink); cursor:pointer; }
+  .composer-schedule-toggle .icon{ width:18px; height:18px; color:var(--brand-700); }
+  .composer-schedule-toggle input{ position:absolute; opacity:0; width:1px; height:1px; }
+  .composer-schedule-toggle .switch{ margin-left:auto; width:38px; height:22px; border-radius:999px; background:var(--line-strong); position:relative; transition:background-color .15s ease; flex:0 0 38px; }
+  .composer-schedule-toggle .switch::after{ content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .15s ease; box-shadow:0 1px 2px rgba(0,0,0,.25); }
+  .composer-schedule-toggle input:checked ~ .switch{ background:var(--brand-600); }
+  .composer-schedule-toggle input:checked ~ .switch::after{ transform:translateX(16px); }
+  .composer-schedule-toggle input:focus-visible ~ .switch{ outline:3px solid var(--brand-500); outline-offset:2px; }
+  .composer-schedule .schedule-fields{ margin-top:12px; }
+  .composer-schedule .schedule-fields .field{ margin-bottom:0; }
+  .composer-error{ margin:10px 24px 0; }
+  .composer-actions{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:16px 0 0; padding:14px 24px 18px; border-top:1px solid var(--line); }
+  .composer-actions .btn .icon{ width:16px; height:16px; }
+  .composer-actions .composer-push{ margin-left:auto; }
+  .composer-actions .btn-primary{ padding:11px 22px; }
+  .btn-ghost-text{ background:none; border-color:transparent; color:var(--ink-soft); }
+  .btn-ghost-text:hover{ background:var(--surface-2); color:var(--ink); }
+  @media (max-width:560px){
+    .composer-row{ padding:4px 16px; } .composer-row label{ flex-basis:54px; }
+    .composer-body{ padding:14px 16px 6px; } .composer-schedule, .composer-error{ margin-left:16px; margin-right:16px; }
+    .composer-actions{ padding:12px 16px 16px; }
+    .composer-actions .btn{ flex:1 1 calc(50% - 5px); }
+    .composer-actions .composer-push{ margin-left:0; }
+    .composer-actions .btn-primary{ flex-basis:100%; order:-1; }
+  }
 </style>
 
 <div id="app"></div>
@@ -1885,7 +1936,7 @@ function renderModal(){
   if(!m) return '';
   if(m.type==='view-staff') return modalWrap(modalViewStaff(m.id));
   if(m.type==='edit-staff') return modalWrap(modalEditStaff(m.id));
-  if(m.type==='ann-edit') return modalWrap(modalAnnEdit(m.id));
+  if(m.type==='ann-edit') return modalWrap(modalAnnEdit(m.id), false, 'composer-modal');
   if(m.type==='report-detail') return modalWrap(modalReportDetail(m.id));
   if(m.type==='doc-detail') return modalWrap(modalReqDetail(m.id,'doc'), false, 'req-detail');
   if(m.type==='land-detail') return modalWrap(modalReqDetail(m.id,'land'), false, 'req-detail');
@@ -1921,36 +1972,47 @@ function modalEditStaff(id){
 
 function modalAnnEdit(id){
   var a = id ? findAnn(id) : {title:'',content:'',postTo:'',status:'Draft',scheduledAt:null};
-  var mode = a.status==='Scheduled' ? 'schedule' : 'now';
+  var scheduled = a.status==='Scheduled';
   var schedDate = '', schedTime = '';
   if(a.scheduledAt){
     var d = new Date(a.scheduledAt);
     schedDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     schedTime = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   }
-  return '<div class="modal-head"><div><h3>'+(id?'Edit Announcement':'Create Announcement')+'</h3></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
-    + '<form data-form="save-ann" data-id="'+(id||'')+'">'
-      + '<div class="field"><label>Title</label><input name="title" type="text" value="'+esc(a.title)+'" required></div>'
-      + '<div class="field"><label>AI Context Details (optional)</label><textarea name="aiDetails" maxlength="1000" placeholder="Add general details to include in the announcement"></textarea></div>'
-      + '<p class="field-hint ai-privacy-hint">Do not include client names, property details, reference numbers, uploaded documents, or other identifying information.</p>'
-      + '<div class="field"><div class="ai-message-heading"><label for="announcement-message">Message</label><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="announcement">'+ic('sparkles','15px')+' Generate with AI</button></div><textarea id="announcement-message" name="content" required>'+esc(a.content)+'</textarea></div>'
-      + '<div class="field"><label>Post To</label><select name="postTo" required>'
-        + '<option value=""'+(a.postTo?'':' selected')+'>Select Audience</option>'
+  var primaryLabel = id && a.status==='Published' ? 'Save Changes' : 'Publish Now';
+  return '<div class="composer-head"><h3>'+(id?'Edit Announcement':'New Announcement')+'</h3>'
+      + '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','16px')+'</button></div>'
+    + '<form data-form="save-ann" data-id="'+(id||'')+'" class="composer" novalidate>'
+      + '<div class="composer-row"><label for="ann-audience">To</label><select id="ann-audience" name="postTo" required>'
+        + '<option value=""'+(a.postTo?'':' selected')+'>Select audience…</option>'
         + Object.keys(ANNOUNCEMENT_AUDIENCES).map(function(k){ return '<option value="'+k+'"'+(a.postTo===k?' selected':'')+'>'+ANNOUNCEMENT_AUDIENCES[k]+'</option>'; }).join('')
       + '</select></div>'
-      + '<div class="field"><label>Publish</label><div class="publish-options" data-publish-options>'
-        + '<label class="publish-option"><input type="radio" name="publishMode" value="now" '+(mode==='now'?'checked':'')+'><span><b>Send Immediately</b><br><span class="field-hint">Goes out to the selected audience as soon as you save.</span></span></label>'
-        + '<label class="publish-option"><input type="radio" name="publishMode" value="schedule" '+(mode==='schedule'?'checked':'')+'><span><b>Schedule for Later</b><br><span class="field-hint">Stays hidden until the date/time below.</span></span></label>'
-      + '</div></div>'
-      + '<div class="schedule-fields" data-schedule-fields>'
-        + '<div class="field-row">'
-          + '<div class="field"><label>Schedule Date</label>'+dtPickerField('date','scheduleDate',schedDate)+'</div>'
-          + '<div class="field"><label>Schedule Time</label>'+dtPickerField('time','scheduleTime',schedTime,{pairDate:'scheduleDate'})+'</div>'
-        + '</div>'
-        + '<div class="schedule-summary" data-schedule-summary hidden></div>'
-        + '<div class="field-error" data-schedule-error hidden>Please select a future date and time.</div>'
+      + '<div class="composer-row"><label for="ann-subject">Subject</label><input id="ann-subject" name="title" type="text" maxlength="200" value="'+esc(a.title)+'" placeholder="Announcement title" required></div>'
+      + '<div class="composer-body"><textarea id="announcement-message" name="content" aria-label="Message" placeholder="Write your announcement…" required>'+esc(a.content)+'</textarea>'
+        + '<details class="composer-ai"><summary>'+ic('sparkles','15px')+'<span>Write with AI</span></summary>'
+          + '<div class="composer-ai-body"><label for="ann-ai-details">Context details (optional)</label><textarea id="ann-ai-details" name="aiDetails" maxlength="1000" placeholder="General details to include in the announcement"></textarea>'
+          + '<p class="field-hint ai-privacy-hint">Do not include client names, property details, reference numbers, uploaded documents, or other identifying information.</p>'
+          + '<div class="ai-message-heading"><span></span><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="announcement">'+ic('sparkles','15px')+' Generate with AI</button></div></div>'
+        + '</details>'
       + '</div>'
-      + '<div class="modal-foot"><button type="button" class="btn btn-outline" data-action="close-modal">Cancel</button><button type="submit" name="saveMode" value="draft" class="btn btn-outline">Save as Draft</button><button type="submit" name="saveMode" value="publish" class="btn btn-primary">'+ic('check','16px')+' '+(id?'Save Changes':'Create Announcement')+'</button></div>'
+      + '<div class="composer-schedule">'
+        + '<label class="composer-schedule-toggle"><span class="icon">'+ICONS.calendar+'</span><span>Schedule for later</span><input type="checkbox" data-schedule-toggle'+(scheduled?' checked':'')+'><span class="switch" aria-hidden="true"></span></label>'
+        + '<div class="schedule-fields" data-schedule-fields'+(scheduled?'':' hidden')+'>'
+          + '<div class="field-row">'
+            + '<div class="field"><label>Date</label>'+dtPickerField('date','scheduleDate',schedDate)+'</div>'
+            + '<div class="field"><label>Time</label>'+dtPickerField('time','scheduleTime',schedTime,{pairDate:'scheduleDate'})+'</div>'
+          + '</div>'
+          + '<div class="schedule-summary" data-schedule-summary hidden></div>'
+          + '<div class="field-error" data-schedule-error hidden>Please select a future date and time.</div>'
+        + '</div>'
+      + '</div>'
+      + '<div class="field-error composer-error" data-composer-error hidden></div>'
+      + '<div class="modal-foot composer-actions">'
+        + '<button type="button" class="btn btn-ghost-text" data-action="close-modal">Discard</button>'
+        + '<button type="submit" name="saveMode" value="draft" class="btn btn-outline composer-push">'+ic('doc','16px')+' Save Draft</button>'
+        + '<button type="submit" name="saveMode" value="schedule" class="btn btn-outline" data-schedule-submit>'+ic('calendar','16px')+' Schedule</button>'
+        + '<button type="submit" name="saveMode" value="publish" class="btn btn-primary" data-publish-submit>'+ic('send','16px')+' '+primaryLabel+'</button>'
+      + '</div>'
     + '</form>';
 }
 
@@ -2472,8 +2534,9 @@ function bindEvents(){
 
   (function(){
     var schedWrap = app.querySelector('[data-schedule-fields]');
-    var radios = app.querySelectorAll('input[name="publishMode"]');
-    if(!schedWrap || !radios.length) return;
+    var toggle = app.querySelector('[data-schedule-toggle]');
+    if(!schedWrap || !toggle) return;
+    var form = schedWrap.closest('form');
 
     var dateWrap = schedWrap.querySelector('[data-datepicker]');
     var timeWrap = schedWrap.querySelector('[data-timepicker]');
@@ -2493,10 +2556,7 @@ function bindEvents(){
       });
     }
 
-    function isScheduleMode(){
-      var checked = app.querySelector('input[name="publishMode"][value="schedule"]');
-      return !!(checked && checked.checked);
-    }
+    function isScheduleMode(){ return toggle.checked; }
     function refreshSummary(){
       if(!dateHidden || !timeHidden) return;
       var dIso = dateHidden.value, tHHMM = timeHidden.value;
@@ -2527,9 +2587,36 @@ function bindEvents(){
       schedWrap.hidden = !isScheduleMode();
       if(!schedWrap.hidden) refreshSummary();
     }
-    radios.forEach(function(r){ r.addEventListener('change', sync); });
+    toggle.addEventListener('change', sync);
     schedWrap.addEventListener('change', refreshSummary);
     sync();
+
+    // Validate on click, before the submit event (the PHP bridge handles
+    // submit in the capture phase, so this is the last client-side check).
+    var composerErr = form && form.querySelector('[data-composer-error]');
+    function fail(msg, field){
+      if(composerErr){ composerErr.textContent = msg; composerErr.hidden = false; }
+      if(field) field.focus();
+    }
+    if(form) form.querySelectorAll('button[type="submit"]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        if(composerErr) composerErr.hidden = true;
+        var mode = btn.value;
+        if(!form.elements.postTo.value && mode!=='draft'){ e.preventDefault(); fail('Choose who should receive this announcement.', form.elements.postTo); return; }
+        if(!form.elements.title.value.trim()){ e.preventDefault(); fail('Add a subject.', form.elements.title); return; }
+        if(!form.elements.content.value.trim()){ e.preventDefault(); fail('Write a message.', form.elements.content); return; }
+        if(mode==='schedule'){
+          if(!toggle.checked){ toggle.checked = true; sync(); }
+          var dIso = dateHidden ? dateHidden.value : '', tHHMM = timeHidden ? timeHidden.value : '';
+          var when = dIso && tHHMM ? new Date(dIso+'T'+tHHMM+':00') : null;
+          if(!when || isNaN(when.getTime()) || when.getTime() <= Date.now()){
+            e.preventDefault();
+            if(errEl) errEl.hidden = false;
+            if(dateWrap && !dIso){ var trig = dateWrap.querySelector('[data-dt-trigger]'); if(trig) trig.focus(); }
+          }
+        }
+      });
+    });
   })();
 
   app.onclick = function(ev){
@@ -2775,13 +2862,12 @@ function bindEvents(){
       var annId = form.getAttribute('data-id');
       var me2 = currentAccount();
       var postTo = fd.get('postTo')||'';
-      var saveMode = fd.get('saveMode')||'publish';
-      var publishMode = fd.get('publishMode')||'now';
+      var saveMode = (ev.submitter && ev.submitter.value) || fd.get('saveMode') || 'publish';
       var annStatus = 'Draft', annScheduledAt = null, annPublishedAt = null;
 
       if(saveMode==='draft'){
         annStatus = 'Draft';
-      } else if(publishMode==='schedule'){
+      } else if(saveMode==='schedule'){
         var schedDateVal = fd.get('scheduleDate')||'', schedTimeVal = fd.get('scheduleTime')||'';
         var when = schedDateVal && schedTimeVal ? new Date(schedDateVal+'T'+schedTimeVal+':00') : null;
         if(!when || isNaN(when.getTime()) || when.getTime() <= Date.now()){
