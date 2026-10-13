@@ -156,14 +156,20 @@ function sa_current_client(): ?array
     return $client;
 }
 
-/** Publish scheduled announcements whose time has come. Uses PHP's clock,
- *  the same one that validated the schedule when it was saved. */
+/** Announcement schedules are Philippine Standard Time wall-clock values. */
+function sa_schedule_timezone(): DateTimeZone
+{
+    return new DateTimeZone('Asia/Manila');
+}
+
+/** Publish scheduled announcements whose Philippine time has come. The
+ *  status condition makes this idempotent, so nothing publishes twice. */
 function sa_publish_due_announcements(): void
 {
     sa_db()->prepare(
         "UPDATE announcements SET status = 'Published', published_at = scheduled_at, scheduled_at = NULL
          WHERE status = 'Scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= :now"
-    )->execute(['now' => (new DateTimeImmutable())->format('Y-m-d H:i:s')]);
+    )->execute(['now' => (new DateTimeImmutable('now', sa_schedule_timezone()))->format('Y-m-d H:i:s')]);
 }
 
 function sa_public_bootstrap(): array
