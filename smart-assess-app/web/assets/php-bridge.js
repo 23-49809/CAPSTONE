@@ -384,6 +384,68 @@
     });
   }
 
+  function enhanceSentNotifications(root) {
+    if (config.portal !== 'internal') return;
+
+    var panel = Array.prototype.slice.call(root.querySelectorAll('.panel-card')).find(function (candidate) {
+      var heading = candidate.querySelector(':scope > h3');
+      return heading && heading.textContent.trim().endsWith('Sent Notifications');
+    });
+    if (!panel || panel.querySelector(':scope > .sent-notifications-accordion')) return;
+
+    var heading = panel.querySelector(':scope > h3');
+    var notificationItems = Array.prototype.slice.call(panel.querySelectorAll(':scope > .notif-item'));
+    var emptyState = panel.querySelector(':scope > .empty-state');
+    var orderedNotifications = ((window.SMART_ASSESS_PAGE || {}).notifs || []).slice().sort(function (a, b) {
+      return String(b.sentAt || '').localeCompare(String(a.sentAt || ''));
+    });
+
+    var details = document.createElement('details');
+    details.className = 'sent-notifications-accordion';
+    var summary = document.createElement('summary');
+    summary.className = 'sent-notifications-summary';
+    summary.appendChild(heading);
+    details.appendChild(summary);
+
+    var list = document.createElement('div');
+    list.className = 'sent-notifications-list';
+    if (notificationItems.length) {
+      notificationItems.forEach(function (item, index) {
+        var notification = orderedNotifications[index] || {};
+        var title = item.querySelector('.ni-top b');
+        if (title) title.remove();
+
+        var referenceLine = item.querySelector('.ni-when');
+        if (referenceLine) {
+          var reference = String(notification.requestRef || '');
+          var referenceButton = document.createElement('button');
+          referenceButton.type = 'button';
+          referenceButton.className = 'notification-reference';
+          referenceButton.textContent = reference || 'Reference unavailable';
+          referenceButton.disabled = !reference;
+          referenceButton.setAttribute('data-action', 'toggle-notification-client');
+          referenceButton.setAttribute('aria-expanded', 'false');
+
+          var clientName = document.createElement('span');
+          clientName.className = 'notification-client-name';
+          clientName.hidden = true;
+          clientName.textContent = notification.clientName || 'Client information unavailable';
+
+          var tail = reference && referenceLine.textContent.indexOf(reference) === 0
+            ? referenceLine.textContent.slice(reference.length)
+            : '';
+          referenceLine.replaceChildren(referenceButton, clientName, document.createTextNode(tail));
+        }
+        item.dataset.notificationEnhanced = 'true';
+        list.appendChild(item);
+      });
+    } else if (emptyState) {
+      list.appendChild(emptyState);
+    }
+    details.appendChild(list);
+    panel.appendChild(details);
+  }
+
   function enhanceInternalTables(root) {
     if (config.portal !== 'internal') return;
 
@@ -440,6 +502,7 @@
       table.dataset.actionsColumnRemoved = 'true';
     });
     enhanceInternalDetails(root);
+    enhanceSentNotifications(root);
   }
 
   if (config.portal === 'internal') {
