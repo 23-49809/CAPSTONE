@@ -1445,8 +1445,9 @@ function sa_announcement_change(array $data, string $action): array
         )->execute(['id' => $id]);
     } elseif ($action === 'schedule') {
         $scheduledAt = sa_text($data, 'scheduled_at', 19, true);
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $scheduledAt);
-        if (!$date || $date->format('Y-m-d H:i:s') !== $scheduledAt || $date <= new DateTimeImmutable()) {
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $scheduledAt, sa_schedule_timezone());
+        if (!$date || $date->format('Y-m-d H:i:s') !== $scheduledAt ||
+            $date <= new DateTimeImmutable('now', sa_schedule_timezone())) {
             throw new SaHttpException(422);
         }
         $pdo->prepare(
