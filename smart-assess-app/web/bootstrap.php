@@ -11,6 +11,9 @@ function sa_start_session(): void
     }
 
     ini_set('session.use_strict_mode', '1');
+    // Keep sessions for a working day of composing; the 24-minute PHP default
+    // expired sessions mid-task and every later save failed CSRF.
+    ini_set('session.gc_maxlifetime', '28800');
     ini_set('session.use_only_cookies', '1');
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Lax');
@@ -87,7 +90,7 @@ function sa_csrf_token(): string
 function sa_verify_csrf(?string $token): void
 {
     if ($token === null || !hash_equals(sa_csrf_token(), $token)) {
-        throw new SaHttpException(403, 'Request could not be completed.');
+        throw new SaHttpException(403, 'Your session has expired or this page is out of date. Reload the page, sign in if asked, and try again.');
     }
 }
 
