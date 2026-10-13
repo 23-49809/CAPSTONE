@@ -1012,10 +1012,12 @@ function sa_generate_ai_message(array $data): array
     $purpose = $generationType === 'notification'
         ? 'a concise notification to a client about an assessor office matter'
         : 'a concise announcement from the Assessor Office of Mabini';
-    $prompt = "Write {$purpose} in a professional, clear, respectful tone. " .
+    $prompt = "Write {$purpose} in one concise paragraph of no more than three short sentences, " .
+        "in a professional, clear, respectful tone. " .
         "Use only the non-sensitive topic and details below. Do not invent facts, " .
         "include personal or property identifiers, add a subject line, or claim that " .
-        "an action has occurred unless the details say so. Return only the message text.\n\n" .
+        "an action has occurred unless the details say so. Do not add a greeting. " .
+        "Return only the message text.\n\n" .
         "Topic: {$topic}\n" .
         'Relevant non-sensitive details: ' . ($details !== '' ? $details : 'None provided.');
     $payload = json_encode([
@@ -1061,7 +1063,10 @@ function sa_generate_ai_message(array $data): array
         throw new SaHttpException(503, 'AI message generation returned an invalid response. You can enter the message manually.');
     }
     $message = is_array($decoded) ? trim((string) ($decoded['response'] ?? '')) : '';
-    if ($message === '' || strlen($message) > 6000) {
+    $message = preg_replace('/^\s*(?:subject|title)\s*:[^\r\n]*(?:\r?\n)+/iu', '', $message, 1) ?? $message;
+    $message = trim($message);
+    $maximumLength = $generationType === 'notification' ? 2000 : 6000;
+    if ($message === '' || strlen($message) > $maximumLength) {
         throw new SaHttpException(503, 'AI message generation returned no usable text. You can enter the message manually.');
     }
     return ['message' => $message];
