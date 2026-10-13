@@ -8,9 +8,10 @@ return static function (array $details): void {
 
     $autoload = __DIR__ . '/vendor/autoload.php';
     $tokenPath = $home . '/.config/smart-assess/gmail-token.json';
+    $credentialsPath = $home . '/.config/smart-assess/google-oauth-client.json';
 
-    if (!is_file($autoload) || !is_readable($tokenPath)) {
-        throw new RuntimeException('Gmail dependencies or private token are unavailable.');
+    if (!is_file($autoload) || !is_readable($tokenPath) || !is_readable($credentialsPath)) {
+        throw new RuntimeException('Gmail dependencies, OAuth client, or private token are unavailable.');
     }
 
     require_once $autoload;
@@ -21,6 +22,8 @@ return static function (array $details): void {
     }
 
     $client = new Google\Client();
+    // The client ID/secret are required to refresh an expired access token.
+    $client->setAuthConfig($credentialsPath);
     $client->setAccessType('offline');
     $client->setScopes([Google\Service\Gmail::GMAIL_SEND]);
     $client->setAccessToken($token);
