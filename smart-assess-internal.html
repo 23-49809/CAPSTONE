@@ -1732,15 +1732,20 @@ function onNotifReferenceChange(select){
 function notifCategoryName(c){
   return ({'Missing Documents':'Missing Document','Other Instructions':'Other Instruction'})[c] || c || '';
 }
+function parseSentAt(value){
+  var str = String(value||'');
+  return new Date(str.indexOf('T')===-1 ? str.replace(' ','T') : str);
+}
+function sentTime(value){ var t = parseSentAt(value).getTime(); return isNaN(t) ? 0 : t; }
 function sentDateKey(value){
   var str = String(value||'');
-  var d = new Date(str.indexOf('T')===-1 ? str.replace(' ','T') : str);
+  var d = parseSentAt(str);
   if(isNaN(d.getTime())) return str.slice(0,10);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
 function renderNotifications(acct){
-  var all = state.notifs.slice().sort(function(a,b){return String(b.sentAt||'').localeCompare(String(a.sentAt||''));});
+  var all = state.notifs.slice().sort(function(a,b){ return sentTime(b.sentAt) - sentTime(a.sentAt); });
   var allRefs = state.docRequests.map(function(r){return r.id;}).concat(state.landRequests.map(function(r){return r.id;}));
   var q = String((state.search && state.search.sentNotifs) || '').toLowerCase();
   var catF = (state.filters && state.filters.sentCategory) || 'all';
