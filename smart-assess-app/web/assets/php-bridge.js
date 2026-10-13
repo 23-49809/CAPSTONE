@@ -288,7 +288,9 @@
   }
 
   function openArchivedAccountDetails(id) {
-    var row = document.querySelector('.table-wrap tr.record-clickable-row[data-action="view-archived-staff"][data-id="' + CSS.escape(id) + '"]');
+    var row = Array.prototype.slice.call(document.querySelectorAll('.table-wrap tr.record-clickable-row[data-action="view-archived-staff"]')).find(function (candidate) {
+      return candidate.getAttribute('data-id') === id;
+    });
     if (!row || !internalApp) return;
     var existing = internalApp.querySelector('[data-archived-account-detail]');
     if (existing) existing.remove();
