@@ -204,8 +204,6 @@
 
     var internalAction = event.target.closest('[data-action]');
     if (!internalAction) return;
-    if (internalAction.matches('tr.record-clickable-row')
-      && event.target.closest('a,button,input,select,textarea,label,[contenteditable="true"]')) return;
     var actionName = internalAction.getAttribute('data-action');
     if (actionName === 'view-archived-staff') {
       event.preventDefault();
@@ -447,6 +445,14 @@
   if (config.portal === 'internal') {
     var internalApp = document.getElementById('app');
     if (internalApp) {
+      internalApp.addEventListener('click', function (event) {
+        var row = event.target.closest('tr.record-clickable-row');
+        if (!row) return;
+        var control = event.target.closest('a,button,input,select,textarea,label,[contenteditable="true"]');
+        if (!control || control === row) return;
+        var controlAction = control.closest('[data-action]');
+        if (!controlAction || controlAction === row) event.stopImmediatePropagation();
+      });
       var internalRowsObserver = new MutationObserver(function () {
         enhanceInternalTables(internalApp);
       });
