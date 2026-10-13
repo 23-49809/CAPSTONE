@@ -46,6 +46,7 @@ final class IprogSmsService
         if (trim($message) === '' || strlen($message) > 1000) {
             throw new InvalidArgumentException('SMS message must contain 1 to 1000 bytes.');
         }
+        $normalizedPhoneNumber = self::normalizePhoneNumber($phoneNumber);
 
         $handle = curl_init(self::ENDPOINT);
         if ($handle === false) {
@@ -56,7 +57,7 @@ final class IprogSmsService
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => http_build_query([
                 'api_token' => $this->apiToken,
-                'phone_number' => self::normalizePhoneNumber($phoneNumber),
+                'phone_number' => $normalizedPhoneNumber,
                 'message' => $message,
             ], '', '&', PHP_QUERY_RFC3986),
             CURLOPT_HTTPHEADER => [
@@ -73,7 +74,6 @@ final class IprogSmsService
         $body = curl_exec($handle);
         $httpStatus = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         $curlError = curl_errno($handle);
-        
 
         if ($body === false || $curlError !== 0) {
             error_log('[IPROG_SMS] Transport failure; cURL error code ' . $curlError . '.');
@@ -86,41 +86,75 @@ final class IprogSmsService
             throw new RuntimeException('IPROG SMS returned an invalid response.');
         }
 
-        $providerStatus = (string) ($response['status'] ?? '');
+        $providerStatusValue = $response['status'] ?? null;
+        $providerStatus = is_scalar($providerStatusValue) ? (string) $providerStatusValue : 'invalid';
         $data = is_array($response['data'] ?? null) ? $response['data'] : [];
         $messageId = $response['message_id'] ?? $data['message_id'] ?? null;
         $messageId = is_scalar($messageId) ? (string) $messageId : null;
 
-       if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== 'success') {
-    error_log(sprintf(
-        '[IPROG_SMS] Provider rejected request; HTTP %d, status %s.',
-        $httpStatus,
-        preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? ''
-    ));
+        if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== 'success') {
+            $safeStatus = preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? '';
+            $safeProviderMessage = $this->safeProviderMessage(
+                $response['message'] ?? null,
+                $phoneNumber,
+                $normalizedPhoneNumber,
+                $message
+            );
+            error_log(sprintf(
+                '[IPROG_SMS] Provider rejected request; HTTP %d, status %s, message: %s',
+                $httpStatus,
+                $safeStatus,
+                $safeProviderMessage
+            ));
 
-    $providerMessage = (string) ($response['message'] ?? 'No error message provided');
-    error_log('[IPROG_SMS] Provider message: ' . substr($providerMessage, 0, 300));
-
-    throw new RuntimeException('IPROG SMS did not accept the message.');
-}
-
-       if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== 'success') {
-    error_log(sprintf(
-        '[IPROG_SMS] Provider rejected request; HTTP %d, status %s.',
-        $httpStatus,
-        preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? ''
-    ));
-
-    $providerMessage = (string) ($response['message'] ?? 'No error message provided');
-    error_log('[IPROG_SMS] Provider message: ' . substr($providerMessage, 0, 300));
-
-    throw new RuntimeException('IPROG SMS did not accept the message.');
-}
+            throw new RuntimeException(sprintf(
+                'IPROG SMS rejected the request (HTTP %d; provider status %s): %s',
+                $httpStatus,
+                $safeStatus !== '' ? $safeStatus : 'unavailable',
+                $safeProviderMessage
+            ));
+        }
 
         return [
             'http_status' => $httpStatus,
             'provider_status' => $providerStatus,
             'message_id' => $messageId,
         ];
+    }
+
+    private function safeProviderMessage(
+        mixed $providerMessage,
+        string $phoneNumber,
+        string $normalizedPhoneNumber,
+        string $message
+    ): string {
+        if (is_array($providerMessage) || is_object($providerMessage)) {
+            $encoded = json_encode(
+                $providerMessage,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE |
+                    JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
+            );
+            $providerMessage = $encoded === false ? '[unavailable]' : $encoded;
+        } elseif (is_scalar($providerMessage)) {
+            $providerMessage = (string) $providerMessage;
+        } else {
+            $providerMessage = 'No provider message supplied.';
+        }
+
+        $safeMessage = str_replace(
+            [$this->apiToken, $phoneNumber, $normalizedPhoneNumber, '+' . $normalizedPhoneNumber, $message],
+            '[redacted]',
+            $providerMessage
+        );
+        $safeMessage = preg_replace(
+            [
+                '/(?<![A-Za-z0-9])(?:\+?63[\s().-]*|0)9(?:[\s().-]*\d){9}(?!\d)/',
+                '/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i',
+            ],
+            '[redacted]',
+            $safeMessage
+        ) ?? '[unavailable]';
+
+        return substr($safeMessage, 0, 500);
     }
 }
