@@ -1708,40 +1708,57 @@ function srHumanDuration(seconds){
 }
 function srComputeLocal(month, year){
   var pad = function(n){ return String(n).padStart(2,'0'); };
-  var from = year+'-'+pad(month)+'-01';
+  var ym = year+'-'+pad(month);
   var days = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  var to = year+'-'+pad(month)+'-'+pad(days);
   var prevM = month===1 ? 12 : month-1, prevY = month===1 ? year-1 : year;
   var all = state.docRequests.map(function(r){ return {r:r, kind:'doc', type:r.docType}; })
     .concat(state.landRequests.map(function(r){ return {r:r, kind:'land', type:r.transferType}; }))
-    .map(function(x){ x.day = phPartsFromStored(x.r.submitted).date; return x; });
-  var inMonth = function(m, y){ var p = y+'-'+pad(m); return all.filter(function(x){ return x.day && x.day.slice(0,7)===p; }); };
-  var cards = function(list){ return { documents:list.filter(function(x){return x.kind==='doc';}).length, landTransfers:list.filter(function(x){return x.kind==='land';}).length, total:list.length, overdue:list.filter(function(x){return x.r.status==='Timed Out';}).length }; };
-  var list = inMonth(month, year);
+    .map(function(x){
+      x.day = phPartsFromStored(x.r.submitted).date;
+      x.doneDay = x.r.processingCompletedAt ? phPartsFromStored(x.r.processingCompletedAt).date : '';
+      var dur = x.r.processingDurationSeconds;
+      x.dur = (dur!=null && Number(dur)>=0) ? Number(dur) : null;
+      return x;
+    });
+  var submittedIn = function(p){ return all.filter(function(x){ return x.day && x.day.slice(0,7)===p; }); };
+  var cards = function(list){ return { documents:list.filter(function(x){return x.kind==='doc';}).length, landTransfers:list.filter(function(x){return x.kind==='land';}).length, total:list.length }; };
+  var list = submittedIn(ym), done = all.filter(function(x){ return x.doneDay && x.doneDay.slice(0,7)===ym; });
+  var stats = function(g){
+    var t = g.filter(function(x){ return x.dur!=null; }).map(function(x){ return x.dur; });
+    return { completed:g.length, timedCount:t.length, fastestSeconds:t.length?Math.min.apply(null,t):null, slowestSeconds:t.length?Math.max.apply(null,t):null,
+      avgProcessingSeconds:t.length?Math.round(t.reduce(function(a,b){return a+b;},0)/t.length):null };
+  };
   var daily = [];
-  for(var d=1; d<=days; d++){ var key = year+'-'+pad(month)+'-'+pad(d); daily.push({day:key, documents:list.filter(function(x){return x.kind==='doc'&&x.day===key;}).length, landTransfers:list.filter(function(x){return x.kind==='land'&&x.day===key;}).length}); }
+  for(var d=1; d<=days; d++){ var key = ym+'-'+pad(d); daily.push({day:key, documents:list.filter(function(x){return x.kind==='doc'&&x.day===key;}).length, landTransfers:list.filter(function(x){return x.kind==='land'&&x.day===key;}).length}); }
   var summary = function(kind){
     var labels = all.filter(function(x){ return x.kind===kind && x.type; }).map(function(x){ return x.type; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
     var rows = labels.map(function(label){
-      var g = list.filter(function(x){ return x.kind===kind && x.type===label; });
-      var timed = g.filter(function(x){ return x.r.processingDurationSeconds!=null; });
-      var done = g.filter(function(x){ return SR_COMPLETED.indexOf(x.r.status)>-1; }).length;
-      return { label:label, total:g.length, completed:done, timedCount:timed.length,
-        avgProcessingSeconds: timed.length ? Math.round(timed.reduce(function(s,x){ return s+Number(x.r.processingDurationSeconds); },0)/timed.length) : null,
-        completionRate: g.length ? Math.round(done/g.length*100) : null };
-    }).sort(function(a,b){ return b.total-a.total || a.label.localeCompare(b.label); });
-    var total = rows.reduce(function(t,r){ t.total+=r.total; t.completed+=r.completed; t.timedCount+=r.timedCount; t.sec+=(r.avgProcessingSeconds||0)*r.timedCount; return t; }, {label:'Total', total:0, completed:0, timedCount:0, sec:0});
-    total.avgProcessingSeconds = total.timedCount ? Math.round(total.sec/total.timedCount) : null;
-    total.completionRate = total.total ? Math.round(total.completed/total.total*100) : null;
-    return {rows:rows, total:total};
+      var st = stats(done.filter(function(x){ return x.kind===kind && x.type===label; }));
+      st.label = label; st.total = list.filter(function(x){ return x.kind===kind && x.type===label; }).length;
+      return st;
+    }).sort(function(a,b){ return (b.total+b.completed)-(a.total+a.completed) || a.label.localeCompare(b.label); });
+    var tot = stats(done.filter(function(x){ return x.kind===kind; }));
+    tot.label = 'Total'; tot.total = list.filter(function(x){ return x.kind===kind; }).length;
+    return {rows:rows, total:tot};
   };
-  var years = all.map(function(x){ return Number(x.day.slice(0,4)); }).concat([year, Number(phToday().slice(0,4))]);
-  var yMin = Math.min.apply(null, years), yMax = Math.max.apply(null, years), yr = [];
-  for(var y=yMin; y<=yMax; y++) yr.push(y);
-  return { month:month, year:year, label:SR_MONTHS[month-1]+' '+year, from:from, to:to, years:yr,
-    cards:cards(list), previousCards:cards(inMonth(prevM, prevY)), daily:daily,
-    documentSummary:summary('doc'), landSummary:summary('land'),
-    requests:list.sort(function(a,b){ return String(b.r.submitted).localeCompare(String(a.r.submitted)); }).map(function(x){ return {id:x.r.id, kind:x.kind, client:x.r.applicant, type:x.type||'', status:x.r.status, submitted:x.r.submitted, processingSeconds:x.r.processingDurationSeconds, processingStartedAt:x.r.processingStartedAt, assignedTo:x.r.processingStaffName}; }),
+  var staffMap = {};
+  state.accounts.filter(function(a){ return a.role==='staff' && a.status==='active'; }).forEach(function(a){ staffMap[a.fullName] = {name:a.fullName}; });
+  done.filter(function(x){ return x.r.processingStaffName || x.r.processingStaffId; }).forEach(function(x){
+    var n = x.r.processingStaffName || ('Staff account #'+x.r.processingStaffId); staffMap[n] = staffMap[n] || {name:n};
+  });
+  var staff = Object.keys(staffMap).map(function(n){
+    var g = done.filter(function(x){ return (x.r.processingStaffName || ('Staff account #'+x.r.processingStaffId))===n && (x.r.processingStaffName || x.r.processingStaffId); });
+    var st = stats(g); st.name = n;
+    st.documents = g.filter(function(x){ return x.kind==='doc'; }).length; st.landTransfers = g.filter(function(x){ return x.kind==='land'; }).length;
+    return st;
+  }).sort(function(a,b){ return b.completed-a.completed || a.name.localeCompare(b.name); });
+  var nowY = Number(phToday().slice(0,4));
+  var years = all.map(function(x){ return Number(x.day.slice(0,4)); }).concat([year, nowY]);
+  var yr = []; for(var y=Math.min.apply(null, years); y<=Math.max(nowY+5, year); y++) yr.push(y);
+  return { month:month, year:year, label:SR_MONTHS[month-1]+' '+year, from:ym+'-01', to:ym+'-'+pad(days), years:yr,
+    cards:cards(list), previousCards:cards(submittedIn(prevY+'-'+pad(prevM))), daily:daily,
+    documentSummary:summary('doc'), landSummary:summary('land'), staffPerformance:staff,
+    requests:list.sort(function(a,b){ return String(b.r.submitted).localeCompare(String(a.r.submitted)); }).map(function(x){ return {id:x.r.id, kind:x.kind, client:x.r.applicant, type:x.type||'', status:x.r.status, submitted:x.r.submitted, processingSeconds:x.dur, processingStartedAt:x.r.processingStartedAt, assignedTo:x.r.processingStaffName}; }),
     generatedAt:new Date(Date.now()+8*3600e3).toISOString().slice(0,19).replace('T',' ') };
 }
 /* Load the selected month: server when available, else the demo data. */
@@ -1750,11 +1767,12 @@ function srLoad(){
   var api = srApiUrl();
   if(!api){ sr.data = srComputeLocal(sr.month, sr.year); sr.loading = false; sr.error = ''; return; }
   sr.loading = true; sr.error = '';
+  var seq = sr.seq = (sr.seq||0) + 1;
   var url = api + '?action=head_monthly_report&month=' + encodeURIComponent(sr.month) + '&year=' + encodeURIComponent(sr.year);
   fetch(url, {credentials:'same-origin', headers:{'Accept':'application/json'}})
     .then(function(res){ return res.json().then(function(body){ if(!res.ok || !body.ok) throw new Error(body.error || 'The report could not be loaded.'); return body.data; }); })
-    .then(function(data){ sr.data = data; sr.loading = false; if(state.view==='reports') render(); })
-    .catch(function(err){ sr.loading = false; sr.error = err.message || 'The report could not be loaded.'; if(state.view==='reports') render(); });
+    .then(function(data){ if(seq!==sr.seq) return; sr.data = data; sr.loading = false; if(state.view==='reports') render(); })
+    .catch(function(err){ if(seq!==sr.seq) return; sr.loading = false; sr.error = err.message || 'The report could not be loaded.'; if(state.view==='reports') render(); });
 }
 
 function srStatCard(label, value, prev, tone, worseIsUp){
@@ -1773,29 +1791,28 @@ function srStatCard(label, value, prev, tone, worseIsUp){
 
 /* Daily stacked bars for one month. Fixed plot geometry, labels every ~5
    days, no value labels on bars (hover/focus shows exact counts). */
-function srChart(d, type){
-  var showDoc = type!=='land', showLand = type!=='doc';
-  var bars = d.daily.map(function(b){ return {day:b.day, doc:showDoc?b.documents:0, land:showLand?b.landTransfers:0}; });
-  var max = Math.max(0, Math.max.apply(null, bars.map(function(b){ return b.doc+b.land; })));
-  var tickStep = max<=5 ? 1 : max<=10 ? 2 : max<=25 ? 5 : max<=50 ? 10 : Math.ceil(max/50)*10;
-  var top = Math.max(5, Math.ceil(max/tickStep)*tickStep);
-  var W = 720, H = 240, L = 34, R = 8, T = 10, B = 26, plotW = W-L-R, plotH = H-T-B;
-  var slot = plotW / bars.length, barW = Math.max(4, Math.min(14, slot*0.6));
+function srChart(d, kind){
+  var key = kind==='doc' ? 'documents' : 'landTransfers';
+  var vals = d.daily.map(function(b){ return {day:b.day, v:b[key]}; });
+  var max = Math.max(0, Math.max.apply(null, vals.map(function(b){ return b.v; })));
+  var tickStep = max<=4 ? 1 : max<=10 ? 2 : max<=25 ? 5 : max<=50 ? 10 : Math.ceil(max/50)*10;
+  var top = Math.max(4, Math.ceil(max/tickStep)*tickStep);
+  var W = 720, H = 190, L = 36, R = 10, T = 12, B = 28, plotW = W-L-R, plotH = H-T-B;
+  var slot = plotW / vals.length, barW = Math.max(4, Math.min(14, slot*0.58));
   var y = function(v){ return T + plotH - v/top*plotH; };
-  var svg = '<svg class="sr-chart-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Requests per day, '+esc(d.label)+'">';
+  var name = kind==='doc' ? 'Document requests' : 'Land transfer requests';
+  var svg = '<svg class="sr-chart-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+name+' per day, '+esc(d.label)+'">';
   for(var t=0;t<=top;t+=tickStep){
     svg += '<line class="sr-grid" x1="'+L+'" x2="'+(W-R)+'" y1="'+y(t)+'" y2="'+y(t)+'"/>'
       + '<text class="sr-axis" x="'+(L-8)+'" y="'+(y(t)+4)+'" text-anchor="end">'+t+'</text>';
   }
-  bars.forEach(function(b, i){
-    var cx = L + slot*i + slot/2, x = cx - barW/2;
-    var hDoc = b.doc/top*plotH, hLand = b.land/top*plotH, gap = (b.doc && b.land) ? 2 : 0;
+  vals.forEach(function(b, i){
+    var cx = L + slot*i + slot/2, x = cx - barW/2, h = b.v/top*plotH;
     var when = phFormatDate(b.day);
-    svg += '<g class="sr-bar" tabindex="0" data-tip="'+esc(when)+'|'+b.doc+'|'+b.land+'" aria-label="'+esc(when)+': '+b.doc+' document, '+b.land+' land transfer">'
-      + '<rect class="sr-hit" x="'+(L+slot*i)+'" y="'+T+'" width="'+slot+'" height="'+plotH+'"/>';
-    if(b.doc) svg += '<path class="sr-doc" d="'+srBarPath(x, y(0), barW, hDoc, !b.land)+'"/>';
-    if(b.land) svg += '<path class="sr-land" d="'+srBarPath(x, y(0)-hDoc-gap, barW, hLand, true)+'"/>';
-    svg += '</g>';
+    svg += '<g class="sr-bar" tabindex="0" data-tip="'+esc(when)+'|'+(kind==='doc'?b.v:'')+'|'+(kind==='land'?b.v:'')+'" aria-label="'+esc(when)+': '+b.v+' '+name.toLowerCase()+'">'
+      + '<rect class="sr-hit" x="'+(L+slot*i)+'" y="'+T+'" width="'+slot+'" height="'+plotH+'"/>'
+      + (b.v ? '<path class="'+(kind==='doc'?'sr-doc':'sr-land')+'" d="'+srBarPath(x, y(0), barW, h, true)+'"/>' : '')
+      + '</g>';
     var dayNum = Number(b.day.slice(8,10));
     if(dayNum===1 || dayNum%5===0) svg += '<text class="sr-axis" x="'+cx+'" y="'+(H-8)+'" text-anchor="middle">'+dayNum+'</text>';
   });
@@ -1811,17 +1828,27 @@ function srBarPath(x, y0, w, h, roundTop){
 
 function srSummaryCard(kind, title, firstCol, summary){
   var icon = kind==='doc' ? 'doc' : 'house';
+  var t = function(sec){ return sec==null ? '<span class="sr-na" title="No completed processing times this month">—</span>' : esc(srHumanDuration(sec)); };
   var cell = function(r, isTotal){
-    return '<tr'+(isTotal?' class="sr-total"':'')+'><td>'+esc(r.label)+'</td><td>'+r.total+'</td>'
-      + '<td>'+(r.avgProcessingSeconds==null ? '<span class="sr-na" title="No completed processing times recorded">—</span>' : esc(srHumanDuration(r.avgProcessingSeconds)))+'</td>'
-      + '<td>'+(r.completionRate==null ? '<span class="sr-na">—</span>' : r.completionRate+'%')+'</td></tr>';
+    return '<tr'+(isTotal?' class="sr-total"':'')+'><td>'+esc(r.label)+'</td><td>'+r.total+'</td><td>'+r.completed+'</td>'
+      + '<td>'+t(r.fastestSeconds)+'</td><td>'+t(r.slowestSeconds)+'</td></tr>';
   };
   return '<section class="sr-card sr-sum"><div class="sr-sum-head"><h3>'+ic(icon,'20px')+esc(title)+'</h3>'
       + '<button type="button" class="sr-viewall" data-action="sr-viewall" data-kind="'+kind+'">View All</button></div>'
-    + '<div class="sr-sum-wrap"><table class="sr-sum-table"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"></colgroup>'
-    + '<thead><tr><th>'+esc(firstCol)+'</th><th>Total Requests</th><th>Avg. Processing Time</th><th>Completion Rate</th></tr></thead><tbody>'
-    + (summary.rows.length ? summary.rows.map(function(r){ return cell(r,false); }).join('') : '<tr><td colspan="4" class="sr-empty">No records for this category yet.</td></tr>')
+    + '<div class="sr-sum-wrap"><table class="sr-sum-table"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"></colgroup>'
+    + '<thead><tr><th>'+esc(firstCol)+'</th><th>Total Requests</th><th>Completed</th><th>Fastest Processing Time</th><th>Slowest Processing Time</th></tr></thead><tbody>'
+    + (summary.rows.length ? summary.rows.map(function(r){ return cell(r,false); }).join('') : '<tr><td colspan="5" class="sr-empty">No records for this category yet.</td></tr>')
     + cell(summary.total, true)
+    + '</tbody></table></div></section>';
+}
+
+function srStaffCard(rows){
+  var t = function(sec){ return sec==null ? '<span class="sr-na">—</span>' : esc(srHumanDuration(sec)); };
+  return '<section class="sr-card sr-sum sr-staff"><div class="sr-sum-head"><h3>'+ic('users','20px')+'Staff Performance</h3><span class="sr-overview-sub">Processing completed in this month</span></div>'
+    + '<div class="sr-sum-wrap"><table class="sr-sum-table sr-staff-table"><thead><tr><th>Staff Name</th><th>Document Requests Processed</th><th>Land Transfers Processed</th><th>Total Requests Completed</th><th>Average Processing Time</th><th>Fastest Processing Time</th><th>Slowest Processing Time</th></tr></thead><tbody>'
+    + (rows.length ? rows.map(function(r){
+        return '<tr><td>'+esc(r.name)+'</td><td>'+r.documents+'</td><td>'+r.landTransfers+'</td><td>'+r.completed+'</td><td>'+t(r.avgProcessingSeconds)+'</td><td>'+t(r.fastestSeconds)+'</td><td>'+t(r.slowestSeconds)+'</td></tr>';
+      }).join('') : '<tr><td colspan="7" class="sr-empty">No active staff accounts.</td></tr>')
     + '</tbody></table></div></section>';
 }
 
@@ -1839,11 +1866,11 @@ function renderReports(acct){
       + '<select id="sr-year" data-sr-draft="draftYear" aria-label="Year">'+years.map(function(y){ return '<option value="'+y+'"'+(sr.draftYear===y?' selected':'')+'>'+y+'</option>'; }).join('')+'</select></div></div>'
     + '<div class="sr-filter"><label for="sr-type">'+ic('doc','16px')+'<span>Report Type</span></label><select id="sr-type" data-sr-draft="type">'
       + ['all','doc','land'].map(function(k){ return '<option value="'+k+'"'+(sr.type===k?' selected':'')+'>'+typeLabel[k]+'</option>'; }).join('')+'</select></div>'
-    + '<button type="button" class="btn btn-primary sr-generate" data-action="sr-generate"'+(sr.loading?' disabled aria-busy="true"':'')+'>'+ic('fileBar','17px')+(sr.loading?' Generating…':' Generate Report')+'</button>'
+    + '<div class="sr-status" role="status" aria-live="polite">'+(sr.loading ? '<span class="sr-spinner" aria-hidden="true"></span>Updating report…' : (d ? 'Showing '+esc(d.label) : ''))+'</div>'
   + '</section>';
   if(!d){
     return head + '<div class="sysreport" id="sysreport">' + filters
-      + '<section class="sr-card"><div class="empty-state">'+(sr.error ? esc(sr.error)+' <button type="button" class="dash-link" data-action="sr-generate">Try again</button>' : 'Loading report…')+'</div></section></div>';
+      + '<section class="sr-card"><div class="empty-state">'+(sr.error ? esc(sr.error)+' <button type="button" class="dash-link" data-action="sr-retry">Try again</button>' : 'Loading report…')+'</div></section></div>';
   }
   var c = d.cards, p = d.previousCards;
   var gen = phPartsFromStored(String(d.generatedAt||''));
@@ -1854,18 +1881,18 @@ function renderReports(acct){
     ['Generated On', gen.date ? phFormatDate(gen.date)+', '+phFormatTime(gen.time) : '—']
   ];
   return head
-  + '<div class="sysreport" id="sysreport">' + filters
-  + (sr.error ? '<p class="field-error">'+esc(sr.error)+'</p>' : '')
+  + '<div class="sysreport'+(sr.loading?' is-loading':'')+'" id="sysreport" aria-busy="'+(sr.loading?'true':'false')+'">' + filters
+  + (sr.error ? '<p class="field-error">'+esc(sr.error)+' <button type="button" class="dash-link" data-action="sr-retry">Try again</button></p>' : '')
   + '<div class="sr-stats">'
     + srStatCard('Total Document Request', c.documents, p.documents, 'tone-green', false)
     + srStatCard('Total Land Transfer', c.landTransfers, p.landTransfers, 'tone-gray', false)
     + srStatCard('Total Requests', c.total, p.total, 'tone-green', false)
-    + srStatCard('Overdue', c.overdue, p.overdue, 'tone-red', true)
   + '</div>'
   + '<div class="sr-mid">'
     + '<section class="sr-card sr-overview"><div class="sr-overview-head"><h3>'+ic('fileBar','18px')+'Requests Overview</h3><span class="sr-overview-sub">Per day · '+esc(d.label)+'</span></div>'
-      + '<div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, sr.type)+'</div><div class="sr-tip" data-sr-tip hidden></div></div>'
-      + '<div class="sr-legend">'+(sr.type!=='land'?'<span><i class="sr-key doc"></i>Document Requests</span>':'')+(sr.type!=='doc'?'<span><i class="sr-key land"></i>Land Transfer Requests</span>':'')+'</div>'
+      + (sr.type!=='land' ? '<div class="sr-chart-block"><div class="sr-chart-title"><i class="sr-key doc"></i>Document Requests <b>'+c.documents+'</b></div><div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, 'doc')+'</div><div class="sr-tip" data-sr-tip hidden></div></div></div>' : '')
+      + (sr.type!=='doc' ? '<div class="sr-chart-block"><div class="sr-chart-title"><i class="sr-key land"></i>Land Transfer Requests <b>'+c.landTransfers+'</b></div><div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, 'land')+'</div><div class="sr-tip" data-sr-tip hidden></div></div></div>' : '')
+      + '<p class="sr-chart-note">Requests submitted per day. Hover or focus a bar for the exact count.</p>'
     + '</section>'
     + '<section class="sr-card sr-summary"><h3>'+ic('doc','18px')+'Report Summary</h3>'
       + '<dl>'+summaryRows.map(function(r){ return '<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>'; }).join('')+'</dl>'
@@ -1877,6 +1904,7 @@ function renderReports(acct){
     + srSummaryCard('doc', 'Document Request Summary', 'Report Title', d.documentSummary)
     + srSummaryCard('land', 'Land Transfer Summary', 'Report Type', d.landSummary)
   + '</div>'
+  + srStaffCard(d.staffPerformance || [])
   + '</div>';
 }
 
