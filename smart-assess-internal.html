@@ -796,7 +796,11 @@
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .sr-card h3 .icon{ color:var(--tone-green); } }
   :root[data-theme="dark"] .sr-card h3 .icon{ color:var(--tone-green); }
 
-  .sr-filters{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto; gap:18px; align-items:end; }
+  .sr-filters{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(150px,auto); gap:18px; align-items:end; }
+  .sr-status{ display:flex; align-items:center; gap:8px; min-height:42px; font-size:13px; color:var(--ink-soft); }
+  .sr-spinner{ width:16px; height:16px; border:2px solid var(--line-strong); border-top-color:var(--brand-700); border-radius:50%; animation:srspin .8s linear infinite; }
+  @keyframes srspin{ to{ transform:rotate(360deg); } }
+  .sysreport.is-loading .sr-stats, .sysreport.is-loading .sr-mid, .sysreport.is-loading .sr-sums, .sysreport.is-loading .sr-staff{ opacity:.55; transition:opacity .15s ease; pointer-events:none; }
   .sr-period{ display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:8px; }
   .sr-filter{ min-width:0; }
   .sr-filter + .sr-filter{ border-left:1px solid var(--line); padding-left:18px; }
@@ -805,7 +809,7 @@
   .sr-filter select{ width:100%; height:42px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; font-size:13.5px; padding:0 12px; }
   .sr-generate{ height:44px; border-radius:8px; white-space:nowrap; }
 
-  .sr-stats{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+  .sr-stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
   .sr-stat{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px 16px 22px; position:relative; box-shadow:0 8px 22px -22px rgba(12,33,23,.5); }
   .sr-stat::before{ content:""; position:absolute; left:8px; top:14px; bottom:14px; width:4px; border-radius:2px; background:var(--brand-700); }
   .sr-stat.tone-gray::before{ background:var(--ink-faint); }
@@ -863,7 +867,6 @@
   .sr-overview-sub{ font-size:12.5px; color:var(--ink-faint); }
   .sr-chart-scroll{ overflow-x:auto; overflow-y:hidden; }
   .sr-chart-svg{ min-width:520px; }
-  .sr-legend{ margin-top:14px; }
 
   /* Summary tables (reference: side-by-side cards, tinted header + total rows) */
   .sr-sums{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start; }
@@ -878,7 +881,16 @@
   .sr-viewall:hover{ color:var(--brand-900); }
   .sr-sum-wrap{ border:1px solid var(--line); border-radius:10px; overflow:hidden; overflow-x:auto; }
   .sr-sum-table{ width:100%; border-collapse:collapse; table-layout:fixed; min-width:440px; }
-  .sr-sum-table col.c1{ width:44%; } .sr-sum-table col.c2{ width:17%; } .sr-sum-table col.c3{ width:21%; } .sr-sum-table col.c4{ width:18%; }
+  .sr-sum-table col.c1{ width:36%; } .sr-sum-table col.c2{ width:14%; } .sr-sum-table col.c3{ width:14%; } .sr-sum-table col.c4{ width:18%; } .sr-sum-table col.c5{ width:18%; }
+  .sr-sum-table{ min-width:520px; }
+  .sr-staff{ margin-top:0; }
+  .sr-staff-table{ table-layout:auto; min-width:760px; }
+  .sr-staff-table td, .sr-staff-table th{ white-space:nowrap; }
+  .sr-staff-table th{ white-space:normal; }
+  .sr-chart-block + .sr-chart-block{ margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  .sr-chart-title{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ink-soft); margin-bottom:4px; }
+  .sr-chart-title b{ color:var(--ink); }
+  .sr-chart-note{ margin-top:10px; font-size:12px; color:var(--ink-faint); }
   .sr-sum-table thead th{ background:var(--surface-2); color:var(--ink); font-size:12.5px; font-weight:700; text-transform:none; letter-spacing:0; text-align:left; padding:11px 12px; border:0; border-right:1px solid var(--line); white-space:normal; }
   .sr-sum-table thead th:last-child, .sr-sum-table td:last-child{ border-right:0; }
   .sr-sum-table tbody td{ padding:10px 12px; font-size:13.5px; color:var(--ink-soft); border-top:1px solid var(--line); border-right:1px solid var(--line); overflow-wrap:anywhere; vertical-align:top; }
@@ -2988,20 +3000,25 @@ function bindEvents(){
   app.querySelectorAll('[data-sr-draft]').forEach(function(input){
     input.addEventListener('change', function(){
       var srd = srState(), k = input.getAttribute('data-sr-draft');
-      if(k==='type'){ srd.type = input.value; render(); }
-      else srd[k] = Number(input.value);
+      if(k==='type'){ srd.type = input.value; render(); return; }
+      // Month/year: regenerate immediately (no Generate button).
+      srd[k] = Number(input.value);
+      srd.month = Number(srd.draftMonth); srd.year = Number(srd.draftYear);
+      srLoad();
+      render();
+      var again = document.getElementById(k==='draftMonth' ? 'sr-month' : 'sr-year'); if(again) again.focus();
     });
   });
-  var srChartEl = app.querySelector('[data-sr-chart]');
-  if(srChartEl){
+  app.querySelectorAll('[data-sr-chart]').forEach(function(srChartEl){
     var tip = srChartEl.querySelector('[data-sr-tip]');
     var showTip = function(g){
       var parts = g.getAttribute('data-tip').split('|');
-      tip.innerHTML = '<b>'+esc(parts[0])+'</b><span><i class="sr-key doc"></i>Document '+parts[1]+'</span><span><i class="sr-key land"></i>Land Transfer '+parts[2]+'</span><span class="sr-tip-total">Total '+(Number(parts[1])+Number(parts[2]))+'</span>';
+      tip.innerHTML = '<b>'+esc(parts[0])+'</b>'
+        + (parts[1]!=='' ? '<span><i class="sr-key doc"></i>Document requests: '+parts[1]+'</span>' : '')
+        + (parts[2]!=='' ? '<span><i class="sr-key land"></i>Land transfers: '+parts[2]+'</span>' : '');
       tip.hidden = false;
       var cr = srChartEl.getBoundingClientRect(), gr = g.getBoundingClientRect();
-      var left = gr.left - cr.left + gr.width/2;
-      tip.style.left = Math.min(Math.max(left, 70), cr.width - 70) + 'px';
+      tip.style.left = Math.min(Math.max(gr.left - cr.left + gr.width/2, 80), cr.width - 80) + 'px';
       srChartEl.querySelectorAll('.sr-bar.on').forEach(function(o){ o.classList.remove('on'); });
       g.classList.add('on');
     };
@@ -3012,7 +3029,7 @@ function bindEvents(){
       g.addEventListener('blur', hideTip);
     });
     srChartEl.addEventListener('mouseleave', hideTip);
-  }
+  });
 
   app.querySelectorAll('tr.dash-row, .sent-item, tr.sr-row').forEach(function(row){
     row.addEventListener('keydown', function(event){
@@ -3262,13 +3279,8 @@ function bindEvents(){
       var cur = pageOf(key);
       setPage(key, dir==='next'?cur+1:Math.max(1,cur-1));
       render();
-    } else if(action==='sr-generate'){
-      var srs = srState();
-      srs.month = Number(srs.draftMonth); srs.year = Number(srs.draftYear);
-      srs.data = null; srs.error = '';
-      srLoad();
-      render();
-      if(!srApiUrl()) pushToast('Report generated for '+SR_MONTHS[srs.month-1]+' '+srs.year+'.', 'check');
+    } else if(action==='sr-retry'){
+      var srr = srState(); srr.error = ''; srLoad(); render();
     } else if(action==='sr-viewall'){
       state.modal = {type:'sr-viewall', kind: el.getAttribute('data-kind')==='land' ? 'land' : 'doc'};
       render();
