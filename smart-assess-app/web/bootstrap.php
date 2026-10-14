@@ -177,23 +177,26 @@ const SA_CLIENT_ANNOUNCEMENT_HOURS = 24;
 /**
  * Single source of truth for when an announcement is visible.
  * Returns [whereSql, expiresSql] for the audience ('client' or 'staff'); bind
- * :vis_now (sa_manila_now()). Uses only stored timestamps, so expired rows
- * cannot reappear from cached pages or frontend-only filtering.
+ * :vis_now, :vis_now2 and :vis_now3 (sa_manila_now()).
+ *
+ * Client expiry is automatic: 24 hours after the moment the announcement went
+ * live. published_at holds that moment for both immediate sends (publish time)
+ * and scheduled sends (sa_publish_due_announcements copies scheduled_at into
+ * it), so a scheduled post expires 24 hours after its send time, not after it
+ * was written. Still-scheduled rows use scheduled_at so the Head can see the
+ * coming expiry. Everything is computed from stored timestamps in SQL, so
+ * expired rows cannot reappear from cached pages or frontend-only filtering,
+ * and no row is ever deleted.
  */
 function sa_announcement_visibility_sql(string $audience): array
 {
-    $hasUntil = sa_has_column('announcements', 'visible_until');
     $published = 'COALESCE(published_at, created_at)';
-    $until = $hasUntil ? 'visible_until' : 'NULL';
+    $liveFrom = 'COALESCE(published_at, scheduled_at, created_at)';
     $dayEnd = "TIMESTAMP(end_date, '23:59:59')";
     $audiences = $audience === 'client' ? "('client', 'both')" : "('staff', 'both')";
-    $ends = [$until, $dayEnd];
-    if ($audience === 'client') {
-        $ends[] = "DATE_ADD({$published}, INTERVAL " . SA_CLIENT_ANNOUNCEMENT_HOURS . ' HOUR)';
-    }
-    // Earliest configured end wins; an unset end counts as "never" (NULL result).
-    $never = "'9999-12-31 23:59:59'";
-    $expires = 'NULLIF(LEAST(' . implode(', ', array_map(static fn ($e) => "COALESCE({$e}, {$never})", $ends)) . "), {$never})";
+    $expires = $audience === 'client'
+        ? "LEAST(COALESCE({$dayEnd}, '9999-12-31 23:59:59'), DATE_ADD({$liveFrom}, INTERVAL " . SA_CLIENT_ANNOUNCEMENT_HOURS . ' HOUR))'
+        : $dayEnd;
     $where = "status = 'Published' AND audience IN {$audiences}
            AND {$published} <= :vis_now
            AND start_date <= DATE(:vis_now2)
@@ -337,10 +340,9 @@ function sa_internal_bootstrap(): array
         // carries its staff/client expiry so expired ones are marked, not deleted.
         [, $staffExpires] = sa_announcement_visibility_sql('staff');
         [, $clientExpires] = sa_announcement_visibility_sql('client');
-        $untilColumn = sa_has_column('announcements', 'visible_until') ? 'visible_until' : 'NULL AS visible_until';
         $data['announcements'] = $pdo->query(
             "SELECT id, title, body, author, audience, start_date, end_date, image_url,
-                    status, scheduled_at, published_at, {$untilColumn}, created_at,
+                    status, scheduled_at, published_at, created_at,
                     {$staffExpires} AS staff_expires_at, {$clientExpires} AS client_expires_at
              FROM announcements ORDER BY created_at DESC, id DESC LIMIT 200"
         )->fetchAll();

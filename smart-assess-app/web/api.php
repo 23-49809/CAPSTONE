@@ -1775,8 +1775,13 @@ function sa_announcement_change(array $data, string $action): array
     } elseif ($action === 'delete') {
         $pdo->prepare('DELETE FROM announcements WHERE id = :id')->execute(['id' => $id]);
     } elseif ($action === 'publish') {
+        // Saving an already-live announcement keeps its original publish time, so
+        // an edit never restarts the 24-hour client window. published_at is set
+        // before status because MySQL applies SET assignments left to right.
         $pdo->prepare(
-            "UPDATE announcements SET status = 'Published', scheduled_at = NULL, published_at = :now
+            "UPDATE announcements
+             SET published_at = IF(status = 'Published' AND published_at IS NOT NULL, published_at, :now),
+                 status = 'Published', scheduled_at = NULL
              WHERE id = :id"
         )->execute(['id' => $id, 'now' => sa_manila_now()]);
     } elseif ($action === 'schedule') {
@@ -1815,44 +1820,11 @@ function sa_announcement_save(array $data): array
     }
 }
 
-/** Optional "Visible until" (form value YYYY-MM-DDTHH:MM, Asia/Manila) as a
- *  DB datetime, validated against now and the schedule; null when blank. */
-function sa_announcement_visible_until(array $data): ?string
-{
-    $raw = trim((string) ($data['visibleUntil'] ?? $data['visible_until'] ?? ''));
-    if ($raw === '') {
-        return null;
-    }
-    $raw = str_replace('T', ' ', $raw);
-    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $raw)) {
-        $raw .= ':00';
-    }
-    $until = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $raw, sa_schedule_timezone());
-    if (!$until || $until->format('Y-m-d H:i:s') !== $raw) {
-        throw new SaHttpException(422, 'Enter a valid "Visible until" date and time.');
-    }
-    if ($until <= new DateTimeImmutable('now', sa_schedule_timezone())) {
-        throw new SaHttpException(422, '"Visible until" must be in the future (Philippine time).');
-    }
-    $start = (string) ($data['scheduled_at'] ?? '');
-    if (($data['announcement_mode'] ?? '') === 'schedule' && $start !== '' && $until->format('Y-m-d H:i:s') <= $start) {
-        throw new SaHttpException(422, '"Visible until" must be after the scheduled send time.');
-    }
-    return $until->format('Y-m-d H:i:s');
-}
-
 function sa_announcement_save_steps(array $data): array
 {
-    $visibleUntil = sa_announcement_visible_until($data);
     $id = filter_var($data['announcement_id'] ?? null, FILTER_VALIDATE_INT);
     $result = sa_announcement_change($data, $id ? 'edit' : 'create');
     $id = (int) $result['announcement_id'];
-    if (sa_has_column('announcements', 'visible_until')) {
-        sa_db()->prepare('UPDATE announcements SET visible_until = :until WHERE id = :id')
-            ->execute(['until' => $visibleUntil, 'id' => $id]);
-    } elseif ($visibleUntil !== null) {
-        throw new SaHttpException(503, 'Announcement expiry is not set up yet. Ask the administrator to run the 20261014 announcement migration.');
-    }
     $mode = (string) ($data['announcement_mode'] ?? 'draft');
     if ($mode === 'publish') {
         sa_announcement_change(['announcement_id' => $id], 'publish');
