@@ -894,6 +894,9 @@
     body.printing-sysreport .sr-card, body.printing-sysreport .sr-stat{ box-shadow:none; break-inside:avoid; }
     body.printing-sysreport .sr-table{ min-width:0; }
   }
+  .composer-row input[type="datetime-local"]{ flex:0 1 230px; font-weight:500; color-scheme:light dark; }
+  .composer-row-hint{ flex:1 1 160px; font-size:12px; color:var(--ink-faint); }
+  @media (max-width:560px){ .composer-row{ flex-wrap:wrap; } .composer-row-hint{ flex-basis:100%; padding:0 0 8px 66px; } }
 </style>
 
 <div id="app"></div>
@@ -1580,7 +1583,7 @@ function renderHeadDashboard(acct){
   var pendingDoc = state.docRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
   var pendingLand = state.landRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
   var completedThisMonth = state.docRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length + state.landRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length;
-  var pubAnn = state.announcements.filter(function(a){ return a.status==='Published'; }).length;
+  var pubAnn = state.announcements.filter(function(a){ return (a.postTo==='staff' || a.postTo==='both') && annVisibleTo(a,'staff'); }).length;
   var recentReports = state.reports.slice(0,4);
   var recentAnn = state.announcements.slice(0,4);
   return ''
@@ -1607,7 +1610,7 @@ function renderHeadDashboard(acct){
       + '<div class="dash-ann-list">'
       + (recentAnn.length ? recentAnn.map(function(a){
           return '<article class="dash-ann">'
-            + '<div class="dash-ann-meta"><strong>'+esc(audienceLabel(a.postTo))+'</strong> &middot; '+esc(a.postedBy)+' &middot; <span class="badge '+annBadgeClass(a.status)+'">'+esc(a.status)+'</span></div>'
+            + '<div class="dash-ann-meta"><strong>'+esc(audienceLabel(a.postTo))+'</strong> &middot; '+esc(a.postedBy)+' &middot; <span class="badge '+annBadgeClass(annDisplayStatus(a))+'">'+esc(annDisplayStatus(a))+'</span></div>'
             + '<h4>'+esc(a.title)+'</h4>'+(a.content?'<p>'+esc(a.content)+'</p><button class="dash-link dash-ann-toggle" type="button" data-action="dash-ann-toggle" aria-expanded="false">Read more</button>':'')+'</article>';
         }).join('') : '<div class="empty-state">No announcements yet.</div>')
       + '</div></section></div>'
@@ -1647,7 +1650,7 @@ function renderAnnouncements(acct){
       actions += '<button class="icon-btn danger action-button" data-action="delete-ann" data-id="'+a.id+'">'+ic('trash','13px')+'Delete</button>';
       return '<tr><td class="cell-name" data-label="Title">'+esc(a.title)+'</td>'
         + '<td data-label="Post To">'+audienceLabel(a.postTo)+'</td>'
-        + '<td data-label="Status"><span class="badge '+annBadgeClass(a.status)+'">'+a.status+'</span></td>'
+        + '<td data-label="Status"><span class="badge '+annBadgeClass(annDisplayStatus(a))+'">'+annDisplayStatus(a)+'</span></td>'
         + '<td data-label="Published / Scheduled">'+annDateCell(a)+'</td>'
         + '<td data-label="Created By">'+esc(a.postedBy)+'</td>'
         + '<td class="actions-cell"><div class="actions-container">'+actions+'</div></td></tr>';
@@ -1908,7 +1911,7 @@ function dashRequestPanel(kind, rows){
  *  Client-only. This is the Staff side of the Post To targeting rule. */
 function renderStaffAnnouncements(){
   var visible = state.announcements.filter(function(a){
-    return a.status==='Published' && (a.postTo==='staff' || a.postTo==='both');
+    return (a.postTo==='staff' || a.postTo==='both') && annVisibleTo(a, 'staff');
   }).sort(function(a,b){ return String(b.publishedAt||'').localeCompare(String(a.publishedAt||'')); });
   return '<section class="dash-panel" aria-labelledby="dash-ann-title">'
     + '<div class="dash-panel-head"><h3 id="dash-ann-title">Announcements</h3></div>'
@@ -2381,6 +2384,7 @@ function modalAnnEdit(id){
         + '<option value=""'+(a.postTo?'':' selected')+'>Select audience…</option>'
         + Object.keys(ANNOUNCEMENT_AUDIENCES).map(function(k){ return '<option value="'+k+'"'+(a.postTo===k?' selected':'')+'>'+ANNOUNCEMENT_AUDIENCES[k]+'</option>'; }).join('')
       + '</select></div>'
+      + '<div class="composer-row"><label for="ann-visible-until">Visible until</label><input id="ann-visible-until" name="visibleUntil" type="datetime-local" value="'+esc(a.visibleUntil ? String(a.visibleUntil).replace(' ','T').slice(0,16) : '')+'" aria-describedby="ann-visible-hint"><span class="composer-row-hint" id="ann-visible-hint">Optional · Philippine time. Clients see it for at most 24 hours.</span></div>'
       + '<div class="composer-row"><label for="ann-subject">Subject</label><input id="ann-subject" name="title" type="text" maxlength="200" value="'+esc(a.title)+'" placeholder="Announcement title" required></div>'
       + '<div class="composer-body"><textarea id="announcement-message" name="content" aria-label="Message" placeholder="Write your announcement…" required>'+esc(a.content)+'</textarea>'
         + '<details class="composer-ai"><summary>'+ic('sparkles','15px')+'<span>Write with AI</span></summary>'
@@ -3391,12 +3395,12 @@ function bindEvents(){
 
       if(annId){
         var ex = findAnn(annId);
-        ex.title = fd.get('title'); ex.content = fd.get('content'); ex.postTo = postTo;
+        ex.title = fd.get('title'); ex.content = fd.get('content'); ex.postTo = postTo; ex.visibleUntil = fd.get('visibleUntil') || null; ex.staffExpiresAt = null; ex.clientExpiresAt = null;
         ex.status = annStatus; ex.scheduledAt = annScheduledAt; ex.publishedAt = annPublishedAt;
         pushToast('Announcement updated.', 'check');
       } else {
         state.announcements.unshift({
-          id:uid('A'), title:fd.get('title'), content:fd.get('content'), postTo:postTo,
+          id:uid('A'), title:fd.get('title'), content:fd.get('content'), postTo:postTo, visibleUntil: fd.get('visibleUntil') || null,
           status:annStatus, scheduledAt:annScheduledAt, publishedAt:annPublishedAt,
           datePosted:new Date().toISOString().slice(0,10), postedBy: me2?me2.fullName:'Assessor Head'
         });
@@ -3435,7 +3439,13 @@ function init(){
   setInterval(updateProcessingTimers, 1000);
   // Passive check so a Scheduled announcement still goes live on its own
   // even if the head leaves this tab idle on some other screen.
-  setInterval(function(){ if(publishDueAnnouncements()) render(); }, 15000);
+  var lastVisibleKey = '';
+  setInterval(function(){
+    var key = (state.announcements||[]).map(function(a){ return a.id+':'+annDisplayStatus(a)+':'+annVisibleTo(a,'staff'); }).join('|');
+    var changed = publishDueAnnouncements();
+    if(changed || (lastVisibleKey && key!==lastVisibleKey)) render();
+    lastVisibleKey = key;
+  }, 15000);
 }
 init();
 
