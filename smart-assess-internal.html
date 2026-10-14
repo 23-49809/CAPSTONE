@@ -1281,8 +1281,15 @@ function annIsExpired(a){
 function annDisplayStatus(a){ return annIsExpired(a) ? 'Expired' : a.status; }
 function annDateCell(a){
   if(a.status==='Published' && a.publishedAt){
-    var exp = a.postTo==='staff' ? annExpiresAt(a,'staff') : annExpiresAt(a,'client');
-    return fmtDateTime(a.publishedAt) + (exp ? '<div class="cell-sub">'+(exp<=Date.now()?'Expired':'Until')+' '+esc(fmtDateTime(new Date(exp).toISOString()))+'</div>' : '');
+    var lines = [];
+    var line = function(who, aud){
+      var exp = annExpiresAt(a, aud); if(!exp) return;
+      var when = esc(fmtDateTime(new Date(exp).toISOString()));
+      lines.push(exp<=Date.now() ? (who ? 'Hidden from '+who+' since ' : 'Expired ')+when : (who ? who.charAt(0).toUpperCase()+who.slice(1)+' until ' : 'Until ')+when);
+    };
+    if(a.postTo==='both'){ line('clients','client'); line('staff','staff'); }
+    else line('', a.postTo==='client' ? 'client' : 'staff');
+    return fmtDateTime(a.publishedAt) + lines.map(function(l){ return '<div class="cell-sub">'+l+'</div>'; }).join('');
   }
   if(a.status==='Scheduled' && a.scheduledAt) return 'Scheduled: '+fmtDateTime(a.scheduledAt);
   return '—';
