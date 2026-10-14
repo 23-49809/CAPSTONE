@@ -886,6 +886,11 @@
   .sr-staff-table{ table-layout:auto; min-width:760px; }
   .sr-staff-table td, .sr-staff-table th{ white-space:nowrap; }
   .sr-staff-table th{ white-space:normal; }
+  .sr-legend{ display:flex; gap:22px; flex-wrap:wrap; margin-top:12px; font-size:12.5px; color:var(--ink-soft); }
+  .sr-legend span{ display:inline-flex; align-items:center; gap:8px; }
+  .sr-key.sel{ border-radius:3px; background:var(--surface-2); border:1px solid var(--line-strong); }
+  .sr-band{ fill:var(--surface-2); }
+  .sr-axis-on{ fill:var(--ink); font-weight:700; }
   .sr-chart-block + .sr-chart-block{ margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
   .sr-chart-title{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ink-soft); margin-bottom:4px; }
   .sr-chart-title b{ color:var(--ink); }
@@ -1739,6 +1744,8 @@ function srComputeLocal(month, year){
     return { completed:g.length, timedCount:t.length, fastestSeconds:t.length?Math.min.apply(null,t):null, slowestSeconds:t.length?Math.max.apply(null,t):null,
       avgProcessingSeconds:t.length?Math.round(t.reduce(function(a,b){return a+b;},0)/t.length):null };
   };
+  var monthly = [];
+  for(var mm=1; mm<=12; mm++){ var g = submittedIn(year+'-'+pad(mm)); monthly.push({month:mm, documents:g.filter(function(x){return x.kind==='doc';}).length, landTransfers:g.filter(function(x){return x.kind==='land';}).length}); }
   var daily = [];
   for(var d=1; d<=days; d++){ var key = ym+'-'+pad(d); daily.push({day:key, documents:list.filter(function(x){return x.kind==='doc'&&x.day===key;}).length, landTransfers:list.filter(function(x){return x.kind==='land'&&x.day===key;}).length}); }
   var summary = function(kind){
@@ -1767,7 +1774,7 @@ function srComputeLocal(month, year){
   var years = all.map(function(x){ return Number(x.day.slice(0,4)); }).concat([year, nowY]);
   var yr = []; for(var y=Math.min.apply(null, years); y<=Math.max(nowY+5, year); y++) yr.push(y);
   return { month:month, year:year, label:SR_MONTHS[month-1]+' '+year, from:ym+'-01', to:ym+'-'+pad(days), years:yr,
-    cards:cards(list), previousCards:cards(submittedIn(prevY+'-'+pad(prevM))), daily:daily,
+    cards:cards(list), previousCards:cards(submittedIn(prevY+'-'+pad(prevM))), daily:daily, monthly:monthly,
     documentSummary:summary('doc'), landSummary:summary('land'), staffPerformance:staff,
     requests:list.sort(function(a,b){ return String(b.r.submitted).localeCompare(String(a.r.submitted)); }).map(function(x){ return {id:x.r.id, kind:x.kind, client:x.r.applicant, type:x.type||'', status:x.r.status, submitted:x.r.submitted, processingSeconds:x.dur, processingStartedAt:x.r.processingStartedAt, assignedTo:x.r.processingStaffName}; }),
     generatedAt:new Date(Date.now()+8*3600e3).toISOString().slice(0,19).replace('T',' ') };
@@ -1802,30 +1809,39 @@ function srStatCard(label, value, prev, tone, worseIsUp){
 
 /* Daily stacked bars for one month. Fixed plot geometry, labels every ~5
    days, no value labels on bars (hover/focus shows exact counts). */
-function srChart(d, kind){
-  var key = kind==='doc' ? 'documents' : 'landTransfers';
-  var vals = d.daily.map(function(b){ return {day:b.day, v:b[key]}; });
-  var max = Math.max(0, Math.max.apply(null, vals.map(function(b){ return b.v; })));
+function srChart(d, type){
+  var showDoc = type!=='land', showLand = type!=='doc';
+  var series = [];
+  if(showDoc) series.push({key:'documents', cls:'sr-doc', name:'Document Requests'});
+  if(showLand) series.push({key:'landTransfers', cls:'sr-land', name:'Land Transfer Requests'});
+  var months = d.monthly || [];
+  var max = 0;
+  months.forEach(function(m){ series.forEach(function(se){ max = Math.max(max, m[se.key]); }); });
   var tickStep = max<=4 ? 1 : max<=10 ? 2 : max<=25 ? 5 : max<=50 ? 10 : Math.ceil(max/50)*10;
   var top = Math.max(4, Math.ceil(max/tickStep)*tickStep);
-  var W = 720, H = 190, L = 36, R = 10, T = 12, B = 28, plotW = W-L-R, plotH = H-T-B;
-  var slot = plotW / vals.length, barW = Math.max(4, Math.min(14, slot*0.58));
+  var W = 720, H = 250, L = 38, R = 10, T = 14, B = 30, plotW = W-L-R, plotH = H-T-B;
+  var slot = plotW / 12, gap = 3;
+  var barW = Math.min(18, (slot*0.7 - gap*(series.length-1)) / series.length);
+  var groupW = barW*series.length + gap*(series.length-1);
   var y = function(v){ return T + plotH - v/top*plotH; };
-  var name = kind==='doc' ? 'Document requests' : 'Land transfer requests';
-  var svg = '<svg class="sr-chart-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+name+' per day, '+esc(d.label)+'">';
+  var svg = '<svg class="sr-chart-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Requests per month, '+d.year+'">';
+  months.forEach(function(m, i){
+    if(m.month===d.month) svg += '<rect class="sr-band" x="'+(L+slot*i+2)+'" y="'+T+'" width="'+(slot-4)+'" height="'+plotH+'" rx="6"/>';
+  });
   for(var t=0;t<=top;t+=tickStep){
     svg += '<line class="sr-grid" x1="'+L+'" x2="'+(W-R)+'" y1="'+y(t)+'" y2="'+y(t)+'"/>'
       + '<text class="sr-axis" x="'+(L-8)+'" y="'+(y(t)+4)+'" text-anchor="end">'+t+'</text>';
   }
-  vals.forEach(function(b, i){
-    var cx = L + slot*i + slot/2, x = cx - barW/2, h = b.v/top*plotH;
-    var when = phFormatDate(b.day);
-    svg += '<g class="sr-bar" tabindex="0" data-tip="'+esc(when)+'|'+(kind==='doc'?b.v:'')+'|'+(kind==='land'?b.v:'')+'" aria-label="'+esc(when)+': '+b.v+' '+name.toLowerCase()+'">'
-      + '<rect class="sr-hit" x="'+(L+slot*i)+'" y="'+T+'" width="'+slot+'" height="'+plotH+'"/>'
-      + (b.v ? '<path class="'+(kind==='doc'?'sr-doc':'sr-land')+'" d="'+srBarPath(x, y(0), barW, h, true)+'"/>' : '')
-      + '</g>';
-    var dayNum = Number(b.day.slice(8,10));
-    if(dayNum===1 || dayNum%5===0) svg += '<text class="sr-axis" x="'+cx+'" y="'+(H-8)+'" text-anchor="middle">'+dayNum+'</text>';
+  months.forEach(function(m, i){
+    var x0 = L + slot*i + (slot-groupW)/2;
+    var label = SR_MONTHS[m.month-1].slice(0,3)+' '+d.year;
+    svg += '<g class="sr-bar" tabindex="0" data-tip="'+esc(label)+'|'+(showDoc?m.documents:'')+'|'+(showLand?m.landTransfers:'')+'" aria-label="'+esc(SR_MONTHS[m.month-1]+' '+d.year)+': '+series.map(function(se){ return m[se.key]+' '+se.name.toLowerCase(); }).join(', ')+'">'
+      + '<rect class="sr-hit" x="'+(L+slot*i)+'" y="'+T+'" width="'+slot+'" height="'+plotH+'"/>';
+    series.forEach(function(se, k){
+      var v = m[se.key];
+      if(v) svg += '<path class="'+se.cls+'" d="'+srBarPath(x0 + k*(barW+gap), y(0), barW, v/top*plotH, true)+'"/>';
+    });
+    svg += '</g><text class="sr-axis'+(m.month===d.month?' sr-axis-on':'')+'" x="'+(L+slot*i+slot/2)+'" y="'+(H-9)+'" text-anchor="middle">'+SR_MONTHS[m.month-1].slice(0,3)+'</text>';
   });
   svg += '<line class="sr-baseline" x1="'+L+'" x2="'+(W-R)+'" y1="'+y(0)+'" y2="'+y(0)+'"/></svg>';
   return svg;
@@ -1900,10 +1916,10 @@ function renderReports(acct){
     + srStatCard('Total Requests', c.total, p.total, 'tone-green', false)
   + '</div>'
   + '<div class="sr-mid">'
-    + '<section class="sr-card sr-overview"><div class="sr-overview-head"><h3>'+ic('fileBar','18px')+'Requests Overview</h3><span class="sr-overview-sub">Per day · '+esc(d.label)+'</span></div>'
-      + (sr.type!=='land' ? '<div class="sr-chart-block"><div class="sr-chart-title"><i class="sr-key doc"></i>Document Requests <b>'+c.documents+'</b></div><div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, 'doc')+'</div><div class="sr-tip" data-sr-tip hidden></div></div></div>' : '')
-      + (sr.type!=='doc' ? '<div class="sr-chart-block"><div class="sr-chart-title"><i class="sr-key land"></i>Land Transfer Requests <b>'+c.landTransfers+'</b></div><div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, 'land')+'</div><div class="sr-tip" data-sr-tip hidden></div></div></div>' : '')
-      + '<p class="sr-chart-note">Requests submitted per day. Hover or focus a bar for the exact count.</p>'
+    + '<section class="sr-card sr-overview"><div class="sr-overview-head"><h3>'+ic('fileBar','18px')+'Requests Overview</h3><span class="sr-overview-sub">Per month · '+d.year+'</span></div>'
+      + '<div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, sr.type)+'</div><div class="sr-tip" data-sr-tip hidden></div></div>'
+      + '<div class="sr-legend" aria-hidden="true">'+(sr.type!=='land'?'<span><i class="sr-key doc"></i>Document Requests</span>':'')+(sr.type!=='doc'?'<span><i class="sr-key land"></i>Land Transfer Requests</span>':'')+'<span class="sr-legend-sel"><i class="sr-key sel"></i>'+esc(SR_MONTHS[d.month-1])+' (selected)</span></div>'
+      + '<p class="sr-chart-note">Requests submitted per month in '+d.year+'. Hover or focus a month for exact counts.</p>'
     + '</section>'
     + '<section class="sr-card sr-summary"><h3>'+ic('doc','18px')+'Report Summary</h3>'
       + '<dl>'+summaryRows.map(function(r){ return '<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>'; }).join('')+'</dl>'
