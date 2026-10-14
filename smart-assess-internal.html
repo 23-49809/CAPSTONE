@@ -964,17 +964,18 @@
   #sr-print-all .rp-table .nowrap{ white-space:nowrap; }
   #sr-print-all .rp-table .rp-total td{ font-weight:700; background:#e9e9e9 !important; border-top:1pt solid #000; }
   #sr-print-all .rp-table .rp-empty{ text-align:center; padding:6mm 2mm; font-style:italic; }
-  #sr-print-all .rp-list col.c-no{ width:9mm; } #sr-print-all .rp-list col.c-ref{ width:32mm; } #sr-print-all .rp-list col.c-client{ width:42mm; }
-  #sr-print-all .rp-list col.c-req{ width:25mm; } #sr-print-all .rp-list col.c-type{ width:auto; } #sr-print-all .rp-list col.c-date{ width:31mm; }
-  #sr-print-all .rp-list col.c-status{ width:25mm; } #sr-print-all .rp-list col.c-time{ width:21mm; } #sr-print-all .rp-list col.c-staff{ width:36mm; }
+  #sr-print-all .rp-list col.c-no{ width:9mm; } #sr-print-all .rp-list col.c-ref{ width:30mm; } #sr-print-all .rp-list col.c-client{ width:40mm; }
+  #sr-print-all .rp-list col.c-req{ width:29mm; } #sr-print-all .rp-list col.c-type{ width:auto; } #sr-print-all .rp-list col.c-date{ width:36mm; }
+  #sr-print-all .rp-list col.c-status{ width:25mm; } #sr-print-all .rp-list col.c-time{ width:21mm; } #sr-print-all .rp-list col.c-staff{ width:34mm; }
   #sr-print-all .rp-note{ margin-top:2mm; font-size:8.5pt; }
-  #sr-print-all .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:18mm; margin-top:9mm; break-inside:avoid; page-break-inside:avoid; }
-  #sr-print-all .rp-sign-label{ font-size:9.5pt; margin-bottom:13mm; }
+  #sr-print-all .rp-closing{ margin-top:8mm; break-inside:avoid; page-break-inside:avoid; }
+  #sr-print-all .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:18mm; }
+  #sr-print-all .rp-sign-label{ font-size:9.5pt; margin-bottom:12mm; }
   #sr-print-all .rp-sign-line{ border-top:.8pt solid #000; padding-top:1mm; text-align:center; font-size:9pt; }
   #sr-print-all .rp-sign-role{ text-align:center; font-size:9pt; font-weight:700; margin-top:.6mm; }
   #sr-print-all .rp-sign-date{ margin-top:6mm; font-size:9pt; display:flex; gap:2mm; align-items:flex-end; }
   #sr-print-all .rp-sign-date span{ flex:1; border-bottom:.8pt solid #000; height:4mm; }
-  #sr-print-all .rp-end{ margin-top:6mm; text-align:center; font-size:8.5pt; letter-spacing:.08em; }
+  #sr-print-all .rp-end{ margin-top:5mm; text-align:center; font-size:8.5pt; letter-spacing:.08em; }
   #sr-print-all .rp-table, #sr-print-all .rp-meta{ table-layout:auto; min-width:0; }
   #sr-print-all .rp-list{ table-layout:fixed; }
   #sr-print-all .rp-table th, #sr-print-all .rp-table td, #sr-print-all .rp-meta th, #sr-print-all .rp-meta td{ font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; color:#000; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.3; }
@@ -1976,7 +1977,7 @@ function srPrintAllRequestsHtml(d, acct){
   var period = d.label+' ('+phFormatDate(d.from)+' – '+phFormatDate(d.to)+')';
   var listRows = total ? reqs.map(function(r, i){
     return '<tr><td class="num">'+(i+1)+'</td><td class="nowrap">'+esc(r.id||'—')+'</td><td>'+esc(r.client||'—')+'</td>'
-      + '<td>'+esc(kindLabel[r.kind]||'—')+'</td><td>'+esc(r.type||'—')+'</td><td>'+esc(stamp(r.submitted))+'</td>'
+      + '<td class="nowrap">'+esc(kindLabel[r.kind]||'—')+'</td><td>'+esc(r.type||'—')+'</td><td class="nowrap">'+esc(stamp(r.submitted))+'</td>'
       + '<td>'+esc(r.status||'—')+'</td><td class="num">'+esc(r.processingSeconds==null ? '—' : srHumanDuration(r.processingSeconds))+'</td>'
       + '<td>'+esc(r.assignedTo||'—')+'</td></tr>';
   }).join('') : '<tr><td colspan="9" class="rp-empty">No requests were submitted during '+esc(d.label)+'.</td></tr>';
@@ -2003,11 +2004,11 @@ function srPrintAllRequestsHtml(d, acct){
       + '<thead><tr><th class="num">No.</th><th>Reference No.</th><th>Client Name</th><th>Request Type</th><th>Document / Transfer Type</th><th>Date Submitted</th><th>Status</th><th class="num">Processing Time</th><th>Processed By</th></tr></thead>'
       + '<tbody>'+listRows+'</tbody></table>'
     + '<p class="rp-note">Covers all requests submitted from '+esc(phFormatDate(d.from))+' to '+esc(phFormatDate(d.to))+', listed newest first. Processing time is shown only for requests with a recorded processing duration.</p>'
-    + '<div class="rp-sign">'
+    + '<div class="rp-closing"><div class="rp-sign">'
       + '<div><div class="rp-sign-label">Prepared by:</div><div class="rp-sign-line">Signature over Printed Name</div><div class="rp-sign-role">Authorized Reporting Staff</div><div class="rp-sign-date">Date:<span></span></div></div>'
       + '<div><div class="rp-sign-label">Reviewed and noted by:</div><div class="rp-sign-line">Signature over Printed Name</div><div class="rp-sign-role">Municipal Assessor / Department Head</div><div class="rp-sign-date">Date:<span></span></div></div>'
     + '</div>'
-    + '<div class="rp-end">— END OF REPORT —</div>'
+    + '<div class="rp-end">— END OF REPORT —</div></div>'
   + '</div>';
 }
 function srPrintAllRequests(d, acct){
