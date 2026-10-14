@@ -1920,12 +1920,10 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
     $end = $start->modify('first day of next month');
     $prevStart = $start->modify('first day of previous month');
     $pdo = sa_db();
-    $completedList = "'" . implode("','", SA_REPORT_COMPLETED_STATUSES) . "'";
 
     $counts = static function (DateTimeImmutable $from, DateTimeImmutable $to) use ($pdo): array {
         $stmt = $pdo->prepare(
-            "SELECT SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers,
-                    COUNT(*) AS total, SUM(status = 'Timed Out') AS overdue
+            "SELECT SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers, COUNT(*) AS total
              FROM requests WHERE created_at >= :start AND created_at < :end"
         );
         $stmt->execute(['start' => $from->format('Y-m-d H:i:s'), 'end' => $to->format('Y-m-d H:i:s')]);
@@ -1934,7 +1932,6 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
             'documents' => (int) ($row['documents'] ?? 0),
             'landTransfers' => (int) ($row['land_transfers'] ?? 0),
             'total' => (int) ($row['total'] ?? 0),
-            'overdue' => (int) ($row['overdue'] ?? 0),
         ];
     };
     $range = ['start' => $start->format('Y-m-d H:i:s'), 'end' => $end->format('Y-m-d H:i:s')];
@@ -1955,53 +1952,107 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
         }
     }
 
-    // Per-category rows. Categories that exist in the data but have no requests
-    // this month are listed with 0 so the table shape stays stable.
-    $summary = static function (string $flow, string $column) use ($pdo, $range, $completedList): array {
+    // Valid processing duration of a completed request (seconds): the stored
+    // duration, else completed - started; NULL when missing or negative.
+    $duration = "CASE WHEN processing_duration_seconds IS NOT NULL AND processing_duration_seconds >= 0 THEN processing_duration_seconds
+                      WHEN processing_started_at IS NOT NULL AND processing_completed_at >= processing_started_at
+                           THEN TIMESTAMPDIFF(SECOND, processing_started_at, processing_completed_at) END";
+    $completedRange = 'processing_completed_at >= :cstart AND processing_completed_at < :cend';
+    $cRange = ['cstart' => $range['start'], 'cend' => $range['end']];
+
+    // Per-category rows. "Total Requests" = submitted this month; "Completed"
+    // and fastest/slowest = processing completed this month (by that request's
+    // own type). Categories with nothing this month are listed with 0.
+    $summary = static function (string $flow, string $column) use ($pdo, $range, $cRange, $duration, $completedRange): array {
         $known = $pdo->prepare(
             "SELECT DISTINCT {$column} AS label FROM requests
              WHERE flow = :flow AND {$column} IS NOT NULL AND {$column} <> '' ORDER BY label"
         );
         $known->execute(['flow' => $flow]);
+        $blank = ['total' => 0, 'completed' => 0, 'timedCount' => 0, 'fastestSeconds' => null, 'slowestSeconds' => null, 'avgProcessingSeconds' => null];
         $rows = [];
         foreach ($known->fetchAll(PDO::FETCH_COLUMN) as $label) {
-            $rows[$label] = ['label' => $label, 'total' => 0, 'completed' => 0, 'avgProcessingSeconds' => null, 'timedCount' => 0];
+            $rows[$label] = ['label' => $label] + $blank;
         }
-        $stmt = $pdo->prepare(
-            "SELECT COALESCE(NULLIF({$column}, ''), 'Unspecified') AS label, COUNT(*) AS total,
-                    SUM(status IN ({$completedList})) AS completed,
-                    AVG(processing_duration_seconds) AS avg_seconds,
-                    COUNT(processing_duration_seconds) AS timed
-             FROM requests
-             WHERE flow = :flow AND created_at >= :start AND created_at < :end
-             GROUP BY label"
+        $submitted = $pdo->prepare(
+            "SELECT COALESCE(NULLIF({$column}, ''), 'Unspecified') AS label, COUNT(*) AS total
+             FROM requests WHERE flow = :flow AND created_at >= :start AND created_at < :end GROUP BY label"
         );
-        $stmt->execute(['flow' => $flow] + $range);
-        foreach ($stmt->fetchAll() as $row) {
-            $rows[$row['label']] = [
-                'label' => $row['label'],
-                'total' => (int) $row['total'],
-                'completed' => (int) $row['completed'],
-                'avgProcessingSeconds' => $row['avg_seconds'] === null ? null : (int) round((float) $row['avg_seconds']),
-                'timedCount' => (int) $row['timed'],
-            ];
+        $submitted->execute(['flow' => $flow] + $range);
+        foreach ($submitted->fetchAll() as $row) {
+            $rows[$row['label']] ??= ['label' => $row['label']] + $blank;
+            $rows[$row['label']]['total'] = (int) $row['total'];
+        }
+        $done = $pdo->prepare(
+            "SELECT COALESCE(NULLIF({$column}, ''), 'Unspecified') AS label, COUNT(*) AS completed,
+                    COUNT({$duration}) AS timed, MIN({$duration}) AS fastest, MAX({$duration}) AS slowest, AVG({$duration}) AS avg_seconds
+             FROM requests WHERE flow = :flow AND {$completedRange} GROUP BY label"
+        );
+        $done->execute(['flow' => $flow] + $cRange);
+        foreach ($done->fetchAll() as $row) {
+            $rows[$row['label']] ??= ['label' => $row['label']] + $blank;
+            $rows[$row['label']]['completed'] = (int) $row['completed'];
+            $rows[$row['label']]['timedCount'] = (int) $row['timed'];
+            $rows[$row['label']]['fastestSeconds'] = $row['fastest'] === null ? null : (int) $row['fastest'];
+            $rows[$row['label']]['slowestSeconds'] = $row['slowest'] === null ? null : (int) $row['slowest'];
+            $rows[$row['label']]['avgProcessingSeconds'] = $row['avg_seconds'] === null ? null : (int) round((float) $row['avg_seconds']);
         }
         $rows = array_values($rows);
-        usort($rows, static fn ($a, $b) => [$b['total'], $a['label']] <=> [$a['total'], $b['label']]);
-        $total = ['label' => 'Total', 'total' => 0, 'completed' => 0, 'avgProcessingSeconds' => null, 'timedCount' => 0];
+        usort($rows, static fn ($a, $b) => [$b['total'] + $b['completed'], $a['label']] <=> [$a['total'] + $a['completed'], $b['label']]);
+        $total = ['label' => 'Total'] + $blank;
         $secondsSum = 0;
-        foreach ($rows as &$row) {
-            $row['completionRate'] = $row['total'] > 0 ? round($row['completed'] / $row['total'] * 100) : null;
+        foreach ($rows as $row) {
             $total['total'] += $row['total'];
             $total['completed'] += $row['completed'];
             $total['timedCount'] += $row['timedCount'];
             $secondsSum += ($row['avgProcessingSeconds'] ?? 0) * $row['timedCount'];
+            if ($row['fastestSeconds'] !== null) {
+                $total['fastestSeconds'] = $total['fastestSeconds'] === null ? $row['fastestSeconds'] : min($total['fastestSeconds'], $row['fastestSeconds']);
+            }
+            if ($row['slowestSeconds'] !== null) {
+                $total['slowestSeconds'] = $total['slowestSeconds'] === null ? $row['slowestSeconds'] : max($total['slowestSeconds'], $row['slowestSeconds']);
+            }
         }
-        unset($row);
         $total['avgProcessingSeconds'] = $total['timedCount'] > 0 ? (int) round($secondsSum / $total['timedCount']) : null;
-        $total['completionRate'] = $total['total'] > 0 ? round($total['completed'] / $total['total'] * 100) : null;
         return ['rows' => $rows, 'total' => $total];
     };
+
+    // Staff performance: requests whose processing the staff member completed
+    // this month (processing_staff_id is set when they accept, and only they
+    // can complete it). Active staff with no completions are listed with 0.
+    $staffRows = [];
+    foreach ($pdo->query(
+        "SELECT u.id, u.name FROM users u JOIN roles r ON r.id = u.role_id
+         WHERE r.name = 'STAFF' AND u.status = 'Active' AND u.archived_at IS NULL AND u.deleted_at IS NULL ORDER BY u.name"
+    )->fetchAll() as $u) {
+        $staffRows[(int) $u['id']] = ['staffId' => (int) $u['id'], 'name' => (string) $u['name'], 'documents' => 0, 'landTransfers' => 0,
+            'completed' => 0, 'timedCount' => 0, 'avgProcessingSeconds' => null, 'fastestSeconds' => null, 'slowestSeconds' => null];
+    }
+    $perf = $pdo->prepare(
+        "SELECT r.processing_staff_id AS staff_id,
+                COALESCE(MAX(u.name), MAX(r.processing_staff_name), CONCAT('Staff account #', r.processing_staff_id)) AS name,
+                SUM(r.flow = 'docreq') AS documents, SUM(r.flow = 'landtransfer') AS land_transfers, COUNT(*) AS completed,
+                COUNT({$duration}) AS timed, AVG({$duration}) AS avg_seconds, MIN({$duration}) AS fastest, MAX({$duration}) AS slowest
+         FROM requests r LEFT JOIN users u ON u.id = r.processing_staff_id
+         WHERE r.processing_staff_id IS NOT NULL AND r.processing_completed_at >= :cstart AND r.processing_completed_at < :cend
+         GROUP BY r.processing_staff_id"
+    );
+    $perf->execute($cRange);
+    foreach ($perf->fetchAll() as $row) {
+        $staffRows[(int) $row['staff_id']] = [
+            'staffId' => (int) $row['staff_id'],
+            'name' => (string) $row['name'],
+            'documents' => (int) $row['documents'],
+            'landTransfers' => (int) $row['land_transfers'],
+            'completed' => (int) $row['completed'],
+            'timedCount' => (int) $row['timed'],
+            'avgProcessingSeconds' => $row['avg_seconds'] === null ? null : (int) round((float) $row['avg_seconds']),
+            'fastestSeconds' => $row['fastest'] === null ? null : (int) $row['fastest'],
+            'slowestSeconds' => $row['slowest'] === null ? null : (int) $row['slowest'],
+        ];
+    }
+    $staffRows = array_values($staffRows);
+    usort($staffRows, static fn ($a, $b) => [$b['completed'], $a['name']] <=> [$a['completed'], $b['name']]);
 
     $list = $pdo->prepare(
         "SELECT reference_no, flow, TRIM(CONCAT_WS(' ', first_name, last_name)) AS client,
@@ -2032,12 +2083,14 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
         'label' => $start->format('F Y'),
         'from' => $start->format('Y-m-d'),
         'to' => $end->modify('-1 day')->format('Y-m-d'),
-        'years' => range(min($firstYear, $year), max((int) $now->format('Y'), $year)),
+        // Past years with data, the current year, and five future years.
+        'years' => range(min($firstYear, $year, (int) $now->format('Y')), max((int) $now->format('Y') + 5, $year)),
         'cards' => $counts($start, $end),
         'previousCards' => $counts($prevStart, $start),
         'daily' => array_values($daily),
         'documentSummary' => $summary('docreq', 'document_type'),
         'landSummary' => $summary('landtransfer', 'transfer_type'),
+        'staffPerformance' => $staffRows,
         'requests' => $requests,
         'generatedAt' => sa_manila_now(),
     ];
