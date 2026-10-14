@@ -517,6 +517,7 @@ function sa_submit_request(array $data): array
         'arp_number' => [60, true],
         'property_address' => [255, false],
         'barangay' => [100, true],
+        'requester_barangay' => [100, false],
     ];
     $values = [];
     foreach ($fields as $key => [$limit, $required]) {
@@ -526,6 +527,12 @@ function sa_submit_request(array $data): array
     $values['city'] = $values['city'] ?? 'Mabini';
     $values['purpose'] ??= $flow === 'landtransfer' ? 'Land Transfer' : null;
     $values['property_address'] ??= 'Barangay ' . $values['barangay'] . ' - ARP ' . $values['arp_number'];
+    // The requester may file for another owner, so their own barangay is kept
+    // with their address; `barangay` stays the PROPERTY's barangay.
+    if (!empty($values['requester_barangay']) &&
+        stripos((string) $values['address_line'], (string) $values['requester_barangay']) === false) {
+        $values['address_line'] = mb_substr($values['address_line'] . ', Barangay ' . $values['requester_barangay'], 0, 255);
+    }
     if ($values['purpose'] === null) {
         throw new SaHttpException(422);
     }
