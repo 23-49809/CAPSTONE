@@ -805,9 +805,26 @@ function renderRequirementsModal(){
   + '</div></div>';
 }
 
+/* Client announcements expire at expiresAt (sent by the server from stored
+   timestamps: the earlier of "Visible until" and 24 hours after publishing,
+   Asia/Manila). The server already omits expired ones; this also hides one
+   that expires while the page stays open. */
+function announcementTime(v){
+  if(!v) return null;
+  const str = String(v);
+  const d = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(str) ? new Date(str.replace(' ','T')+(str.length===16?':00':'')+'+08:00') : new Date(str);
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+function announcementIsVisible(a){
+  if(a.status!=='Published') return false;
+  const now = Date.now(), pub = announcementTime(a.publishedAt);
+  if(pub && pub > now) return false;
+  const exp = announcementTime(a.expiresAt) || (pub ? pub + 24*3600000 : null);
+  return exp==null || exp > now;
+}
 function currentPublicAnnouncement(){
   const announcements = Array.isArray(state.announcements) ? state.announcements : [];
-  return announcements.find(function(announcement){ return announcement.status==='Published'; }) || null;
+  return announcements.find(announcementIsVisible) || null;
 }
 function renderAnnouncementModal(){
   if(!state.announcementModal) return '';
