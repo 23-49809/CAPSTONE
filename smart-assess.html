@@ -831,8 +831,7 @@ function renderRequirementsModal(){
 }
 
 /* Client announcements expire at expiresAt (sent by the server from stored
-   timestamps: the earlier of "Visible until" and 24 hours after publishing,
-   Asia/Manila). The server already omits expired ones; this also hides one
+   timestamps: 24 hours after the announcement went live, Asia/Manila). The server already omits expired ones; this also hides one
    that expires while the page stays open. */
 function announcementTime(v){
   if(!v) return null;
