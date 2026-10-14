@@ -928,62 +928,57 @@
      (srPrintAllRequests). It lives outside #app, is hidden on screen, and
      while printing it is the only thing shown. Paper size and page-number
      margin boxes are injected as a temporary <style> during that print, so
-     no other page's print layout changes. */
+     no other page's print layout changes. Rules are scoped under the id so
+     the dashboard's table/heading styles cannot leak in. */
   #sr-print-all{ display:none; }
   @media print{
     body.printing-allreq{ background:#fff !important; }
     body.printing-allreq > *:not(#sr-print-all){ display:none !important; }
     body.printing-allreq #sr-print-all{ display:block; }
   }
-  #sr-print-all .rp{ color:#000; background:#fff; font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; font-size:9.5pt; line-height:1.35;
+  #sr-print-all .rp{ color:#000; background:#fff; font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; font-size:10pt; line-height:1.4;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   #sr-print-all .rp *{ box-sizing:border-box; }
-  #sr-print-all .rp-head{ display:grid; grid-template-columns:22mm 1fr 22mm; align-items:center; gap:4mm; padding-bottom:3mm; border-bottom:1.6pt solid #000; }
-  #sr-print-all .rp-seal{ width:21mm; height:21mm; object-fit:contain; }
-  #sr-print-all .rp-gov{ text-align:center; font-family:"Times New Roman", Times, serif; font-size:10.5pt; line-height:1.3; }
-  #sr-print-all .rp-gov .rp-office{ font-size:13pt; font-weight:700; letter-spacing:.04em; margin-top:1mm; }
-  #sr-print-all .rp-gov .rp-system{ font-size:9pt; letter-spacing:.14em; margin-top:.5mm; }
-  #sr-print-all .rp-rule{ border-top:.5pt solid #000; margin-top:.8mm; }
-  #sr-print-all .rp-title{ margin:5mm 0 1mm; text-align:center; font-family:"Times New Roman", Times, serif; font-size:15pt; font-weight:700; letter-spacing:.06em; }
-  #sr-print-all .rp-subtitle{ text-align:center; font-size:10pt; margin-bottom:4mm; }
-  #sr-print-all .rp-meta{ width:100%; border-collapse:collapse; margin-bottom:4mm; font-size:9.5pt; }
-  #sr-print-all .rp-meta th, #sr-print-all .rp-meta td{ border:.5pt solid #9a9a9a; padding:1.4mm 2.4mm; text-align:left; vertical-align:top; }
-  #sr-print-all .rp-meta th{ width:34mm; background:#efefef; font-weight:700; }
-  #sr-print-all .rp h2{ margin:4mm 0 1.6mm; font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; color:#000; font-size:10pt; font-weight:700; text-transform:uppercase; letter-spacing:.05em; break-after:avoid; page-break-after:avoid; }
-  #sr-print-all .rp-section{ break-inside:avoid; page-break-inside:avoid; }
-  #sr-print-all .rp-grid{ display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:6mm; align-items:start; }
-  #sr-print-all .rp-table{ width:100%; border-collapse:collapse; font-size:9pt; }
-  #sr-print-all .rp-table th, #sr-print-all .rp-table td{ border:.5pt solid #9a9a9a; padding:1.3mm 2mm; vertical-align:top; overflow-wrap:anywhere; word-break:break-word; }
-  #sr-print-all .rp-table thead th{ background:#e2e2e2; font-weight:700; text-align:left; vertical-align:bottom; }
+  #sr-print-all .rp-head{ display:grid; grid-template-columns:18mm 1fr 18mm; align-items:center; gap:4mm; padding-bottom:3mm; border-bottom:1.5pt solid #000; }
+  #sr-print-all .rp-seal{ width:17mm; height:17mm; object-fit:contain; }
+  #sr-print-all .rp-office{ text-align:center; font-family:"Times New Roman", Times, serif; font-size:15pt; font-weight:700; letter-spacing:.05em; }
+  #sr-print-all .rp-office-sub{ text-align:center; font-size:8.5pt; letter-spacing:.12em; margin-top:.8mm; }
+  #sr-print-all .rp-title{ margin:6mm 0 1mm; text-align:center; font-family:"Times New Roman", Times, serif; font-size:14pt; font-weight:700; letter-spacing:.06em; }
+  #sr-print-all .rp-period{ text-align:center; font-size:11pt; font-weight:700; }
+  #sr-print-all .rp-generated{ text-align:center; font-size:9pt; margin-top:1mm; }
+  #sr-print-all .rp-notice{ margin:5mm 0 0; padding:2.5mm 3mm; border:.75pt solid #000; text-align:center; font-weight:700; }
+  #sr-print-all .rp h2{ margin:7mm 0 1.2mm; font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; color:#000; font-size:10.5pt; font-weight:700;
+    text-transform:uppercase; letter-spacing:.04em; break-after:avoid; page-break-after:avoid; }
+  #sr-print-all .rp-stats{ margin:0 0 2mm; font-size:9pt; break-after:avoid; page-break-after:avoid; }
+  #sr-print-all .rp-stats b{ font-weight:700; }
+  #sr-print-all .rp-table{ width:100%; border-collapse:collapse; table-layout:fixed; min-width:0; }
   #sr-print-all .rp-table thead{ display:table-header-group; }
   #sr-print-all .rp-table tfoot{ display:table-row-group; }
   #sr-print-all .rp-table tr{ break-inside:avoid; page-break-inside:avoid; }
-  #sr-print-all .rp-table tbody tr:nth-child(even) td{ background:#f4f4f4; }
-  #sr-print-all .rp-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #sr-print-all .rp-table th, #sr-print-all .rp-table td{ font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; font-size:9pt; color:#000;
+    text-transform:none; letter-spacing:0; white-space:normal; line-height:1.3; padding:1.4mm 2mm; border:.5pt solid #000;
+    vertical-align:top; overflow-wrap:anywhere; word-break:break-word; }
+  #sr-print-all .rp-table thead th{ background:#e6e6e6; font-weight:700; text-align:left; vertical-align:bottom; }
+  #sr-print-all .rp-table thead th.num{ text-align:right; }
+  #sr-print-all .rp-table .num{ text-align:right; font-variant-numeric:tabular-nums; }
   #sr-print-all .rp-table .ctr{ text-align:center; }
-  #sr-print-all .rp-table .nowrap{ white-space:nowrap; }
-  #sr-print-all .rp-table .rp-total td{ font-weight:700; background:#e9e9e9 !important; border-top:1pt solid #000; }
-  #sr-print-all .rp-table .rp-empty{ text-align:center; padding:6mm 2mm; font-style:italic; }
-  #sr-print-all .rp-list col.c-no{ width:9mm; } #sr-print-all .rp-list col.c-ref{ width:30mm; } #sr-print-all .rp-list col.c-client{ width:40mm; }
-  #sr-print-all .rp-list col.c-req{ width:29mm; } #sr-print-all .rp-list col.c-type{ width:auto; } #sr-print-all .rp-list col.c-date{ width:36mm; }
-  #sr-print-all .rp-list col.c-status{ width:25mm; } #sr-print-all .rp-list col.c-time{ width:21mm; } #sr-print-all .rp-list col.c-staff{ width:34mm; }
-  #sr-print-all .rp-note{ margin-top:2mm; font-size:8.5pt; }
-  #sr-print-all .rp-closing{ margin-top:8mm; break-inside:avoid; page-break-inside:avoid; }
-  #sr-print-all .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:18mm; }
-  #sr-print-all .rp-sign-label{ font-size:9.5pt; margin-bottom:12mm; }
-  #sr-print-all .rp-sign-line{ border-top:.8pt solid #000; padding-top:1mm; text-align:center; font-size:9pt; }
-  #sr-print-all .rp-sign-role{ text-align:center; font-size:9pt; font-weight:700; margin-top:.6mm; }
-  #sr-print-all .rp-sign-date{ margin-top:6mm; font-size:9pt; display:flex; gap:2mm; align-items:flex-end; }
-  #sr-print-all .rp-sign-date span{ flex:1; border-bottom:.8pt solid #000; height:4mm; }
-  #sr-print-all .rp-end{ margin-top:5mm; text-align:center; font-size:8.5pt; letter-spacing:.08em; }
-  #sr-print-all .rp-table, #sr-print-all .rp-meta{ table-layout:auto; min-width:0; }
-  #sr-print-all .rp-list{ table-layout:fixed; }
-  #sr-print-all .rp-table th, #sr-print-all .rp-table td, #sr-print-all .rp-meta th, #sr-print-all .rp-meta td{ font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; color:#000; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.3; }
-  #sr-print-all .rp-table th, #sr-print-all .rp-table td{ font-size:8.5pt; padding:1.1mm 1.8mm; border:.5pt solid #8c8c8c; }
-  #sr-print-all .rp-meta th, #sr-print-all .rp-meta td{ font-size:9pt; padding:1.2mm 2.2mm; border:.5pt solid #8c8c8c; }
-  #sr-print-all .rp-table .nowrap, #sr-print-all .rp-table .num{ white-space:nowrap; }
   #sr-print-all .rp-table tbody tr:hover{ background:none; }
-  #sr-print-all .rp-table thead th.num{ text-align:right; white-space:normal; }
+  #sr-print-all .rp-table .rp-total td{ font-weight:700; background:#f0f0f0; border-top:1pt solid #000; }
+  #sr-print-all .rp-table .rp-top td{ font-weight:700; background:#f0f0f0; }
+  #sr-print-all .rp-table .rp-empty{ text-align:center; font-style:italic; padding:4mm 2mm; }
+  #sr-print-all .rp-sum col.c1{ width:auto; } #sr-print-all .rp-sum col.cn{ width:24mm; } #sr-print-all .rp-sum col.ct{ width:31mm; }
+  #sr-print-all .rp-staff col.cr{ width:12mm; } #sr-print-all .rp-staff col.c1{ width:auto; } #sr-print-all .rp-staff col.cn{ width:24mm; } #sr-print-all .rp-staff col.ct{ width:30mm; }
+  #sr-print-all .rp-badge{ display:inline-block; margin-left:1.5mm; padding:0 1.4mm; border:.6pt solid #000; font-size:7pt; font-weight:700; letter-spacing:.04em; text-transform:uppercase; vertical-align:1px; }
+  #sr-print-all .rp-top-line{ margin:0 0 2mm; padding:2mm 3mm; border-left:2pt solid #000; background:#f3f3f3; break-after:avoid; page-break-after:avoid; }
+  #sr-print-all .rp-note{ margin:1.6mm 0 0; font-size:8pt; line-height:1.35; }
+  #sr-print-all .rp-section{ break-inside:avoid; page-break-inside:avoid; }
+  #sr-print-all .rp-closing{ margin-top:12mm; break-inside:avoid; page-break-inside:avoid; }
+  #sr-print-all .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:16mm; }
+  #sr-print-all .rp-sign-label{ font-size:9.5pt; font-weight:700; margin-bottom:12mm; }
+  #sr-print-all .rp-sign-line{ border-top:.8pt solid #000; padding-top:1mm; text-align:center; font-size:8.5pt; }
+  #sr-print-all .rp-sign-field{ display:flex; gap:2mm; align-items:flex-end; margin-top:5mm; font-size:9pt; }
+  #sr-print-all .rp-sign-field span{ flex:1; border-bottom:.8pt solid #000; min-height:4.5mm; text-align:center; font-size:9pt; }
+  #sr-print-all .rp-end{ margin-top:7mm; text-align:center; font-size:8pt; letter-spacing:.08em; }
 
   /* ============ Dropdowns (shared) ============
      One rule for every native single-select: a drawn chevron 14px from the
@@ -1954,61 +1949,103 @@ function srStaffCard(rows){
 }
 
 /* ---- All Requests: formal printed report ----
-   Uses only the loaded monthly report data (d.requests / d.cards come from
-   the database via head_monthly_report). Names are never invented: the
-   signature lines are blank for the signatories to fill in by hand. */
+   Monthly Request Summary Report for the month/year selected on the Reports
+   page. Every figure comes from the loaded report data (head_monthly_report,
+   i.e. the same database results the page shows): documentSummary,
+   landSummary and staffPerformance. Signature lines are left blank. */
+
+/* Rank staff for the selected month: most completed requests first; equal
+   counts are separated by the faster average processing time (seconds, so
+   two averages that round to the same label are still compared exactly).
+   Staff with no valid recorded time rank after those with one at the same
+   count. Identical results share a rank (1, 1, 3, …). Staff who completed
+   nothing in the period are not ranked. */
+function srRankStaff(rows){
+  var key = function(r){ return r.avgProcessingSeconds==null ? Infinity : Number(r.avgProcessingSeconds); };
+  var ranked = (rows||[]).filter(function(r){ return Number(r.completed) > 0; })
+    .map(function(r){ return Object.assign({}, r, {completed:Number(r.completed)}); })
+    .sort(function(a,b){ return b.completed-a.completed || key(a)-key(b) || String(a.name).localeCompare(String(b.name)); });
+  ranked.forEach(function(r, i){
+    var prev = ranked[i-1];
+    r.rank = (prev && prev.completed===r.completed && key(prev)===key(r)) ? prev.rank : i+1;
+  });
+  return ranked;
+}
+/* Exact duration for the ranking table, e.g. "2 hrs 14 min", "3 days 4 hrs". */
+function srExactDuration(seconds){
+  if(seconds==null || !isFinite(seconds)) return '—';
+  var s = Math.max(0, Math.round(Number(seconds)));
+  var d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60), sec = s%60;
+  var unit = function(n, w){ return n+' '+w+(n===1?'':'s'); };
+  if(d) return unit(d,'day')+(h?' '+unit(h,'hr'):'');
+  if(h) return unit(h,'hr')+(m?' '+m+' min':'');
+  if(m) return m+' min'+(sec?' '+sec+' sec':'');
+  return sec+' sec';
+}
 function srPrintAllRequestsHtml(d, acct){
-  var reqs = d.requests || [];
-  var kindLabel = {doc:'Document Request', land:'Land Transfer'};
-  var stamp = function(v){ var x = phPartsFromStored(String(v||'')); return x.date ? phFormatDate(x.date)+', '+phFormatTime(x.time) : '—'; };
+  var t = function(sec){ return sec==null ? '—' : srHumanDuration(sec); };
   var gen = phPartsFromStored(String(d.generatedAt||'')); if(!gen.date) gen = phNowParts();
-  var total = reqs.length;
-  var pct = function(n){ return total ? (Math.round(n/total*1000)/10).toFixed(1)+'%' : '0.0%'; };
-  // Status counts from the actual records: the standard statuses first (zero
-  // rows included so the summary is complete), then any other stored value.
-  var counts = {};
-  reqs.forEach(function(r){ var k = r.status || 'Unspecified'; counts[k] = (counts[k]||0) + 1; });
-  var statuses = STATUS_ORDER.concat(Object.keys(counts).filter(function(k){ return STATUS_ORDER.indexOf(k)<0; }).sort());
-  var byKind = function(kind, status){ return reqs.filter(function(r){ return r.kind===kind && (!status || (r.status||'Unspecified')===status); }).length; };
-  var statusRows = statuses.map(function(st){
-    return '<tr><td>'+esc(st)+'</td><td class="num">'+byKind('doc', st)+'</td><td class="num">'+byKind('land', st)+'</td><td class="num">'+(counts[st]||0)+'</td><td class="num">'+pct(counts[st]||0)+'</td></tr>';
-  }).join('');
-  var docTotal = byKind('doc'), landTotal = byKind('land');
   var period = d.label+' ('+phFormatDate(d.from)+' – '+phFormatDate(d.to)+')';
-  var listRows = total ? reqs.map(function(r, i){
-    return '<tr><td class="num">'+(i+1)+'</td><td class="nowrap">'+esc(r.id||'—')+'</td><td>'+esc(r.client||'—')+'</td>'
-      + '<td class="nowrap">'+esc(kindLabel[r.kind]||'—')+'</td><td>'+esc(r.type||'—')+'</td><td class="nowrap">'+esc(stamp(r.submitted))+'</td>'
-      + '<td>'+esc(r.status||'—')+'</td><td class="num">'+esc(r.processingSeconds==null ? '—' : srHumanDuration(r.processingSeconds))+'</td>'
-      + '<td>'+esc(r.assignedTo||'—')+'</td></tr>';
-  }).join('') : '<tr><td colspan="9" class="rp-empty">No requests were submitted during '+esc(d.label)+'.</td></tr>';
+  var cards = d.cards || {documents:0, landTransfers:0, total:0};
+  var docSum = d.documentSummary || {rows:[], total:{}}, landSum = d.landSummary || {rows:[], total:{}};
+  var nothing = !cards.total && !Number(docSum.total.completed||0) && !Number(landSum.total.completed||0);
+
+  // Same columns as the on-screen summary tables.
+  var summary = function(title, firstCol, sum, submittedCount, emptyText){
+    var tot = sum.total || {};
+    var row = function(r, isTotal){
+      return '<tr'+(isTotal?' class="rp-total"':'')+'><td>'+esc(r.label)+'</td><td class="num">'+(r.total||0)+'</td><td class="num">'+(r.completed||0)+'</td>'
+        + '<td class="num">'+esc(t(r.fastestSeconds))+'</td><td class="num">'+esc(t(r.slowestSeconds))+'</td></tr>';
+    };
+    return '<section class="rp-block"><h2>'+esc(title)+'</h2>'
+      + '<p class="rp-stats">Requests submitted: <b>'+submittedCount+'</b> &nbsp;·&nbsp; Completed: <b>'+(tot.completed||0)+'</b>'
+        + ' &nbsp;·&nbsp; Average processing time: <b>'+esc(t(tot.avgProcessingSeconds))+'</b></p>'
+      + '<table class="rp-table rp-sum"><colgroup><col class="c1"><col class="cn"><col class="cn"><col class="ct"><col class="ct"></colgroup>'
+      + '<thead><tr><th>'+esc(firstCol)+'</th><th class="num">Total Requests</th><th class="num">Completed</th><th class="num">Fastest Processing Time</th><th class="num">Slowest Processing Time</th></tr></thead>'
+      + '<tbody>'+((sum.rows||[]).length ? sum.rows.map(function(r){ return row(r,false); }).join('') : '<tr><td colspan="5" class="rp-empty">'+esc(emptyText)+'</td></tr>')+'</tbody>'
+      + '<tfoot>'+row(Object.assign({}, tot, {label:'Total'}), true)+'</tfoot></table></section>';
+  };
+
+  var ranked = srRankStaff(d.staffPerformance);
+  var tops = ranked.filter(function(r){ return r.rank===1; });
+  var staffBlock = '<section class="rp-block"><h2>Top Performing Staff</h2>';
+  if(!tops.length){
+    staffBlock += '<p class="rp-top-line">No staff member completed a request during '+esc(d.label)+', so no top performer can be identified for this period.</p>';
+  } else {
+    var names = tops.map(function(r){ return esc(r.name); });
+    var joined = names.length===1 ? names[0] : names.slice(0,-1).join(', ')+' and '+names[names.length-1];
+    staffBlock += '<p class="rp-top-line"><b>'+(tops.length>1 ? 'Top performers (tied): ' : 'Top performer: ')+joined+'</b> — '
+      + tops[0].completed+' completed request'+(tops[0].completed===1?'':'s')
+      + (tops[0].avgProcessingSeconds==null ? ', no recorded processing time' : ', average processing time '+esc(srExactDuration(tops[0].avgProcessingSeconds)))+'.</p>'
+      + '<table class="rp-table rp-staff"><colgroup><col class="cr"><col class="c1"><col class="cn"><col class="cn"><col class="cn"><col class="ct"></colgroup>'
+      + '<thead><tr><th class="ctr">Rank</th><th>Staff Name</th><th class="num">Document Requests Processed</th><th class="num">Land Transfers Processed</th><th class="num">Total Requests Completed</th><th class="num">Average Processing Time</th></tr></thead><tbody>'
+      + ranked.map(function(r){
+          return '<tr'+(r.rank===1?' class="rp-top"':'')+'><td class="ctr">'+r.rank+'</td><td>'+esc(r.name)+(r.rank===1?'<span class="rp-badge">Top performer</span>':'')+'</td>'
+            + '<td class="num">'+(r.documents||0)+'</td><td class="num">'+(r.landTransfers||0)+'</td><td class="num">'+r.completed+'</td>'
+            + '<td class="num">'+esc(srExactDuration(r.avgProcessingSeconds))+'</td></tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+  staffBlock += '<p class="rp-note">Ranking basis: requests whose processing the staff member completed between '+esc(phFormatDate(d.from))+' and '+esc(phFormatDate(d.to))
+    + ', ranked first by total requests completed, then by the faster average processing time when totals are equal. Averages use only valid recorded processing durations; '
+    + 'staff with identical results share a rank. Staff with no completed requests in this period are not ranked.</p></section>';
+
   return '<div class="rp">'
     + '<header class="rp-head"><img class="rp-seal" src="data:image/png;base64,'+LOGO_B64+'" alt="Municipality of Mabini seal">'
-      + '<div class="rp-gov"><div>Republic of the Philippines</div><div>Province of Batangas</div><div>Municipality of Mabini</div>'
-      + '<div class="rp-office">OFFICE OF THE MUNICIPAL ASSESSOR</div><div class="rp-rule"></div><div class="rp-system">SMART ASSESS · Assessor’s Office System</div></div><div></div></header>'
-    + '<div class="rp-title">ALL REQUESTS SUMMARY REPORT</div>'
-    + '<div class="rp-subtitle">For the month of '+esc(d.label)+'</div>'
-    + '<table class="rp-meta"><tbody>'
-      + '<tr><th>Reporting Period</th><td>'+esc(period)+'</td><th>Total Requests</th><td><strong>'+total+'</strong></td></tr>'
-      + '<tr><th>Date Generated</th><td>'+esc(phFormatDate(gen.date)+', '+phFormatTime(gen.time))+' (Philippine Time)</td><th>Generated By</th><td>'+esc(acct ? acct.fullName : '—')+'</td></tr>'
-    + '</tbody></table>'
-    + '<div class="rp-grid">'
-      + '<section class="rp-section"><h2>Summary by Status</h2><table class="rp-table"><thead><tr><th>Status</th><th class="num">Document Requests</th><th class="num">Land Transfers</th><th class="num">Total</th><th class="num">Share</th></tr></thead><tbody>'
-        + statusRows + '</tbody><tfoot><tr class="rp-total"><td>Total</td><td class="num">'+docTotal+'</td><td class="num">'+landTotal+'</td><td class="num">'+total+'</td><td class="num">'+(total?'100.0%':'0.0%')+'</td></tr></tfoot></table></section>'
-      + '<section class="rp-section"><h2>Summary by Request Type</h2><table class="rp-table"><thead><tr><th>Request Type</th><th class="num">Requests</th><th class="num">Share</th></tr></thead><tbody>'
-        + '<tr><td>Document Requests</td><td class="num">'+docTotal+'</td><td class="num">'+pct(docTotal)+'</td></tr>'
-        + '<tr><td>Land Transfers</td><td class="num">'+landTotal+'</td><td class="num">'+pct(landTotal)+'</td></tr>'
-        + '</tbody><tfoot><tr class="rp-total"><td>Total</td><td class="num">'+total+'</td><td class="num">'+(total?'100.0%':'0.0%')+'</td></tr></tfoot></table></section>'
-    + '</div>'
-    + '<h2>List of Requests</h2>'
-    + '<table class="rp-table rp-list"><colgroup><col class="c-no"><col class="c-ref"><col class="c-client"><col class="c-req"><col class="c-type"><col class="c-date"><col class="c-status"><col class="c-time"><col class="c-staff"></colgroup>'
-      + '<thead><tr><th class="num">No.</th><th>Reference No.</th><th>Client Name</th><th>Request Type</th><th>Document / Transfer Type</th><th>Date Submitted</th><th>Status</th><th class="num">Processing Time</th><th>Processed By</th></tr></thead>'
-      + '<tbody>'+listRows+'</tbody></table>'
-    + '<p class="rp-note">Covers all requests submitted from '+esc(phFormatDate(d.from))+' to '+esc(phFormatDate(d.to))+', listed newest first. Processing time is shown only for requests with a recorded processing duration.</p>'
+      + '<div><div class="rp-office">ASSESSOR’S OFFICE OF MABINI</div><div class="rp-office-sub">SMART ASSESS · Assessor’s Office System</div></div><div></div></header>'
+    + '<div class="rp-title">MONTHLY REQUEST SUMMARY REPORT</div>'
+    + '<div class="rp-period">'+esc(period)+'</div>'
+    + '<div class="rp-generated">Date generated: '+esc(phFormatDate(gen.date)+', '+phFormatTime(gen.time))+' (Philippine Time)</div>'
+    + (nothing ? '<p class="rp-notice">No requests were recorded during '+esc(d.label)+'.</p>' : '')
+    + summary('Document Request Summary', 'Report Title', docSum, cards.documents||0, 'No document request categories recorded.')
+    + summary('Land Transfer Summary', 'Report Type', landSum, cards.landTransfers||0, 'No land transfer categories recorded.')
+    + staffBlock
     + '<div class="rp-closing"><div class="rp-sign">'
-      + '<div><div class="rp-sign-label">Prepared by:</div><div class="rp-sign-line">Signature over Printed Name</div><div class="rp-sign-role">Authorized Reporting Staff</div><div class="rp-sign-date">Date:<span></span></div></div>'
-      + '<div><div class="rp-sign-label">Reviewed and noted by:</div><div class="rp-sign-line">Signature over Printed Name</div><div class="rp-sign-role">Municipal Assessor / Department Head</div><div class="rp-sign-date">Date:<span></span></div></div>'
-    + '</div>'
-    + '<div class="rp-end">— END OF REPORT —</div></div>'
+      + '<div><div class="rp-sign-label">Prepared by:</div><div class="rp-sign-line">Signature over Printed Name</div>'
+        + '<div class="rp-sign-field">Position:<span></span></div><div class="rp-sign-field">Date:<span></span></div></div>'
+      + '<div><div class="rp-sign-label">Noted by:</div><div class="rp-sign-line">Signature over Printed Name</div>'
+        + '<div class="rp-sign-field">Position:<span>Municipal Assessor</span></div><div class="rp-sign-field">Date:<span></span></div></div>'
+    + '</div><div class="rp-end">— END OF REPORT —</div></div>'
   + '</div>';
 }
 function srPrintAllRequests(d, acct){
@@ -2019,20 +2056,19 @@ function srPrintAllRequests(d, acct){
   host.innerHTML = srPrintAllRequestsHtml(d, acct);
   document.body.appendChild(host);
   // Paper size and footer only exist for this print. Chrome/Edge fill the
-  // margin boxes; browsers without them still get the in-page report.
+  // margin boxes; claiming the top boxes keeps the browser's own date/title
+  // header ("Headers and footers" in the print dialog) off the report.
   var page = document.createElement('style');
   page.id = 'sr-print-page';
-  var foot = 'SMART ASSESS · All Requests Summary Report · '+d.label;
-  // Claiming the top margin boxes keeps the browser's own date/title header
-  // ("Headers and footers" in the print dialog) off the report.
-  page.textContent = '@page{ size:A4 landscape; margin:14mm 12mm 16mm;'
+  var foot = 'Monthly Request Summary Report · '+d.label;
+  page.textContent = '@page{ size:A4 portrait; margin:16mm 16mm 18mm;'
     + ' @top-left{ content:" "; } @top-center{ content:" "; } @top-right{ content:" "; }'
-    + ' @bottom-left{ content:"For internal use only \\2014  Office of the Municipal Assessor, Mabini"; font:7.5pt Arial, sans-serif; color:#000; }'
+    + ' @bottom-left{ content:"Assessor\\2019s Office of Mabini \\2014  For internal use only"; font:7.5pt Arial, sans-serif; color:#000; }'
     + ' @bottom-center{ content:"'+foot.replace(/["\\]/g,'')+'"; font:7.5pt Arial, sans-serif; color:#000; }'
     + ' @bottom-right{ content:"Page " counter(page) " of " counter(pages); font:7.5pt Arial, sans-serif; color:#000; } }';
   document.head.appendChild(page);
   var prevTitle = document.title;
-  document.title = 'All Requests Summary Report - '+d.label;   // default PDF file name
+  document.title = 'Monthly Request Summary Report - '+d.label;   // default PDF file name
   document.body.classList.add('printing-allreq');
   var done = false;
   var cleanup = function(){
@@ -3458,7 +3494,13 @@ function bindEvents(){
       // All Requests prints the formal report; the other types keep the
       // dashboard print. The browser's print dialog offers "Save as PDF".
       var srp = srState();
-      if(srp.type==='all' && srp.data){ srPrintAllRequests(srp.data, currentAccount()); return; }
+      if(srp.type==='all'){
+        // Print exactly the month/year selected on the page, never a stale one.
+        if(srp.loading || !srp.data || Number(srp.data.month)!==Number(srp.month) || Number(srp.data.year)!==Number(srp.year)){
+          pushToast('The report for the selected month is still loading. Try again in a moment.', 'clock'); return;
+        }
+        srPrintAllRequests(srp.data, currentAccount()); return;
+      }
       document.body.classList.add('printing-sysreport');
       var cleanup = function(){ document.body.classList.remove('printing-sysreport'); window.removeEventListener('afterprint', cleanup); };
       window.addEventListener('afterprint', cleanup);
