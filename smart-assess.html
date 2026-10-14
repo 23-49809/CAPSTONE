@@ -604,7 +604,7 @@ const BARANGAY_CODES = {};
 BARANGAYS.forEach(function(name, i){ BARANGAY_CODES[name] = [String(i+1).padStart(4,'0'), name]; });
 /* Names saved by earlier versions of the form, mapped to the current ones so
    older drafts and records still resolve to the right code. */
-const BARANGAY_ALIASES = {'ANILAO PROPER':'ANILAO P.', 'MALIMATOC-I':'MALIMATOC I', 'MALIMATOC-II':'MALIMATOC II', 'P. LUPA':'PULANG LUPA', 'STO. NINO':'STO NIÑO'};
+const BARANGAY_ALIASES = {'ANILAO P.':'ANILAO PROPER','MALIMATOC-I':'MALIMATOC I', 'MALIMATOC-II':'MALIMATOC II', 'P. LUPA':'PULANG LUPA', 'STO. NINO':'STO NIÑO'};
 function barangayCode(name){ const e = BARANGAY_CODES[BARANGAY_ALIASES[name] || name]; return e ? e[0] : ''; }
 /* The user-entered last segment (up to 5 digits) of a stored ARP. */
 function arpSerial(arp){ const m = String(arp||'').match(/^14-\d{0,4}-?(\d{0,5})$/); return m ? m[1] : String(arp||'').replace(/\D/g,'').slice(-5); }
