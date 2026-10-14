@@ -110,7 +110,6 @@ $page['announcements'] = array_map(static function (array $announcement): array 
         'status' => (string) ($announcement['status'] ?? 'Draft'),
         'scheduledAt' => $announcement['scheduled_at'] ?? null,
         'publishedAt' => $announcement['published_at'] ?? null,
-        'visibleUntil' => $announcement['visible_until'] ?? null,
         'staffExpiresAt' => $announcement['staff_expires_at'] ?? null,
         'clientExpiresAt' => $announcement['client_expires_at'] ?? null,
     ];
