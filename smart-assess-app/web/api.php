@@ -1903,6 +1903,146 @@ function sa_announcement_transition(array $data): array
     return ['announcement_id' => (int) $id, 'status' => $statuses[$transition]];
 }
 
+/** Statuses that count as completed in reports (same rule as the Head dashboard). */
+const SA_REPORT_COMPLETED_STATUSES = ['Approved', 'Out for Release'];
+
+/**
+ * Department Head monthly System Report. Every figure comes from one month of
+ * `requests` (by created_at, Asia/Manila wall time — MySQL's clock and the
+ * stored timestamps are Philippine time), so cards, chart and tables agree.
+ */
+function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
+{
+    $now = new DateTimeImmutable('now', sa_schedule_timezone());
+    $month = filter_var($monthIn, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 12]]) ?: (int) $now->format('n');
+    $year = filter_var($yearIn, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2000, 'max_range' => 2100]]) ?: (int) $now->format('Y');
+    $start = (new DateTimeImmutable(sprintf('%04d-%02d-01 00:00:00', $year, $month), sa_schedule_timezone()));
+    $end = $start->modify('first day of next month');
+    $prevStart = $start->modify('first day of previous month');
+    $pdo = sa_db();
+    $completedList = "'" . implode("','", SA_REPORT_COMPLETED_STATUSES) . "'";
+
+    $counts = static function (DateTimeImmutable $from, DateTimeImmutable $to) use ($pdo): array {
+        $stmt = $pdo->prepare(
+            "SELECT SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers,
+                    COUNT(*) AS total, SUM(status = 'Timed Out') AS overdue
+             FROM requests WHERE created_at >= :start AND created_at < :end"
+        );
+        $stmt->execute(['start' => $from->format('Y-m-d H:i:s'), 'end' => $to->format('Y-m-d H:i:s')]);
+        $row = $stmt->fetch() ?: [];
+        return [
+            'documents' => (int) ($row['documents'] ?? 0),
+            'landTransfers' => (int) ($row['land_transfers'] ?? 0),
+            'total' => (int) ($row['total'] ?? 0),
+            'overdue' => (int) ($row['overdue'] ?? 0),
+        ];
+    };
+    $range = ['start' => $start->format('Y-m-d H:i:s'), 'end' => $end->format('Y-m-d H:i:s')];
+
+    $daily = [];
+    for ($d = $start; $d < $end; $d = $d->modify('+1 day')) {
+        $daily[$d->format('Y-m-d')] = ['day' => $d->format('Y-m-d'), 'documents' => 0, 'landTransfers' => 0];
+    }
+    $stmt = $pdo->prepare(
+        "SELECT DATE(created_at) AS day, SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers
+         FROM requests WHERE created_at >= :start AND created_at < :end GROUP BY DATE(created_at)"
+    );
+    $stmt->execute($range);
+    foreach ($stmt->fetchAll() as $row) {
+        if (isset($daily[$row['day']])) {
+            $daily[$row['day']]['documents'] = (int) $row['documents'];
+            $daily[$row['day']]['landTransfers'] = (int) $row['land_transfers'];
+        }
+    }
+
+    // Per-category rows. Categories that exist in the data but have no requests
+    // this month are listed with 0 so the table shape stays stable.
+    $summary = static function (string $flow, string $column) use ($pdo, $range, $completedList): array {
+        $known = $pdo->prepare(
+            "SELECT DISTINCT {$column} AS label FROM requests
+             WHERE flow = :flow AND {$column} IS NOT NULL AND {$column} <> '' ORDER BY label"
+        );
+        $known->execute(['flow' => $flow]);
+        $rows = [];
+        foreach ($known->fetchAll(PDO::FETCH_COLUMN) as $label) {
+            $rows[$label] = ['label' => $label, 'total' => 0, 'completed' => 0, 'avgProcessingSeconds' => null, 'timedCount' => 0];
+        }
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(NULLIF({$column}, ''), 'Unspecified') AS label, COUNT(*) AS total,
+                    SUM(status IN ({$completedList})) AS completed,
+                    AVG(processing_duration_seconds) AS avg_seconds,
+                    COUNT(processing_duration_seconds) AS timed
+             FROM requests
+             WHERE flow = :flow AND created_at >= :start AND created_at < :end
+             GROUP BY label"
+        );
+        $stmt->execute(['flow' => $flow] + $range);
+        foreach ($stmt->fetchAll() as $row) {
+            $rows[$row['label']] = [
+                'label' => $row['label'],
+                'total' => (int) $row['total'],
+                'completed' => (int) $row['completed'],
+                'avgProcessingSeconds' => $row['avg_seconds'] === null ? null : (int) round((float) $row['avg_seconds']),
+                'timedCount' => (int) $row['timed'],
+            ];
+        }
+        $rows = array_values($rows);
+        usort($rows, static fn ($a, $b) => [$b['total'], $a['label']] <=> [$a['total'], $b['label']]);
+        $total = ['label' => 'Total', 'total' => 0, 'completed' => 0, 'avgProcessingSeconds' => null, 'timedCount' => 0];
+        $secondsSum = 0;
+        foreach ($rows as &$row) {
+            $row['completionRate'] = $row['total'] > 0 ? round($row['completed'] / $row['total'] * 100) : null;
+            $total['total'] += $row['total'];
+            $total['completed'] += $row['completed'];
+            $total['timedCount'] += $row['timedCount'];
+            $secondsSum += ($row['avgProcessingSeconds'] ?? 0) * $row['timedCount'];
+        }
+        unset($row);
+        $total['avgProcessingSeconds'] = $total['timedCount'] > 0 ? (int) round($secondsSum / $total['timedCount']) : null;
+        $total['completionRate'] = $total['total'] > 0 ? round($total['completed'] / $total['total'] * 100) : null;
+        return ['rows' => $rows, 'total' => $total];
+    };
+
+    $list = $pdo->prepare(
+        "SELECT reference_no, flow, TRIM(CONCAT_WS(' ', first_name, last_name)) AS client,
+                document_type, transfer_type, status, created_at, processing_duration_seconds,
+                processing_started_at, processing_staff_name
+         FROM requests WHERE created_at >= :start AND created_at < :end
+         ORDER BY created_at DESC, id DESC"
+    );
+    $list->execute($range);
+    $requests = array_map(static fn (array $r): array => [
+        'id' => (string) $r['reference_no'],
+        'kind' => $r['flow'] === 'landtransfer' ? 'land' : 'doc',
+        'client' => (string) $r['client'],
+        'type' => (string) ($r['flow'] === 'landtransfer' ? ($r['transfer_type'] ?? '') : ($r['document_type'] ?? '')),
+        'status' => (string) $r['status'],
+        'submitted' => (string) $r['created_at'],
+        'processingSeconds' => $r['processing_duration_seconds'] === null ? null : (int) $r['processing_duration_seconds'],
+        'processingStartedAt' => $r['processing_started_at'],
+        'assignedTo' => $r['processing_staff_name'],
+    ], $list->fetchAll());
+
+    $bounds = $pdo->query('SELECT YEAR(MIN(created_at)) AS first_year FROM requests')->fetch();
+    $firstYear = (int) ($bounds['first_year'] ?? $now->format('Y')) ?: (int) $now->format('Y');
+
+    return [
+        'month' => $month,
+        'year' => $year,
+        'label' => $start->format('F Y'),
+        'from' => $start->format('Y-m-d'),
+        'to' => $end->modify('-1 day')->format('Y-m-d'),
+        'years' => range(min($firstYear, $year), max((int) $now->format('Y'), $year)),
+        'cards' => $counts($start, $end),
+        'previousCards' => $counts($prevStart, $start),
+        'daily' => array_values($daily),
+        'documentSummary' => $summary('docreq', 'document_type'),
+        'landSummary' => $summary('landtransfer', 'transfer_type'),
+        'requests' => $requests,
+        'generatedAt' => sa_manila_now(),
+    ];
+}
+
 function sa_mark_notification_read(array $data): array
 {
     $client = sa_client_or_fail();
@@ -1925,6 +2065,10 @@ try {
         if ($action === 'internal_bootstrap') {
             sa_internal_or_fail(['STAFF', 'ADMIN', 'DEPARTMENT_HEAD']);
             sa_json_response(['ok' => true, 'data' => sa_internal_bootstrap()]);
+        }
+        if ($action === 'head_monthly_report') {
+            sa_internal_or_fail(['DEPARTMENT_HEAD']);
+            sa_json_response(['ok' => true, 'data' => sa_head_monthly_report($_GET['month'] ?? null, $_GET['year'] ?? null)]);
         }
         if ($action === 'track') {
             $request = sa_track_request((string) ($_GET['ref'] ?? ''));
