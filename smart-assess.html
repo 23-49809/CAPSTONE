@@ -548,7 +548,7 @@ function blankFormData(){
   return {
     firstName:'', lastName:'', middleName:'', contact:'+63', email:'',
     addressLine:'', province:'Batangas', city:'Mabini', zip:'4202',
-    documentType:'', transferType:'', purpose:'', arp:'', barangay:'',
+    documentType:'', transferType:'', purpose:'', arp:'', barangay:'', requesterBarangay:'',
     isOwner:true, files:{}
   };
 }
@@ -637,7 +637,7 @@ function validateStep1(fd, errors){
   if(!fd.email.trim()) errors.email = 'Email address is required.';
   else if(!EMAIL_RE.test(fd.email.trim())) errors.email = 'Enter a valid email address.';
   if(!fd.addressLine.trim()) errors.addressLine = 'House number / street is required.';
-  if(!fd.barangay.trim()) errors.barangay = 'Barangay is required.';
+  if(!String(fd.requesterBarangay||'').trim()) errors.requesterBarangay = 'Barangay is required.';
   if(!fd.province.trim()) errors.province = 'Province is required.';
   if(!fd.city.trim()) errors.city = 'City/Municipality is required.';
   if(!ZIP_RE.test(fd.zip.trim())) errors.zip = 'Zip code must be 4 digits.';
@@ -741,7 +741,7 @@ function submitRequest(){
   validateStep1(fd, errors); validateStep2(state.flow, fd, errors); validateUploads(state.flow, fd, errors);
   if(Object.keys(errors).length){
     state.errors = errors;
-    if(errors.firstName||errors.lastName||errors.contact||errors.email||errors.addressLine||errors.barangay||errors.province||errors.city||errors.zip) state.step=1;
+    if(errors.firstName||errors.lastName||errors.contact||errors.email||errors.addressLine||errors.requesterBarangay||errors.province||errors.city||errors.zip) state.step=1;
     else if(errors.documentType||errors.transferType||errors.purpose||errors.arp||errors.barangay) state.step=2;
     else state.step=3;
     render(); return;
@@ -759,9 +759,9 @@ function confirmSubmitRequest(){
     id: refNo, flow: state.flow,
     applicant: [fd.firstName, fd.middleName, fd.lastName].filter(Boolean).join(' '),
     contact: fd.contact, email: fd.email,
-    address: fd.addressLine + ', ' + fd.barangay + ', ' + fd.city + ', ' + fd.province + ' ' + fd.zip,
+    address: fd.addressLine + ', ' + fd.requesterBarangay + ', ' + fd.city + ', ' + fd.province + ' ' + fd.zip,
     docType: state.flow==='docreq' ? fd.documentType : fd.transferType,
-    purpose: fd.purpose, arp: fd.arp, barangay: fd.barangay,
+    purpose: fd.purpose, arp: fd.arp, barangay: fd.barangay, requesterBarangay: fd.requesterBarangay,
     isOwner: fd.isOwner,
     files: JSON.parse(JSON.stringify(fd.files)),
     advisory: getAdvisory(state.flow, fd),
@@ -895,17 +895,20 @@ function stepPill(i, label){
 }
 function fieldError(key){ return state.errors[key] ? '<div class="field-error" id="err-'+key+'">'+esc(state.errors[key])+'</div>' : ''; }
 function inv(key){ return state.errors[key] ? ' invalid' : ''; }
-function barangaySelect(fd){
-  const selected = fd.barangay || '';
+/* key = 'requesterBarangay' (Step 1, the requester's own address) or
+   'barangay' (Step 2, the property's location, which drives the ARP code). */
+function barangaySelect(fd, key){
+  key = key || 'barangay';
+  const selected = fd[key] || '';
   const selectedLabel = selected || 'Select a barangay';
   return '<div class="barangay-dropdown" data-barangay-dropdown>'
-    + '<button type="button" class="barangay-trigger'+(inv('barangay')?' invalid':'')+(selected?'':' placeholder')+'" data-barangay-trigger aria-haspopup="listbox" aria-expanded="false">'
+    + '<button type="button" class="barangay-trigger'+(inv(key)?' invalid':'')+(selected?'':' placeholder')+'" data-barangay-trigger aria-haspopup="listbox" aria-expanded="false">'
       + '<span>'+esc(selectedLabel)+'</span><span class="barangay-chevron" aria-hidden="true"></span>'
     + '</button>'
     + '<div class="barangay-menu" role="listbox" hidden data-barangay-menu aria-label="Barangay">'
       + BARANGAYS.map(function(b){ return '<button type="button" class="barangay-option'+(selected===b?' selected':'')+'" role="option" aria-selected="'+(selected===b?'true':'false')+'" data-barangay-option="'+esc(b)+'"><span>'+esc(b)+'</span><span class="barangay-code">'+barangayCode(b)+'</span><span class="barangay-check" aria-hidden="true">&#10003;</span></button>'; }).join('')
     + '</div>'
-    + '<select id="f-barangay" class="barangay-native-select" data-bind-select="barangay" tabindex="-1" aria-hidden="true"><option value="">Select a barangay</option>'
+    + '<select id="f-'+key+'" class="barangay-native-select" data-bind-select="'+key+'" tabindex="-1" aria-hidden="true"><option value="">Select a barangay</option>'
       + BARANGAYS.map(function(b){ return '<option value="'+esc(b)+'" '+(selected===b?'selected':'')+'>'+esc(b)+'</option>'; }).join('')
     + '</select>'
   + '</div>';
@@ -934,7 +937,7 @@ function renderStep1(){
     + '<div class="section-divider">'+ic('pin')+'<span>Address Information</span></div>'
     + '<div class="field-grid">'
       + '<div class="field"><label>House No. / Street<span class="req">*</span></label><input id="f-addressLine" class="'+(inv('addressLine')?'invalid':'')+'" type="text" value="'+esc(fd.addressLine)+'" data-bind="addressLine" placeholder="123 Rizal St.">' + fieldError('addressLine') + '</div>'
-      + '<div class="field"><label>Barangay<span class="req">*</span></label>'+barangaySelect(fd) + fieldError('barangay') + '</div>'
+      + '<div class="field"><label>Barangay<span class="req">*</span></label>'+barangaySelect(fd, 'requesterBarangay') + fieldError('requesterBarangay') + '</div>'
       + '<div class="field"><label>Province<span class="req">*</span></label><input id="f-province" class="'+(inv('province')?'invalid':'')+'" type="text" value="'+esc(fd.province)+'" data-bind="province">' + fieldError('province') + '</div>'
       + '<div class="field"><label>City/Municipality<span class="req">*</span></label><input id="f-city" class="'+(inv('city')?'invalid':'')+'" type="text" value="'+esc(fd.city)+'" data-bind="city">' + fieldError('city') + '</div>'
       + '<div class="field"><label>Zip Code</label><input id="f-zip" type="text" value="4202" readonly aria-readonly="true">' + fieldError('zip') + '</div>'
@@ -945,7 +948,7 @@ function renderStep1(){
 function renderStep2(){
   const fd = state.formData;
   const advisory = getAdvisory(state.flow, fd);
-  const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd) + fieldError('barangay') + '</div>';
+  const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd, 'barangay') + fieldError('barangay') + '</div>';
   if(state.flow==='docreq'){
     return '<div class="wizard-card-head"><h2>'+ic('home')+' Enter Property Information</h2><p>Fill in document and property details. Additional files are required when filing on behalf of the owner.</p></div>'
     + '<div class="wizard-card-body">'
@@ -1067,7 +1070,7 @@ function renderStep4(){
       + '<div class="review-card"><h3>'+ic('user')+' Personal Information</h3>'
         + '<div class="review-row"><span class="k">Full Name</span><span class="v">'+esc(fullName)+'</span></div>'
         + '<div class="review-row"><span class="k">Email</span><span class="v">'+esc(fd.email||'—')+'</span></div>'
-        + '<div class="review-row"><span class="k">Address</span><span class="v">'+esc(fd.addressLine)+', '+esc(fd.barangay)+', '+esc(fd.city)+', '+esc(fd.province)+'</span></div>'
+        + '<div class="review-row"><span class="k">Address</span><span class="v">'+esc(fd.addressLine)+', '+esc(fd.requesterBarangay)+', '+esc(fd.city)+', '+esc(fd.province)+'</span></div>'
         + '<div class="review-row"><span class="k">Zip Code</span><span class="v">'+esc(fd.zip||'—')+'</span></div>'
         + '<div class="review-row"><span class="k">Contact Number</span><span class="v">'+esc(fd.contact||'—')+'</span></div>'
       + '</div>'
@@ -1427,7 +1430,7 @@ function bindEvents(root){
     option.addEventListener('click', function(e){
       e.stopPropagation();
       const dropdown = option.closest('[data-barangay-dropdown]');
-      const select = dropdown.querySelector('[data-bind-select="barangay"]');
+      const select = dropdown.querySelector('[data-bind-select]');
       select.value = option.getAttribute('data-barangay-option');
       select.dispatchEvent(new Event('change',{bubbles:true}));
     });
