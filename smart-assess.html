@@ -884,6 +884,7 @@ function inv(key){ return state.errors[key] ? ' invalid' : ''; }
    'barangay' (Step 2, the property's location, which drives the ARP code). */
 function barangaySelect(fd, key){
   key = key || 'barangay';
+  if(BARANGAY_ALIASES[fd[key]]) fd[key] = BARANGAY_ALIASES[fd[key]]; // older drafts
   const selected = fd[key] || '';
   const selectedLabel = selected || 'Select a barangay';
   return '<div class="barangay-dropdown" data-barangay-dropdown>'
