@@ -130,7 +130,9 @@
       purpose: formValues.purpose || inputValue('purpose') || form.purpose || '',
       arp_number: arpNumber,
       property_address: formValues.propertyAddress || inputValue('propertyAddress') || form.propertyAddress || '',
+      // Property's barangay (Step 2). The requester's own barangay (Step 1) is separate.
       barangay: formValues.barangay || inputValue('barangay') || form.barangay || '',
+      requester_barangay: formValues.requesterBarangay || inputValue('requesterBarangay') || form.requesterBarangay || '',
       documents: documents,
       is_owner: document.getElementById('f-isOwner') ?
         document.getElementById('f-isOwner').checked : isOwner
