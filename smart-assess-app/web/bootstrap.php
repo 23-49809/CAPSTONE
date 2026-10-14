@@ -194,8 +194,11 @@ function sa_announcement_visibility_sql(string $audience): array
     $liveFrom = 'COALESCE(published_at, scheduled_at, created_at)';
     $dayEnd = "TIMESTAMP(end_date, '23:59:59')";
     $audiences = $audience === 'client' ? "('client', 'both')" : "('staff', 'both')";
+    $clientEnd = "DATE_ADD({$liveFrom}, INTERVAL " . SA_CLIENT_ANNOUNCEMENT_HOURS . ' HOUR)';
+    // Both branches stay plain DATETIME values ("Y-m-d H:i:s"), which the pages
+    // parse as Philippine time.
     $expires = $audience === 'client'
-        ? "LEAST(COALESCE({$dayEnd}, '9999-12-31 23:59:59'), DATE_ADD({$liveFrom}, INTERVAL " . SA_CLIENT_ANNOUNCEMENT_HOURS . ' HOUR))'
+        ? "IF(end_date IS NULL, {$clientEnd}, LEAST({$dayEnd}, {$clientEnd}))"
         : $dayEnd;
     $where = "status = 'Published' AND audience IN {$audiences}
            AND {$published} <= :vis_now
