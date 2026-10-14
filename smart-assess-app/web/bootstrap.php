@@ -185,17 +185,15 @@ function sa_announcement_visibility_sql(string $audience): array
     $hasUntil = sa_has_column('announcements', 'visible_until');
     $published = 'COALESCE(published_at, created_at)';
     $until = $hasUntil ? 'visible_until' : 'NULL';
-    $dayEnd = "IF(end_date IS NULL, NULL, TIMESTAMP(end_date, '23:59:59'))";
+    $dayEnd = "TIMESTAMP(end_date, '23:59:59')";
     $audiences = $audience === 'client' ? "('client', 'both')" : "('staff', 'both')";
     $ends = [$until, $dayEnd];
     if ($audience === 'client') {
         $ends[] = "DATE_ADD({$published}, INTERVAL " . SA_CLIENT_ANNOUNCEMENT_HOURS . ' HOUR)';
     }
-    // Earliest non-NULL end wins.
-    $expires = 'NULL';
-    foreach ($ends as $end) {
-        $expires = "IF({$expires} IS NULL, {$end}, IF({$end} IS NULL, {$expires}, LEAST({$expires}, {$end})))";
-    }
+    // Earliest configured end wins; an unset end counts as "never" (NULL result).
+    $never = "'9999-12-31 23:59:59'";
+    $expires = 'NULLIF(LEAST(' . implode(', ', array_map(static fn ($e) => "COALESCE({$e}, {$never})", $ends)) . "), {$never})";
     $where = "status = 'Published' AND audience IN {$audiences}
            AND {$published} <= :vis_now
            AND start_date <= DATE(:vis_now2)
