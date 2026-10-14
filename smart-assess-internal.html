@@ -807,13 +807,11 @@
   .sr-filter label{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:8px; }
   .sr-filter label .icon{ width:16px; height:16px; color:var(--ink-soft); }
   .sr-filter select{ width:100%; height:42px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; font-size:13.5px; padding:0 12px; }
-  .sr-generate{ height:44px; border-radius:8px; white-space:nowrap; }
 
   .sr-stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
   .sr-stat{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px 16px 22px; position:relative; box-shadow:0 8px 22px -22px rgba(12,33,23,.5); }
   .sr-stat::before{ content:""; position:absolute; left:8px; top:14px; bottom:14px; width:4px; border-radius:2px; background:var(--brand-700); }
   .sr-stat.tone-gray::before{ background:var(--ink-faint); }
-  .sr-stat.tone-red::before{ background:var(--danger); }
   .sr-stat-label{ font-size:14px; font-weight:700; color:var(--ink); }
   .sr-stat-row{ display:flex; align-items:baseline; gap:12px; margin:8px 0 4px; }
   .sr-stat-num{ font-size:30px; font-weight:700; line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; }
@@ -838,8 +836,6 @@
   .sr-tip b{ color:var(--ink); font-size:12.5px; }
   .sr-tip span{ display:flex; align-items:center; gap:6px; }
   .sr-tip-total{ border-top:1px solid var(--line); padding-top:3px; color:var(--ink); font-weight:600; }
-  .sr-legend{ display:flex; gap:28px; flex-wrap:wrap; margin-top:10px; font-size:12.5px; color:var(--ink-soft); }
-  .sr-legend span{ display:inline-flex; align-items:center; gap:8px; }
   .sr-key{ display:inline-block; width:10px; height:10px; border-radius:50%; flex:0 0 10px; }
   .sr-key.doc{ background:var(--sr-doc); } .sr-key.land{ background:var(--sr-land); }
 
@@ -904,8 +900,8 @@
   @container sysreport (max-width:1000px){
     .sr-filters{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     .sr-filter + .sr-filter{ border-left:0; padding-left:0; }
-    .sr-generate{ grid-column:1 / -1; }
-    .sr-stats{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .sr-status{ grid-column:1 / -1; min-height:0; }
+    .sr-stats{ grid-template-columns:repeat(3,minmax(0,1fr)); }
     .sr-mid{ grid-template-columns:minmax(0,1fr); }
     .sr-sums{ grid-template-columns:minmax(0,1fr); }
   }
