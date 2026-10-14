@@ -564,38 +564,23 @@ const ZIP_RE = /^\d{4}$/;
 const ARP_RE = /^14-\d{4}-\d{5}$/;
 const EMAIL_RE = /^[^\s@]+@gmail\.com$/i;
 const VALID_FILE_RE = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
+/* Barangays of Mabini, Batangas in the Municipal Assessor's Office order
+   (office barangay list, 01-34). The list position is also the ARP
+   barangay code: 14-<code>-NNNNN, e.g. PULANG LUPA = 0020. */
 const BARANGAYS = [
-  'POBLACION','ANILAO PROPER','ANILAO EAST','BAGALANGIT','BULACAN','CALAMIAS',
-  'ESTRELLA','GASANG','LAUREL','LIGAYA','MAINAGA','MAINIT','MAJUBEN','MALIMATOC-I',
-  'MALIMATOC-II','NAG-IBA','PILAHAN','P. ANAHAO','P. BALIBAGUHAN','P. LUPA',
-  'P. NIOGAN','SAGUING','SAMPAGUITA','SAN FRANCISCO','SAN JOSE','SAN JUAN',
-  'SAN TEODORO','SOLO','STA. ANA','STA. MESA','STO. NINO','STO. TOMAS',
-  'TALAGA PROPER','TALAGA EAST'
+  'POBLACION','ANILAO P.','ANILAO EAST','BAGALANGIT','BULACAN','CALAMIAS',
+  'ESTRELLA','GASANG','LAUREL','LIGAYA','MAINAGA','MAINIT',
+  'MAJUBEN','MALIMATOC I','MALIMATOC II','NAG-IBA','PILAHAN','P. ANAHAO',
+  'P. BALIBAGUHAN','PULANG LUPA','P. NIOGAN','SAGUING','SAMPAGUITA','SAN FRANCISCO',
+  'SAN JOSE','SAN JUAN','SAN TEODORO','SOLO','STA. ANA','STA. MESA',
+  'STO NIÑO','STO. TOMAS','TALAGA PROPER','TALAGA EAST'
 ];
-/* ARP barangay codes 0001-0034: the 34 barangays of Mabini, Batangas numbered
-   in the order of the PSA Philippine Standard Geographic Code list
-   (PSGC 0401016001-0401016035; the PSGC itself skips 013). Keys are the
-   dropdown values above; the PSA name is kept for reference. */
-const BARANGAY_CODES = {
-  'ANILAO PROPER':['0001','Anilao Proper'], 'ANILAO EAST':['0002','Anilao East'],
-  'BAGALANGIT':['0003','Bagalangit'], 'BULACAN':['0004','Bulacan'],
-  'CALAMIAS':['0005','Calamias'], 'ESTRELLA':['0006','Estrella'],
-  'GASANG':['0007','Gasang'], 'LAUREL':['0008','Laurel'],
-  'LIGAYA':['0009','Ligaya'], 'MAINAGA':['0010','Mainaga'],
-  'MAINIT':['0011','Mainit'], 'MAJUBEN':['0012','Majuben'],
-  'MALIMATOC-I':['0013','Malimatoc I'], 'MALIMATOC-II':['0014','Malimatoc II'],
-  'NAG-IBA':['0015','Nag-Iba'], 'PILAHAN':['0016','Pilahan'],
-  'POBLACION':['0017','Poblacion'], 'P. LUPA':['0018','Pulang Lupa'],
-  'P. ANAHAO':['0019','Pulong Anahao'], 'P. BALIBAGUHAN':['0020','Pulong Balibaguhan'],
-  'P. NIOGAN':['0021','Pulong Niogan'], 'SAGUING':['0022','Saguing'],
-  'SAMPAGUITA':['0023','Sampaguita'], 'SAN FRANCISCO':['0024','San Francisco'],
-  'SAN JOSE':['0025','San Jose'], 'SAN JUAN':['0026','San Juan'],
-  'SAN TEODORO':['0027','San Teodoro'], 'STA. ANA':['0028','Santa Ana'],
-  'STA. MESA':['0029','Santa Mesa'], 'STO. NINO':['0030','Santo Niño'],
-  'STO. TOMAS':['0031','Santo Tomas'], 'SOLO':['0032','Solo'],
-  'TALAGA PROPER':['0033','Talaga Proper'], 'TALAGA EAST':['0034','Talaga East']
-};
-function barangayCode(name){ const e = BARANGAY_CODES[name]; return e ? e[0] : ''; }
+const BARANGAY_CODES = {};
+BARANGAYS.forEach(function(name, i){ BARANGAY_CODES[name] = [String(i+1).padStart(4,'0'), name]; });
+/* Names saved by earlier versions of the form, mapped to the current ones so
+   older drafts and records still resolve to the right code. */
+const BARANGAY_ALIASES = {'ANILAO PROPER':'ANILAO P.', 'MALIMATOC-I':'MALIMATOC I', 'MALIMATOC-II':'MALIMATOC II', 'P. LUPA':'PULANG LUPA', 'STO. NINO':'STO NIÑO'};
+function barangayCode(name){ const e = BARANGAY_CODES[BARANGAY_ALIASES[name] || name]; return e ? e[0] : ''; }
 /* The user-entered last segment (up to 5 digits) of a stored ARP. */
 function arpSerial(arp){ const m = String(arp||'').match(/^14-\d{0,4}-?(\d{0,5})$/); return m ? m[1] : String(arp||'').replace(/\D/g,'').slice(-5); }
 /* Full ARP from the selected barangay and the serial: 14-BBBB-NNNNN. */
