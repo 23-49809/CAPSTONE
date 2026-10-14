@@ -182,6 +182,8 @@
   .mono{ font-family:var(--font-mono); }
   .cell-name{ font-weight:700; }
   .cell-sub{ font-size:11.5px; color:var(--ink-faint); }
+  .ann-date{ min-width:0; }
+  .table-wrap table td .ann-date .cell-sub{ white-space:normal; overflow:visible; }
 
   .badge{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px; white-space:nowrap; }
   .badge.green{ background:var(--success-bg); color:var(--success); }
@@ -1704,7 +1706,7 @@ function renderAnnouncements(acct){
       return '<tr><td class="cell-name" data-label="Title">'+esc(a.title)+'</td>'
         + '<td data-label="Post To">'+audienceLabel(a.postTo)+'</td>'
         + '<td data-label="Status"><span class="badge '+annBadgeClass(annDisplayStatus(a))+'">'+annDisplayStatus(a)+'</span></td>'
-        + '<td data-label="Published / Scheduled">'+annDateCell(a)+'</td>'
+        + '<td data-label="Published / Scheduled"><div class="ann-date">'+annDateCell(a)+'</div></td>'
         + '<td data-label="Created By">'+esc(a.postedBy)+'</td>'
         + '<td class="actions-cell"><div class="actions-container">'+actions+'</div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">No announcements match your search.</div></td></tr>')
