@@ -920,9 +920,6 @@
     body.printing-sysreport .sr-card, body.printing-sysreport .sr-stat{ box-shadow:none; break-inside:avoid; }
     body.printing-sysreport .sr-table{ min-width:0; }
   }
-  .composer-row input[type="datetime-local"]{ flex:0 1 230px; font-weight:500; color-scheme:light dark; }
-  .composer-row-hint{ flex:1 1 160px; font-size:12px; color:var(--ink-faint); }
-  @media (max-width:560px){ .composer-row{ flex-wrap:wrap; } .composer-row-hint{ flex-basis:100%; padding:0 0 8px 66px; } }
 
   /* ============ Dropdowns (shared) ============
      One rule for every native single-select: a drawn chevron 14px from the
@@ -1292,10 +1289,11 @@ function annBadgeClass(status){
   if(status==='Expired') return 'slate';
   return status==='Published' ? 'green' : status==='Scheduled' ? 'amber' : status==='Cancelled' ? 'red' : 'slate';
 }
-/* Announcement expiry. The server sends staffExpiresAt / clientExpiresAt (Asia/
-   Manila wall time) computed from the stored timestamps; the demo data computes
-   the same rule here: staff = "Visible until"; clients = the earlier of
-   "Visible until" and 24 hours after publishing. */
+/* Announcement expiry is automatic. The server sends staffExpiresAt /
+   clientExpiresAt (Asia/Manila wall time) computed from the stored timestamps;
+   the demo data computes the same rule here: clients stop seeing an
+   announcement 24 hours after it goes live (the publish time, or the scheduled
+   send time for scheduled posts); staff keep seeing it. */
 var CLIENT_ANNOUNCEMENT_HOURS = 24;
 function annTime(v){
   if(!v) return null;
@@ -1306,10 +1304,9 @@ function annTime(v){
 function annExpiresAt(a, audience){
   var server = audience==='client' ? a.clientExpiresAt : a.staffExpiresAt;
   if(server) return annTime(server);
-  var ends = [annTime(a.visibleUntil)];
-  if(audience==='client'){ var pub = annTime(a.publishedAt); if(pub) ends.push(pub + CLIENT_ANNOUNCEMENT_HOURS*3600000); }
-  ends = ends.filter(function(t){ return t!=null; });
-  return ends.length ? Math.min.apply(null, ends) : null;
+  if(audience!=='client') return null;
+  var live = annTime(a.publishedAt || a.scheduledAt);
+  return live ? live + CLIENT_ANNOUNCEMENT_HOURS*3600000 : null;
 }
 function annVisibleTo(a, audience){
   if(a.status!=='Published') return false;
@@ -1337,7 +1334,10 @@ function annDateCell(a){
     else line('', a.postTo==='client' ? 'client' : 'staff');
     return fmtDateTime(a.publishedAt) + lines.map(function(l){ return '<div class="cell-sub">'+l+'</div>'; }).join('');
   }
-  if(a.status==='Scheduled' && a.scheduledAt) return 'Scheduled: '+fmtDateTime(a.scheduledAt);
+  if(a.status==='Scheduled' && a.scheduledAt){
+    var hides = a.postTo==='staff' ? null : annExpiresAt(a, 'client');
+    return 'Scheduled: '+fmtDateTime(a.scheduledAt) + (hides ? '<div class="cell-sub">'+(a.postTo==='both' ? 'Clients until ' : 'Until ')+esc(fmtDateTime(new Date(hides).toISOString()))+'</div>' : '');
+  }
   return '—';
 }
 /** Scheduled -> Published the moment the scheduled time arrives. There's no
@@ -2473,7 +2473,6 @@ function modalAnnEdit(id){
         + '<option value=""'+(a.postTo?'':' selected')+'>Select audience…</option>'
         + Object.keys(ANNOUNCEMENT_AUDIENCES).map(function(k){ return '<option value="'+k+'"'+(a.postTo===k?' selected':'')+'>'+ANNOUNCEMENT_AUDIENCES[k]+'</option>'; }).join('')
       + '</select></div>'
-      + '<div class="composer-row"><label for="ann-visible-until">Visible until</label><input id="ann-visible-until" name="visibleUntil" type="datetime-local" value="'+esc(a.visibleUntil ? String(a.visibleUntil).replace(' ','T').slice(0,16) : '')+'" aria-describedby="ann-visible-hint"><span class="composer-row-hint" id="ann-visible-hint">Optional · Philippine time. Clients see it for at most 24 hours.</span></div>'
       + '<div class="composer-row"><label for="ann-subject">Subject</label><input id="ann-subject" name="title" type="text" maxlength="200" value="'+esc(a.title)+'" placeholder="Announcement title" required></div>'
       + '<div class="composer-body"><textarea id="announcement-message" name="content" aria-label="Message" placeholder="Write your announcement…" required>'+esc(a.content)+'</textarea>'
         + '<details class="composer-ai"><summary>'+ic('sparkles','15px')+'<span>Write with AI</span></summary>'
@@ -3484,12 +3483,12 @@ function bindEvents(){
 
       if(annId){
         var ex = findAnn(annId);
-        ex.title = fd.get('title'); ex.content = fd.get('content'); ex.postTo = postTo; ex.visibleUntil = fd.get('visibleUntil') || null; ex.staffExpiresAt = null; ex.clientExpiresAt = null;
+        ex.title = fd.get('title'); ex.content = fd.get('content'); ex.postTo = postTo; ex.staffExpiresAt = null; ex.clientExpiresAt = null;
         ex.status = annStatus; ex.scheduledAt = annScheduledAt; ex.publishedAt = annPublishedAt;
         pushToast('Announcement updated.', 'check');
       } else {
         state.announcements.unshift({
-          id:uid('A'), title:fd.get('title'), content:fd.get('content'), postTo:postTo, visibleUntil: fd.get('visibleUntil') || null,
+          id:uid('A'), title:fd.get('title'), content:fd.get('content'), postTo:postTo,
           status:annStatus, scheduledAt:annScheduledAt, publishedAt:annPublishedAt,
           datePosted:new Date().toISOString().slice(0,10), postedBy: me2?me2.fullName:'Assessor Head'
         });
