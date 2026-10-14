@@ -2023,7 +2023,10 @@ function srPrintAllRequests(d, acct){
   var page = document.createElement('style');
   page.id = 'sr-print-page';
   var foot = 'SMART ASSESS · All Requests Summary Report · '+d.label;
+  // Claiming the top margin boxes keeps the browser's own date/title header
+  // ("Headers and footers" in the print dialog) off the report.
   page.textContent = '@page{ size:A4 landscape; margin:14mm 12mm 16mm;'
+    + ' @top-left{ content:" "; } @top-center{ content:" "; } @top-right{ content:" "; }'
     + ' @bottom-left{ content:"For internal use only \\2014  Office of the Municipal Assessor, Mabini"; font:7.5pt Arial, sans-serif; color:#000; }'
     + ' @bottom-center{ content:"'+foot.replace(/["\\]/g,'')+'"; font:7.5pt Arial, sans-serif; color:#000; }'
     + ' @bottom-right{ content:"Page " counter(page) " of " counter(pages); font:7.5pt Arial, sans-serif; color:#000; } }';
