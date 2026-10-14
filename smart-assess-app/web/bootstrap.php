@@ -165,6 +165,59 @@ function sa_schedule_timezone(): DateTimeZone
     return new DateTimeZone('Asia/Manila');
 }
 
+/** Current Asia/Manila wall time, the convention all announcement timestamps use. */
+function sa_manila_now(): string
+{
+    return (new DateTimeImmutable('now', sa_schedule_timezone()))->format('Y-m-d H:i:s');
+}
+
+/** Client-facing announcements disappear this many hours after publishing. */
+const SA_CLIENT_ANNOUNCEMENT_HOURS = 24;
+
+/**
+ * Single source of truth for when an announcement is visible.
+ * Returns [whereSql, expiresSql] for the audience ('client' or 'staff'); bind
+ * :vis_now (sa_manila_now()). Uses only stored timestamps, so expired rows
+ * cannot reappear from cached pages or frontend-only filtering.
+ */
+function sa_announcement_visibility_sql(string $audience): array
+{
+    $hasUntil = sa_has_column('announcements', 'visible_until');
+    $published = 'COALESCE(published_at, created_at)';
+    $until = $hasUntil ? 'visible_until' : 'NULL';
+    $dayEnd = "IF(end_date IS NULL, NULL, TIMESTAMP(end_date, '23:59:59'))";
+    $audiences = $audience === 'client' ? "('client', 'both')" : "('staff', 'both')";
+    $ends = [$until, $dayEnd];
+    if ($audience === 'client') {
+        $ends[] = "DATE_ADD({$published}, INTERVAL " . SA_CLIENT_ANNOUNCEMENT_HOURS . ' HOUR)';
+    }
+    // Earliest non-NULL end wins.
+    $expires = 'NULL';
+    foreach ($ends as $end) {
+        $expires = "IF({$expires} IS NULL, {$end}, IF({$end} IS NULL, {$expires}, LEAST({$expires}, {$end})))";
+    }
+    $where = "status = 'Published' AND audience IN {$audiences}
+           AND {$published} <= :vis_now
+           AND start_date <= DATE(:vis_now2)
+           AND ({$expires} IS NULL OR {$expires} > :vis_now3)";
+    return [$where, $expires];
+}
+
+/** Published announcements currently visible to the audience, newest first. */
+function sa_visible_announcements(string $audience, string $columns): array
+{
+    sa_publish_due_announcements();
+    [$where, $expires] = sa_announcement_visibility_sql($audience);
+    $stmt = sa_db()->prepare(
+        "SELECT {$columns}, {$expires} AS expires_at FROM announcements
+         WHERE {$where}
+         ORDER BY COALESCE(published_at, created_at) DESC"
+    );
+    $now = sa_manila_now();
+    $stmt->execute(['vis_now' => $now, 'vis_now2' => $now, 'vis_now3' => $now]);
+    return $stmt->fetchAll();
+}
+
 /** Publish scheduled announcements whose Philippine time has come. The
  *  status condition makes this idempotent, so nothing publishes twice. */
 function sa_publish_due_announcements(): void
@@ -183,13 +236,10 @@ function sa_public_bootstrap(): array
     foreach ($pdo->query('SELECT setting_key, setting_value FROM settings')->fetchAll() as $row) {
         $settings[$row['setting_key']] = $row['setting_value'];
     }
-    $announcements = $pdo->query(
-        "SELECT id, title, body, audience, start_date, end_date, image_url, published_at
-         FROM announcements
-         WHERE status = 'Published' AND audience IN ('client', 'both')
-           AND start_date <= CURDATE() AND (end_date IS NULL OR end_date >= CURDATE())
-         ORDER BY COALESCE(published_at, created_at) DESC"
-    )->fetchAll();
+    $announcements = sa_visible_announcements(
+        'client',
+        'id, title, body, audience, start_date, end_date, image_url, published_at'
+    );
     return [
         'csrf' => sa_csrf_token(),
         'settings' => $settings,
@@ -285,11 +335,18 @@ function sa_internal_bootstrap(): array
 
     if ($roleId === 4) {
         sa_publish_due_announcements();
+        // The Head's list keeps every announcement (history/audit); each row
+        // carries its staff/client expiry so expired ones are marked, not deleted.
+        [, $staffExpires] = sa_announcement_visibility_sql('staff');
+        [, $clientExpires] = sa_announcement_visibility_sql('client');
+        $untilColumn = sa_has_column('announcements', 'visible_until') ? 'visible_until' : 'NULL AS visible_until';
         $data['announcements'] = $pdo->query(
-            'SELECT id, title, body, author, audience, start_date, end_date, image_url,
-                    status, scheduled_at, published_at, created_at
-             FROM announcements ORDER BY created_at DESC, id DESC LIMIT 200'
+            "SELECT id, title, body, author, audience, start_date, end_date, image_url,
+                    status, scheduled_at, published_at, {$untilColumn}, created_at,
+                    {$staffExpires} AS staff_expires_at, {$clientExpires} AS client_expires_at
+             FROM announcements ORDER BY created_at DESC, id DESC LIMIT 200"
         )->fetchAll();
+        $data['server_now'] = sa_manila_now();
         $data['reports'] = [
             'total_requests' => (int) $pdo->query('SELECT COUNT(*) FROM requests')->fetchColumn(),
             'by_status' => $pdo->query(

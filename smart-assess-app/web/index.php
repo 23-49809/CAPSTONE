@@ -72,7 +72,9 @@ $page['announcements'] = array_map(static function (array $announcement): array 
         'status' => 'Published',
         'scheduledAt' => null,
         'publishedAt' => $announcement['published_at'] ?? null,
+        'expiresAt' => $announcement['expires_at'] ?? null,
     ];
 }, $publicData['announcements'] ?? []);
+$page['serverNow'] = sa_manila_now();
 
 sa_emit_prototype('smart-assess.html', $page, 'client');
