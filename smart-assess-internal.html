@@ -1240,10 +1240,47 @@ var REPORT_TYPE_LABEL = {document:'Document Requests', 'land-transfer':'Land Tra
 var ANNOUNCEMENT_AUDIENCES = {client:'Client Interface', staff:'Staff Interface', both:'Both'};
 function audienceLabel(code){ return ANNOUNCEMENT_AUDIENCES[code] || code; }
 function annBadgeClass(status){
+  if(status==='Expired') return 'slate';
   return status==='Published' ? 'green' : status==='Scheduled' ? 'amber' : status==='Cancelled' ? 'red' : 'slate';
 }
+/* Announcement expiry. The server sends staffExpiresAt / clientExpiresAt (Asia/
+   Manila wall time) computed from the stored timestamps; the demo data computes
+   the same rule here: staff = "Visible until"; clients = the earlier of
+   "Visible until" and 24 hours after publishing. */
+var CLIENT_ANNOUNCEMENT_HOURS = 24;
+function annTime(v){
+  if(!v) return null;
+  var str = String(v);
+  var d = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(str) ? new Date(str.replace(' ','T')+(str.length===16?':00':'')+'+08:00') : new Date(str);
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+function annExpiresAt(a, audience){
+  var server = audience==='client' ? a.clientExpiresAt : a.staffExpiresAt;
+  if(server) return annTime(server);
+  var ends = [annTime(a.visibleUntil)];
+  if(audience==='client'){ var pub = annTime(a.publishedAt); if(pub) ends.push(pub + CLIENT_ANNOUNCEMENT_HOURS*3600000); }
+  ends = ends.filter(function(t){ return t!=null; });
+  return ends.length ? Math.min.apply(null, ends) : null;
+}
+function annVisibleTo(a, audience){
+  if(a.status!=='Published') return false;
+  var pub = annTime(a.publishedAt);
+  if(pub && pub > Date.now()) return false;
+  var exp = annExpiresAt(a, audience);
+  return exp==null || exp > Date.now();
+}
+/* Published but no longer shown to anyone in its audience. */
+function annIsExpired(a){
+  if(a.status!=='Published') return false;
+  var auds = a.postTo==='both' ? ['staff','client'] : [a.postTo==='client'?'client':'staff'];
+  return auds.every(function(x){ return !annVisibleTo(a, x); });
+}
+function annDisplayStatus(a){ return annIsExpired(a) ? 'Expired' : a.status; }
 function annDateCell(a){
-  if(a.status==='Published' && a.publishedAt) return fmtDateTime(a.publishedAt);
+  if(a.status==='Published' && a.publishedAt){
+    var exp = a.postTo==='staff' ? annExpiresAt(a,'staff') : annExpiresAt(a,'client');
+    return fmtDateTime(a.publishedAt) + (exp ? '<div class="cell-sub">'+(exp<=Date.now()?'Expired':'Until')+' '+esc(fmtDateTime(new Date(exp).toISOString()))+'</div>' : '');
+  }
   if(a.status==='Scheduled' && a.scheduledAt) return 'Scheduled: '+fmtDateTime(a.scheduledAt);
   return '—';
 }
