@@ -287,7 +287,6 @@
   .barangay-option .barangay-check{ width:16px; height:16px; flex-shrink:0; opacity:0; color:var(--brand-700); }
   .barangay-option.selected .barangay-check{ opacity:1; }
   .barangay-native-select{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-  .barangay-dropdown.drop-up .barangay-menu{ top:auto; bottom:calc(100% + 6px); }
   @media (max-width:640px){ .barangay-menu{ max-height:240px; } .barangay-option{ min-height:46px; padding:11px 12px; } }
   .field-error{ font-size:12.5px; color:var(--danger); }
   .field-hint{ font-size:12px; color:var(--ink-faint); }
@@ -1405,26 +1404,34 @@ function bindEvents(root){
     const updatedSlider = root.querySelector('[data-home-slider]');
     if(slideIndex>=0 && updatedSlider && updatedSlider._showSlide) updatedSlider._showSlide(slideIndex);
   }
-  // The wizard body scrolls, so an absolutely positioned menu would be cut off at its edge.
-  // Open upward when there is more room above, and cap the height to the visible space.
+  // The wizard body scrolls and the card clips its content, so the open menu is pinned to the
+  // viewport (like a native select) and sized to the space above or below the trigger.
   function placeBarangayMenu(dropdown, menu){
     dropdown.classList.remove('drop-up');
     menu.style.maxHeight = '';
-    const trigger = dropdown.querySelector('[data-barangay-trigger]').getBoundingClientRect();
-    let top = 0, bottom = window.innerHeight;
-    for(let el = dropdown.parentElement; el && el !== document.body; el = el.parentElement){
-      const cs = getComputedStyle(el);
-      if(/(auto|scroll|hidden)/.test(cs.overflowY)){
-        const r = el.getBoundingClientRect();
-        top = Math.max(top, r.top); bottom = Math.min(bottom, r.bottom);
-      }
-    }
-    const gap = 14, wanted = menu.scrollHeight;
-    const below = bottom - trigger.bottom - gap, above = trigger.top - top - gap;
+    const r = dropdown.querySelector('[data-barangay-trigger]').getBoundingClientRect();
+    const gap = 6, edge = 12, wanted = Math.min(menu.scrollHeight, window.innerWidth <= 640 ? 240 : 280);
+    const below = window.innerHeight - r.bottom - gap - edge, above = r.top - gap - edge;
     const up = below < Math.min(wanted, 200) && above > below;
+    const room = Math.max(up ? above : below, 120);
+    const height = Math.min(wanted, room);
+    menu.style.position = 'fixed';
+    menu.style.left = r.left + 'px';
+    menu.style.width = r.width + 'px';
+    menu.style.right = 'auto';
+    menu.style.bottom = 'auto';
+    menu.style.top = (up ? r.top - gap - height : r.bottom + gap) + 'px';
+    menu.style.maxHeight = height + 'px';
     if(up) dropdown.classList.add('drop-up');
-    const room = up ? above : below;
-    if(room < wanted) menu.style.maxHeight = Math.max(room, 120) + 'px';
+  }
+  function repositionBarangayMenu(){
+    const dropdown = root.querySelector('[data-barangay-dropdown].open');
+    if(dropdown) placeBarangayMenu(dropdown, dropdown.querySelector('[data-barangay-menu]'));
+  }
+  if(!window._barangayMenuListeners){
+    window._barangayMenuListeners = true;
+    window.addEventListener('resize', repositionBarangayMenu);
+    document.addEventListener('scroll', repositionBarangayMenu, true);
   }
   function closeBarangayMenus(){
     root.querySelectorAll('[data-barangay-dropdown].open').forEach(function(dropdown){
