@@ -1665,56 +1665,79 @@ function renderAnnouncements(acct){
   + '</tbody></table></div>';
 }
 
-/* ---------------- Head: System Report ---------------- */
-var SR_COMPLETED = ['Approved', 'Out for Release', 'Completed'];
-var SR_OVERDUE = ['Timed Out'];
-var SR_CLOSED = ['Rejected'];
-function srBucket(status){
-  if(SR_COMPLETED.indexOf(status)>-1) return 'completed';
-  if(SR_OVERDUE.indexOf(status)>-1) return 'overdue';
-  if(SR_CLOSED.indexOf(status)>-1) return 'closed';
-  return 'progress';
-}
-function srMonthStart(){ return phToday().slice(0,8)+'01'; }
+/* ---------------- Head: System Report (monthly) ----------------
+   Figures come from the server (api.php?action=head_monthly_report), which
+   counts one Asia/Manila calendar month of `requests` with parameterized
+   queries. The standalone demo has no server, so it computes the same
+   structure from the demo data (srComputeLocal). */
+var SR_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var SR_COMPLETED = ['Approved', 'Out for Release'];
 function srState(){
-  if(!state.sysReport){
-    var from = srMonthStart(), to = phToday();
-    state.sysReport = { draft:{from:from, to:to, type:'all', brgy:'all'}, applied:{from:from, to:to, type:'all', brgy:'all'}, generatedAt:new Date().toISOString(), q:'', page:1 };
+  if(!state.sysReport || !state.sysReport.v2){
+    var t = phToday();
+    state.sysReport = { v2:true, month:Number(t.slice(5,7)), year:Number(t.slice(0,4)), draftMonth:Number(t.slice(5,7)), draftYear:Number(t.slice(0,4)), type:'all', data:null, loading:false, error:'' };
   }
   return state.sysReport;
 }
-function srAllRequests(){
-  return state.docRequests.map(function(r){ return {r:r, kind:'doc'}; })
-    .concat(state.landRequests.map(function(r){ return {r:r, kind:'land'}; }))
-    .map(function(x){ x.day = phPartsFromStored(x.r.submitted).date; return x; });
-}
-function srFilter(list, f, from, to){
-  return list.filter(function(x){
-    return x.day && x.day >= from && x.day <= to
-      && (f.type==='all' || f.type===x.kind)
-      && (f.brgy==='all' || String(x.r.barangay||'').toUpperCase()===f.brgy);
-  });
-}
-function srDays(from, to){ return Math.round((new Date(to+'T00:00:00Z') - new Date(from+'T00:00:00Z'))/86400000) + 1; }
-function srCounts(list){
-  var c = {total:list.length, progress:0, completed:0, overdue:0};
-  list.forEach(function(x){ var b = srBucket(x.r.status); if(c[b]!=null) c[b]++; });
-  return c;
-}
+function srApiUrl(){ var c = window.SMART_ASSESS_CONFIG; return c && c.api ? c.api : null; }
 function srHumanDuration(seconds){
   if(seconds==null || !isFinite(seconds)) return '—';
   seconds = Math.max(0, Number(seconds));
-  var d = Math.floor(seconds/86400), h = Math.floor(seconds%86400/3600), m = Math.floor(seconds%3600/60);
-  if(d>0) return d+' day'+(d===1?'':'s')+(h?' '+h+' hr':'');
-  if(h>0) return h+' hr'+(m?' '+m+' min':'');
-  return Math.max(1,m)+' min';
+  if(seconds >= 86400) return (Math.round(seconds/86400*10)/10)+' days';
+  if(seconds >= 3600) return (Math.round(seconds/3600*10)/10)+' hrs';
+  if(seconds >= 60) return Math.round(seconds/60)+' min';
+  return Math.round(seconds)+' sec';
 }
-function srProcessing(r){
-  if(r.processingDurationSeconds!=null) return srHumanDuration(r.processingDurationSeconds);
-  if(r.processingStartedEpoch!=null) return srHumanDuration(Date.now()/1000 - Number(r.processingStartedEpoch)) + ' (ongoing)';
-  return '—';
+function srComputeLocal(month, year){
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  var from = year+'-'+pad(month)+'-01';
+  var days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  var to = year+'-'+pad(month)+'-'+pad(days);
+  var prevM = month===1 ? 12 : month-1, prevY = month===1 ? year-1 : year;
+  var all = state.docRequests.map(function(r){ return {r:r, kind:'doc', type:r.docType}; })
+    .concat(state.landRequests.map(function(r){ return {r:r, kind:'land', type:r.transferType}; }))
+    .map(function(x){ x.day = phPartsFromStored(x.r.submitted).date; return x; });
+  var inMonth = function(m, y){ var p = y+'-'+pad(m); return all.filter(function(x){ return x.day && x.day.slice(0,7)===p; }); };
+  var cards = function(list){ return { documents:list.filter(function(x){return x.kind==='doc';}).length, landTransfers:list.filter(function(x){return x.kind==='land';}).length, total:list.length, overdue:list.filter(function(x){return x.r.status==='Timed Out';}).length }; };
+  var list = inMonth(month, year);
+  var daily = [];
+  for(var d=1; d<=days; d++){ var key = year+'-'+pad(month)+'-'+pad(d); daily.push({day:key, documents:list.filter(function(x){return x.kind==='doc'&&x.day===key;}).length, landTransfers:list.filter(function(x){return x.kind==='land'&&x.day===key;}).length}); }
+  var summary = function(kind){
+    var labels = all.filter(function(x){ return x.kind===kind && x.type; }).map(function(x){ return x.type; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
+    var rows = labels.map(function(label){
+      var g = list.filter(function(x){ return x.kind===kind && x.type===label; });
+      var timed = g.filter(function(x){ return x.r.processingDurationSeconds!=null; });
+      var done = g.filter(function(x){ return SR_COMPLETED.indexOf(x.r.status)>-1; }).length;
+      return { label:label, total:g.length, completed:done, timedCount:timed.length,
+        avgProcessingSeconds: timed.length ? Math.round(timed.reduce(function(s,x){ return s+Number(x.r.processingDurationSeconds); },0)/timed.length) : null,
+        completionRate: g.length ? Math.round(done/g.length*100) : null };
+    }).sort(function(a,b){ return b.total-a.total || a.label.localeCompare(b.label); });
+    var total = rows.reduce(function(t,r){ t.total+=r.total; t.completed+=r.completed; t.timedCount+=r.timedCount; t.sec+=(r.avgProcessingSeconds||0)*r.timedCount; return t; }, {label:'Total', total:0, completed:0, timedCount:0, sec:0});
+    total.avgProcessingSeconds = total.timedCount ? Math.round(total.sec/total.timedCount) : null;
+    total.completionRate = total.total ? Math.round(total.completed/total.total*100) : null;
+    return {rows:rows, total:total};
+  };
+  var years = all.map(function(x){ return Number(x.day.slice(0,4)); }).concat([year, Number(phToday().slice(0,4))]);
+  var yMin = Math.min.apply(null, years), yMax = Math.max.apply(null, years), yr = [];
+  for(var y=yMin; y<=yMax; y++) yr.push(y);
+  return { month:month, year:year, label:SR_MONTHS[month-1]+' '+year, from:from, to:to, years:yr,
+    cards:cards(list), previousCards:cards(inMonth(prevM, prevY)), daily:daily,
+    documentSummary:summary('doc'), landSummary:summary('land'),
+    requests:list.sort(function(a,b){ return String(b.r.submitted).localeCompare(String(a.r.submitted)); }).map(function(x){ return {id:x.r.id, kind:x.kind, client:x.r.applicant, type:x.type||'', status:x.r.status, submitted:x.r.submitted, processingSeconds:x.r.processingDurationSeconds, processingStartedAt:x.r.processingStartedAt, assignedTo:x.r.processingStaffName}; }),
+    generatedAt:new Date(Date.now()+8*3600e3).toISOString().slice(0,19).replace('T',' ') };
 }
-function srRangeLabel(f){ return phFormatDate(f.from)+' – '+phFormatDate(f.to); }
+/* Load the selected month: server when available, else the demo data. */
+function srLoad(){
+  var sr = srState();
+  var api = srApiUrl();
+  if(!api){ sr.data = srComputeLocal(sr.month, sr.year); sr.loading = false; sr.error = ''; return; }
+  sr.loading = true; sr.error = '';
+  var url = api + '?action=head_monthly_report&month=' + encodeURIComponent(sr.month) + '&year=' + encodeURIComponent(sr.year);
+  fetch(url, {credentials:'same-origin', headers:{'Accept':'application/json'}})
+    .then(function(res){ return res.json().then(function(body){ if(!res.ok || !body.ok) throw new Error(body.error || 'The report could not be loaded.'); return body.data; }); })
+    .then(function(data){ sr.data = data; sr.loading = false; if(state.view==='reports') render(); })
+    .catch(function(err){ sr.loading = false; sr.error = err.message || 'The report could not be loaded.'; if(state.view==='reports') render(); });
+}
 
 function srStatCard(label, value, prev, tone, worseIsUp){
   var delta = '';
@@ -1727,47 +1750,38 @@ function srStatCard(label, value, prev, tone, worseIsUp){
   }
   return '<div class="sr-stat '+tone+'"><div class="sr-stat-label">'+esc(label)+'</div>'
     + '<div class="sr-stat-row"><span class="sr-stat-num">'+value+'</span>'+delta+'</div>'
-    + '<div class="sr-stat-sub">vs. previous period</div></div>';
+    + '<div class="sr-stat-sub">vs. previous month</div></div>';
 }
 
-/* Stacked daily (or weekly, for long ranges) bars: Document Requests below,
-   Land Transfer Requests above. Hover/focus a bar for exact counts. */
-function srChart(list, f){
-  var days = srDays(f.from, f.to), step = days > 62 ? 7 : 1;
-  var buckets = [];
-  for(var i=0;i<days;i+=step){
-    var start = phAddDays(f.from, i), end = phAddDays(f.from, Math.min(i+step-1, days-1));
-    buckets.push({start:start, end:end, doc:0, land:0});
-  }
-  list.forEach(function(x){
-    var idx = Math.floor(srDays(f.from, x.day)-1) ; idx = Math.floor(idx/step);
-    if(buckets[idx]) buckets[idx][x.kind]++;
-  });
-  var max = Math.max(1, Math.max.apply(null, buckets.map(function(b){ return b.doc+b.land; })));
+/* Daily stacked bars for one month. Fixed plot geometry, labels every ~5
+   days, no value labels on bars (hover/focus shows exact counts). */
+function srChart(d, type){
+  var showDoc = type!=='land', showLand = type!=='doc';
+  var bars = d.daily.map(function(b){ return {day:b.day, doc:showDoc?b.documents:0, land:showLand?b.landTransfers:0}; });
+  var max = Math.max(0, Math.max.apply(null, bars.map(function(b){ return b.doc+b.land; })));
   var tickStep = max<=5 ? 1 : max<=10 ? 2 : max<=25 ? 5 : max<=50 ? 10 : Math.ceil(max/50)*10;
   var top = Math.max(5, Math.ceil(max/tickStep)*tickStep);
-  var W = 680, H = 210, L = 30, B = 22, T = 8, plotW = W-L-6, plotH = H-B-T;
-  var bw = plotW / buckets.length, barW = Math.max(3, Math.min(22, bw*0.62));
+  var W = 720, H = 240, L = 34, R = 8, T = 10, B = 26, plotW = W-L-R, plotH = H-T-B;
+  var slot = plotW / bars.length, barW = Math.max(4, Math.min(14, slot*0.6));
   var y = function(v){ return T + plotH - v/top*plotH; };
-  var svg = '<svg class="sr-chart-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Requests per '+(step===7?'week':'day')+', '+esc(srRangeLabel(f))+'">';
+  var svg = '<svg class="sr-chart-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Requests per day, '+esc(d.label)+'">';
   for(var t=0;t<=top;t+=tickStep){
-    svg += '<line class="sr-grid" x1="'+L+'" x2="'+(W-6)+'" y1="'+y(t)+'" y2="'+y(t)+'"/>'
-      + '<text class="sr-axis" x="'+(L-6)+'" y="'+(y(t)+3.5)+'" text-anchor="end">'+t+'</text>';
+    svg += '<line class="sr-grid" x1="'+L+'" x2="'+(W-R)+'" y1="'+y(t)+'" y2="'+y(t)+'"/>'
+      + '<text class="sr-axis" x="'+(L-8)+'" y="'+(y(t)+4)+'" text-anchor="end">'+t+'</text>';
   }
-  var labelEvery = Math.max(1, Math.ceil(buckets.length/6));
-  buckets.forEach(function(b, i){
-    var cx = L + bw*i + bw/2, x = cx - barW/2, total = b.doc + b.land;
+  bars.forEach(function(b, i){
+    var cx = L + slot*i + slot/2, x = cx - barW/2;
     var hDoc = b.doc/top*plotH, hLand = b.land/top*plotH, gap = (b.doc && b.land) ? 2 : 0;
-    var when = step===7 ? phFormatDate(b.start)+' – '+phFormatDate(b.end) : phFormatDate(b.start);
+    var when = phFormatDate(b.day);
     svg += '<g class="sr-bar" tabindex="0" data-tip="'+esc(when)+'|'+b.doc+'|'+b.land+'" aria-label="'+esc(when)+': '+b.doc+' document, '+b.land+' land transfer">'
-      + '<rect class="sr-hit" x="'+(L+bw*i)+'" y="'+T+'" width="'+bw+'" height="'+plotH+'"/>';
+      + '<rect class="sr-hit" x="'+(L+slot*i)+'" y="'+T+'" width="'+slot+'" height="'+plotH+'"/>';
     if(b.doc) svg += '<path class="sr-doc" d="'+srBarPath(x, y(0), barW, hDoc, !b.land)+'"/>';
-    if(b.land) svg += '<path class="sr-land" d="'+srBarPath(x, y(0)-hDoc-gap, barW, Math.max(0,hLand-(b.doc?0:0)), true)+'"/>';
-    if(total===0) svg += '<rect class="sr-zero" x="'+x+'" y="'+(y(0)-1)+'" width="'+barW+'" height="1"/>';
+    if(b.land) svg += '<path class="sr-land" d="'+srBarPath(x, y(0)-hDoc-gap, barW, hLand, true)+'"/>';
     svg += '</g>';
-    if(i % labelEvery === 0) svg += '<text class="sr-axis" x="'+cx+'" y="'+(H-6)+'" text-anchor="middle">'+esc(phFormatDate(b.start).replace(/, \d{4}$/,''))+'</text>';
+    var dayNum = Number(b.day.slice(8,10));
+    if(dayNum===1 || dayNum%5===0) svg += '<text class="sr-axis" x="'+cx+'" y="'+(H-8)+'" text-anchor="middle">'+dayNum+'</text>';
   });
-  svg += '<line class="sr-baseline" x1="'+L+'" x2="'+(W-6)+'" y1="'+y(0)+'" y2="'+y(0)+'"/></svg>';
+  svg += '<line class="sr-baseline" x1="'+L+'" x2="'+(W-R)+'" y1="'+y(0)+'" y2="'+y(0)+'"/></svg>';
   return svg;
 }
 /* Bar rising from baseline y0 with height h; 4px rounded top when roundTop. */
@@ -1777,60 +1791,63 @@ function srBarPath(x, y0, w, h, roundTop){
   return 'M'+x+','+y0+'V'+(yt+r)+(r?'Q'+x+','+yt+' '+(x+r)+','+yt:'')+'H'+(x+w-r)+(r?'Q'+(x+w)+','+yt+' '+(x+w)+','+(yt+r):'')+'V'+y0+'Z';
 }
 
+function srSummaryCard(kind, title, firstCol, summary){
+  var icon = kind==='doc' ? 'doc' : 'house';
+  var cell = function(r, isTotal){
+    return '<tr'+(isTotal?' class="sr-total"':'')+'><td>'+esc(r.label)+'</td><td>'+r.total+'</td>'
+      + '<td>'+(r.avgProcessingSeconds==null ? '<span class="sr-na" title="No completed processing times recorded">—</span>' : esc(srHumanDuration(r.avgProcessingSeconds)))+'</td>'
+      + '<td>'+(r.completionRate==null ? '<span class="sr-na">—</span>' : r.completionRate+'%')+'</td></tr>';
+  };
+  return '<section class="sr-card sr-sum"><div class="sr-sum-head"><h3>'+ic(icon,'20px')+esc(title)+'</h3>'
+      + '<button type="button" class="sr-viewall" data-action="sr-viewall" data-kind="'+kind+'">View All</button></div>'
+    + '<div class="sr-sum-wrap"><table class="sr-sum-table"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"></colgroup>'
+    + '<thead><tr><th>'+esc(firstCol)+'</th><th>Total Requests</th><th>Avg. Processing Time</th><th>Completion Rate</th></tr></thead><tbody>'
+    + (summary.rows.length ? summary.rows.map(function(r){ return cell(r,false); }).join('') : '<tr><td colspan="4" class="sr-empty">No records for this category yet.</td></tr>')
+    + cell(summary.total, true)
+    + '</tbody></table></div></section>';
+}
+
 function renderReports(acct){
-  var sr = srState(), f = sr.applied, d = sr.draft;
-  var all = srAllRequests();
-  var list = srFilter(all, f, f.from, f.to);
-  var span = srDays(f.from, f.to);
-  var prev = srFilter(all, f, phAddDays(f.from, -span), phAddDays(f.from, -1));
-  var c = srCounts(list), p = srCounts(prev);
-  var barangays = all.map(function(x){ return String(x.r.barangay||'').toUpperCase(); }).filter(function(b,i,a){ return b && a.indexOf(b)===i; }).sort();
+  var sr = srState();
+  if(!sr.data && !sr.loading && !sr.error) srLoad();
+  var d = sr.data;
   var typeLabel = {all:'All Requests', doc:'Document Requests', land:'Land Transfer Requests'};
-  // detailed table: search + pagination (5 per page, newest first)
-  var q = String(sr.q||'').toLowerCase();
-  var rows = list.filter(function(x){ return !q || (x.r.id+' '+x.r.applicant).toLowerCase().indexOf(q)>-1; })
-    .sort(function(a,b){ return String(b.r.submitted).localeCompare(String(a.r.submitted)); });
-  var per = 5, pages = Math.max(1, Math.ceil(rows.length/per)); if(sr.page>pages) sr.page = pages;
-  var pageRows = rows.slice((sr.page-1)*per, sr.page*per);
-  var pager = '';
-  if(rows.length > per){
-    var nums = '';
-    for(var n=1;n<=pages;n++) nums += '<button type="button" class="'+(n===sr.page?'active':'')+'" data-action="sr-page" data-page="'+n+'"'+(n===sr.page?' aria-current="page"':'')+'>'+n+'</button>';
-    pager = '<div class="sr-pager-btns"><button type="button" data-action="sr-page" data-page="'+(sr.page-1)+'" aria-label="Previous page"'+(sr.page<=1?' disabled':'')+'>'+ic('chevLeft','15px')+'</button>'+nums
-      + '<button type="button" data-action="sr-page" data-page="'+(sr.page+1)+'" aria-label="Next page"'+(sr.page>=pages?' disabled':'')+'>'+ic('chevRight','15px')+'</button></div>';
-  }
-  var generated = new Date(sr.generatedAt||Date.now());
-  var genParts = phPartsFromStored(generated.toISOString());
-  var summaryRows = [
-    ['Report Type', typeLabel[f.type] + (f.brgy!=='all' ? ' · Barangay '+f.brgy : '')],
-    ['Date Range', srRangeLabel(f)],
-    ['Generated By', acct.fullName+' ('+(acct.position||ROLE_LABEL[acct.role])+')'],
-    ['Generated On', phFormatDate(genParts.date)+', '+phFormatTime(genParts.time)]
-  ];
-  // Saved reports (existing feature) keep their table + View Details.
-  var saved = state.reports.slice().sort(function(a,b){ return String(b.dateGenerated).localeCompare(String(a.dateGenerated)); });
-  return ''
-  + '<div class="page-head"><div><h1>System Report</h1><p>View and manage system reports based on your access level.</p></div></div>'
-  + '<div class="sysreport" id="sysreport">'
-  + '<section class="sr-card sr-filters" aria-label="Report filters">'
-    + '<div class="sr-filter"><label>'+ic('calendar','16px')+'<span>Date Range</span></label><div class="sr-range"><input type="date" data-sr-draft="from" value="'+esc(d.from)+'" aria-label="Start date"><span>–</span><input type="date" data-sr-draft="to" value="'+esc(d.to)+'" aria-label="End date"></div></div>'
+  var years = (d && d.years) || [sr.year];
+  if(years.indexOf(sr.draftYear)<0) years = years.concat([sr.draftYear]).sort();
+  var head = '<div class="page-head"><div><h1>System Report</h1><p>View and manage system reports based on your access level.</p></div></div>';
+  var filters = '<section class="sr-card sr-filters" aria-label="Report filters">'
+    + '<div class="sr-filter"><label for="sr-month">'+ic('calendar','16px')+'<span>Month</span></label><div class="sr-period">'
+      + '<select id="sr-month" data-sr-draft="draftMonth" aria-label="Month">'+SR_MONTHS.map(function(m,i){ return '<option value="'+(i+1)+'"'+(sr.draftMonth===i+1?' selected':'')+'>'+m+'</option>'; }).join('')+'</select>'
+      + '<select id="sr-year" data-sr-draft="draftYear" aria-label="Year">'+years.map(function(y){ return '<option value="'+y+'"'+(sr.draftYear===y?' selected':'')+'>'+y+'</option>'; }).join('')+'</select></div></div>'
     + '<div class="sr-filter"><label for="sr-type">'+ic('doc','16px')+'<span>Report Type</span></label><select id="sr-type" data-sr-draft="type">'
-      + ['all','doc','land'].map(function(k){ return '<option value="'+k+'"'+(d.type===k?' selected':'')+'>'+typeLabel[k]+'</option>'; }).join('')+'</select></div>'
-    + '<div class="sr-filter"><label for="sr-brgy">'+ic('building','16px')+'<span>Barangay</span></label><select id="sr-brgy" data-sr-draft="brgy"><option value="all">All Barangays</option>'
-      + barangays.map(function(b){ return '<option value="'+esc(b)+'"'+(d.brgy===b?' selected':'')+'>'+esc(b)+'</option>'; }).join('')+'</select></div>'
-    + '<button type="button" class="btn btn-primary sr-generate" data-action="sr-generate">'+ic('fileBar','17px')+' Generate Report</button>'
-    + '<p class="field-error sr-range-error" data-sr-error hidden></p>'
-  + '</section>'
+      + ['all','doc','land'].map(function(k){ return '<option value="'+k+'"'+(sr.type===k?' selected':'')+'>'+typeLabel[k]+'</option>'; }).join('')+'</select></div>'
+    + '<button type="button" class="btn btn-primary sr-generate" data-action="sr-generate"'+(sr.loading?' disabled aria-busy="true"':'')+'>'+ic('fileBar','17px')+(sr.loading?' Generating…':' Generate Report')+'</button>'
+  + '</section>';
+  if(!d){
+    return head + '<div class="sysreport" id="sysreport">' + filters
+      + '<section class="sr-card"><div class="empty-state">'+(sr.error ? esc(sr.error)+' <button type="button" class="dash-link" data-action="sr-generate">Try again</button>' : 'Loading report…')+'</div></section></div>';
+  }
+  var c = d.cards, p = d.previousCards;
+  var gen = phPartsFromStored(String(d.generatedAt||''));
+  var summaryRows = [
+    ['Report Type', typeLabel[sr.type]],
+    ['Period', d.label+' ('+phFormatDate(d.from)+' – '+phFormatDate(d.to)+')'],
+    ['Generated By', acct.fullName+' ('+(acct.position||ROLE_LABEL[acct.role])+')'],
+    ['Generated On', gen.date ? phFormatDate(gen.date)+', '+phFormatTime(gen.time) : '—']
+  ];
+  return head
+  + '<div class="sysreport" id="sysreport">' + filters
+  + (sr.error ? '<p class="field-error">'+esc(sr.error)+'</p>' : '')
   + '<div class="sr-stats">'
+    + srStatCard('Total Document Request', c.documents, p.documents, 'tone-green', false)
+    + srStatCard('Total Land Transfer', c.landTransfers, p.landTransfers, 'tone-gray', false)
     + srStatCard('Total Requests', c.total, p.total, 'tone-green', false)
-    + srStatCard('In Progress', c.progress, p.progress, 'tone-gray', false)
-    + srStatCard('Completed', c.completed, p.completed, 'tone-green', false)
     + srStatCard('Overdue', c.overdue, p.overdue, 'tone-red', true)
   + '</div>'
   + '<div class="sr-mid">'
-    + '<section class="sr-card sr-overview"><h3>'+ic('fileBar','18px')+'Requests Overview</h3>'
-      + '<div class="sr-chart" data-sr-chart>'+srChart(list, f)+'<div class="sr-tip" data-sr-tip hidden></div></div>'
-      + '<div class="sr-legend"><span><i class="sr-key doc"></i>Document Requests</span><span><i class="sr-key land"></i>Land Transfer Requests</span></div>'
+    + '<section class="sr-card sr-overview"><div class="sr-overview-head"><h3>'+ic('fileBar','18px')+'Requests Overview</h3><span class="sr-overview-sub">Per day · '+esc(d.label)+'</span></div>'
+      + '<div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, sr.type)+'</div><div class="sr-tip" data-sr-tip hidden></div></div>'
+      + '<div class="sr-legend">'+(sr.type!=='land'?'<span><i class="sr-key doc"></i>Document Requests</span>':'')+(sr.type!=='doc'?'<span><i class="sr-key land"></i>Land Transfer Requests</span>':'')+'</div>'
     + '</section>'
     + '<section class="sr-card sr-summary"><h3>'+ic('doc','18px')+'Report Summary</h3>'
       + '<dl>'+summaryRows.map(function(r){ return '<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>'; }).join('')+'</dl>'
@@ -1838,29 +1855,30 @@ function renderReports(acct){
       + '<button type="button" class="btn btn-primary" data-action="sr-pdf">'+ic('printIcon','16px')+' Download PDF</button></div>'
     + '</section>'
   + '</div>'
-  + '<section class="sr-card sr-detail" id="sr-detail" tabindex="-1"><div class="sr-detail-head"><h3>'+ic('doc','18px')+'Detailed Report</h3>'
-      + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search request ID, client name…" value="'+esc(sr.q)+'" data-input="sr-search" aria-label="Search detailed report"></div></div>'
-    + '<div class="sr-table-wrap"><table class="sr-table"><thead><tr><th>Request ID</th><th>Client Name</th><th>Type</th><th>Status</th><th>Date Submitted</th><th>Processing Time</th><th>Assigned To</th></tr></thead><tbody>'
-    + (pageRows.length ? pageRows.map(function(x){
-        var r = x.r, m = STATUS_META[r.status] || {cls:'slate'};
-        return '<tr class="sr-row" data-action="view-'+x.kind+'-req" data-id="'+esc(r.id)+'" tabindex="0" aria-label="Open request '+esc(r.id)+'">'
-          + '<td>'+esc(r.id)+'</td><td>'+esc(r.applicant)+'</td><td>'+(x.kind==='doc'?'Document Request':'Land Transfer')+'</td>'
-          + '<td><span class="badge '+(srBucket(r.status)==='overdue'?'red':m.cls)+'">'+esc(statusLabel(r.status))+'</span></td>'
-          + '<td>'+esc(fmtDateTime(r.submitted))+'</td><td>'+esc(srProcessing(r))+'</td>'
-          + '<td>'+esc(r.processingStaffName || 'Unassigned')+'</td></tr>';
-      }).join('') : '<tr><td colspan="7"><div class="empty-state">No requests in this period'+(q?' match your search':'')+'.</div></td></tr>')
-    + '</tbody></table></div>'
-    + '<div class="sr-pager"><span>'+(rows.length ? 'Showing '+((sr.page-1)*per+1)+'–'+Math.min(sr.page*per, rows.length)+' of '+rows.length : 'Showing 0 of 0')+'</span>'+pager+'</div>'
-  + '</section>'
+  + '<div class="sr-sums" id="sr-detail" tabindex="-1">'
+    + srSummaryCard('doc', 'Document Request Summary', 'Report Title', d.documentSummary)
+    + srSummaryCard('land', 'Land Transfer Summary', 'Report Type', d.landSummary)
   + '</div>'
-  + '<section class="sr-card sr-saved"><h3>'+ic('fileBar','18px')+'Saved Reports</h3>'
-    + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Report Title</th><th>Type</th><th>Date Generated</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
-    + (saved.length ? saved.map(function(r){
-        return '<tr><td class="cell-name" data-label="Report Title">'+esc(r.title)+'</td><td data-label="Type"><span class="badge blue">'+REPORT_TYPE_LABEL[r.type]+'</span></td><td data-label="Date Generated">'+fmtDate(r.dateGenerated)+'</td>'
-          + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-report" data-id="'+r.id+'">'+ic('eye','13px')+'View Details</button></div></td></tr>';
-      }).join('') : '<tr><td colspan="4"><div class="empty-state">No saved reports yet.</div></td></tr>')
+  + '</div>';
+}
+
+/* View All: every request of one category for the reported month. */
+function modalSrViewAll(kind){
+  var sr = srState(), d = sr.data;
+  if(!d) return '';
+  var rows = d.requests.filter(function(r){ return r.kind===kind; });
+  var title = (kind==='doc' ? 'Document Requests' : 'Land Transfers')+' — '+d.label;
+  return '<div class="modal-head"><div><h3>'+esc(title)+'</h3><p>'+rows.length+' request'+(rows.length===1?'':'s')+' submitted '+esc(phFormatDate(d.from))+' – '+esc(phFormatDate(d.to))+'</p></div><button class="modal-close" data-action="close-modal" aria-label="Close">'+ic('x','15px')+'</button></div>'
+    + '<div class="sr-table-wrap"><table class="sr-table"><thead><tr><th>Request ID</th><th>Client Name</th><th>'+(kind==='doc'?'Document Type':'Transfer Type')+'</th><th>Status</th><th>Date Submitted</th><th>Processing Time</th><th>Assigned To</th></tr></thead><tbody>'
+    + (rows.length ? rows.map(function(r){
+        var m = STATUS_META[r.status] || {cls:'slate'};
+        var known = kind==='doc' ? findDocReq(r.id) : findLandReq(r.id);
+        return '<tr'+(known?' class="sr-row" data-action="view-'+kind+'-req" data-id="'+esc(r.id)+'" tabindex="0"':'')+'><td>'+esc(r.id)+'</td><td>'+esc(r.client||'—')+'</td><td>'+esc(r.type||'—')+'</td>'
+          + '<td><span class="badge '+(r.status==='Timed Out'?'red':m.cls)+'">'+esc(statusLabel(r.status))+'</span></td>'
+          + '<td>'+esc(fmtDateTime(r.submitted))+'</td><td>'+esc(srHumanDuration(r.processingSeconds))+'</td><td>'+esc(r.assignedTo||'Unassigned')+'</td></tr>';
+      }).join('') : '<tr><td colspan="7"><div class="empty-state">No requests in this month.</div></td></tr>')
     + '</tbody></table></div>'
-  + '</section>';
+    + '<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Close</button></div>';
 }
 
 /* ---------------- Staff views ---------------- */
@@ -2307,6 +2325,7 @@ function renderModal(){
   if(m.type==='edit-staff') return modalWrap(modalEditStaff(m.id));
   if(m.type==='ann-edit') return modalWrap(modalAnnEdit(m.id), false, 'composer-modal');
   if(m.type==='report-detail') return modalWrap(modalReportDetail(m.id));
+  if(m.type==='sr-viewall') return modalWrap(modalSrViewAll(m.kind), false, 'sr-viewall-modal');
   if(m.type==='doc-detail') return modalWrap(modalReqDetail(m.id,'doc'), false, 'req-detail');
   if(m.type==='land-detail') return modalWrap(modalReqDetail(m.id,'land'), false, 'req-detail');
   if(m.type==='req-result-detail') return modalWrap(modalReqResultDetail(m.ref));
@@ -2922,8 +2941,9 @@ function bindEvents(){
 
   app.querySelectorAll('[data-sr-draft]').forEach(function(input){
     input.addEventListener('change', function(){
-      var srd = srState(); srd.draft[input.getAttribute('data-sr-draft')] = input.value;
-      var srErr = document.querySelector('[data-sr-error]'); if(srErr) srErr.hidden = true;
+      var srd = srState(), k = input.getAttribute('data-sr-draft');
+      if(k==='type'){ srd.type = input.value; render(); }
+      else srd[k] = Number(input.value);
     });
   });
   var srChartEl = app.querySelector('[data-sr-chart]');
@@ -3198,19 +3218,14 @@ function bindEvents(){
       render();
     } else if(action==='sr-generate'){
       var srs = srState();
-      if(!srs.draft.from || !srs.draft.to || srs.draft.from > srs.draft.to){
-        var srErr = document.querySelector('[data-sr-error]');
-        if(srErr){ srErr.textContent = 'Choose a start date that is on or before the end date.'; srErr.hidden = false; }
-        return;
-      }
-      srs.applied = {from:srs.draft.from, to:srs.draft.to, type:srs.draft.type, brgy:srs.draft.brgy};
-      srs.generatedAt = new Date().toISOString();
-      srs.page = 1;
+      srs.month = Number(srs.draftMonth); srs.year = Number(srs.draftYear);
+      srs.data = null; srs.error = '';
+      srLoad();
       render();
-      pushToast('Report generated for '+srRangeLabel(srs.applied)+'.', 'check');
-    } else if(action==='sr-page'){
-      var srp = srState(), pg2 = Number(el.getAttribute('data-page'))||1;
-      if(!el.disabled){ srp.page = Math.max(1, pg2); render(); var dt = document.getElementById('sr-detail'); if(dt) dt.scrollIntoView({block:'nearest'}); }
+      if(!srApiUrl()) pushToast('Report generated for '+SR_MONTHS[srs.month-1]+' '+srs.year+'.', 'check');
+    } else if(action==='sr-viewall'){
+      state.modal = {type:'sr-viewall', kind: el.getAttribute('data-kind')==='land' ? 'land' : 'doc'};
+      render();
     } else if(action==='sr-view'){
       var det = document.getElementById('sr-detail');
       if(det){ det.scrollIntoView({behavior:'smooth', block:'start'}); det.focus({preventScroll:true}); }
@@ -3285,7 +3300,6 @@ function bindEvents(){
     else if(key==='search-announcements') state.search.announcements = el.value;
     else if(key==='search-reports') state.search.reports = el.value;
     else if(key==='search-sent-notifs'){ state.search.sentNotifs = el.value; setPage('sentNotifs',1); }
-    else if(key==='sr-search'){ var srq = srState(); srq.q = el.value; srq.page = 1; }
     else return;
     render();
     var newEl = document.querySelector('[data-input="'+key+'"]');
