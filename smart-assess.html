@@ -490,8 +490,9 @@
   select::-ms-expand{ display:none; }
   /* Client form controls share one height (text inputs, native selects and
      the custom barangay picker were 45px vs 48px). */
-  .field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .field select, .barangay-trigger{ min-height:48px; }
+  .field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .field select:not(.barangay-native-select), .barangay-trigger{ min-height:48px; }
   .contact-input, .arp-input{ min-height:48px; }
+  .field .contact-input > input, .field .arp-input > input{ min-height:0; }
 </style>
 
 <div id="app"></div>
