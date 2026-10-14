@@ -935,46 +935,54 @@
     body.printing-allreq > *:not(#sr-print-all){ display:none !important; }
     body.printing-allreq #sr-print-all{ display:block; }
   }
-  .rp{ color:#000; background:#fff; font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; font-size:9.5pt; line-height:1.35;
+  #sr-print-all .rp{ color:#000; background:#fff; font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; font-size:9.5pt; line-height:1.35;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .rp *{ box-sizing:border-box; }
-  .rp-head{ display:grid; grid-template-columns:22mm 1fr 22mm; align-items:center; gap:4mm; padding-bottom:3mm; border-bottom:1.6pt solid #000; }
-  .rp-seal{ width:21mm; height:21mm; object-fit:contain; }
-  .rp-gov{ text-align:center; font-family:"Times New Roman", Times, serif; font-size:10.5pt; line-height:1.3; }
-  .rp-gov .rp-office{ font-size:13pt; font-weight:700; letter-spacing:.04em; margin-top:1mm; }
-  .rp-gov .rp-system{ font-size:9pt; letter-spacing:.14em; margin-top:.5mm; }
-  .rp-rule{ border-top:.5pt solid #000; margin-top:.8mm; }
-  .rp-title{ margin:5mm 0 1mm; text-align:center; font-family:"Times New Roman", Times, serif; font-size:15pt; font-weight:700; letter-spacing:.06em; }
-  .rp-subtitle{ text-align:center; font-size:10pt; margin-bottom:4mm; }
-  .rp-meta{ width:100%; border-collapse:collapse; margin-bottom:4mm; font-size:9.5pt; }
-  .rp-meta th, .rp-meta td{ border:.5pt solid #9a9a9a; padding:1.4mm 2.4mm; text-align:left; vertical-align:top; }
-  .rp-meta th{ width:34mm; background:#efefef; font-weight:700; }
-  .rp h2{ margin:5mm 0 2mm; font-size:10.5pt; font-weight:700; text-transform:uppercase; letter-spacing:.05em; break-after:avoid; page-break-after:avoid; }
-  .rp-section{ break-inside:avoid; page-break-inside:avoid; }
-  .rp-grid{ display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:6mm; align-items:start; }
-  .rp-table{ width:100%; border-collapse:collapse; font-size:9pt; }
-  .rp-table th, .rp-table td{ border:.5pt solid #9a9a9a; padding:1.3mm 2mm; vertical-align:top; overflow-wrap:anywhere; word-break:break-word; }
-  .rp-table thead th{ background:#e2e2e2; font-weight:700; text-align:left; vertical-align:bottom; }
-  .rp-table thead{ display:table-header-group; }
-  .rp-table tfoot{ display:table-row-group; }
-  .rp-table tr{ break-inside:avoid; page-break-inside:avoid; }
-  .rp-table tbody tr:nth-child(even) td{ background:#f4f4f4; }
-  .rp-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .rp-table .ctr{ text-align:center; }
-  .rp-table .nowrap{ white-space:nowrap; }
-  .rp-table .rp-total td{ font-weight:700; background:#e9e9e9 !important; border-top:1pt solid #000; }
-  .rp-table .rp-empty{ text-align:center; padding:6mm 2mm; font-style:italic; }
-  .rp-list col.c-no{ width:8mm; } .rp-list col.c-ref{ width:30mm; } .rp-list col.c-client{ width:40mm; }
-  .rp-list col.c-req{ width:24mm; } .rp-list col.c-type{ width:auto; } .rp-list col.c-date{ width:30mm; }
-  .rp-list col.c-status{ width:24mm; } .rp-list col.c-time{ width:20mm; } .rp-list col.c-staff{ width:34mm; }
-  .rp-note{ margin-top:2mm; font-size:8.5pt; }
-  .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:18mm; margin-top:9mm; break-inside:avoid; page-break-inside:avoid; }
-  .rp-sign-label{ font-size:9.5pt; margin-bottom:13mm; }
-  .rp-sign-line{ border-top:.8pt solid #000; padding-top:1mm; text-align:center; font-size:9pt; }
-  .rp-sign-role{ text-align:center; font-size:9pt; font-weight:700; margin-top:.6mm; }
-  .rp-sign-date{ margin-top:6mm; font-size:9pt; display:flex; gap:2mm; align-items:flex-end; }
-  .rp-sign-date span{ flex:1; border-bottom:.8pt solid #000; height:4mm; }
-  .rp-end{ margin-top:6mm; text-align:center; font-size:8.5pt; letter-spacing:.08em; }
+  #sr-print-all .rp *{ box-sizing:border-box; }
+  #sr-print-all .rp-head{ display:grid; grid-template-columns:22mm 1fr 22mm; align-items:center; gap:4mm; padding-bottom:3mm; border-bottom:1.6pt solid #000; }
+  #sr-print-all .rp-seal{ width:21mm; height:21mm; object-fit:contain; }
+  #sr-print-all .rp-gov{ text-align:center; font-family:"Times New Roman", Times, serif; font-size:10.5pt; line-height:1.3; }
+  #sr-print-all .rp-gov .rp-office{ font-size:13pt; font-weight:700; letter-spacing:.04em; margin-top:1mm; }
+  #sr-print-all .rp-gov .rp-system{ font-size:9pt; letter-spacing:.14em; margin-top:.5mm; }
+  #sr-print-all .rp-rule{ border-top:.5pt solid #000; margin-top:.8mm; }
+  #sr-print-all .rp-title{ margin:5mm 0 1mm; text-align:center; font-family:"Times New Roman", Times, serif; font-size:15pt; font-weight:700; letter-spacing:.06em; }
+  #sr-print-all .rp-subtitle{ text-align:center; font-size:10pt; margin-bottom:4mm; }
+  #sr-print-all .rp-meta{ width:100%; border-collapse:collapse; margin-bottom:4mm; font-size:9.5pt; }
+  #sr-print-all .rp-meta th, #sr-print-all .rp-meta td{ border:.5pt solid #9a9a9a; padding:1.4mm 2.4mm; text-align:left; vertical-align:top; }
+  #sr-print-all .rp-meta th{ width:34mm; background:#efefef; font-weight:700; }
+  #sr-print-all .rp h2{ margin:5mm 0 2mm; font-size:10.5pt; font-weight:700; text-transform:uppercase; letter-spacing:.05em; break-after:avoid; page-break-after:avoid; }
+  #sr-print-all .rp-section{ break-inside:avoid; page-break-inside:avoid; }
+  #sr-print-all .rp-grid{ display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:6mm; align-items:start; }
+  #sr-print-all .rp-table{ width:100%; border-collapse:collapse; font-size:9pt; }
+  #sr-print-all .rp-table th, #sr-print-all .rp-table td{ border:.5pt solid #9a9a9a; padding:1.3mm 2mm; vertical-align:top; overflow-wrap:anywhere; word-break:break-word; }
+  #sr-print-all .rp-table thead th{ background:#e2e2e2; font-weight:700; text-align:left; vertical-align:bottom; }
+  #sr-print-all .rp-table thead{ display:table-header-group; }
+  #sr-print-all .rp-table tfoot{ display:table-row-group; }
+  #sr-print-all .rp-table tr{ break-inside:avoid; page-break-inside:avoid; }
+  #sr-print-all .rp-table tbody tr:nth-child(even) td{ background:#f4f4f4; }
+  #sr-print-all .rp-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #sr-print-all .rp-table .ctr{ text-align:center; }
+  #sr-print-all .rp-table .nowrap{ white-space:nowrap; }
+  #sr-print-all .rp-table .rp-total td{ font-weight:700; background:#e9e9e9 !important; border-top:1pt solid #000; }
+  #sr-print-all .rp-table .rp-empty{ text-align:center; padding:6mm 2mm; font-style:italic; }
+  #sr-print-all .rp-list col.c-no{ width:8mm; } .rp-list col.c-ref{ width:30mm; } .rp-list col.c-client{ width:40mm; }
+  #sr-print-all .rp-list col.c-req{ width:24mm; } .rp-list col.c-type{ width:auto; } .rp-list col.c-date{ width:30mm; }
+  #sr-print-all .rp-list col.c-status{ width:24mm; } .rp-list col.c-time{ width:20mm; } .rp-list col.c-staff{ width:34mm; }
+  #sr-print-all .rp-note{ margin-top:2mm; font-size:8.5pt; }
+  #sr-print-all .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:18mm; margin-top:9mm; break-inside:avoid; page-break-inside:avoid; }
+  #sr-print-all .rp-sign-label{ font-size:9.5pt; margin-bottom:13mm; }
+  #sr-print-all .rp-sign-line{ border-top:.8pt solid #000; padding-top:1mm; text-align:center; font-size:9pt; }
+  #sr-print-all .rp-sign-role{ text-align:center; font-size:9pt; font-weight:700; margin-top:.6mm; }
+  #sr-print-all .rp-sign-date{ margin-top:6mm; font-size:9pt; display:flex; gap:2mm; align-items:flex-end; }
+  #sr-print-all .rp-sign-date span{ flex:1; border-bottom:.8pt solid #000; height:4mm; }
+  #sr-print-all .rp-end{ margin-top:6mm; text-align:center; font-size:8.5pt; letter-spacing:.08em; }
+  #sr-print-all .rp-table, #sr-print-all .rp-meta{ table-layout:auto; min-width:0; }
+  #sr-print-all .rp-list{ table-layout:fixed; }
+  #sr-print-all .rp-table th, #sr-print-all .rp-table td, #sr-print-all .rp-meta th, #sr-print-all .rp-meta td{ font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; color:#000; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.3; }
+  #sr-print-all .rp-table th, #sr-print-all .rp-table td{ font-size:8.5pt; padding:1.1mm 1.8mm; border:.5pt solid #8c8c8c; }
+  #sr-print-all .rp-meta th, #sr-print-all .rp-meta td{ font-size:9pt; padding:1.2mm 2.2mm; border:.5pt solid #8c8c8c; }
+  #sr-print-all .rp-table .nowrap, #sr-print-all .rp-table .num{ white-space:nowrap; }
+  #sr-print-all .rp-table tbody tr:hover{ background:none; }
+  #sr-print-all h2{ font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; color:#000; margin:4mm 0 1.6mm; font-size:10pt; }
 
   /* ============ Dropdowns (shared) ============
      One rule for every native single-select: a drawn chevron 14px from the
