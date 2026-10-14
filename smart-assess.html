@@ -1611,5 +1611,13 @@ function bindEvents(root){
 }
 
 render();
+// Re-render when the shown announcement expires while the page stays open.
+(function(){
+  let shown = (currentPublicAnnouncement()||{}).id || null;
+  setInterval(function(){
+    const now = (currentPublicAnnouncement()||{}).id || null;
+    if(now !== shown){ shown = now; if(state.view==='landing' || state.view==='announcement') render(); }
+  }, 30000);
+})();
 })();
 </script>
