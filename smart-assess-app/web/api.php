@@ -1949,6 +1949,22 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
         }
     }
 
+    // Monthly counts for the whole selected year (grouped bar chart).
+    $yearStart = new DateTimeImmutable(sprintf('%04d-01-01 00:00:00', $year), sa_schedule_timezone());
+    $monthly = [];
+    for ($m = 1; $m <= 12; $m++) {
+        $monthly[$m] = ['month' => $m, 'documents' => 0, 'landTransfers' => 0];
+    }
+    $byMonth = $pdo->prepare(
+        "SELECT MONTH(created_at) AS m, SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers
+         FROM requests WHERE created_at >= :ystart AND created_at < :yend GROUP BY MONTH(created_at)"
+    );
+    $byMonth->execute(['ystart' => $yearStart->format('Y-m-d H:i:s'), 'yend' => $yearStart->modify('+1 year')->format('Y-m-d H:i:s')]);
+    foreach ($byMonth->fetchAll() as $row) {
+        $monthly[(int) $row['m']]['documents'] = (int) $row['documents'];
+        $monthly[(int) $row['m']]['landTransfers'] = (int) $row['land_transfers'];
+    }
+
     // Valid processing duration of a completed request (seconds): the stored
     // duration, else completed - started; NULL when missing or negative.
     $duration = "CASE WHEN processing_duration_seconds IS NOT NULL AND processing_duration_seconds >= 0 THEN processing_duration_seconds
@@ -2085,6 +2101,7 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
         'cards' => $counts($start, $end),
         'previousCards' => $counts($prevStart, $start),
         'daily' => array_values($daily),
+        'monthly' => array_values($monthly),
         'documentSummary' => $summary('docreq', 'document_type'),
         'landSummary' => $summary('landtransfer', 'transfer_type'),
         'staffPerformance' => $staffRows,
