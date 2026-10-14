@@ -972,14 +972,14 @@
   #sr-print-all .rp-top-line{ margin:0 0 2mm; padding:2mm 3mm; border-left:2pt solid #000; background:#f3f3f3; break-after:avoid; page-break-after:avoid; }
   #sr-print-all .rp-note{ margin:1.6mm 0 0; font-size:8pt; line-height:1.35; }
   #sr-print-all .rp-section{ break-inside:avoid; page-break-inside:avoid; }
-  #sr-print-all .rp-closing{ margin-top:8mm; break-inside:avoid; page-break-inside:avoid; }
+  #sr-print-all .rp-closing{ margin-top:6mm; break-inside:avoid; page-break-inside:avoid; }
   #sr-print-all .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:14mm; }
-  #sr-print-all .rp-sign-label{ font-size:9.5pt; font-weight:700; margin-bottom:10mm; }
+  #sr-print-all .rp-sign-label{ font-size:9.5pt; font-weight:700; margin-bottom:9mm; }
   #sr-print-all .rp-sign-line{ border-top:.8pt solid #000; padding-top:.8mm; text-align:center; font-size:8.5pt; }
   #sr-print-all .rp-sign-fields{ display:grid; grid-template-columns:1.6fr 1fr; gap:4mm; margin-top:4mm; }
   #sr-print-all .rp-sign-field{ display:flex; gap:1.5mm; align-items:flex-end; font-size:9pt; }
   #sr-print-all .rp-sign-field span{ flex:1; border-bottom:.8pt solid #000; min-height:4.5mm; text-align:center; font-size:9pt; }
-  #sr-print-all .rp-end{ margin-top:5mm; text-align:center; font-size:8pt; letter-spacing:.08em; }
+  #sr-print-all .rp-end{ margin-top:4mm; text-align:center; font-size:8pt; letter-spacing:.08em; }
 
   /* ============ Dropdowns (shared) ============
      One rule for every native single-select: a drawn chevron 14px from the
@@ -2027,9 +2027,8 @@ function srPrintAllRequestsHtml(d, acct){
         }).join('')
       + '</tbody></table>';
   }
-  staffBlock += '<p class="rp-note">Ranking basis: requests whose processing the staff member completed between '+esc(phFormatDate(d.from))+' and '+esc(phFormatDate(d.to))
-    + ', ranked first by total requests completed, then by the faster average processing time when totals are equal. Averages use only valid recorded processing durations; '
-    + 'staff with identical results share a rank. Staff with no completed requests in this period are not ranked.</p></section>';
+  staffBlock += '<p class="rp-note">Ranking basis: requests the staff member completed from '+esc(phFormatDate(d.from))+' to '+esc(phFormatDate(d.to))
+    + ', ranked by total completed, then by faster average processing time (valid recorded durations only). Identical results share a rank; staff with no completions are not ranked.</p></section>';
 
   return '<div class="rp">'
     + '<header class="rp-head"><img class="rp-seal" src="data:image/png;base64,'+LOGO_B64+'" alt="Municipality of Mabini seal">'
