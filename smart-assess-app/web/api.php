@@ -1903,9 +1903,6 @@ function sa_announcement_transition(array $data): array
     return ['announcement_id' => (int) $id, 'status' => $statuses[$transition]];
 }
 
-/** Statuses that count as completed in reports (same rule as the Head dashboard). */
-const SA_REPORT_COMPLETED_STATUSES = ['Approved', 'Out for Release'];
-
 /**
  * Department Head monthly System Report. Every figure comes from one month of
  * `requests` (by created_at, Asia/Manila wall time — MySQL's clock and the
