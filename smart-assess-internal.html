@@ -3021,6 +3021,14 @@ function bindEvents(){
       var again = document.getElementById(k==='draftMonth' ? 'sr-month' : 'sr-year'); if(again) again.focus();
     });
   });
+  // Narrow screens: the month chart scrolls sideways; bring the selected month into view.
+  app.querySelectorAll('.sr-chart-scroll').forEach(function(sc){
+    var band = sc.querySelector('.sr-band');
+    if(!band || sc.scrollWidth <= sc.clientWidth) return;
+    var svg = sc.querySelector('svg'), vb = svg.viewBox.baseVal, scale = svg.getBoundingClientRect().width / vb.width;
+    var center = (Number(band.getAttribute('x')) + Number(band.getAttribute('width'))/2) * scale;
+    sc.scrollLeft = Math.max(0, center - sc.clientWidth/2);
+  });
   app.querySelectorAll('[data-sr-chart]').forEach(function(srChartEl){
     var tip = srChartEl.querySelector('[data-sr-tip]');
     var showTip = function(g){
