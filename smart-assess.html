@@ -1415,13 +1415,18 @@ function bindEvents(root){
     const up = below < Math.min(wanted, 200) && above > below;
     const room = Math.max(up ? above : below, 120);
     const height = Math.min(wanted, room);
+    const left = r.left, top = up ? r.top - gap - height : r.bottom + gap;
     menu.style.position = 'fixed';
-    menu.style.left = r.left + 'px';
-    menu.style.width = r.width + 'px';
     menu.style.right = 'auto';
     menu.style.bottom = 'auto';
-    menu.style.top = (up ? r.top - gap - height : r.bottom + gap) + 'px';
+    menu.style.width = r.width + 'px';
     menu.style.maxHeight = height + 'px';
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    // A transformed ancestor (the step fade-in) becomes the containing block; correct for its offset.
+    const placed = menu.getBoundingClientRect();
+    menu.style.left = (2 * left - placed.left) + 'px';
+    menu.style.top = (2 * top - placed.top) + 'px';
     if(up) dropdown.classList.add('drop-up');
   }
   function repositionBarangayMenu(){
