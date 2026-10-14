@@ -234,7 +234,8 @@
   .step-pill.done .step-num svg{ width:12px; height:12px; }
   .step-label{ text-align:left; overflow:hidden; text-overflow:ellipsis; }
 
-  .wizard-card{ background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:hidden; }
+  /* overflow stays visible so the barangay option list can extend past the card instead of being clipped. */
+  .wizard-card{ background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:visible; }
   .wizard-card-head{ padding:28px 32px 4px; }
   .wizard-card-head h2{ font-size:21px; display:flex; align-items:center; gap:10px; margin-bottom:6px; }
   .wizard-card-head h2 .icon{ width:21px; height:21px; color:var(--brand-600); }
