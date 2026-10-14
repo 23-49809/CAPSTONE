@@ -1,0 +1,3 @@
+<div style="position:absolute;left:-10000px"><img id="a" src="/assets/LOGO.png"></div>
+<script>var t=performance.now(),i=document.getElementById('a');
+i.addEventListener('load',function(){ var l=performance.now()-t; i.decode().then(function(){ console.log('"DEC load='+Math.round(l)+' decoded='+Math.round(performance.now()-t)+'"'); }); });</script>
