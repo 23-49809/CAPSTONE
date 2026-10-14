@@ -89,6 +89,8 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
     $html = str_replace($scriptNeedle, $bridge . $scriptNeedle, $html);
 
     header('Content-Type: text/html; charset=UTF-8');
+    // Pages embed announcement data; never let a browser reuse a stale copy.
+    header('Cache-Control: no-store, private');
     echo $html;
     exit;
 }
