@@ -923,6 +923,59 @@
     body.printing-sysreport .sr-table{ min-width:0; }
   }
 
+  /* ============ All Requests — formal printed report ============
+     Built only when the Head prints with Report Type = All Requests
+     (srPrintAllRequests). It lives outside #app, is hidden on screen, and
+     while printing it is the only thing shown. Paper size and page-number
+     margin boxes are injected as a temporary <style> during that print, so
+     no other page's print layout changes. */
+  #sr-print-all{ display:none; }
+  @media print{
+    body.printing-allreq{ background:#fff !important; }
+    body.printing-allreq > *:not(#sr-print-all){ display:none !important; }
+    body.printing-allreq #sr-print-all{ display:block; }
+  }
+  .rp{ color:#000; background:#fff; font-family:Arial, "Helvetica Neue", Helvetica, sans-serif; font-size:9.5pt; line-height:1.35;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rp *{ box-sizing:border-box; }
+  .rp-head{ display:grid; grid-template-columns:22mm 1fr 22mm; align-items:center; gap:4mm; padding-bottom:3mm; border-bottom:1.6pt solid #000; }
+  .rp-seal{ width:21mm; height:21mm; object-fit:contain; }
+  .rp-gov{ text-align:center; font-family:"Times New Roman", Times, serif; font-size:10.5pt; line-height:1.3; }
+  .rp-gov .rp-office{ font-size:13pt; font-weight:700; letter-spacing:.04em; margin-top:1mm; }
+  .rp-gov .rp-system{ font-size:9pt; letter-spacing:.14em; margin-top:.5mm; }
+  .rp-rule{ border-top:.5pt solid #000; margin-top:.8mm; }
+  .rp-title{ margin:5mm 0 1mm; text-align:center; font-family:"Times New Roman", Times, serif; font-size:15pt; font-weight:700; letter-spacing:.06em; }
+  .rp-subtitle{ text-align:center; font-size:10pt; margin-bottom:4mm; }
+  .rp-meta{ width:100%; border-collapse:collapse; margin-bottom:4mm; font-size:9.5pt; }
+  .rp-meta th, .rp-meta td{ border:.5pt solid #9a9a9a; padding:1.4mm 2.4mm; text-align:left; vertical-align:top; }
+  .rp-meta th{ width:34mm; background:#efefef; font-weight:700; }
+  .rp h2{ margin:5mm 0 2mm; font-size:10.5pt; font-weight:700; text-transform:uppercase; letter-spacing:.05em; break-after:avoid; page-break-after:avoid; }
+  .rp-section{ break-inside:avoid; page-break-inside:avoid; }
+  .rp-grid{ display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:6mm; align-items:start; }
+  .rp-table{ width:100%; border-collapse:collapse; font-size:9pt; }
+  .rp-table th, .rp-table td{ border:.5pt solid #9a9a9a; padding:1.3mm 2mm; vertical-align:top; overflow-wrap:anywhere; word-break:break-word; }
+  .rp-table thead th{ background:#e2e2e2; font-weight:700; text-align:left; vertical-align:bottom; }
+  .rp-table thead{ display:table-header-group; }
+  .rp-table tfoot{ display:table-row-group; }
+  .rp-table tr{ break-inside:avoid; page-break-inside:avoid; }
+  .rp-table tbody tr:nth-child(even) td{ background:#f4f4f4; }
+  .rp-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .rp-table .ctr{ text-align:center; }
+  .rp-table .nowrap{ white-space:nowrap; }
+  .rp-table .rp-total td{ font-weight:700; background:#e9e9e9 !important; border-top:1pt solid #000; }
+  .rp-table .rp-empty{ text-align:center; padding:6mm 2mm; font-style:italic; }
+  .rp-list col.c-no{ width:8mm; } .rp-list col.c-ref{ width:30mm; } .rp-list col.c-client{ width:40mm; }
+  .rp-list col.c-req{ width:24mm; } .rp-list col.c-type{ width:auto; } .rp-list col.c-date{ width:30mm; }
+  .rp-list col.c-status{ width:24mm; } .rp-list col.c-time{ width:20mm; } .rp-list col.c-staff{ width:34mm; }
+  .rp-note{ margin-top:2mm; font-size:8.5pt; }
+  .rp-sign{ display:grid; grid-template-columns:1fr 1fr; gap:18mm; margin-top:9mm; break-inside:avoid; page-break-inside:avoid; }
+  .rp-sign-label{ font-size:9.5pt; margin-bottom:13mm; }
+  .rp-sign-line{ border-top:.8pt solid #000; padding-top:1mm; text-align:center; font-size:9pt; }
+  .rp-sign-role{ text-align:center; font-size:9pt; font-weight:700; margin-top:.6mm; }
+  .rp-sign-date{ margin-top:6mm; font-size:9pt; display:flex; gap:2mm; align-items:flex-end; }
+  .rp-sign-date span{ flex:1; border-bottom:.8pt solid #000; height:4mm; }
+  .rp-end{ margin-top:6mm; text-align:center; font-size:8.5pt; letter-spacing:.08em; }
+
   /* ============ Dropdowns (shared) ============
      One rule for every native single-select: a drawn chevron 14px from the
      right edge (matching the custom barangay picker), 40px reserved for it so
@@ -1889,6 +1942,97 @@ function srStaffCard(rows){
         return '<tr><td>'+esc(r.name)+'</td><td>'+r.documents+'</td><td>'+r.landTransfers+'</td><td>'+r.completed+'</td><td>'+t(r.avgProcessingSeconds)+'</td><td>'+t(r.fastestSeconds)+'</td><td>'+t(r.slowestSeconds)+'</td></tr>';
       }).join('') : '<tr><td colspan="7" class="sr-empty">No active staff accounts.</td></tr>')
     + '</tbody></table></div></section>';
+}
+
+/* ---- All Requests: formal printed report ----
+   Uses only the loaded monthly report data (d.requests / d.cards come from
+   the database via head_monthly_report). Names are never invented: the
+   signature lines are blank for the signatories to fill in by hand. */
+function srPrintAllRequestsHtml(d, acct){
+  var reqs = d.requests || [];
+  var kindLabel = {doc:'Document Request', land:'Land Transfer'};
+  var stamp = function(v){ var x = phPartsFromStored(String(v||'')); return x.date ? phFormatDate(x.date)+', '+phFormatTime(x.time) : '—'; };
+  var gen = phPartsFromStored(String(d.generatedAt||'')); if(!gen.date) gen = phNowParts();
+  var total = reqs.length;
+  var pct = function(n){ return total ? (Math.round(n/total*1000)/10).toFixed(1)+'%' : '0.0%'; };
+  // Status counts from the actual records: the standard statuses first (zero
+  // rows included so the summary is complete), then any other stored value.
+  var counts = {};
+  reqs.forEach(function(r){ var k = r.status || 'Unspecified'; counts[k] = (counts[k]||0) + 1; });
+  var statuses = STATUS_ORDER.concat(Object.keys(counts).filter(function(k){ return STATUS_ORDER.indexOf(k)<0; }).sort());
+  var byKind = function(kind, status){ return reqs.filter(function(r){ return r.kind===kind && (!status || (r.status||'Unspecified')===status); }).length; };
+  var statusRows = statuses.map(function(st){
+    return '<tr><td>'+esc(st)+'</td><td class="num">'+byKind('doc', st)+'</td><td class="num">'+byKind('land', st)+'</td><td class="num">'+(counts[st]||0)+'</td><td class="num">'+pct(counts[st]||0)+'</td></tr>';
+  }).join('');
+  var docTotal = byKind('doc'), landTotal = byKind('land');
+  var period = d.label+' ('+phFormatDate(d.from)+' – '+phFormatDate(d.to)+')';
+  var listRows = total ? reqs.map(function(r, i){
+    return '<tr><td class="num">'+(i+1)+'</td><td class="nowrap">'+esc(r.id||'—')+'</td><td>'+esc(r.client||'—')+'</td>'
+      + '<td>'+esc(kindLabel[r.kind]||'—')+'</td><td>'+esc(r.type||'—')+'</td><td>'+esc(stamp(r.submitted))+'</td>'
+      + '<td>'+esc(r.status||'—')+'</td><td class="num">'+esc(r.processingSeconds==null ? '—' : srHumanDuration(r.processingSeconds))+'</td>'
+      + '<td>'+esc(r.assignedTo||'—')+'</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="rp-empty">No requests were submitted during '+esc(d.label)+'.</td></tr>';
+  return '<div class="rp">'
+    + '<header class="rp-head"><img class="rp-seal" src="data:image/png;base64,'+LOGO_B64+'" alt="Municipality of Mabini seal">'
+      + '<div class="rp-gov"><div>Republic of the Philippines</div><div>Province of Batangas</div><div>Municipality of Mabini</div>'
+      + '<div class="rp-office">OFFICE OF THE MUNICIPAL ASSESSOR</div><div class="rp-rule"></div><div class="rp-system">SMART ASSESS · Assessor’s Office System</div></div><div></div></header>'
+    + '<div class="rp-title">ALL REQUESTS SUMMARY REPORT</div>'
+    + '<div class="rp-subtitle">For the month of '+esc(d.label)+'</div>'
+    + '<table class="rp-meta"><tbody>'
+      + '<tr><th>Reporting Period</th><td>'+esc(period)+'</td><th>Total Requests</th><td><strong>'+total+'</strong></td></tr>'
+      + '<tr><th>Date Generated</th><td>'+esc(phFormatDate(gen.date)+', '+phFormatTime(gen.time))+' (Philippine Time)</td><th>Generated By</th><td>'+esc(acct ? acct.fullName : '—')+'</td></tr>'
+    + '</tbody></table>'
+    + '<div class="rp-grid">'
+      + '<section class="rp-section"><h2>Summary by Status</h2><table class="rp-table"><thead><tr><th>Status</th><th class="num">Document Requests</th><th class="num">Land Transfers</th><th class="num">Total</th><th class="num">Share</th></tr></thead><tbody>'
+        + statusRows + '</tbody><tfoot><tr class="rp-total"><td>Total</td><td class="num">'+docTotal+'</td><td class="num">'+landTotal+'</td><td class="num">'+total+'</td><td class="num">'+(total?'100.0%':'0.0%')+'</td></tr></tfoot></table></section>'
+      + '<section class="rp-section"><h2>Summary by Request Type</h2><table class="rp-table"><thead><tr><th>Request Type</th><th class="num">Requests</th><th class="num">Share</th></tr></thead><tbody>'
+        + '<tr><td>Document Requests</td><td class="num">'+docTotal+'</td><td class="num">'+pct(docTotal)+'</td></tr>'
+        + '<tr><td>Land Transfers</td><td class="num">'+landTotal+'</td><td class="num">'+pct(landTotal)+'</td></tr>'
+        + '</tbody><tfoot><tr class="rp-total"><td>Total</td><td class="num">'+total+'</td><td class="num">'+(total?'100.0%':'0.0%')+'</td></tr></tfoot></table></section>'
+    + '</div>'
+    + '<h2>List of Requests</h2>'
+    + '<table class="rp-table rp-list"><colgroup><col class="c-no"><col class="c-ref"><col class="c-client"><col class="c-req"><col class="c-type"><col class="c-date"><col class="c-status"><col class="c-time"><col class="c-staff"></colgroup>'
+      + '<thead><tr><th class="num">No.</th><th>Reference No.</th><th>Client Name</th><th>Request Type</th><th>Document / Transfer Type</th><th>Date Submitted</th><th>Status</th><th class="num">Processing Time</th><th>Processed By</th></tr></thead>'
+      + '<tbody>'+listRows+'</tbody></table>'
+    + '<p class="rp-note">Covers all requests submitted from '+esc(phFormatDate(d.from))+' to '+esc(phFormatDate(d.to))+', listed newest first. Processing time is shown only for requests with a recorded processing duration.</p>'
+    + '<div class="rp-sign">'
+      + '<div><div class="rp-sign-label">Prepared by:</div><div class="rp-sign-line">Signature over Printed Name</div><div class="rp-sign-role">Authorized Reporting Staff</div><div class="rp-sign-date">Date:<span></span></div></div>'
+      + '<div><div class="rp-sign-label">Reviewed and noted by:</div><div class="rp-sign-line">Signature over Printed Name</div><div class="rp-sign-role">Municipal Assessor / Department Head</div><div class="rp-sign-date">Date:<span></span></div></div>'
+    + '</div>'
+    + '<div class="rp-end">— END OF REPORT —</div>'
+  + '</div>';
+}
+function srPrintAllRequests(d, acct){
+  var old = document.getElementById('sr-print-all'); if(old) old.remove();
+  var oldPage = document.getElementById('sr-print-page'); if(oldPage) oldPage.remove();
+  var host = document.createElement('div');
+  host.id = 'sr-print-all';
+  host.innerHTML = srPrintAllRequestsHtml(d, acct);
+  document.body.appendChild(host);
+  // Paper size and footer only exist for this print. Chrome/Edge fill the
+  // margin boxes; browsers without them still get the in-page report.
+  var page = document.createElement('style');
+  page.id = 'sr-print-page';
+  var foot = 'SMART ASSESS · All Requests Summary Report · '+d.label;
+  page.textContent = '@page{ size:A4 landscape; margin:14mm 12mm 16mm;'
+    + ' @bottom-left{ content:"For internal use only \\2014  Office of the Municipal Assessor, Mabini"; font:7.5pt Arial, sans-serif; color:#000; }'
+    + ' @bottom-center{ content:"'+foot.replace(/["\\]/g,'')+'"; font:7.5pt Arial, sans-serif; color:#000; }'
+    + ' @bottom-right{ content:"Page " counter(page) " of " counter(pages); font:7.5pt Arial, sans-serif; color:#000; } }';
+  document.head.appendChild(page);
+  var prevTitle = document.title;
+  document.title = 'All Requests Summary Report - '+d.label;   // default PDF file name
+  document.body.classList.add('printing-allreq');
+  var done = false;
+  var cleanup = function(){
+    if(done) return; done = true;
+    document.body.classList.remove('printing-allreq');
+    document.title = prevTitle;
+    host.remove(); page.remove();
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+  setTimeout(cleanup, 1000);
 }
 
 function renderReports(acct){
@@ -3299,7 +3443,10 @@ function bindEvents(){
       var det = document.getElementById('sr-detail');
       if(det){ det.scrollIntoView({behavior:'smooth', block:'start'}); det.focus({preventScroll:true}); }
     } else if(action==='sr-pdf'){
-      // Print only the report; the browser's print dialog offers "Save as PDF".
+      // All Requests prints the formal report; the other types keep the
+      // dashboard print. The browser's print dialog offers "Save as PDF".
+      var srp = srState();
+      if(srp.type==='all' && srp.data){ srPrintAllRequests(srp.data, currentAccount()); return; }
       document.body.classList.add('printing-sysreport');
       var cleanup = function(){ document.body.classList.remove('printing-sysreport'); window.removeEventListener('afterprint', cleanup); };
       window.addEventListener('afterprint', cleanup);
