@@ -110,10 +110,13 @@ $page['announcements'] = array_map(static function (array $announcement): array 
         'status' => (string) ($announcement['status'] ?? 'Draft'),
         'scheduledAt' => $announcement['scheduled_at'] ?? null,
         'publishedAt' => $announcement['published_at'] ?? null,
+        'visibleUntil' => $announcement['visible_until'] ?? null,
+        'staffExpiresAt' => $announcement['staff_expires_at'] ?? null,
+        'clientExpiresAt' => $announcement['client_expires_at'] ?? null,
     ];
 }, $page['announcements'] ?? []);
+$page['serverNow'] = sa_manila_now();
 if ($user && (int) $user['role_id'] !== 4) {
-    sa_publish_due_announcements();
     $page['announcements'] = array_map(static function (array $announcement): array {
         return [
             'id' => (string) $announcement['id'],
@@ -125,14 +128,12 @@ if ($user && (int) $user['role_id'] !== 4) {
             'status' => (string) $announcement['status'],
             'scheduledAt' => $announcement['scheduled_at'] ?? null,
             'publishedAt' => $announcement['published_at'] ?? null,
+            'staffExpiresAt' => $announcement['expires_at'] ?? null,
         ];
-    }, sa_db()->query(
-        "SELECT id, title, body, author, audience, start_date, status, scheduled_at, published_at
-         FROM announcements
-         WHERE status = 'Published' AND audience IN ('staff', 'both')
-           AND start_date <= CURDATE() AND (end_date IS NULL OR end_date >= CURDATE())
-         ORDER BY COALESCE(published_at, created_at) DESC"
-    )->fetchAll());
+    }, sa_visible_announcements(
+        'staff',
+        'id, title, body, author, audience, start_date, status, scheduled_at, published_at'
+    ));
 }
 $page['reports'] = [];
 $reportDate = date('Y-m-d');
