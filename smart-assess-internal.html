@@ -951,7 +951,9 @@
     text-transform:uppercase; letter-spacing:.04em; break-after:avoid; page-break-after:avoid; }
   #sr-print-all .rp-stats{ margin:0 0 2mm; font-size:9pt; break-after:avoid; page-break-after:avoid; }
   #sr-print-all .rp-stats b{ font-weight:700; }
-  #sr-print-all .rp-block{ break-inside:avoid; page-break-inside:avoid; }
+  /* Short sections stay on one page; long tables continue on the next page
+     with their headings repeated (the heading never sits alone). */
+  #sr-print-all .rp-keep{ break-inside:avoid; page-break-inside:avoid; }
   #sr-print-all .rp-table{ width:100%; border-collapse:collapse; table-layout:fixed; min-width:0; }
   #sr-print-all .rp-table thead{ display:table-header-group; }
   #sr-print-all .rp-table tfoot{ display:table-row-group; }
@@ -2007,7 +2009,8 @@ function srPrintAllRequestsHtml(d, acct){
       return '<tr'+(isTotal?' class="rp-total"':'')+'><td>'+esc(r.label)+'</td><td class="num">'+(r.total||0)+'</td><td class="num">'+(r.completed||0)+'</td>'
         + '<td class="num">'+esc(t(r.fastestSeconds))+'</td><td class="num">'+esc(t(r.slowestSeconds))+'</td></tr>';
     };
-    return '<section class="rp-block"><h2>'+esc(title)+'</h2>'
+    var rowCount = (sum.rows||[]).length + 1;
+    return '<section class="rp-block'+(rowCount<=12?' rp-keep':'')+'"><h2>'+esc(title)+'</h2>'
       + '<p class="rp-stats">Requests submitted: <b>'+submittedCount+'</b> &nbsp;·&nbsp; Completed: <b>'+(tot.completed||0)+'</b>'
         + ' &nbsp;·&nbsp; Average processing time: <b>'+esc(t(tot.avgProcessingSeconds))+'</b></p>'
       + '<table class="rp-table rp-sum"><colgroup><col class="c1"><col class="cn"><col class="cn"><col class="ct"><col class="ct"></colgroup>'
@@ -2018,7 +2021,7 @@ function srPrintAllRequestsHtml(d, acct){
 
   var ranked = srRankStaff(d.staffPerformance);
   var tops = ranked.filter(function(r){ return r.rank===1; });
-  var staffBlock = '<section class="rp-block"><h2>Top Performing Staff</h2>';
+  var staffBlock = '<section class="rp-block'+(ranked.length<=12?' rp-keep':'')+'"><h2>Top Performing Staff</h2>';
   if(!tops.length){
     staffBlock += '<p class="rp-top-line">No staff member completed a request during '+esc(d.label)+', so no top performer can be identified for this period.</p>';
   } else {
