@@ -47,6 +47,22 @@ function sa_has_column(string $table, string $column): bool
     return $cache[$key];
 }
 
+/** True when $table.$column accepts NULL (cached per request). */
+function sa_column_nullable(string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (!array_key_exists($key, $cache)) {
+        $stmt = sa_db()->prepare(
+            'SELECT IS_NULLABLE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c'
+        );
+        $stmt->execute(['t' => $table, 'c' => $column]);
+        $cache[$key] = strtoupper((string) $stmt->fetchColumn()) === 'YES';
+    }
+    return $cache[$key];
+}
+
 function sa_db(): PDO
 {
     static $pdo = null;
@@ -110,8 +126,13 @@ function sa_json_response(array $data, int $status = 200): never
 
 class SaHttpException extends RuntimeException
 {
-    public function __construct(public readonly int $statusCode, string $message = 'Request could not be completed.')
-    {
+    /** $errorCode: optional machine-readable reason sent as "code" in the JSON
+     *  error response, so the page can react (e.g. "terms_outdated"). */
+    public function __construct(
+        public readonly int $statusCode,
+        string $message = 'Request could not be completed.',
+        public readonly ?string $errorCode = null
+    ) {
         parent::__construct($message);
     }
 }

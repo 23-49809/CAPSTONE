@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/drafts.php';
+require_once __DIR__ . '/terms.php';
 
 /** Short random reference shown to the user and written to the log, so a
  *  reported error can be matched to its diagnostic entry. */
@@ -508,7 +510,7 @@ function sa_submit_request(array $data): array
         'middle_name' => [80, false],
         'last_name' => [80, true],
         'contact_number' => [20, true],
-        'email' => [150, true],
+        'email' => [150, false],
         'address_line' => [255, true],
         'province' => [80, false],
         'city' => [80, false],
@@ -536,8 +538,14 @@ function sa_submit_request(array $data): array
     if ($values['purpose'] === null) {
         throw new SaHttpException(422);
     }
-    if (!filter_var((string) $values['email'], FILTER_VALIDATE_EMAIL)) {
+    // Email is optional; when one is given it must be a valid address.
+    if ($values['email'] !== null && !filter_var($values['email'], FILTER_VALIDATE_EMAIL)) {
         throw new SaHttpException(422, 'Enter a valid email address.');
+    }
+    // Store a missing email as NULL; until the 20261015 migration makes the
+    // column nullable, fall back to an empty string so submission still works.
+    if ($values['email'] === null && !sa_column_nullable('requests', 'email')) {
+        $values['email'] = '';
     }
     if (!preg_match('/^\+63\d{10}$/', (string) $values['contact_number'])) {
         throw new SaHttpException(422, 'Enter 10 digits after the +63 contact prefix.');
@@ -594,8 +602,39 @@ function sa_submit_request(array $data): array
 
     $pdo = sa_db();
     $storedFiles = [];
+    $movedDraftFiles = [];
+    $draftCode = isset($data['draft_token']) && sa_drafts_enabled() ? sa_draft_normalize_code($data['draft_token']) : null;
     try {
         $pdo->beginTransaction();
+        // A submission that comes from a saved draft locks that draft. If it
+        // was already submitted (double click, retry after a lost response,
+        // second tab), return the existing reference instead of a duplicate.
+        $draft = null;
+        $draftFiles = [];
+        if ($draftCode !== null) {
+            $lock = $pdo->prepare('SELECT * FROM request_drafts WHERE token_hash = :h LIMIT 1 FOR UPDATE');
+            $lock->execute(['h' => sa_draft_hash($draftCode)]);
+            $draft = $lock->fetch() ?: null;
+            if ($draft !== null && $draft['submitted_reference'] !== null) {
+                $pdo->commit();
+                return ['reference_no' => (string) $draft['submitted_reference'], 'status' => 'Received', 'duplicate' => true];
+            }
+            if ($draft !== null && $draft['flow'] === $flow) {
+                $rows = $pdo->prepare('SELECT doc_key, original_name, stored_path, mime_type, file_size FROM request_draft_files WHERE draft_id = :id');
+                $rows->execute(['id' => $draft['id']]);
+                foreach ($rows->fetchAll() as $row) {
+                    $path = sa_draft_file_path((string) $row['stored_path']);
+                    if ($path !== null && is_file($path)) {
+                        $draftFiles[(string) $row['doc_key']] = $row + ['path' => $path];
+                    }
+                }
+                foreach ($draftFiles as $key => $_draftFile) {
+                    $documents[$key] ??= $key;
+                }
+            }
+        }
+        // Server-side Terms and Conditions check (not just the checkbox).
+        $termsAcceptanceId = sa_terms_require($pdo, $data, $flow);
         $reference = strtoupper($flow === 'docreq' ? 'DR' : 'LT') . '-' . date('Y') . '-' . strtoupper(bin2hex(random_bytes(4)));
         $stmt = $pdo->prepare(
             "INSERT INTO requests
@@ -669,6 +708,26 @@ function sa_submit_request(array $data): array
                     'file_size' => $size,
                     'file_status' => 'ok',
                 ]);
+            } elseif (isset($draftFiles[$key])) {
+                // Saved with the draft earlier; move it into the request folder.
+                $draftFile = $draftFiles[$key];
+                $extension = strtolower(pathinfo((string) $draftFile['path'], PATHINFO_EXTENSION));
+                $storedName = $requestId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
+                if (!rename((string) $draftFile['path'], $destination)) {
+                    throw new RuntimeException('Unable to store a saved draft file.');
+                }
+                $movedDraftFiles[$destination] = (string) $draftFile['path'];
+                $documentInsert->execute([
+                    'request_id' => $requestId,
+                    'doc_key' => $key,
+                    'label' => $label,
+                    'original_name' => $draftFile['original_name'],
+                    'stored_path' => 'private_uploads/requests/' . $storedName,
+                    'mime_type' => $draftFile['mime_type'],
+                    'file_size' => (int) $draftFile['file_size'],
+                    'file_status' => 'ok',
+                ]);
             } else {
                 $missing++;
                 $documentInsert->execute([
@@ -706,30 +765,48 @@ function sa_submit_request(array $data): array
                 'message' => 'Your request ' . $reference . ' has been received.',
             ]);
         }
+        sa_terms_link($pdo, $termsAcceptanceId, $requestId);
+        if ($draft !== null) {
+            // The draft becomes a receipt of this submission: personal data and
+            // files are removed; the row is kept for a day to catch duplicates.
+            $pdo->prepare(
+                "UPDATE request_drafts SET submitted_request_id = :rid, submitted_reference = :ref, submitted_at = NOW(),
+                        form_data = '{}', expires_at = DATE_ADD(NOW(), INTERVAL 1 DAY) WHERE id = :id"
+            )->execute(['rid' => $requestId, 'ref' => $reference, 'id' => $draft['id']]);
+            $pdo->prepare('DELETE FROM request_draft_files WHERE draft_id = :id')->execute(['id' => $draft['id']]);
+        }
         $pdo->commit();
 
         // Send confirmation after the database transaction succeeds.
-        // Email failures must not invalidate a saved request.
-        try {
-            $sendConfirmation = require dirname(__DIR__) . '/gmail-mailer.php';
-            $sendConfirmation([
-                'email' => $values['email'],
-                'first_name' => $values['first_name'],
-                'last_name' => $values['last_name'],
-                'flow' => $flow,
-                'reference_no' => $reference,
-            ]);
-        } catch (Throwable $emailException) {
-            error_log(
-                '[SMART_ASSESS] Confirmation email failed for '
-                . $reference . ': ' . $emailException->getMessage()
-            );
+        // Email failures must not invalidate a saved request, and requests
+        // submitted without an email address skip this step entirely.
+        if ((string) $values['email'] !== '') {
+            try {
+                $sendConfirmation = require dirname(__DIR__) . '/gmail-mailer.php';
+                $sendConfirmation([
+                    'email' => $values['email'],
+                    'first_name' => $values['first_name'],
+                    'last_name' => $values['last_name'],
+                    'flow' => $flow,
+                    'reference_no' => $reference,
+                ]);
+            } catch (Throwable $emailException) {
+                error_log(
+                    '[SMART_ASSESS] Confirmation email failed for '
+                    . $reference . ': ' . $emailException->getMessage()
+                );
+            }
         }
 
         return ['reference_no' => $reference, 'status' => 'Received'];
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
+        }
+        foreach ($movedDraftFiles as $moved => $original) {
+            if (is_file($moved)) {
+                @rename($moved, $original);   // give the draft its files back
+            }
         }
         foreach ($storedFiles as $path) {
             if (is_file($path)) {
@@ -2126,8 +2203,17 @@ try {
     $data = sa_normalize_bridge_request($data);
     $action = (string) ($data['action'] ?? '');
     sa_verify_csrf(isset($data['csrf']) ? (string) $data['csrf'] : null);
+    if ($action === 'draft_file') {
+        sa_draft_file($data);
+    }
     $result = match ($action) {
         'submit_request' => sa_submit_request($data),
+        'terms_accept' => sa_terms_accept($data),
+        'draft_save' => sa_draft_save($data),
+        'draft_upload' => sa_draft_upload($data),
+        'draft_remove_file' => sa_draft_remove_file($data),
+        'draft_load' => sa_draft_load($data),
+        'draft_discard' => sa_draft_discard($data),
         'client_register' => sa_register_client($data),
         'client_login' => sa_login_client($data),
         'client_logout' => (function (): array {
@@ -2211,7 +2297,11 @@ try {
     $message = $exception->getMessage() !== 'Request could not be completed.'
         ? $exception->getMessage()
         : sa_default_error_message($exception->statusCode);
-    sa_json_response(['error' => $message . ' (Ref: ' . sa_request_ref() . ')', 'ref' => sa_request_ref()], $exception->statusCode);
+    $body = ['error' => $message . ' (Ref: ' . sa_request_ref() . ')', 'ref' => sa_request_ref()];
+    if ($exception->errorCode !== null) {
+        $body['code'] = $exception->errorCode;
+    }
+    sa_json_response($body, $exception->statusCode);
 } catch (Throwable $exception) {
     $failedAction = isset($action) ? (string) $action
         : (string) ((isset($data) && is_array($data) ? ($data['action'] ?? '') : '') ?: ($_GET['action'] ?? ''));
