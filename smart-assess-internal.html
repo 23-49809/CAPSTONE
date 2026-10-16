@@ -986,12 +986,13 @@
   #sr-print-all .rp-top-line{ margin:0 0 2mm; padding:2mm 3mm; border-left:2pt solid #000; background:#f3f3f3; break-after:avoid; page-break-after:avoid; }
   #sr-print-all .rp-note{ margin:1.6mm 0 0; font-size:8pt; line-height:1.35; }
   #sr-print-all .rp-section{ break-inside:avoid; page-break-inside:avoid; }
-  #sr-print-all .rp-closing{ margin-top:5mm; break-inside:avoid; page-break-inside:avoid; }
+  /* Prepared by: one unbreakable block that follows the last section
+     (never a forced page break; it moves to the next page only if it cannot fit). */
+  #sr-print-all .rp-closing{ margin-top:5mm; break-inside:avoid; page-break-inside:avoid; break-before:auto; page-break-before:auto; }
   #sr-print-all .rp-sign{ width:78mm; }
-  #sr-print-all .rp-sign-label{ font-size:9.5pt; font-weight:700; margin-bottom:9mm; }
+  #sr-print-all .rp-sign-label{ font-size:9.5pt; font-weight:700; margin-bottom:8mm; }
   #sr-print-all .rp-sign-name{ border-top:.8pt solid #000; padding-top:1mm; text-align:center; font-size:10pt; font-weight:700; text-transform:uppercase; letter-spacing:.02em; min-height:5.5mm; }
   #sr-print-all .rp-sign-role{ text-align:center; font-size:9pt; margin-top:.4mm; }
-  #sr-print-all .rp-end{ margin-top:4mm; text-align:center; font-size:8pt; letter-spacing:.08em; }
 
   /* ============ Dropdowns (shared) ============
      One rule for every native single-select: a drawn chevron 14px from the
@@ -2058,7 +2059,7 @@ function srPrintAllRequestsHtml(d, acct){
     + staffBlock
     + '<div class="rp-closing"><div class="rp-sign"><div class="rp-sign-label">Prepared by:</div>'
       + '<div class="rp-sign-name">'+esc(preparer)+'</div><div class="rp-sign-role">Department Head</div>'
-    + '</div><div class="rp-end">— END OF REPORT —</div></div>'
+    + '</div></div>'
   + '</div>';
 }
 /* Resolves once every image in root has loaded and decoded (or failed), or
@@ -2068,7 +2069,12 @@ function srImagesReady(root, timeoutMs){
   var each = imgs.map(function(img){
     var loaded = img.complete && img.naturalWidth > 0 ? Promise.resolve()
       : new Promise(function(resolve){ img.addEventListener('load', resolve, {once:true}); img.addEventListener('error', resolve, {once:true}); });
-    return loaded.then(function(){ return img.decode ? img.decode().catch(function(){}) : null; });
+    // decode() is best effort: it can stay pending for an off-screen image,
+    // so it never holds printing up for more than a second.
+    return loaded.then(function(){
+      if(!img.decode) return null;
+      return Promise.race([img.decode().catch(function(){}), new Promise(function(resolve){ setTimeout(resolve, 1000); })]);
+    });
   });
   return Promise.race([Promise.all(each), new Promise(function(resolve){ setTimeout(resolve, timeoutMs); })])
     .then(function(){ return imgs.filter(function(img){ return !(img.complete && img.naturalWidth > 0); }); });

@@ -91,6 +91,8 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
     header('Content-Type: text/html; charset=UTF-8');
     // Pages embed announcement data; never let a browser reuse a stale copy.
     header('Cache-Control: no-store, private');
+    // Resume links carry a recovery code; never send it to other sites.
+    header('Referrer-Policy: same-origin');
     echo $html;
     exit;
 }

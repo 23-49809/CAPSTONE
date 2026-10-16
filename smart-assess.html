@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SMART ASSESS</title>
 <style>
   /* ============ Tokens ============ */
@@ -103,15 +105,26 @@
   /* Light, split hero: copy on the paper colour at left, the real Mabini
      Assessor's Office photo at right fading into it, and a green wave
      anchoring the bottom-left corner. */
-  :root{ --hero-ink:var(--brand-900); --hero-text:#33403a; --hero-accent:var(--brand-800); --hero-wave-light:#cfe5d4; --hero-scrim:246,247,243; }
+  :root{ --hero-ink:#043a2b; --hero-text:#0c4433; --hero-accent:var(--brand-800); --hero-wave-light:#cfe5d4; --hero-scrim:246,247,243; }
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --hero-ink:#e3f4e8; --hero-text:#b9c8be; --hero-accent:#8fdcb1; --hero-wave-light:#1d3a28; --hero-scrim:10,19,14; } }
   :root[data-theme="dark"]{ --hero-ink:#e3f4e8; --hero-text:#b9c8be; --hero-accent:#8fdcb1; --hero-wave-light:#1d3a28; --hero-scrim:10,19,14; }
 
   .hero{ position:relative; overflow:hidden; background:var(--paper); color:var(--hero-ink); }
   .hero-photo{ position:absolute; inset:0; background:url("hero-mao.jpg") 58% 42% / cover no-repeat; }
-  /* Light scrim only behind the copy column so the photo stays vivid. */
-  .hero-photo::after{ content:""; position:absolute; inset:0;
-    background:linear-gradient(90deg, rgba(var(--hero-scrim),.78) 0%, rgba(var(--hero-scrim),.6) 32%, rgba(var(--hero-scrim),.18) 52%, rgba(var(--hero-scrim),0) 66%); }
+  /* Readability overlay: a dedicated layer above the photo and below the
+     text (.wrap has z-index:1), never intercepting clicks. Near-opaque
+     (94%) at the far left and still ~88% at the right edge of the text column
+     (which ends at max(648px, 50% + 2px) of the hero), then fading to fully
+     transparent over the next ~320px so the rest of the photo keeps its
+     original colours and sharpness. The photo itself is never filtered. */
+  .hero-photo::after{ content:""; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(90deg,
+      rgba(var(--hero-scrim),.94) 0,
+      rgba(var(--hero-scrim),.9) max(420px, calc(50% - 220px)),
+      rgba(var(--hero-scrim),.86) max(680px, calc(50% + 34px)),
+      rgba(var(--hero-scrim),.5) max(820px, calc(50% + 170px)),
+      rgba(var(--hero-scrim),.15) max(920px, calc(50% + 270px)),
+      rgba(var(--hero-scrim),0) max(1000px, calc(50% + 350px))); }
   .hero .home-slide-inner p, .hero .eyebrow{ text-shadow:0 0 12px rgba(var(--hero-scrim),.9), 0 0 2px rgba(var(--hero-scrim),.7); }
   .hero-wave{ position:absolute; left:0; bottom:0; width:min(760px,62%); height:auto; pointer-events:none; }
   .hero-wave .wave-light{ fill:var(--hero-wave-light); }
@@ -119,9 +132,9 @@
   .hero .wrap{ position:relative; z-index:1; height:100%; }
   .hero-inner{ position:relative; padding:96px 0 88px; max-width:620px; }
   .eyebrow{ font-size:14px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#c3ecd4; margin-bottom:22px; display:block; }
-  .hero .eyebrow{ color:var(--hero-text); margin-bottom:0; }
+  .hero .eyebrow{ color:var(--hero-text); font-size:15px; margin-bottom:0; }
   .hero .eyebrow::after{ content:""; display:block; width:56px; height:3px; margin-top:16px; border-radius:2px; background:var(--hero-accent); }
-  .hero h1{ color:var(--hero-ink); font-size:clamp(40px,5.6vw,68px); line-height:1.05; letter-spacing:-.015em; font-weight:700; margin-bottom:22px; }
+  .hero h1{ color:var(--hero-ink); font-size:clamp(36px,4vw,48px); line-height:1.12; letter-spacing:-.01em; font-weight:700; margin-bottom:22px; }
   .hero p.lede{ font-size:20px; line-height:1.6; color:var(--hero-text); max-width:600px; margin-bottom:38px; }
   @media (max-width:768px){ .hero-inner{ padding:64px 0 56px; } }
 
@@ -130,9 +143,9 @@
   .home-slide.active{ display:block; animation:homeSlideIn .35s ease both; }
   .home-slide .home-slide-inner{ max-width:560px; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:40px 0 110px; }
   .home-slide h1{ margin:22px 0 14px; }
-  .home-slide p{ color:var(--hero-text); font-size:18px; max-width:520px; margin-bottom:28px; }
+  .home-slide p{ color:var(--hero-text); font-size:19px; line-height:1.7; font-weight:500; max-width:540px; margin-bottom:28px; }
   .home-slide .hero-tagline{ font-family:var(--font-body); font-style:italic; font-weight:700; font-size:22px; color:var(--hero-accent); margin-bottom:16px; }
-  .home-slide .hero-requirements{ font-size:16px; color:var(--hero-text); margin-top:-16px; }
+  .home-slide .hero-requirements{ font-size:18px; color:var(--hero-text); margin-top:-16px; }
   .home-slide .announcement-copy{ margin-bottom:24px; }
   .home-slide .announcement-copy h3{ color:var(--hero-ink); font-size:24px; margin-bottom:7px; }
   .home-slide .announcement-copy time{ color:var(--hero-text); font-size:14px; }
@@ -168,7 +181,7 @@
   .announcement-detail-note strong{ color:var(--ink); }
   .announcement-detail-note p{ margin-top:5px; }
   @keyframes homeSlideIn{ from{ opacity:0; transform:translateX(15px); } to{ opacity:1; transform:none; } }
-  @media (max-width:768px){ .home-slider{ height:840px; min-height:840px; } .hero-photo{ background-position:60% 50%; } .hero-photo::after{ background:linear-gradient(180deg, rgba(var(--hero-scrim),0) 0%, rgba(var(--hero-scrim),0) 28%, rgba(var(--hero-scrim),.62) 40%, rgba(var(--hero-scrim),.7) 100%); } .hero-wave{ width:90%; } .home-slide .home-slide-inner{ justify-content:flex-start; padding:300px 0 92px; } .home-slide p{ font-size:17px; } .home-slide .hero-tagline{ font-size:19px; } .home-slide-control{ top:150px; width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
+  @media (max-width:768px){ .home-slider{ height:840px; min-height:840px; } .hero-photo{ background-position:60% 50%; } .hero-photo::after{ background:linear-gradient(180deg, rgba(var(--hero-scrim),0) 0%, rgba(var(--hero-scrim),0) 22%, rgba(var(--hero-scrim),.9) 35%, rgba(var(--hero-scrim),.94) 100%); } .hero-wave{ width:90%; } .home-slide .home-slide-inner{ justify-content:flex-start; padding:300px 0 92px; } .home-slide p{ font-size:18px; } .home-slide .hero-tagline{ font-size:20px; } .home-slide-control{ top:150px; width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
 
   /* ============ Services / cards ============ */
   .section{ padding:88px 0; }
@@ -197,12 +210,16 @@
   .section-alt{ background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 
   /* ============ Footer ============ */
-  .site-footer{ background:var(--brand-900); color:#dcefe3; padding:60px 0 38px; }
-  .footer-grid{ display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:40px; }
-  @media (max-width:768px){ .footer-grid{ grid-template-columns:1fr; gap:32px; } }
-  .footer-grid h5{ color:#fff; font-family:var(--font-body); font-weight:700; font-size:17px; margin-bottom:14px; }
-  .footer-grid p, .footer-grid div{ font-size:16px; line-height:1.75; color:#c2ddcd; }
-  .footer-bottom{ margin-top:48px; padding-top:24px; border-top:1px solid rgba(255,255,255,.15); font-size:14px; color:#a8cbb8; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  /* Compact footer: tighter padding, gaps and line spacing; same colours,
+     content and three-column layout. On phones the address spans the row and
+     Contact / Office Hours sit side by side, stacking only on very narrow screens. */
+  .site-footer{ background:var(--brand-900); color:#dcefe3; padding:32px 0 18px; }
+  .footer-grid{ display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:16px 32px; }
+  @media (max-width:768px){ .footer-grid{ grid-template-columns:1.4fr 1fr; gap:16px 24px; } .footer-grid > div:first-child{ grid-column:1 / -1; } }
+  @media (max-width:499px){ .footer-grid{ grid-template-columns:1fr; gap:14px; } }
+  .footer-grid h5{ color:#fff; font-family:var(--font-body); font-weight:700; font-size:16px; margin-bottom:4px; }
+  .footer-grid p, .footer-grid div{ font-size:15px; line-height:1.55; color:#c2ddcd; }
+  .footer-bottom{ margin-top:22px; padding-top:14px; border-top:1px solid rgba(255,255,255,.15); font-size:13.5px; line-height:1.5; color:#a8cbb8; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 10px; }
 
   /* ============ Wizard shell ============ */
   .wizard-shell{ flex:1; background:
@@ -245,9 +262,14 @@
 
   .field-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px 24px; margin-bottom:22px; }
   @media (max-width:640px){ .field-grid{ grid-template-columns:1fr; } }
+  /* Two short fields sharing one grid cell (City/Municipality + Zip Code);
+     they stack only on very narrow screens. */
+  .field-pair{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:20px 16px; align-items:start; min-width:0; }
+  @media (max-width:339px){ .field-pair{ grid-template-columns:1fr; } }
   .field{ display:flex; flex-direction:column; gap:7px; }
   .field label{ font-size:13px; font-weight:700; color:var(--ink); }
   .field label .req{ color:var(--danger); margin-left:2px; }
+  .field label .opt{ color:var(--ink-faint); font-weight:500; }
   .field input, .field select{
     font-family:inherit; font-size:14.5px; padding:12px 14px; border-radius:var(--radius-sm);
     border:1.5px solid var(--line-strong); background:var(--surface); color:var(--ink);
@@ -390,13 +412,83 @@
   .check-banner .icon{ width:20px; height:20px; flex-shrink:0; }
   .check-banner .sub{ font-weight:400; display:block; font-size:12.5px; margin-top:2px; opacity:.9; }
 
-  /* ============ Confirmation ============ */
-  .confirm-shell{ flex:1; display:flex; align-items:center; justify-content:center; padding:60px 20px; background:linear-gradient(rgba(235,243,245,.72),rgba(235,243,245,.72)), url("bg MAO.jpg") center / cover no-repeat; }
-  .confirm-card{ max-width:540px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:44px 40px; text-align:center; }
-  .confirm-icon{ width:64px; height:64px; border-radius:50%; background:var(--success-bg); color:var(--success); display:flex; align-items:center; justify-content:center; margin:0 auto 22px; }
-  .confirm-icon .icon{ width:30px; height:30px; }
-  .confirm-ref{ font-family:var(--font-mono); font-size:22px; font-weight:600; color:var(--brand-700); background:var(--brand-50); border:1px dashed var(--line-strong); border-radius:var(--radius-sm); padding:14px; margin:20px 0; letter-spacing:.03em; }
-  .confirm-actions{ display:flex; gap:10px; justify-content:center; margin-top:26px; flex-wrap:wrap; }
+  /* ============ Confirmation (receipt) ============
+     A paper receipt with torn top/bottom edges. The paper keeps its light
+     colours in dark mode (like a printed slip); the page around it follows
+     the theme. */
+  .confirm-shell{ flex:1; display:flex; flex-direction:column; align-items:center; padding:28px 16px 36px; background:#eef4f0; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .confirm-shell{ background:var(--paper); } }
+  :root[data-theme="dark"] .confirm-shell{ background:var(--paper); }
+  .rcpt-wrap{ width:min(100%, 460px); filter:drop-shadow(0 18px 30px rgba(20,60,40,.13)) drop-shadow(0 2px 4px rgba(20,60,40,.06)); }
+  .rcpt{ --zz:9px; position:relative; overflow:hidden; background:#fbfdfb; color:#1f2a24; padding:30px 26px 20px; text-align:center;
+    -webkit-mask:conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--zz)*2) 51% repeat-x,
+                 conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / calc(var(--zz)*2) 51% repeat-x;
+            mask:conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--zz)*2) 51% repeat-x,
+                 conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / calc(var(--zz)*2) 51% repeat-x; }
+  .rcpt-brand{ display:flex; align-items:center; justify-content:center; gap:14px; text-align:left; }
+  /* LOGO.png's seal fills ~55% of the file; the negative margins trim its
+     transparent border so the emblem itself shows at ~68px. */
+  .rcpt-brand img{ width:108px; height:108px; margin:-24px -20px -24px -24px; object-fit:contain; flex-shrink:0; }
+  .rcpt-brand-name{ font-family:var(--font-display); font-weight:700; font-size:22px; line-height:1.1; color:#134e37; letter-spacing:.01em; }
+  .rcpt-brand-office{ font-size:13px; font-weight:700; color:#134e37; margin-top:3px; line-height:1.3; }
+  .rcpt-brand-place{ font-size:13px; color:#3b4a42; line-height:1.35; }
+  .rcpt-check{ width:48px; height:48px; margin:16px auto 10px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff;
+    background:linear-gradient(160deg, #66b892, #3f9a70); box-shadow:0 8px 18px -8px rgba(47,138,98,.7); }
+  .rcpt-check .icon{ width:25px; height:25px; }
+  .rcpt-check .icon svg{ stroke-width:2.6; }
+  .rcpt h2{ font-family:var(--font-body); font-size:24px; font-weight:800; color:#134e37; letter-spacing:-.01em; line-height:1.15; }
+  .rcpt-lead{ margin:6px auto 0; max-width:360px; font-size:13.5px; line-height:1.5; color:#5c6a62; }
+  .rcpt-rule{ height:1px; background:#e1e9e4; margin:14px 0; }
+  .rcpt-ref{ background:#eef6f1; border:1px solid #dcebe2; border-radius:12px; padding:10px 12px 6px; container-type:inline-size; }
+  .rcpt-ref-label{ font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#5c6a62; }
+  /* Font size follows the number's length (--len, set inline) so long numbers
+     stay on one line: about 26px for DR-2026-00001, never below 17px. */
+  .rcpt-ref-no{ margin-top:2px; font-family:var(--font-body); font-size:26px; font-size:clamp(17px, calc(150cqi / var(--len, 13)), 26px); font-weight:800; letter-spacing:.01em; color:#134e37; line-height:1.2; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+  .rcpt-copy{ margin-top:2px; display:inline-flex; align-items:center; gap:7px; min-height:32px; padding:4px 12px; border:0; border-radius:999px; background:transparent; color:#1f7a4d;
+    font-family:var(--font-body); font-size:13.5px; font-weight:600; cursor:pointer; transition:background .15s ease, color .15s ease; }
+  .rcpt-copy:hover{ background:#e0efe6; }
+  .rcpt-copy:focus-visible{ outline:2px solid #1f7a4d; outline-offset:2px; }
+  .rcpt-copy .icon{ width:16px; height:16px; }
+  .rcpt-copy.copied{ background:#dff1e7; color:#155c3b; }
+  .rcpt-rows{ list-style:none; margin:8px 0 0; padding:0; text-align:left; }
+  .rcpt-row{ display:grid; grid-template-columns:22px minmax(0,auto) minmax(0,1fr); align-items:center; column-gap:12px; padding:8px 0; border-bottom:1px dashed #dfe7e2; font-size:14px; line-height:1.4; }
+  .rcpt-row:last-child{ border-bottom:0; }
+  .rcpt-row .icon{ width:19px; height:19px; color:#2f5c47; }
+  .rcpt-k{ color:#5c6a62; white-space:nowrap; }
+  .rcpt-v{ color:#1f2a24; font-weight:500; text-align:right; overflow-wrap:anywhere; }
+  .rcpt-pill{ display:inline-block; padding:2px 11px; border-radius:999px; background:#e3f2e9; border:1px solid #cfe6d8; color:#1f7a4d; font-weight:600; font-size:13px; }
+  .rcpt-cut{ border-top:1.5px dashed #d9e3dd; margin:6px 0 12px; }
+  .rcpt-note{ display:flex; gap:12px; align-items:center; text-align:left; background:#eef6f1; border:1px solid #dcebe2; border-radius:12px; padding:9px 14px; font-size:13px; line-height:1.45; color:#2b3a32; }
+  .rcpt-note-i{ flex-shrink:0; width:24px; height:24px; border-radius:50%; background:#1f7a4d; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; font-family:Georgia, serif; }
+  .rcpt-thanks{ margin-top:12px; font-weight:800; font-size:16px; color:#134e37; }
+  .rcpt-thanks-sub{ font-size:12.5px; color:#6b7a71; line-height:1.4; margin-top:2px; }
+  .rcpt-bldg{ height:58px; margin:4px -26px 0; background:url("hero-mao.jpg") center 42% / cover no-repeat; filter:grayscale(1) contrast(1.15) brightness(1.18); opacity:.16;
+    -webkit-mask:linear-gradient(to bottom, transparent, #000 40%, #000 70%, transparent), linear-gradient(to right, transparent, #000 20%, #000 80%, transparent); -webkit-mask-composite:source-in;
+            mask:linear-gradient(to bottom, transparent, #000 40%, #000 70%, transparent), linear-gradient(to right, transparent, #000 20%, #000 80%, transparent); mask-composite:intersect; }
+  .rcpt-tagline{ margin-top:0; display:flex; align-items:center; justify-content:center; gap:10px; font-family:'Segoe Script','Brush Script MT','Snell Roundhand',cursive; font-style:italic; font-size:14.5px; color:#2f7a55; }
+  .rcpt-tagline::before, .rcpt-tagline::after{ content:""; width:20px; height:1px; background:#7fae95; }
+  .confirm-actions{ width:min(100%, 460px); display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-top:14px; }
+  .confirm-actions .btn{ width:100%; min-height:50px; padding:10px 10px; gap:8px; font-size:14.5px; line-height:1.25; text-align:center; white-space:normal; }
+  .confirm-actions .btn .icon{ flex-shrink:0; }
+  .rcpt-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  @media (max-width:480px){
+    .confirm-shell{ padding:20px 16px 28px; }
+    .rcpt{ padding:26px 16px 18px; }
+    .rcpt-brand img{ width:96px; height:96px; margin:-21px -18px -21px -21px; }
+    .rcpt-brand-name{ font-size:20px; }
+    .rcpt h2{ font-size:22px; }
+    .rcpt-row{ column-gap:10px; font-size:13.5px; }
+    .rcpt-bldg{ margin:4px -16px 0; }
+    .confirm-actions .btn{ font-size:14px; padding:8px 10px; gap:6px; }
+  }
+  @media (max-width:359px){
+    .rcpt-row{ grid-template-columns:20px minmax(0,1fr); row-gap:2px; }
+    .rcpt-row .rcpt-v{ grid-column:2; text-align:left; }
+    .rcpt-tagline{ font-size:12.5px; gap:6px; }
+    .rcpt-tagline{ flex-wrap:wrap; text-align:center; }
+    .rcpt-tagline::before, .rcpt-tagline::after{ display:none; }
+  }
+  @media (max-width:339px){ .confirm-actions{ grid-template-columns:minmax(0,1fr); } }
   .submit-modal-backdrop{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(18,35,52,.48); }
   .submit-modal{ width:min(100%,520px); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:0 20px 60px rgba(18,35,52,.24); padding:28px; }
   .submit-modal h2{ margin:0; color:var(--ink); font-size:21px; }
@@ -404,15 +496,146 @@
   .submit-modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; flex-wrap:wrap; }
 
   /* ============ Track ============ */
-  .track-card{ background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:30px 32px; }
-  .track-form{ display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
-  .track-form input{ flex:1; min-width:200px; font-family:var(--font-mono); font-size:14.5px; padding:12px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--surface); color:var(--ink); }
-  .track-result{ margin-top:24px; padding-top:22px; border-top:1px solid var(--line); }
-  .timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
-  .timeline li{ display:flex; gap:10px; align-items:flex-start; font-size:13px; }
-  .timeline .t-dot{ width:9px; height:9px; border-radius:50%; background:var(--brand-500); margin-top:6px; flex-shrink:0; }
-  .timeline .t-status{ font-weight:700; }
-  .timeline .t-when{ color:var(--ink-faint); font-size:11.5px; font-family:var(--font-mono); }
+  /* ============ Terms and Conditions popup ============ */
+  .terms-backdrop{ position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(10,24,17,.58); }
+  .terms-modal{ width:min(100%, 760px); max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); display:flex; flex-direction:column;
+    background:var(--surface); color:var(--ink); border-radius:var(--radius-lg); box-shadow:0 24px 60px rgba(0,0,0,.3); overflow:hidden; }
+  .terms-modal:focus{ outline:none; }
+  .terms-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:20px 24px 16px; border-bottom:1px solid var(--line); }
+  .terms-head h2{ font-family:var(--font-body); font-size:22px; font-weight:800; letter-spacing:.01em; }
+  .terms-head p{ margin-top:2px; font-size:15px; color:var(--ink-soft); }
+  .terms-x{ flex-shrink:0; width:42px; height:42px; display:flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:var(--surface); color:var(--ink); cursor:pointer; font-size:24px; line-height:1; }
+  .terms-x:hover{ background:var(--surface-2); }
+  .terms-x:focus-visible, .terms-check input:focus-visible{ outline:3px solid var(--brand-500); outline-offset:2px; }
+  .terms-body{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:18px 24px 22px; font-size:16px; line-height:1.65; color:var(--ink-soft); }
+  .terms-body:focus-visible{ outline:2px solid var(--brand-500); outline-offset:-2px; }
+  .terms-title{ text-align:center; margin-bottom:14px; }
+  .terms-title h3{ font-family:var(--font-display); font-size:24px; color:var(--ink); }
+  .terms-title p{ margin:2px 0 0; font-size:15px; font-style:italic; }
+  .terms-body h4{ margin:20px 0 6px; font-family:var(--font-body); font-size:17px; font-weight:700; color:var(--ink); }
+  .terms-body p{ margin:0 0 10px; }
+  .terms-body ul{ margin:0 0 10px; padding-left:22px; }
+  .terms-body li{ margin:2px 0; }
+  .terms-foot{ padding:14px 24px 18px; border-top:1px solid var(--line); background:var(--surface); }
+  .terms-check{ display:flex; align-items:flex-start; gap:12px; font-size:16px; font-weight:600; color:var(--ink); line-height:1.45; cursor:pointer; }
+  .terms-check input{ flex-shrink:0; width:22px; height:22px; margin-top:1px; accent-color:var(--brand-700); cursor:pointer; }
+  .terms-error{ margin:10px 0 0; font-size:14.5px; font-weight:600; color:var(--danger); }
+  .terms-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
+  .terms-actions .btn{ min-height:48px; padding:10px 22px; font-size:16px; }
+  .terms-actions .btn:disabled{ opacity:.45; cursor:not-allowed; box-shadow:none; transform:none; }
+  @media (max-width:600px){
+    .terms-backdrop{ padding:0; align-items:stretch; }
+    .terms-modal{ width:100%; max-height:none; height:100%; border-radius:0; }
+    .terms-head{ padding:16px 16px 12px; } .terms-head h2{ font-size:19px; }
+    .terms-body{ padding:14px 16px 18px; font-size:15.5px; }
+    .terms-foot{ padding:12px 16px 16px; }
+    .terms-actions .btn{ flex:1 1 0; }
+  }
+
+  /* ============ Draft auto-save ============ */
+  .draft-bar{ display:flex; align-items:center; justify-content:space-between; gap:10px 16px; flex-wrap:wrap; margin:-6px 0 14px; padding:9px 14px;
+    background:rgba(255,255,255,.94); border:1px solid var(--line); border-radius:var(--radius-md); font-size:14.5px; color:var(--ink-soft); }
+  .draft-bar{ position:relative; justify-content:flex-end; }
+  .draft-bar.bare{ margin:0; padding:0; border:0; background:none; }
+  /* The save status is not shown on screen (it still updates for screen
+     readers); saving itself is unchanged. */
+  .draft-state{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  .draft-state::before{ content:""; width:9px; height:9px; border-radius:50%; background:var(--brand-600); flex-shrink:0; }
+  .draft-state.saving::before{ background:var(--warn); animation:draftPulse 1s ease-in-out infinite; }
+  .draft-state.offline::before, .draft-state.error::before{ background:var(--danger); }
+  .draft-state.local::before{ background:var(--info); }
+  @keyframes draftPulse{ 50%{ opacity:.35; } }
+  .draft-later{ border:0; background:none; padding:4px 2px; font:inherit; font-weight:700; color:var(--brand-700); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  .draft-panel{ margin:0 0 14px; padding:16px 18px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); font-size:15px; color:var(--ink-soft); }
+  .draft-panel strong{ color:var(--ink); }
+  .draft-code{ display:block; margin:8px 0 10px; font-family:var(--font-mono); font-size:19px; font-weight:700; letter-spacing:.06em; color:var(--ink); overflow-wrap:anywhere; }
+  .draft-panel .btn{ min-height:42px; padding:8px 16px; font-size:15px; }
+  .draft-panel-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .draft-resume{ margin:0 0 28px; padding:18px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px 18px; flex-wrap:wrap;
+    background:var(--brand-50); border:1px solid var(--brand-100); border-radius:var(--radius-lg); }
+  .draft-resume h3{ font-family:var(--font-body); font-size:18px; font-weight:700; color:var(--ink); }
+  .draft-resume p{ margin-top:2px; font-size:15px; color:var(--ink-soft); }
+  .draft-resume-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .draft-resume .btn{ min-height:46px; padding:10px 20px; font-size:16px; }
+  .draft-msg{ margin-top:10px; font-weight:600; color:var(--danger); }
+  .upload-saved-file{ display:flex; align-items:center; justify-content:center; width:100%; height:100%; min-height:90px; color:var(--brand-700); }
+  .upload-saved-file .icon{ width:34px; height:34px; }
+  @media (max-width:600px){ .draft-resume{ padding:16px; } .draft-resume-actions{ width:100%; } .draft-resume .btn{ flex:1 1 0; } }
+
+  /* ============ Track Request ============ */
+  .trk{ width:min(100%, 760px); margin:0 auto; }
+  .trk-head{ text-align:center; margin-bottom:22px; }
+  .trk-head h1{ font-size:clamp(30px,4vw,40px); color:#fff; }
+  .trk-head p{ margin-top:8px; font-size:17px; color:#d7ecdf; }
+  .trk-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:26px 28px; }
+  .trk-card + .trk-card, .trk-results > .trk-card:first-child{ margin-top:16px; }
+  .trk-label{ display:block; font-size:15px; font-weight:700; color:var(--ink); margin-bottom:8px; }
+  .trk-form{ display:flex; gap:10px; }
+  .trk-input{ position:relative; flex:1; min-width:0; }
+  .trk-input .icon{ position:absolute; left:15px; top:50%; transform:translateY(-50%); width:20px; height:20px; color:var(--ink-faint); pointer-events:none; }
+  .trk-input input{ width:100%; height:56px; padding:0 16px 0 46px; font-family:var(--font-mono); font-size:18px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--ink); background:var(--surface); border:1.5px solid var(--line-strong); border-radius:var(--radius-md); }
+  .trk-input input::placeholder{ text-transform:none; letter-spacing:0; font-weight:400; color:var(--ink-faint); }
+  .trk-input input:focus{ outline:none; border-color:var(--brand-600); box-shadow:0 0 0 3px var(--brand-100); }
+  .trk-input input[aria-invalid="true"]{ border-color:var(--danger); }
+  .trk-form .btn{ height:56px; padding:0 24px; font-size:16px; white-space:nowrap; flex-shrink:0; }
+  .trk-form .btn[aria-busy="true"]{ opacity:.85; cursor:progress; }
+  .trk-spin{ width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; animation:trkSpin .8s linear infinite; }
+  @keyframes trkSpin{ to{ transform:rotate(360deg); } }
+  .trk-hint{ margin-top:10px; font-size:14px; color:var(--ink-faint); }
+  .trk-error{ margin-top:10px; font-size:14.5px; font-weight:600; color:var(--danger); }
+  .trk-empty{ text-align:center; padding:30px 28px; }
+  .trk-empty h2{ font-family:var(--font-body); font-size:20px; font-weight:700; color:var(--ink); }
+  .trk-empty p{ margin:8px auto 0; max-width:440px; font-size:15.5px; color:var(--ink-soft); }
+  .trk-empty code{ font-family:var(--font-mono); font-weight:600; color:var(--ink); white-space:nowrap; }
+  .trk-sum{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; padding-bottom:18px; border-bottom:1px solid var(--line); }
+  .trk-sum-k{ font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); }
+  .trk-ref{ margin-top:2px; font-family:var(--font-mono); font-size:24px; font-weight:700; color:var(--ink); overflow-wrap:anywhere; }
+  .trk-pill{ display:inline-flex; align-items:center; gap:7px; padding:6px 13px; border-radius:999px; font-size:14.5px; font-weight:700; border:1px solid transparent; }
+  .trk-pill::before{ content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .trk-pill.s-info{ background:var(--info-bg); color:var(--info); }
+  .trk-pill.s-warn{ background:var(--warn-bg); color:var(--warn); }
+  .trk-pill.s-ok{ background:var(--success-bg); color:var(--success); }
+  .trk-pill.s-bad{ background:var(--danger-bg); color:var(--danger); }
+  .trk-pill.s-neutral{ background:var(--neutral-bg); color:var(--neutral); }
+  .trk-grid{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px 24px; margin:18px 0 0; }
+  .trk-grid dt{ font-size:13.5px; color:var(--ink-faint); }
+  .trk-grid dd{ margin:2px 0 0; font-size:16.5px; font-weight:600; color:var(--ink); overflow-wrap:anywhere; }
+  .trk-note{ margin-top:18px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--warn-bg); color:var(--warn); font-size:14.5px; line-height:1.5; }
+  .trk-note strong{ display:block; }
+  .trk-card h3{ font-family:var(--font-body); font-size:17px; font-weight:700; color:var(--ink); margin-bottom:18px; }
+  /* Progress tracker: horizontal on wide screens, vertical on phones. */
+  .trk-steps{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(var(--n,4), minmax(0,1fr)); }
+  .trk-step{ position:relative; text-align:center; padding:0 6px; }
+  .trk-step::before{ content:""; position:absolute; top:15px; left:-50%; width:100%; height:3px; background:var(--line); }
+  .trk-step:first-child::before{ display:none; }
+  .trk-step.done::before, .trk-step.current::before{ background:var(--brand-600); }
+  .trk-step.current.end-bad::before{ background:var(--danger); }
+  .trk-dot{ position:relative; z-index:1; width:32px; height:32px; margin:0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:var(--surface); border:2px solid var(--line-strong); color:var(--ink-faint); font-size:14px; font-weight:700; }
+  .trk-dot .icon{ width:16px; height:16px; }
+  .trk-step.done .trk-dot{ background:var(--brand-600); border-color:var(--brand-600); color:#fff; }
+  .trk-step.current .trk-dot{ background:var(--surface); border:3px solid var(--brand-600); color:var(--brand-700); box-shadow:0 0 0 4px var(--brand-100); }
+  .trk-step.current.end-ok .trk-dot{ background:var(--brand-600); color:#fff; }
+  .trk-step.current.end-bad .trk-dot{ background:var(--danger); border-color:var(--danger); color:#fff; box-shadow:0 0 0 4px var(--danger-bg); }
+  .trk-step-name{ margin-top:10px; font-size:15px; font-weight:700; color:var(--ink); line-height:1.3; }
+  .trk-step.upcoming .trk-step-name, .trk-step.skipped .trk-step-name{ color:var(--ink-faint); font-weight:600; }
+  .trk-step-when{ margin-top:3px; font-size:13px; color:var(--ink-faint); line-height:1.35; }
+  .trk-step-tag{ display:inline-block; margin-top:4px; font-size:12px; font-weight:700; color:var(--brand-700); }
+  .trk-step.end-bad .trk-step-tag{ color:var(--danger); }
+  .trk-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  @media (max-width:600px){
+    .trk-card{ padding:20px 18px; }
+    .trk-form{ flex-direction:column; }
+    .trk-form .btn{ width:100%; }
+    .trk-grid{ grid-template-columns:minmax(0,1fr); gap:12px; }
+    .trk-steps{ grid-template-columns:minmax(0,1fr); gap:0; }
+    .trk-step{ display:grid; grid-template-columns:32px minmax(0,1fr); column-gap:14px; text-align:left; padding:0 0 18px; }
+    .trk-step:last-child{ padding-bottom:0; }
+    .trk-step::before{ top:auto; bottom:calc(100% - 15px); left:14.5px; width:3px; height:calc(100% - 14px); }
+    .trk-step-name{ margin-top:5px; }
+    .trk-step-info{ min-width:0; }
+  }
   .sms-item{ background:var(--surface-2); border-radius:var(--radius-sm); padding:10px 12px; font-size:12.5px; margin-bottom:8px; }
   .sms-item .sms-when{ color:var(--ink-faint); font-size:11px; font-family:var(--font-mono); margin-top:4px; }
   .modal-section-title{ font-size:13px; font-weight:700; margin:20px 0 10px; display:flex; align-items:center; gap:7px; }
@@ -438,7 +661,7 @@
     .section{ padding:56px 0; }
     .section-head{ margin-bottom:36px; }
     .service-card{ padding:28px 24px; }
-    .site-footer{ padding:44px 0 30px; }
+    .site-footer{ padding:26px 0 16px; }
 
     .wizard-shell{ padding:28px 14px 44px; }
     .wizard-header{ padding:4px 4px 20px; }
@@ -450,14 +673,8 @@
     .stepper{ -webkit-overflow-scrolling:touch; }
     .step-pill{ min-width:128px; padding:10px 13px; }
 
-    .confirm-card{ padding:32px 22px; }
-    .confirm-ref{ font-size:19px; padding:12px; word-break:break-all; }
     .confirm-actions .btn{ width:100%; }
 
-    .track-card{ padding:22px 20px; }
-    .track-form{ flex-direction:column; }
-    .track-form input{ width:100%; }
-    .track-form .btn{ width:100%; }
   }
   @media (max-width:480px){
     html,body{ overflow-x:hidden; }
@@ -516,6 +733,9 @@ const ICONS = {
   id: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.5-1.8 1.7-2.7 3-2.7s2.5.9 3 2.7"/><line x1="14" y1="9" x2="18" y2="9"/><line x1="14" y1="12" x2="18" y2="12"/><line x1="14" y1="15" x2="17" y2="15"/>'),
   file: svg('<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="14 3 14 7 18 7"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="15.5" x2="15.5" y2="15.5"/>'),
   check: svg('<polyline points="5 13 10 18 19 6"/>'),
+  calendar: svg('<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/><line x1="8" y1="3" x2="8" y2="6.5"/><line x1="16" y1="3" x2="16" y2="6.5"/><line x1="7.5" y1="13" x2="8.5" y2="13"/><line x1="11.5" y1="13" x2="12.5" y2="13"/><line x1="15.5" y1="13" x2="16.5" y2="13"/><line x1="7.5" y1="16.5" x2="8.5" y2="16.5"/><line x1="11.5" y1="16.5" x2="12.5" y2="16.5"/>'),
+  copy: svg('<rect x="8.5" y="8.5" width="11" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"/>'),
+  service: svg('<rect x="5" y="3" width="14" height="18" rx="1.5"/><line x1="8.5" y1="8" x2="15.5" y2="8"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="16" x2="12.5" y2="16"/>'),
   arrowRight: svg('<line x1="4" y1="12" x2="20" y2="12"/><polyline points="14 6 20 12 14 18"/>'),
   arrowLeft: svg('<line x1="20" y1="12" x2="4" y2="12"/><polyline points="10 6 4 12 10 18"/>'),
   search: svg('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
@@ -574,7 +794,7 @@ function blankFormData(){
     firstName:'', lastName:'', middleName:'', contact:'+63', email:'',
     addressLine:'', province:'Batangas', city:'Mabini', zip:'4202',
     documentType:'', transferType:'', purpose:'', arp:'', barangay:'', requesterBarangay:'',
-    isOwner:true, files:{}
+    isOwner:true, files:{}, termsToken:''
   };
 }
 const state = {
@@ -630,6 +850,7 @@ function processUploadedFile(key, file){
     return;
   }
   if(typeof window.SMART_ASSESS_SET_FILE === 'function') window.SMART_ASSESS_SET_FILE(key, file);
+  draftQueueFile(key, file);
   const reader = new FileReader();
   reader.onload = function(){
     state.formData.files[key] = fileMetaFromFile(file, reader.result);
@@ -644,8 +865,8 @@ function validateStep1(fd, errors){
   if(!fd.lastName.trim()) errors.lastName = 'Last name is required.';
   if(fd.contact === '+63') errors.contact = 'Enter 10 digits after +63.';
   else if(!PH_MOBILE_RE.test(fd.contact.trim())) errors.contact = 'Enter 10 digits after +63.';
-  if(!fd.email.trim()) errors.email = 'Email address is required.';
-  else if(!EMAIL_RE.test(fd.email.trim())) errors.email = 'Enter a valid email address.';
+  // Email is optional; a provided address must still be valid.
+  if(fd.email.trim() && !EMAIL_RE.test(fd.email.trim())) errors.email = 'Enter a valid email address.';
   if(!fd.addressLine.trim()) errors.addressLine = 'House number / street is required.';
   if(!String(fd.requesterBarangay||'').trim()) errors.requesterBarangay = 'Barangay is required.';
   if(!fd.province.trim()) errors.province = 'Province is required.';
@@ -720,7 +941,10 @@ function pushStatus(record, status){
 
 /* ======================= Navigation helpers ======================= */
 function go(view){ state.view = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
-function startFlow(flow){
+function startFlow(flow, confirmed){
+  const existing = draftLocalRead();
+  if(!confirmed && existing && draftHasContent(existing) && !confirm('You have an unfinished application. Start a new one and discard it?')) return;
+  discardDraft();
   state.flow = flow; state.view='wizard'; state.step=1; state.maxStep=1;
   state.formData = blankFormData(); state.errors={};
   render(); window.scrollTo({top:0,behavior:'smooth'});
@@ -781,6 +1005,7 @@ function confirmSubmitRequest(){
   pushStatus(record, 'Received');
   const list = loadRequests(); list.unshift(record); saveRequests(list);
   state.lastSubmission = record;
+  draftCompleted();
   state.view = 'confirmation';
   render(); window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -869,12 +1094,13 @@ function renderLanding(){
     + '<div class="hero-photo" role="img" aria-label="Mabini Municipal Assessor’s Office building"></div>'
     + '<svg class="hero-wave" viewBox="0 0 760 200" preserveAspectRatio="none" aria-hidden="true"><path class="wave-light" d="M0 40 C 180 110, 360 190, 760 200 L0 200 Z"/><path class="wave-dark" d="M0 95 C 160 150, 300 192, 540 200 L0 200 Z"/></svg>'
     + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">MABINI MUNICIPAL ASSESSOR’S OFFICE</span><h1>Welcome to<br>SMART ASSESS</h1><p class="hero-tagline">Your Digital Gateway to Assessor Services</p><p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p><button class="btn btn-hero" data-action="get-started">Explore Services '+ic('arrowRight')+'</button></div></div></div>'
-    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">Announcements</span><h1>Announcements</h1><div class="announcement-copy"><h3>'+esc(announcement ? announcement.title : 'No published announcements')+'</h3><p>'+esc(announcement ? announcement.content : 'There are no current announcements from the Assessor’s Office.')+'</p><time>'+(announcement ? esc(fmtDateTime(announcement.publishedAt || announcement.datePosted)) : '')+'</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">LATEST UPDATES</span><h1>Announcements</h1><div class="announcement-copy"><h3>'+esc(announcement ? announcement.title : 'No published announcements')+'</h3><p>'+esc(announcement ? announcement.content : 'There are no current announcements from the Assessor’s Office.')+'</p><time>'+(announcement ? esc(fmtDateTime(announcement.publishedAt || announcement.datePosted)) : '')+'</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
     + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
     + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Welcome to SMART ASSESS slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Announcements slide"></button></div>'
   + '</section>'
 
   + '<section class="section" id="services"><div class="wrap">'
+    + renderResumeCard()
     + '<div class="section-head"><h2>How Can We Help You?</h2>'
     + '<p>Choose the service that best matches your needs. We offer two main pathways to access municipal property assessment services:</p></div>'
     + '<div class="service-grid">'
@@ -946,7 +1172,7 @@ function arpField(fd){
   return '<div class="field"><label for="f-arp-serial">ARP / Tax Declaration Number<span class="req">*</span></label>'
     + '<div class="arp-input'+(inv('arp')?' invalid':'')+'"><span>14-</span><span class="arp-code'+(code?'':' empty')+'" data-arp-code title="Barangay code (set from the Barangay field)">'+(code||'XXXX')+'</span><span>-</span>'
     + '<input id="f-arp-serial" type="text" value="'+esc(serial)+'" data-arp-serial inputmode="numeric" maxlength="5" placeholder="XXXXX" autocomplete="off" aria-describedby="arp-hint"></div>'
-    + '<div class="field-hint" id="arp-hint">'+(code?'Barangay code '+code+' is filled in from the selected barangay. Enter the last 5 digits.':'Select the property barangay below to fill in its code.')+'</div>'
+    + '<div class="field-hint" id="arp-hint">'+(code?'Barangay code '+code+' is filled in from the selected barangay. Enter the last 5 digits.':'Select the property barangay first to fill in its code.')+'</div>'
     + fieldError('arp') + '</div>';
 }
 
@@ -959,15 +1185,17 @@ function renderStep1(){
       + '<div class="field"><label>Last Name<span class="req">*</span></label><input id="f-lastName" class="'+(inv('lastName')?'invalid':'')+'" type="text" value="'+esc(fd.lastName)+'" data-bind="lastName" placeholder="Dela Cruz">' + fieldError('lastName') + '</div>'
       + '<div class="field"><label>Middle Name</label><input id="f-middleName" type="text" value="'+esc(fd.middleName)+'" data-bind="middleName" placeholder="Santos"></div>'
       + '<div class="field"><label>Contact Number<span class="req">*</span></label><div class="contact-input"><span>+63</span><input id="f-contact" class="'+(inv('contact')?'invalid':'')+'" type="tel" value="'+esc(fd.contact.replace(/^\+63/,''))+'" data-bind="contact" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX"></div>' + fieldError('contact') + '</div>'
-      + '<div class="field" style="grid-column:1/-1"><label>Email Address<span class="req">*</span></label><input id="f-email" class="'+(inv('email')?'invalid':'')+'" type="text" value="'+esc(fd.email)+'" data-bind="email" placeholder="juan.delacruz@gmail.com">' + fieldError('email') + '</div>'
+      + '<div class="field" style="grid-column:1/-1"><label for="f-email">Email Address <span class="opt">(optional)</span></label><input id="f-email" class="'+(inv('email')?'invalid':'')+'" type="text" value="'+esc(fd.email)+'" data-bind="email" placeholder="juan.delacruz@gmail.com" aria-describedby="email-hint"><div class="field-hint" id="email-hint">Add your email to receive a confirmation of your request.</div>' + fieldError('email') + '</div>'
     + '</div>'
     + '<div class="section-divider">'+ic('pin')+'<span>Address Information</span></div>'
     + '<div class="field-grid">'
       + '<div class="field"><label>House No. / Street<span class="req">*</span></label><input id="f-addressLine" class="'+(inv('addressLine')?'invalid':'')+'" type="text" value="'+esc(fd.addressLine)+'" data-bind="addressLine" placeholder="123 Rizal St.">' + fieldError('addressLine') + '</div>'
       + '<div class="field"><label>Barangay<span class="req">*</span></label>'+barangaySelect(fd, 'requesterBarangay') + fieldError('requesterBarangay') + '</div>'
       + '<div class="field"><label>Province<span class="req">*</span></label><input id="f-province" class="'+(inv('province')?'invalid':'')+'" type="text" value="'+esc(fd.province)+'" data-bind="province">' + fieldError('province') + '</div>'
-      + '<div class="field"><label>City/Municipality<span class="req">*</span></label><input id="f-city" class="'+(inv('city')?'invalid':'')+'" type="text" value="'+esc(fd.city)+'" data-bind="city">' + fieldError('city') + '</div>'
-      + '<div class="field"><label>Zip Code</label><input id="f-zip" type="text" value="4202" readonly aria-readonly="true">' + fieldError('zip') + '</div>'
+      + '<div class="field-pair">'
+        + '<div class="field"><label>City/Municipality<span class="req">*</span></label><input id="f-city" class="'+(inv('city')?'invalid':'')+'" type="text" value="'+esc(fd.city)+'" data-bind="city">' + fieldError('city') + '</div>'
+        + '<div class="field"><label>Zip Code</label><input id="f-zip" type="text" value="4202" readonly aria-readonly="true">' + fieldError('zip') + '</div>'
+      + '</div>'
     + '</div>'
   + '</div>';
 }
@@ -993,8 +1221,8 @@ function renderStep2(){
           + (advisory ? '<div class="advisory">'+ic('alert')+'<span>'+esc(advisory)+'</span></div>' : '')
         ) : '')
       + '<div class="field-grid">'
-        + arpField(fd)
         + barangayField
+        + arpField(fd)
       + '</div>'
     + '</div>';
   }
@@ -1006,8 +1234,8 @@ function renderStep2(){
         + TRANSFER_TYPES.map(function(t){ return '<option value="'+esc(t)+'" '+(fd.transferType===t?'selected':'')+'>'+esc(t)+'</option>'; }).join('')
       + '</select>' + fieldError('transferType') + '</div>'
     + '<div class="field-grid">'
-      + arpField(fd)
       + barangayField
+      + arpField(fd)
     + '</div>'
   + '</div>';
 }
@@ -1022,8 +1250,8 @@ function uploadBox(key, label, fd){
     const isAuthLetter = key==='authLetter';
     const title = isAuthLetter ? 'Upload Authorization Letter' : (key==='requesterId' ? 'Upload Authorized Representative\'s Valid ID' : 'Upload Property Owner\'s Valid ID');
     const subtitle = isAuthLetter ? 'Upload an image of the authorization letter' : 'Upload';
-    const previewMarkup = file && file.preview
-      ? '<div class="upload-preview-wrap"><div class="upload-preview"><img src="'+esc(file.preview)+'" alt="Selected file preview" /></div><div class="upload-meta"><span>'+esc(file.name)+'</span><span class="upload-sep">•</span><span class="upload-link" data-replace-file="'+key+'">Replace</span><span class="upload-sep">•</span><span class="upload-link" data-remove-file="'+key+'">Remove</span></div></div>'
+    const previewMarkup = file && (file.preview || file.saved)
+      ? '<div class="upload-preview-wrap"><div class="upload-preview">'+(file.preview ? '<img src="'+esc(file.preview)+'" alt="Selected file preview" />' : '<span class="upload-saved-file" title="Saved with your application">'+ic('file')+'</span>')+'</div><div class="upload-meta"><span>'+esc(file.name)+'</span><span class="upload-sep">•</span><span class="upload-link" data-replace-file="'+key+'">Replace</span><span class="upload-sep">•</span><span class="upload-link" data-remove-file="'+key+'">Remove</span></div></div>'
       : '<div class="upload-placeholder"><div class="upload-icon-wrap">'+ic('file')+'</div><div class="upload-title">'+title+'</div><div class="upload-subtitle">'+subtitle+'</div></div>';
 
     return '<div class="'+cls+'" data-upload="'+key+'">'
@@ -1127,6 +1355,7 @@ function renderWizard(){
     + '<div class="wizard-shell"><div class="wizard-col fade-in">'
     + '<div class="wizard-header"><h1>'+esc(flowTitle)+'</h1><p>'+esc(flowSub)+'</p></div>'
     + '<div class="stepper">' + labels.map(function(l,idx){ return stepPill(idx+1, l); }).join('') + '</div>'
+    + renderDraftBar()
     + '<div class="wizard-card">'
       + body
       + '<div class="wizard-card-foot">'
@@ -1152,157 +1381,140 @@ function renderSubmitConfirmationModal(){
     + '</div>'
   + '</div>';
 }
+/* "Save My Tracking Number": downloads the same receipt shown on screen as a
+   PNG. Drawn on a canvas at 2x; if the images make the canvas unreadable
+   (e.g. opened from file://), it is redrawn without them. */
 function saveTrackingNumber(){
   const submission = state.lastSubmission;
   if(!submission || !submission.id) return;
-  const canvas = document.createElement('canvas');
-  canvas.width = 1400;
-  canvas.height = 980;
-  const ctx = canvas.getContext('2d');
-  if(!ctx) return;
-  const background = new Image();
-  const logo = new Image();
-  const requestType = submission.flow==='docreq' ? 'Document Request' : 'Land Transfer Request';
-  const submittedAt = new Date(submission.submittedAt || Date.now());
-  const dateSubmitted = submittedAt.toLocaleDateString('en-PH', {year:'numeric', month:'long', day:'numeric'});
-  let loaded = 0;
-  let drawn = false;
-  function downloadReceipt(receiptCanvas){
-    function saveBlob(receiptBlob){
-      if(!receiptBlob) return;
-      const url = URL.createObjectURL(receiptBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'smart-assess-request-confirmation-'+submission.id+'.png';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+  const W = 760, S = 2;
+  const details = [
+    ['Request Type', submission.flow==='docreq' ? 'Document Request' : 'Land Transfer'],
+    ['Date Submitted', receiptDate(submission.submittedAt)],
+    ['Client Name', submission.applicant || '—'],
+    ['Service', submission.docType || '—'],
+    ['Current Status', receiptStatus(submission)]
+  ];
+  const display = getComputedStyle(document.documentElement).getPropertyValue('--font-display') || 'Georgia, serif';
+  const body = getComputedStyle(document.documentElement).getPropertyValue('--font-body') || 'Arial, sans-serif';
+  const logo = new Image(), bldg = new Image();
+  let pending = 2;
+  function wrap(ctx, text, maxW){
+    const words = String(text).split(' '), lines = []; let line = '';
+    words.forEach(function(w){ const t = line ? line+' '+w : w; if(ctx.measureText(t).width > maxW && line){ lines.push(line); line = w; } else line = t; });
+    if(line) lines.push(line); return lines;
+  }
+  function roundRect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); }
+  function draw(withImages){
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const px = 80, pw = W - 160, inner = pw - 64, cx = W/2;
+    // Measure the wrapped service value to size the canvas.
+    ctx.font = '500 17px '+body;
+    const rowLines = details.map(function(d){ return d[0]==='Current Status' ? [d[1]] : wrap(ctx, d[1], inner - 190); });
+    const rowsH = rowLines.reduce(function(h, l){ return h + Math.max(54, 30 + l.length*22); }, 0);
+    const H = 1070 + rowsH;
+    canvas.width = W*S; canvas.height = H*S; ctx.scale(S, S);
+    ctx.fillStyle = '#eef4f0'; ctx.fillRect(0, 0, W, H);
+    // Paper with torn (zigzag) top and bottom edges.
+    const top = 40, bottom = H - 40, zz = 10;
+    ctx.save(); ctx.shadowColor = 'rgba(20,60,40,.16)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
+    ctx.beginPath(); ctx.moveTo(px, top+zz);
+    for(let x = px; x < px+pw; x += zz*2){ ctx.lineTo(x+zz, top); ctx.lineTo(Math.min(x+zz*2, px+pw), top+zz); }
+    ctx.lineTo(px+pw, bottom-zz);
+    for(let x = px+pw; x > px; x -= zz*2){ ctx.lineTo(x-zz, bottom); ctx.lineTo(Math.max(x-zz*2, px), bottom-zz); }
+    ctx.closePath(); ctx.fillStyle = '#fbfdfb'; ctx.fill(); ctx.restore();
+    let y = top + 46;
+    // Brand: seal + name (the seal fills ~55% of LOGO.png, so crop to it).
+    ctx.font = '700 30px '+display; const nameW = ctx.measureText('SMART ASSESS').width;
+    const brandW = 84 + 18 + Math.max(nameW, 220), bx = cx - brandW/2;
+    if(withImages && logo.naturalWidth){ const k = logo.naturalWidth/600; ctx.drawImage(logo, 135*k, 135*k, 329*k, 329*k, bx, y, 84, 84); }
+    ctx.textAlign = 'left'; ctx.fillStyle = '#134e37'; ctx.font = '700 30px '+display; ctx.fillText('SMART ASSESS', bx+102, y+32);
+    ctx.font = '700 16px '+body; ctx.fillText('Municipal Assessor’s Office', bx+102, y+56);
+    ctx.fillStyle = '#3b4a42'; ctx.font = '15px '+body; ctx.fillText('Mabini, Batangas', bx+102, y+77);
+    y += 120;
+    // Success check.
+    const g = ctx.createLinearGradient(cx, y, cx, y+72); g.addColorStop(0, '#66b892'); g.addColorStop(1, '#3f9a70');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, y+36, 36, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(cx-15, y+37); ctx.lineTo(cx-4, y+48); ctx.lineTo(cx+16, y+25); ctx.stroke();
+    y += 118;
+    ctx.textAlign = 'center'; ctx.fillStyle = '#134e37'; ctx.font = '800 34px '+body; ctx.fillText('Request Submitted', cx, y);
+    y += 40; ctx.fillStyle = '#5c6a62'; ctx.font = '17px '+body;
+    wrap(ctx, 'Your request has been successfully submitted to the Municipal Assessor’s Office. Please keep this receipt for your reference.', inner-40).forEach(function(l){ ctx.fillText(l, cx, y); y += 26; });
+    y += 10; ctx.fillStyle = '#e1e9e4'; ctx.fillRect(px+32, y, inner, 1); y += 28;
+    // Tracking number box.
+    roundRect(ctx, px+32, y, inner, 132, 14); ctx.fillStyle = '#eef6f1'; ctx.fill(); ctx.strokeStyle = '#dcebe2'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#5c6a62'; ctx.font = '700 14px '+body; ctx.fillText('YOUR TRACKING NUMBER', cx, y+38);
+    ctx.fillStyle = '#134e37'; ctx.font = '800 40px '+body; ctx.fillText(submission.id, cx, y+90);
+    y += 132 + 18;
+    // Detail rows.
+    details.forEach(function(d, idx){
+      const lines = rowLines[idx], h = Math.max(54, 30 + lines.length*22);
+      ctx.textAlign = 'left'; ctx.fillStyle = '#5c6a62'; ctx.font = '17px '+body; ctx.fillText(d[0], px+32, y + h/2 + 6);
+      ctx.textAlign = 'right';
+      if(d[0]==='Current Status'){
+        ctx.font = '600 15px '+body; const tw = ctx.measureText(d[1]).width + 28;
+        roundRect(ctx, px+32+inner-tw, y + h/2 - 16, tw, 32, 16); ctx.fillStyle = '#e3f2e9'; ctx.fill(); ctx.strokeStyle = '#cfe6d8'; ctx.stroke();
+        ctx.fillStyle = '#1f7a4d'; ctx.fillText(d[1], px+32+inner-14, y + h/2 + 5);
+      } else {
+        ctx.fillStyle = '#1f2a24'; ctx.font = '500 17px '+body;
+        const startY = y + h/2 + 6 - (lines.length-1)*11;
+        lines.forEach(function(l, k){ ctx.fillText(l, px+32+inner, startY + k*22); });
+      }
+      y += h;
+      if(idx < details.length-1){ ctx.strokeStyle = '#dfe7e2'; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(px+32, y); ctx.lineTo(px+32+inner, y); ctx.stroke(); ctx.setLineDash([]); }
+    });
+    y += 14; ctx.strokeStyle = '#d9e3dd'; ctx.lineWidth = 1.5; ctx.setLineDash([6,5]); ctx.beginPath(); ctx.moveTo(px+32, y); ctx.lineTo(px+32+inner, y); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+    y += 24;
+    // Info note.
+    roundRect(ctx, px+32, y, inner, 82, 14); ctx.fillStyle = '#eef6f1'; ctx.fill(); ctx.strokeStyle = '#dcebe2'; ctx.stroke();
+    ctx.fillStyle = '#1f7a4d'; ctx.beginPath(); ctx.arc(px+66, y+41, 15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '800 17px Georgia, serif'; ctx.fillText('i', px+66, y+47);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#2b3a32'; ctx.font = '15.5px '+body;
+    let ny = y + 34; wrap(ctx, 'You can track the status of your request using your tracking number on the “Track Your Request” page.', inner-80).forEach(function(l){ ctx.fillText(l, px+94, ny); ny += 22; });
+    y += 82 + 48;
+    ctx.textAlign = 'center'; ctx.fillStyle = '#134e37'; ctx.font = '800 21px '+body; ctx.fillText('Thank you!', cx, y);
+    ctx.fillStyle = '#6b7a71'; ctx.font = '15px '+body; ctx.fillText('Municipal Assessor’s Office', cx, y+28); ctx.fillText('Mabini, Batangas', cx, y+50);
+    y += 70;
+    // Faded building photo, as on screen.
+    if(withImages && bldg.naturalWidth){
+      const bw = pw, bh = 120, off = document.createElement('canvas'); off.width = bw*S; off.height = bh*S;
+      const o = off.getContext('2d'); o.scale(S, S); o.filter = 'grayscale(1) contrast(1.15) brightness(1.18)';
+      const sc = Math.max(bw/bldg.naturalWidth, bh/bldg.naturalHeight), iw = bldg.naturalWidth*sc, ih = bldg.naturalHeight*sc;
+      o.drawImage(bldg, (bw-iw)/2, (bh-ih)*0.42, iw, ih); o.filter = 'none';
+      o.globalCompositeOperation = 'destination-in';
+      const v = o.createLinearGradient(0, 0, 0, bh); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(.4, 'rgba(0,0,0,1)'); v.addColorStop(.7, 'rgba(0,0,0,1)'); v.addColorStop(1, 'rgba(0,0,0,0)');
+      o.fillStyle = v; o.fillRect(0, 0, bw, bh);
+      const hz = o.createLinearGradient(0, 0, bw, 0); hz.addColorStop(0, 'rgba(0,0,0,0)'); hz.addColorStop(.2, 'rgba(0,0,0,1)'); hz.addColorStop(.8, 'rgba(0,0,0,1)'); hz.addColorStop(1, 'rgba(0,0,0,0)');
+      o.fillStyle = hz; o.fillRect(0, 0, bw, bh);
+      ctx.globalAlpha = .16; ctx.drawImage(off, px, y, bw, bh); ctx.globalAlpha = 1;
+    }
+    y += 132;
+    ctx.fillStyle = '#2f7a55'; ctx.font = 'italic 18px "Segoe Script", "Brush Script MT", "Snell Roundhand", cursive';
+    const tag = 'Sa Tamang Impormasyon, Mas Mabilis na Serbisyo', tw = ctx.measureText(tag).width;
+    ctx.fillText(tag, cx, y); ctx.fillStyle = '#7fae95'; ctx.fillRect(cx - tw/2 - 34, y-6, 22, 1); ctx.fillRect(cx + tw/2 + 12, y-6, 22, 1);
+    return canvas;
+  }
+  function save(canvas){
+    const link = document.createElement('a');
+    link.download = 'smart-assess-request-confirmation-'+submission.id+'.png';
+    canvas.toBlob(function(blob){
+      if(!blob) return;
+      const url = URL.createObjectURL(blob);
+      link.href = url; document.body.appendChild(link); link.click(); link.remove();
       setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    }
-    try {
-      receiptCanvas.toBlob(saveBlob, 'image/png');
-    } catch(error) {
-      const fallback = document.createElement('canvas');
-      fallback.width = 1400;
-      fallback.height = 980;
-      const fallbackCtx = fallback.getContext('2d');
-      fallbackCtx.fillStyle = '#f5f8fa';
-      fallbackCtx.fillRect(0, 0, fallback.width, fallback.height);
-      fallbackCtx.fillStyle = '#087f5b';
-      fallbackCtx.fillRect(0, 0, fallback.width, 24);
-      fallbackCtx.fillStyle = '#d9f4e8';
-      fallbackCtx.fillRect(105, 65, 14, 850);
-      fallbackCtx.fillStyle = '#ffffff';
-      fallbackCtx.fillRect(105, 65, 1190, 850);
-      fallbackCtx.fillStyle = '#087f5b';
-      fallbackCtx.font = '700 34px Georgia, serif';
-      fallbackCtx.fillText("MUNICIPAL ASSESSOR'S OFFICE", 155, 145);
-      fallbackCtx.font = '700 22px Arial, sans-serif';
-      fallbackCtx.fillText('REQUEST CONFIRMATION', 155, 190);
-      fallbackCtx.font = '700 30px Arial, sans-serif';
-      fallbackCtx.fillText('Request Submitted', 155, 290);
-      fallbackCtx.font = '18px Arial, sans-serif';
-      fallbackCtx.fillText("Requester's Name: "+(submission.applicant || '—'), 155, 365);
-      fallbackCtx.fillText('Request Type: '+requestType, 155, 415);
-      fallbackCtx.fillText('Date Submitted: '+dateSubmitted, 155, 465);
-      fallbackCtx.fillStyle = '#e7f7ef';
-      fallbackCtx.fillRect(145, 500, 900, 100);
-      fallbackCtx.strokeStyle = '#087f5b';
-      fallbackCtx.lineWidth = 3;
-      fallbackCtx.strokeRect(145, 500, 900, 100);
-      fallbackCtx.fillStyle = '#087f5b';
-      fallbackCtx.font = '700 48px monospace';
-      fallbackCtx.fillText(submission.id, 155, 570);
-      fallbackCtx.font = '18px Arial, sans-serif';
-      fallbackCtx.fillText('Please save this receipt. You will need your tracking number', 155, 700);
-      fallbackCtx.fillText('to check your request status.', 155, 735);
-      fallback.toBlob(saveBlob, 'image/png');
-    }
+    }, 'image/png');
   }
-  function drawReceipt(){
-    loaded += 1;
-    if(loaded < 2 || drawn) return;
-    drawn = true;
-    if(background.naturalWidth && background.naturalHeight){
-      const scale = Math.max(canvas.width/background.naturalWidth, canvas.height/background.naturalHeight);
-      const bgWidth = background.naturalWidth * scale;
-      const bgHeight = background.naturalHeight * scale;
-      ctx.drawImage(background, (canvas.width-bgWidth)/2, (canvas.height-bgHeight)/2, bgWidth, bgHeight);
-    } else {
-      ctx.fillStyle = '#dce9ed';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    ctx.fillStyle = 'rgba(8, 35, 52, .34)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#087f5b';
-    ctx.fillRect(0, 0, canvas.width, 24);
-    ctx.fillStyle = 'rgba(255, 255, 255, .94)';
-    ctx.fillRect(105, 65, 1190, 850);
-    ctx.fillStyle = 'rgba(255, 255, 255, .72)';
-    ctx.fillRect(105, 65, 1190, 850);
-    ctx.fillStyle = '#d9f4e8';
-    ctx.fillRect(105, 65, 14, 850);
-    ctx.strokeStyle = '#b8d9cc';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(105, 65, 1190, 850);
-    if(logo.naturalWidth && logo.naturalHeight){
-      const logoSize = 105;
-      const logoScale = Math.min(logoSize/logo.naturalWidth, logoSize/logo.naturalHeight);
-      const logoWidth = logo.naturalWidth * logoScale;
-      const logoHeight = logo.naturalHeight * logoScale;
-      ctx.drawImage(logo, 155, 105, logoWidth, logoHeight);
-    }
-    ctx.fillStyle = '#087f5b';
-    ctx.font = '700 34px Georgia, serif';
-    ctx.fillText("MUNICIPAL ASSESSOR'S OFFICE", 295, 145);
-    ctx.fillStyle = '#5c7483';
-    ctx.font = '700 18px Arial, sans-serif';
-    ctx.fillText('SMART ASSESS  /  REQUEST CONFIRMATION', 297, 178);
-    ctx.strokeStyle = '#c5d3db';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(155, 235); ctx.lineTo(1245, 235); ctx.stroke();
-    ctx.fillStyle = '#12354d';
-    ctx.font = '700 31px Arial, sans-serif';
-    ctx.fillText('Request Submitted', 155, 300);
-    ctx.fillStyle = '#5c7483';
-    ctx.font = '18px Arial, sans-serif';
-    ctx.fillText("Requester's Name", 155, 365);
-    ctx.fillText('Request Type', 760, 365);
-    ctx.fillText('Date Submitted', 760, 445);
-    ctx.fillStyle = '#12354d';
-    ctx.font = '700 23px Arial, sans-serif';
-    ctx.fillText(submission.applicant || '—', 155, 405);
-    ctx.fillText(requestType, 760, 405);
-    ctx.font = '700 23px Arial, sans-serif';
-    ctx.fillText(dateSubmitted, 760, 475);
-    ctx.fillStyle = '#e7f7ef';
-    ctx.fillRect(145, 520, 1090, 145);
-    ctx.strokeStyle = '#087f5b';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(145, 520, 1090, 145);
-    ctx.fillStyle = '#087f5b';
-    ctx.font = '700 16px Arial, sans-serif';
-    ctx.fillText('TRACKING NUMBER', 180, 555);
-    ctx.fillStyle = '#12354d';
-    ctx.font = '700 48px monospace';
-    ctx.fillText(submission.id, 180, 620);
-    ctx.fillStyle = '#e7f7ef';
-    ctx.fillRect(155, 665, 1090, 125);
-    ctx.fillStyle = '#315a6d';
-    ctx.font = '18px Arial, sans-serif';
-    ctx.fillText('Please save this receipt. You will need your tracking number', 195, 718);
-    ctx.fillText('to check your request status.', 195, 752);
-    ctx.fillStyle = '#78909c';
-    ctx.font = '14px Arial, sans-serif';
-    ctx.fillText('Municipal Assessor\'s Office  •  Smart Assess Public Client Portal', 155, 865);
-    downloadReceipt(canvas);
+  function done(){
+    if(--pending > 0) return;
+    try { save(draw(true)); }
+    catch(error){ save(draw(false)); }   // tainted canvas: same receipt without images
   }
-  background.onload = drawReceipt;
-  background.onerror = drawReceipt;
-  logo.onload = drawReceipt;
-  logo.onerror = drawReceipt;
-  background.src = 'bg%20MAO.jpg';
+  logo.onload = logo.onerror = done;
+  bldg.onload = bldg.onerror = done;
   logo.src = 'LOGO.png';
+  bldg.src = 'hero-mao.jpg';
 }
 function viewSubmittedStatus(){
   const submission = state.lastSubmission;
@@ -1315,62 +1527,537 @@ function viewSubmittedStatus(){
   render();
   window.scrollTo({top:0,behavior:'smooth'});
 }
+/* Submission time as "Oct 14, 2026 - 2:27 PM", Philippine time. The PHP app
+   stores Manila wall time ("YYYY-MM-DD HH:MM:SS"); the demo stores ISO. */
+function receiptDate(value){
+  const str = String(value||'');
+  const d = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(str) ? new Date(str.replace(' ','T').slice(0,19)+'+08:00') : new Date(str);
+  if(isNaN(d.getTime())) return '—';
+  const opts = {timeZone:'Asia/Manila'};
+  return d.toLocaleDateString('en-US', Object.assign({month:'short', day:'numeric', year:'numeric'}, opts))
+    + ' - ' + d.toLocaleTimeString('en-US', Object.assign({hour:'numeric', minute:'2-digit'}, opts));
+}
+function receiptStatus(r){
+  if(r.status) return r.status;
+  const t = r.timestamps || {};
+  const latest = Object.keys(t).sort(function(a,b){ return new Date(t[a]) - new Date(t[b]); }).pop();
+  return latest || 'Received';
+}
 function renderConfirmation(){
   const r = state.lastSubmission;
   if(!r) return renderLanding();
+  const requestType = r.flow==='docreq' ? 'Document Request' : 'Land Transfer';
+  const row = function(icon, label, value){ return '<li class="rcpt-row">'+ic(icon)+'<span class="rcpt-k">'+label+'</span><span class="rcpt-v">'+value+'</span></li>'; };
   return renderHeader()
-  + '<div class="confirm-shell"><div class="confirm-card fade-in">'
-    + '<div class="confirm-icon">'+ic('check')+'</div>'
-    + '<h2>Request Submitted</h2>'
-    + '<p style="color:var(--ink-soft);font-size:14px;margin-top:8px">Your '+(r.flow==='docreq'?'document request':'land transfer request')+' has been received by the Municipal Assessor\'s Office. Use your tracking number below to check your request status.</p>'
-    + '<div style="margin-top:20px;font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center">Your Request Tracking Number</div>'
-    + '<div class="confirm-ref" aria-label="Your Request Tracking Number">'+esc(r.id)+'</div>'
-    + '<p class="field-hint" style="margin:10px 0 0;text-align:center">Please save this number. You will need it to check your request status.</p>'
-    + '<div class="confirm-actions">'
-      + '<button class="btn btn-ghost" data-action="save-tracking">Save My Tracking Number</button>'
-      + '<button class="btn btn-primary" data-action="view-status">'+ic('search')+' View My Request Status</button>'
-    + '</div>'
+  + '<div class="confirm-shell"><div class="rcpt-wrap fade-in"><section class="rcpt" aria-labelledby="rcpt-title">'
+    + '<div class="rcpt-brand"><img src="LOGO.png" alt="Bayan ng Mabini seal"><div><div class="rcpt-brand-name">SMART ASSESS</div><div class="rcpt-brand-office">Municipal Assessor’s Office</div><div class="rcpt-brand-place">Mabini, Batangas</div></div></div>'
+    + '<div class="rcpt-check" aria-hidden="true">'+ic('check')+'</div>'
+    + '<h2 id="rcpt-title">Request Submitted</h2>'
+    + '<p class="rcpt-lead">Your request has been successfully submitted to the Municipal Assessor’s Office. Please keep this receipt for your reference.</p>'
+    + '<div class="rcpt-rule"></div>'
+    + '<div class="rcpt-ref"><div class="rcpt-ref-label" id="rcpt-ref-label">Your Tracking Number</div>'
+      + '<div class="rcpt-ref-no" aria-labelledby="rcpt-ref-label" data-ref-no style="--len:'+Math.max(String(r.id).length, 13)+'">'+esc(r.id)+'</div>'
+      + '<button type="button" class="rcpt-copy" data-action="copy-tracking">'+ic('copy')+'<span data-copy-label>Copy Tracking Number</span></button>'
+      + '<span class="rcpt-sr" role="status" aria-live="polite" data-copy-status></span></div>'
+    + '<ul class="rcpt-rows">'
+      + row('doc', 'Request Type', esc(requestType))
+      + row('calendar', 'Date Submitted', esc(receiptDate(r.submittedAt)))
+      + row('user', 'Client Name', esc(r.applicant || '—'))
+      + row('service', 'Service', esc(r.docType || '—'))
+      + row('clock', 'Current Status', '<span class="rcpt-pill">'+esc(receiptStatus(r))+'</span>')
+    + '</ul>'
+    + '<div class="rcpt-cut" aria-hidden="true"></div>'
+    + '<div class="rcpt-note"><span class="rcpt-note-i" aria-hidden="true">i</span><span>You can track the status of your request using your tracking number on the “Track Your Request” page.</span></div>'
+    + '<div class="rcpt-thanks">Thank you!</div>'
+    + '<div class="rcpt-thanks-sub">Municipal Assessor’s Office<br>Mabini, Batangas</div>'
+    + '<div class="rcpt-bldg" aria-hidden="true"></div>'
+    + '<div class="rcpt-tagline">Sa Tamang Impormasyon, Mas Mabilis na Serbisyo</div>'
+  + '</section></div>'
+  + '<div class="confirm-actions">'
+    + '<button class="btn btn-ghost" data-action="save-tracking">Save My Tracking Number</button>'
+    + '<button class="btn btn-primary" data-action="view-status">'+ic('search')+' View My Request Status</button>'
   + '</div></div>';
+}
+function draftCopy(button, text){
+  const label = button.textContent;
+  const done = function(ok){ button.textContent = ok ? 'Copied!' : 'Copy failed'; setTimeout(function(){ button.textContent = label; }, 2000); };
+  const fallback = function(){ const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); let ok = false; try{ ok = document.execCommand('copy'); }catch(e){} ta.remove(); done(ok); };
+  if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback); else fallback();
+}
+/* Copy the tracking number; the button confirms "Copied!" for 2 seconds. */
+function copyTrackingNumber(button){
+  const r = state.lastSubmission;
+  if(!r || !r.id) return;
+  const label = button.querySelector('[data-copy-label]');
+  const live = document.querySelector('[data-copy-status]');
+  const done = function(ok){
+    button.classList.toggle('copied', ok);
+    label.textContent = ok ? 'Copied!' : 'Copy failed — select the number to copy';
+    if(live) live.textContent = ok ? 'Tracking number '+r.id+' copied to clipboard.' : 'Could not copy. Select the tracking number to copy it.';
+    if(!ok){
+      // Select the number so it can be copied with Ctrl/Cmd+C.
+      const refEl = document.querySelector('[data-ref-no]');
+      const sel = window.getSelection && window.getSelection();
+      if(refEl && sel){ sel.removeAllRanges(); const range = document.createRange(); range.selectNodeContents(refEl); sel.addRange(range); }
+    }
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(function(){ button.classList.remove('copied'); label.textContent = 'Copy Tracking Number'; if(live) live.textContent = ''; }, ok ? 2000 : 4000);
+  };
+  const fallback = function(){
+    const ta = document.createElement('textarea');
+    ta.value = r.id; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand('copy'); }catch(e){}
+    ta.remove(); done(ok);
+  };
+  if(navigator.clipboard && window.isSecureContext){
+    // Some browsers leave the request pending (e.g. a permission prompt that
+    // never shows); fall back after 1.5s so the button always responds.
+    let settled = false;
+    const settle = function(fn){ return function(){ if(settled) return; settled = true; clearTimeout(guard); fn(); }; };
+    const guard = setTimeout(settle(fallback), 1500);
+    navigator.clipboard.writeText(r.id).then(settle(function(){ done(true); }), settle(fallback));
+  } else fallback();
 }
 
 /* ---------- Track ---------- */
-function timelineHtml(record){
-  const entries = STATUS_FLOW.filter(function(s){ return record.timestamps && record.timestamps[s]; })
-    .map(function(s){ return { status:s, at:record.timestamps[s] }; })
-    .sort(function(a,b){ return new Date(a.at)-new Date(b.at); });
-  return '<ul class="timeline">' + entries.map(function(e){
-    return '<li><span class="t-dot"></span><div><div class="t-status">'+esc(e.status)+'</div><div class="t-when">'+fmtDateTime(e.at)+'</div></div></li>';
-  }).join('') + '</ul>';
+/* Reference numbers: DR-/LT- + year + serial (demo: 00001, server: hex). */
+const TRACK_REF_RE = /^(DR|LT)-\d{4}-[A-Z0-9]{4,12}$/;
+function trackRefError(q){
+  if(!q) return 'Enter your reference number to track your request.';
+  if(!TRACK_REF_RE.test(q)) return 'That doesn’t look like a reference number. It should look like DR-2026-00001 or LT-2026-00001.';
+  return '';
+}
+const TRACK_STATUS_TONE = {'Received':'s-info','Processing':'s-warn','Approved':'s-ok','Out for Release':'s-ok','Rejected':'s-bad','Timed Out':'s-neutral'};
+/* Steps from submission to completion. A request ends either at "Ready for
+   Release" (Out for Release) or at Rejected / Timed Out after processing. */
+function trackSteps(r){
+  const status = receiptStatus(r), t = r.timestamps || {};
+  const ended = status==='Rejected' || status==='Timed Out' ? status : '';
+  const steps = [
+    {key:'Received', label:'Submitted'},
+    {key:'Processing', label:'Processing'},
+    ended ? {key:ended, label:ended, bad:true} : {key:'Approved', label:'Approved'},
+  ];
+  if(!ended) steps.push({key:'Out for Release', label:'Ready for Release'});
+  let current = steps.findIndex(function(s){ return s.key===status; });
+  if(current<0) current = 0;
+  return steps.map(function(s, i){
+    let state = i<current ? 'done' : (i===current ? 'current' : 'upcoming');
+    // A request can time out before anyone starts processing it.
+    if(state==='done' && s.key==='Processing' && ended==='Timed Out' && !t['Processing']) state = 'skipped';
+    const last = i===steps.length-1;
+    return Object.assign({}, s, {state:state, end: state==='current' && last ? (s.bad ? 'end-bad' : 'end-ok') : (s.bad && state==='current' ? 'end-bad' : ''), at: t[s.key] || null});
+  });
+}
+function trackStepsHtml(r){
+  const steps = trackSteps(r);
+  return '<ol class="trk-steps" style="--n:'+steps.length+'">' + steps.map(function(s, i){
+    const tag = s.state==='current' ? (s.end==='end-ok' ? 'Completed' : (s.end==='end-bad' ? 'Final status' : 'Current step')) : '';
+    const mark = s.state==='done' || s.end==='end-ok' ? ic('check') : (s.end==='end-bad' ? '!' : String(i+1));
+    return '<li class="trk-step '+s.state+' '+s.end+'"'+(s.state==='current'?' aria-current="step"':'')+'>'
+      + '<span class="trk-dot" aria-hidden="true">'+mark+'</span>'
+      + '<div class="trk-step-info"><div class="trk-step-name">'+esc(s.label)+'<span class="trk-sr"> — '+(s.state==='done'?'completed':(s.state==='current'?'current status':(s.state==='skipped'?'not started':'upcoming')))+'</span></div>'
+      + (s.at ? '<div class="trk-step-when">'+esc(receiptDate(s.at))+'</div>' : (s.state==='upcoming' ? '<div class="trk-step-when">Pending</div>' : (s.state==='skipped' ? '<div class="trk-step-when">Not started</div>' : '')))
+      + (tag ? '<span class="trk-step-tag">'+tag+'</span>' : '')
+      + '</div></li>';
+  }).join('') + '</ol>';
 }
 function renderTrack(){
   const t = state.track;
+  const err = t.error || '';
   let resultBlock = '';
-  if(t.searched){
+  if(t.searched && !err){
     if(t.result){
-      const r = t.result;
-      resultBlock = '<div class="track-result">'
-        + '<div class="check-banner '+(r.requirementComplete?'ok':'bad')+'">'+ic(r.requirementComplete?'check':'alert')
-          + '<span>Current status: <strong>'+esc(r.status)+'</strong>'
-          + (r.requirementComplete ? '' : '<span class="sub">Missing/invalid: '+esc(r.missing.join(', '))+'</span>')
-          + '</span></div>'
-        + '<div class="review-row"><span class="k">Applicant</span><span class="v">'+esc(r.applicant)+'</span></div>'
-        + '<div class="review-row"><span class="k">Service</span><span class="v">'+(r.flow==='docreq'?'Document Request':'Land Transfer')+' &mdash; '+esc(r.docType)+'</span></div>'
-        + '<div class="modal-section-title">'+ic('timer')+' Status Timeline</div>' + timelineHtml(r)
-        + '</div>';
+      const r = t.result, status = receiptStatus(r);
+      const missing = (r.missing || []).filter(Boolean);
+      resultBlock = '<section class="trk-card" aria-labelledby="trk-sum-title">'
+          + '<div class="trk-sum"><div><div class="trk-sum-k" id="trk-sum-title">Reference Number</div><div class="trk-ref">'+esc(r.id)+'</div></div>'
+            + '<div><div class="trk-sum-k" style="margin-bottom:6px">Current Status</div><span class="trk-pill '+(TRACK_STATUS_TONE[status]||'s-neutral')+'">'+esc(status)+'</span></div></div>'
+          + '<dl class="trk-grid">'
+            + '<div><dt>Request Type</dt><dd>'+(r.flow==='docreq'?'Document Request':'Land Transfer')+'</dd></div>'
+            + '<div><dt>Service</dt><dd>'+esc(r.docType || '—')+'</dd></div>'
+            + '<div><dt>Applicant</dt><dd>'+esc(r.applicant || '—')+'</dd></div>'
+            + '<div><dt>Date Submitted</dt><dd>'+esc(receiptDate(r.submittedAt))+'</dd></div>'
+          + '</dl>'
+          + (!r.requirementComplete && missing.length ? '<div class="trk-note"><strong>Requirements need attention</strong>'+esc(missing.join(', '))+'</div>' : '')
+        + '</section>'
+        + '<section class="trk-card" aria-label="Request progress"><h3>Request Progress</h3>'+trackStepsHtml(r)+'</section>';
     } else {
-      resultBlock = '<div class="track-result"><p style="color:var(--ink-soft);font-size:14px">No request found with reference number "'+esc(t.query)+'". Double-check the tracking number from your confirmation screen.</p></div>';
+      resultBlock = '<section class="trk-card trk-empty" role="status"><h2>No request found</h2>'
+        + '<p>We couldn’t find a request with reference number <code>'+esc(t.query)+'</code>. Check the number on your receipt or confirmation email and try again.</p></section>';
     }
   }
   return renderHeader()
-  + '<div class="wizard-shell"><div class="wizard-col narrow fade-in">'
-    + '<div class="wizard-header"><h1>Track Your Request</h1><p>Enter your reference number to view live status &mdash; no account needed.</p></div>'
-    + '<div class="track-card">'
-      + '<div class="track-form"><input id="track-input" type="text" placeholder="e.g. DR-2026-00001" value="'+esc(t.query)+'"><button class="btn btn-primary" data-action="track-search">'+ic('search')+' Track</button></div>'
-      + '<p class="field-hint">Reference numbers look like DR-2026-00001 (Document Request) or LT-2026-00001 (Land Transfer).</p>'
-      + resultBlock
-    + '</div>'
+  + '<div class="wizard-shell"><div class="trk fade-in">'
+    + '<div class="trk-head"><h1>Track Your Request</h1><p>Enter your reference number to see the latest status. No account needed.</p></div>'
+    + '<section class="trk-card"><form class="trk-search" data-track-form novalidate>'
+      + '<label class="trk-label" for="track-input">Reference Number</label>'
+      + '<div class="trk-form"><div class="trk-input">'+ic('search')+'<input id="track-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. DR-2026-00001" value="'+esc(t.query)+'"'+(err?' aria-invalid="true" aria-describedby="track-error"':' aria-describedby="track-hint"')+'></div>'
+      + '<button type="submit" class="btn btn-primary" data-action="track-search">Track Request</button></div>'
+      + (err ? '<p class="trk-error" id="track-error" role="alert">'+esc(err)+'</p>' : '<p class="trk-hint" id="track-hint">You can find it on your receipt. It starts with DR (Document Request) or LT (Land Transfer).</p>')
+    + '</form></section>'
+    + '<div class="trk-results" aria-live="polite">'+resultBlock+'</div>'
   + '</div></div>';
 }
+/* Shared by the page and the PHP bridge (which reloads with ?track=). Returns
+   true when the reference is valid; otherwise shows the inline error. */
+function trackPrepare(){
+  const input = document.getElementById('track-input');
+  const q = (input && input.value || '').trim().toUpperCase();
+  const err = trackRefError(q);
+  state.track.query = q;
+  if(err){
+    state.track.error = err; state.track.searched = false; state.track.result = null;
+    render(); const again = document.getElementById('track-input'); if(again) again.focus();
+    return false;
+  }
+  state.track.error = '';
+  const btn = document.querySelector('[data-action="track-search"]');
+  if(btn){ btn.setAttribute('aria-busy','true'); btn.disabled = true; btn.innerHTML = '<span class="trk-spin" aria-hidden="true"></span>Tracking…'; }
+  return true;
+}
+window.SMART_ASSESS_TRACK = { prepare: function(){ return trackPrepare(); } };
+
+/* ======================= Terms and Conditions =======================
+   Shown before either application form opens (guests included). Continue
+   stays disabled until the box is ticked; it records the acceptance on the
+   server (time, version, application type) and keeps the returned token with
+   the application and its saved draft, so the client is not asked again
+   while moving between steps or after resuming. The server refuses a final
+   submission without a valid acceptance. TERMS_VERSION must match
+   SA_TERMS_VERSION in web/terms.php.
+   REVIEW NOTE: the data-retention period in section 13 is still to be
+   confirmed by the Municipal Assessor's Office. */
+const TERMS_VERSION = '2026-10-16';
+const TERMS_AGREE_TEXT = 'I have read, understood, and agree to the Terms and Conditions of SMART ASSESS.';
+function termsList(items){ return '<ul>'+items.map(function(i){ return '<li>'+i+'</li>'; }).join('')+'</ul>'; }
+function renderTermsContent(){
+  const sec = function(n, title, body){ return '<h4 id="terms-s'+n+'">'+n+'. '+title+'</h4>'+body; };
+  const MAO = 'Municipal Assessor’s Office';
+  return '<div class="terms-title"><h3>SMART ASSESS</h3><p>Land Transfer and Document Request Management System</p><p>'+MAO+' of Mabini, Batangas</p></div>'
+    + '<p>By using SMART ASSESS to submit a document request or land transfer application, you confirm that you have read, understood, and agreed to these Terms and Conditions. You do not need an account to apply.</p>'
+    + sec(1,'Purpose of the System','<p>SMART ASSESS is an online system of the '+MAO+' of Mabini, Batangas for document requests and land transfer transactions. It lets you submit requests and required documents, track their status, and receive updates.</p>')
+    + sec(2,'Information You Provide','<p>To process your request, you may be asked for:</p>'+termsList(['Your first, middle, and last name','Contact number','Email address (optional)','Address','ARP / Tax Declaration Number','Property address and the barangay where the property is located'])+'<p>Other information may be needed depending on the service you request.</p>')
+    + sec(3,'Document Request Services','<p>You may use SMART ASSESS to request:</p>'+termsList(['Certified True Copy of Tax Declaration (CTC-TD)','Certification of No/With Existing Improvement','Certification of Property/No Property Holdings','Certification of No Liens and Encumbrances','Certification of Assessment'])+'<p>You are responsible for providing the information and documents required for your request.</p>')
+    + sec(4,'Land Transfer Services','<p>You may use SMART ASSESS for land transfers by sale, donation, or inheritance. Additional information and supporting documents may be required depending on the type of transfer.</p>')
+    + sec(5,'Submitting Documents','<p>Depending on your request, you may need to upload documents such as:</p>'+termsList(['Certified True Copy of Tax Declaration or Title','Vicinity Map','Tax Clearance','Notarial Deed of Sale or Donation','Certification of No Improvement','A valid ID, and an authorization letter if you are applying on behalf of the property owner'])+'<p>All documents you submit must be genuine, complete, and clearly readable.</p>')
+    + sec(6,'Accuracy of Information','<p>You must give true, correct, and up-to-date information. False, misleading, incomplete, or fraudulent information or documents may cause your request to be delayed or rejected, and may be dealt with under applicable laws and regulations.</p>')
+    + sec(7,'Processing and Verification','<p>Authorized personnel of the '+MAO+' will review and verify what you submit. Submitting a request does not mean it is approved or completed. Every request remains subject to the Office’s requirements, verification, evaluation, and approval procedures.</p>')
+    + sec(8,'Request Status and Notifications','<p>After submitting, you will receive a reference number. Use it on the Track Request page to check your request’s status. Keep it safe, because anyone with your reference number can view the status of your request.</p><p>The Office may send SMS updates to the contact number you provide, and an email confirmation if you provide an email address. Please make sure your contact number is valid and active.</p>')
+    + sec(9,'Saved Applications and Your Responsibility','<p>Your application is saved automatically while you fill it in, so you can continue later. You may receive a recovery code or resume link to open your saved application on another device.</p>'
+        + termsList(['Keep your recovery code, resume link, and reference number private. Anyone who has them can open your saved application or view your request’s status.','Do not use another person’s reference number, recovery code, or resume link without their permission.','Saved applications that are not submitted are deleted automatically 7 days after your last change.','If you believe someone has accessed your application without permission, report it to the '+MAO+' right away.']))
+    + sec(10,'Who Can Access Your Information','<p>Only authorized users can access submitted information, according to their roles:</p>'+termsList(['<strong>Client</strong> – submits and monitors their own requests;','<strong>Staff</strong> – processes and manages assigned requests;','<strong>Head</strong> – reviews and manages transactions within their responsibilities; and','<strong>Administrator</strong> – manages system accounts and system functions.']))
+    + sec(11,'Personal Information and Privacy','<p>SMART ASSESS collects personal and property-related information only as needed to provide its services. This information is used to:</p>'+termsList(['Process your request or transaction;','Verify your information and documents;','Identify you and the property involved;','Track the status of your request;','Contact you about your request; and','Keep the Office’s transaction records.'])+'<p>Your personal information is handled in accordance with the Data Privacy Act of 2012 (Republic Act No. 10173) and other applicable laws, rules, and policies. For questions or concerns about your personal information, you may contact the '+MAO+'.</p>')
+    + sec(12,'Data Storage and Security','<p>Information you submit is stored in the SMART ASSESS database. Reasonable security measures are used to protect it from unauthorized access, disclosure, alteration, loss, or destruction, and access is limited to authorized personnel.</p>')
+    + sec(13,'Data Retention','<p>Submitted requests and their records are kept in accordance with applicable laws, regulations, and the records-retention policies of the '+MAO+'.</p><p><em>Specific retention period: To be confirmed by the '+MAO+'.</em></p>')
+    + sec(14,'Prohibited Activities','<p>You must not:</p>'+termsList(['Provide false or fraudulent information;','Submit documents that do not belong to you or were obtained unlawfully;','Use another person’s reference number, recovery code, or resume link without permission;','Try to access information belonging to another client;','Try to bypass or interfere with the system’s security;','Damage, disrupt, or misuse the system; or','Use the system for purposes unrelated to the services of the '+MAO+'.']))
+    + sec(15,'System Availability','<p>The Office will make reasonable efforts to keep SMART ASSESS available. Temporary interruptions may still happen because of maintenance, technical problems, connectivity issues, or other causes beyond the Office’s control.</p>')
+    + sec(16,'Changes to These Terms','<p>These Terms and Conditions may be updated to reflect changes in the system, office procedures, laws, regulations, or policies. When they change, you will be asked to read and accept the updated version before your next application.</p>')
+    + sec(17,'Client Acknowledgment','<p>By checking the box below, you confirm that you have read and understood these Terms and Conditions and agree to follow them when using SMART ASSESS.</p>');
+}
+function renderTermsModal(){
+  const t = state.terms;
+  if(!t) return '';
+  const what = t.flow==='docreq' ? 'Document Request' : 'Land Transfer';
+  return '<div class="terms-backdrop" data-terms-backdrop><div class="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-heading" aria-describedby="terms-sub" tabindex="-1" data-terms-modal>'
+    + '<div class="terms-head"><div><h2 id="terms-heading">Terms and Conditions</h2><p id="terms-sub">'+(t.renew==='terms_outdated' ? 'The Terms and Conditions were updated. Please accept the current version to submit your '+what+'.' : (t.renew ? 'Please accept the Terms and Conditions to submit your '+what+'.' : 'Please read before starting your '+what+'.'))+'</p></div>'
+      + '<button type="button" class="terms-x" data-action="terms-cancel" aria-label="Close Terms and Conditions">&times;</button></div>'
+    + '<div class="terms-body" tabindex="0" aria-label="Terms and Conditions text">'+renderTermsContent()+'</div>'
+    + '<div class="terms-foot"><label class="terms-check"><input type="checkbox" id="terms-agree" data-terms-agree'+(t.agreed?' checked':'')+'><span>'+esc(TERMS_AGREE_TEXT)+'</span></label>'
+      + (t.error ? '<p class="terms-error" role="alert">'+esc(t.error)+'</p>' : '')
+      + '<div class="terms-actions"><button type="button" class="btn btn-ghost" data-action="terms-cancel">Cancel</button>'
+      + '<button type="button" class="btn btn-primary" data-action="terms-continue"'+(t.agreed && !t.busy ? '' : ' disabled')+(t.busy?' aria-busy="true"':'')+'>'+(t.busy?'Please wait…':'Continue')+'</button></div></div>'
+  + '</div></div>';
+}
+function openTerms(flow, opts){
+  state.terms = { flow:flow, agreed:false, busy:false, error:'', resume: !!(opts && opts.resume), renew:(opts && opts.renew) || '', onAccepted:(opts && opts.onAccepted) || null,
+    returnFocus: (opts && opts.renew) ? 'submit' : ((opts && opts.resume) ? 'draft-resume' : 'start-'+flow) };
+  document.body.style.overflow = 'hidden';
+  render();
+  const m = document.querySelector('[data-terms-modal]'); if(m) m.focus();
+}
+function closeTerms(){
+  const back = state.terms && state.terms.returnFocus;
+  state.terms = null; document.body.style.overflow = '';
+  render();
+  if(back){ const el = document.querySelector('[data-action="'+back+'"]'); if(el) el.focus(); }
+}
+function acceptTerms(){
+  const t = state.terms;
+  if(!t || !t.agreed || t.busy) return;
+  const finish = function(token){
+    const flow = t.flow, resume = t.resume, onAccepted = t.onAccepted;
+    state.terms = null; document.body.style.overflow = '';
+    if(resume){ state.formData.termsToken = token; state.view = 'wizard'; render(); if(!onAccepted) window.scrollTo({top:0,behavior:'smooth'}); }
+    else { startFlow(flow, true); state.formData.termsToken = token; render(); }
+    if(onAccepted) onAccepted();   // e.g. retry the submission with the new acceptance
+  };
+  if(!draftServer()){ finish('local-'+TERMS_VERSION); return; }   // standalone demo (no server)
+  t.busy = true; t.error = ''; render();
+  draftApi('terms_accept', { flow:t.flow, agreed:true, terms_version:TERMS_VERSION }).then(function(d){ finish(d.terms_token); }, function(err){
+    if(!state.terms) return;
+    state.terms.busy = false;
+    state.terms.error = err.status===0 ? 'Could not reach the server to record your agreement. Check your connection and press Continue again.' : err.message;
+    render();
+  });
+}
+/* Final submission was refused because the saved acceptance is for an older
+   Terms version (or is no longer valid): drop the old token, show the same
+   popup over the form, and resubmit only after the new acceptance is
+   recorded. Form data, saved files and the draft are untouched. */
+window.SMART_ASSESS_TERMS_RECOVER = function(code, retry){
+  state.submitConfirmation = false;
+  state.formData.termsToken = '';
+  openTerms(state.flow, { resume:true, renew:code, onAccepted:retry });
+};
+/* Entry point for both "Begin" buttons. */
+function beginApplication(flow){
+  const existing = draftLocalRead();
+  if(existing && draftHasContent(existing) && !confirm('You have an unfinished application. Start a new one and discard it?')) return;
+  openTerms(flow);
+}
+/* After restoring a draft: older drafts saved before this step have no
+   recorded acceptance, so ask once before showing the form. */
+function draftEnterWizard(){
+  if(!state.formData.termsToken){ state.view = 'landing'; openTerms(state.flow, { resume:true }); return false; }
+  return true;
+}
+
+/* ======================= Draft auto-save & resume =======================
+   Guests never need an account. Every change is written immediately to this
+   browser (survives a crash or power loss) and, in the PHP app, saved to the
+   server ~0.7s later (survives clearing the browser and works on another
+   device). Uploads are sent to the draft as soon as a file is chosen. The
+   server identifies a draft only by its random recovery code; this page keeps
+   that code and shows it with a resume link. Nothing is an official request
+   until the final Submit. */
+const DRAFT_KEY = 'smartAssessDraftV1';
+const draft = { code:'', revision:0, status:'idle', savedAt:'', expiresAt:'', timer:null, inflight:false, again:false,
+  lastSnap:'', retryMs:0, retryTimer:null, files:{}, uploads:{}, panel:false, resumeMsg:'', notice:'' };
+function draftServer(){ const c = window.SMART_ASSESS_CONFIG; return !!(c && c.api && c.csrf); }
+function draftFields(){ const fd = Object.assign({}, state.formData); delete fd.files; return fd; }
+function draftLocalRead(){ try{ const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return d && d.flow ? d : null; }catch(e){ return null; } }
+function draftLocalWrite(){
+  try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({ v:1, code:draft.code, flow:state.flow, step:state.step, maxStep:state.maxStep,
+    fields:draftFields(), files:Object.keys(state.formData.files||{}).filter(function(k){ return draft.files[k]==='saved'; }),
+    revision:draft.revision, savedAt:new Date().toISOString() })); }catch(e){}
+}
+function draftLocalClear(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} }
+function draftReset(){ clearTimeout(draft.timer); clearTimeout(draft.retryTimer);
+  Object.assign(draft, { code:'', revision:0, status:'idle', savedAt:'', expiresAt:'', inflight:false, again:false, lastSnap:'', retryMs:0, files:{}, uploads:{}, panel:false, notice:'' }); }
+function draftHasContent(d){
+  const f = d.fields || {};
+  return !!(f.firstName || f.lastName || f.middleName || (f.contact && f.contact!=='+63') || f.email || f.addressLine || f.documentType || f.transferType || f.arp || f.barangay || (d.files && d.files.length) || (d.step||1) > 1);
+}
+function draftApi(action, payload, asBlob){
+  const c = window.SMART_ASSESS_CONFIG;
+  const isForm = payload instanceof FormData;
+  let body;
+  if(isForm){ payload.append('action', action); payload.append('csrf', c.csrf); body = payload; }
+  else body = JSON.stringify(Object.assign({}, payload, { action:action, csrf:c.csrf }));
+  return fetch(c.api + '?action=' + encodeURIComponent(action), {
+    method:'POST', credentials:'same-origin',
+    headers: isForm ? { 'Accept':'application/json' } : { 'Content-Type':'application/json', 'Accept':'application/json' },
+    body:body
+  }).then(function(res){
+    if(asBlob && res.ok) return res.blob();
+    return res.json().catch(function(){ return {}; }).then(function(json){
+      if(!res.ok || !json.ok){ const err = new Error(json.error || ('HTTP ' + res.status)); err.status = res.status; throw err; }
+      return json.data;
+    });
+  }, function(){ const err = new Error('offline'); err.status = 0; throw err; });
+}
+/* Called after every render and input: saves only when something changed. */
+function scheduleDraftSave(){
+  if(state.view!=='wizard' || !state.flow) return;
+  const snap = JSON.stringify([state.flow, state.step, state.maxStep, draftFields()]);
+  if(snap===draft.lastSnap) return;
+  const first = !draft.lastSnap && !draftHasContent({ fields:draftFields(), step:state.step });
+  draft.lastSnap = snap;
+  if(first) return;                         // nothing typed yet: don't create an empty draft
+  draft.revision += 1;
+  draftLocalWrite();
+  if(!draftServer()){ setDraftStatus('local'); return; }
+  setDraftStatus('saving');
+  clearTimeout(draft.timer);
+  draft.timer = setTimeout(flushDraft, 700);
+}
+function flushDraft(){
+  if(!draftServer() || state.view!=='wizard' || !state.flow) return Promise.resolve();
+  if(draft.inflight){ draft.again = true; return draft.inflight; }
+  const rev = draft.revision;
+  draft.inflight = draftApi('draft_save', { draft_token:draft.code || '', flow:state.flow, step:state.step, max_step:state.maxStep, fields:draftFields(), revision:rev })
+    .then(function(d){
+      if(d.submitted){ draftAlreadySubmitted(d.reference_no); return; }
+      if(d.code) draft.code = d.code.replace(/-/g,'');
+      draft.savedAt = d.saved_at || ''; draft.expiresAt = d.expires_at || '';
+      draft.retryMs = 0;
+      draftLocalWrite();
+      draftSyncFiles();
+      setDraftStatus(Object.keys(draft.uploads).length ? 'saving' : 'saved');
+    }, function(err){
+      if(err.status===404 || err.status===410){
+        // The saved copy expired on the server: keep working and save as new.
+        draft.code = ''; draft.files = {}; draft.notice = 'Your earlier saved copy had expired, so this application is now saved as a new one.';
+        draft.again = true; return;
+      }
+      if(err.status===503){ setDraftStatus('local'); return; }
+      setDraftStatus(err.status===0 ? 'offline' : 'error');
+      draftRetryLater();
+    })
+    .then(function(){ draft.inflight = false; if(draft.again){ draft.again = false; flushDraft(); } });
+  return draft.inflight;
+}
+function draftRetryLater(){
+  clearTimeout(draft.retryTimer);
+  draft.retryMs = Math.min(30000, (draft.retryMs || 2500) * 2);
+  draft.retryTimer = setTimeout(function(){ draft.revision += 1; flushDraft(); }, draft.retryMs);
+}
+/* Uploads: sent once the draft exists; failed ones are retried when back online. */
+const draftPendingFiles = {};
+function draftQueueFile(key, file){ draftPendingFiles[key] = file; draft.files[key] = 'pending'; if(draftServer()){ if(draft.code) draftSyncFiles(); else { draft.revision += 1; draftLocalWrite(); setDraftStatus('saving'); flushDraft(); } } }
+function draftSyncFiles(){
+  if(!draft.code) return;
+  Object.keys(draftPendingFiles).forEach(function(key){
+    if(draft.uploads[key]) return;
+    const file = draftPendingFiles[key];
+    const fdata = new FormData(); fdata.append('draft_token', draft.code); fdata.append('doc_key', key); fdata.append('file', file);
+    draft.uploads[key] = true; draft.files[key] = 'uploading'; setDraftStatus('saving');
+    draftApi('draft_upload', fdata).then(function(){
+      if(draftPendingFiles[key]===file){ delete draftPendingFiles[key]; draft.files[key] = 'saved'; }
+      draftLocalWrite();
+    }, function(err){
+      draft.files[key] = 'failed';
+      if(err.status===422){ delete draftPendingFiles[key]; draft.notice = err.message; }   // rejected file: don't retry
+      else draftRetryLater();
+    }).then(function(){ delete draft.uploads[key]; setDraftStatus(Object.keys(draft.uploads).length ? 'saving' : (Object.values(draft.files).indexOf('failed')>=0 ? (navigator.onLine===false?'offline':'error') : 'saved')); });
+  });
+}
+function draftRemoveFile(key){
+  delete draftPendingFiles[key]; delete draft.files[key];
+  if(draftServer() && draft.code) draftApi('draft_remove_file', { draft_token:draft.code, doc_key:key }).catch(function(){});
+  draftLocalWrite();
+}
+function setDraftStatus(status){
+  draft.status = status;
+  const el = document.querySelector('[data-draft-state]');
+  if(el){ el.className = 'draft-state '+status; el.textContent = draftStatusText(); }
+}
+function draftStatusText(){
+  const failed = Object.keys(draft.files).filter(function(k){ return draft.files[k]==='failed'; }).length;
+  if(draft.status==='saving') return Object.keys(draft.uploads).length ? 'Saving… uploading document' : 'Saving…';
+  if(draft.status==='offline') return 'You’re offline. Changes are kept on this device and will be saved when you reconnect.';
+  if(draft.status==='error') return failed ? failed+' document'+(failed>1?'s':'')+' not saved yet. Retrying…' : 'Couldn’t save to the server. Retrying…';
+  if(draft.status==='local') return 'Draft saved on this device';
+  if(draft.status==='saved'){ const t = draft.savedAt ? receiptDate(draft.savedAt).split(' - ')[1] : ''; return 'Draft saved'+(t?' · '+t:''); }
+  return 'Your progress is saved automatically';
+}
+function draftResumeUrl(){ return location.origin + location.pathname + '?resume=' + draftFormatCode(draft.code); }
+function draftFormatCode(c){ return String(c||'').replace(/(.{5})(?=.)/g, '$1-'); }
+function renderDraftBar(){
+  const server = draftServer();
+  return '<div class="draft-bar'+(server && draft.code ? '' : ' bare')+'"><span class="draft-state '+draft.status+'" data-draft-state role="status" aria-live="polite">'+esc(draftStatusText())+'</span>'
+    + (server && draft.code ? '<button type="button" class="draft-later" data-action="draft-later" aria-expanded="'+draft.panel+'">'+(draft.panel?'Hide recovery code':'Continue later')+'</button>' : '')
+    + '</div>'
+    + (draft.notice ? '<div class="draft-panel" role="alert">'+esc(draft.notice)+'</div>' : '')
+    + (draft.panel && draft.code ? '<div class="draft-panel"><strong>Continue later on any device</strong><br>Keep this recovery code or link private. Anyone with it can open this application.'
+        + '<span class="draft-code">'+esc(draftFormatCode(draft.code))+'</span>'
+        + '<div class="draft-panel-actions"><button type="button" class="btn btn-primary" data-action="draft-copy-link">Copy resume link</button><button type="button" class="btn btn-ghost" data-action="draft-copy-code">Copy code</button></div>'
+        + '<p class="field-hint" style="margin-top:10px">Saved applications are kept for 7 days after your last change.</p></div>' : '');
+}
+function renderResumeCard(){
+  const d = draftLocalRead();
+  if(draft.resumeMsg && (!d || !draftHasContent(d))) return '<div class="draft-resume" role="alert"><p style="margin:0">'+esc(draft.resumeMsg)+'</p></div>';
+  if(!d || !draftHasContent(d)) return '';
+  const name = d.flow==='docreq' ? 'Document Request' : 'Land Transfer';
+  const when = d.savedAt ? receiptDate(d.savedAt) : '';
+  return '<div class="draft-resume" role="region" aria-label="Unfinished application"><div><h3>You have an unfinished '+name+'</h3><p>Step '+(d.step||1)+' of 4'+(when?' · last saved '+esc(when):'')+'</p></div>'
+    + '<div class="draft-resume-actions"><button class="btn btn-primary" data-action="draft-resume">Resume Draft</button><button class="btn btn-ghost" data-action="draft-discard">Start Over</button></div></div>';
+}
+function draftApplyFields(flow, step, maxStep, fields, savedFiles){
+  state.flow = flow; state.view = 'wizard';
+  state.formData = Object.assign(blankFormData(), fields || {}, { files:{} });
+  (savedFiles || []).forEach(function(f){
+    state.formData.files[f.doc_key] = { name:f.name, size:f.size, type:f.type, valid:true, preview:null, saved:true };
+    draft.files[f.doc_key] = 'saved';
+  });
+  state.maxStep = Math.min(4, Math.max(1, maxStep || step || 1));
+  state.step = Math.min(state.maxStep, Math.max(1, step || 1));
+  state.errors = {};
+  draft.lastSnap = JSON.stringify([state.flow, state.step, state.maxStep, draftFields()]);
+}
+/* Image previews for files saved on the server. */
+function draftLoadPreviews(){
+  Object.keys(state.formData.files).forEach(function(key){
+    const f = state.formData.files[key];
+    if(!f.saved || f.preview || !/^image\//.test(f.type||'')) return;
+    draftApi('draft_file', { draft_token:draft.code, doc_key:key }, true).then(function(blob){
+      if(state.formData.files[key]===f){ f.preview = URL.createObjectURL(blob); render(); }
+    }).catch(function(){});
+  });
+}
+function resumeDraft(code){
+  draft.resumeMsg = '';
+  const local = draftLocalRead();
+  const useCode = code || (local && local.code) || '';
+  if(!draftServer() || !useCode){
+    if(local){ draftReset(); draft.code = local.code || ''; draft.revision = local.revision || 0; draftApplyFields(local.flow, local.step, local.maxStep, local.fields, []); setDraftStatus(draftServer()?'saving':'local');
+      if(draftEnterWizard()){ render(); window.scrollTo({top:0,behavior:'smooth'}); } if(draftServer()){ draft.revision += 1; flushDraft(); } }
+    return;
+  }
+  draftApi('draft_load', { draft_token:useCode }).then(function(d){
+    if(d.submitted){ draftAlreadySubmitted(d.reference_no); return; }
+    draftReset();
+    draft.code = d.code.replace(/-/g,''); draft.revision = d.revision; draft.savedAt = d.saved_at; draft.expiresAt = d.expires_at;
+    // This device may hold newer, unsynced changes to the same draft.
+    const newer = !code && local && local.code===draft.code && (local.revision||0) > d.revision;
+    if(newer) draftApplyFields(local.flow, local.step, local.maxStep, local.fields, d.files);
+    else draftApplyFields(d.flow, d.step, d.max_step, d.fields, d.files);
+    draft.status = 'saved';
+    draftLocalWrite();
+    if(draftEnterWizard()){ render(); window.scrollTo({top:0,behavior:'smooth'}); }
+    draftLoadPreviews();
+    if(newer){ draft.revision = Math.max(draft.revision, local.revision) + 1; flushDraft(); }
+  }, function(err){
+    if(!code && local && err.status===0){
+      // Offline: continue from this device's copy and sync later.
+      draftReset(); draft.code = local.code; draft.revision = local.revision || 0;
+      draftApplyFields(local.flow, local.step, local.maxStep, local.fields, []); draft.status = 'offline';
+      if(draftEnterWizard()) render(); return;
+    }
+    if(!code && (err.status===404 || err.status===410)) draftLocalClear();
+    draft.resumeMsg = err.status===0 ? 'Could not reach the server. Check your connection and try again.' : err.message;
+    state.view = 'landing'; render();
+    requestAnimationFrame(function(){ const el = document.getElementById('services'); if(el) el.scrollIntoView({block:'center'}); });
+  });
+}
+function draftAlreadySubmitted(reference){
+  draftLocalClear(); draftReset();
+  draft.resumeMsg = 'This application was already submitted. Its reference number is '+reference+'. Use Track Request to check its status.';
+  state.view = 'landing'; render();
+}
+function discardDraft(){
+  const local = draftLocalRead();
+  const code = draft.code || (local && local.code);
+  if(draftServer() && code) draftApi('draft_discard', { draft_token:code }).catch(function(){});
+  Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; });
+  draftLocalClear(); draftReset();
+}
+function draftCompleted(){ Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; }); draftLocalClear(); draftReset(); }
+window.SMART_ASSESS_DRAFT_DONE = draftCompleted;
+window.SMART_ASSESS_FORM = function(){ return { flow:state.flow, formData:state.formData, draftCode:draft.code }; };
+window.addEventListener('online', function(){ if(state.view==='wizard' && (draft.status==='offline' || draft.status==='error')){ draft.revision += 1; setDraftStatus('saving'); flushDraft(); } });
+window.addEventListener('offline', function(){ if(state.view==='wizard' && draft.status!=='idle') setDraftStatus('offline'); });
+/* Leaving or closing the page: push the latest change without waiting. */
+window.addEventListener('pagehide', function(){
+  if(!draftServer() || state.view!=='wizard' || !state.flow || !draft.code || draft.status==='saved' || !navigator.sendBeacon) return;
+  const c = window.SMART_ASSESS_CONFIG, fdata = new FormData();
+  draft.revision += 1;
+  fdata.append('payload', JSON.stringify({ action:'draft_save', csrf:c.csrf, draft_token:draft.code, flow:state.flow, step:state.step, max_step:state.maxStep, fields:draftFields(), revision:draft.revision }));
+  navigator.sendBeacon(c.api + '?action=draft_save', fdata);
+  draftLocalWrite();
+});
 
 /* ======================= Root render + events ======================= */
 function render(){
@@ -1381,9 +2068,11 @@ function render(){
   else if(state.view==='wizard') html = renderWizard();
   else if(state.view==='confirmation') html = renderConfirmation();
   else if(state.view==='track') html = renderTrack();
+  html += renderTermsModal();
   app.innerHTML = html + (state.view==='wizard' ? '<input type="hidden" id="f-arp" data-bind="arp" value="'+esc(state.formData.arp||'')+'">' : '');
   bindEvents(app);
   publishArp();
+  scheduleDraftSave();
 }
 /* The PHP bridge records [data-bind] values from input events; announce the
    full ARP whenever it may have changed (typing or a barangay change). */
@@ -1537,8 +2226,10 @@ function bindEvents(root){
     el.addEventListener('click', function(event){
       const a = el.getAttribute('data-action');
       if(a==='get-started') goToServices();
-      else if(a==='start-docreq') startFlow('docreq');
-      else if(a==='start-landtransfer') startFlow('landtransfer');
+      else if(a==='start-docreq') beginApplication('docreq');
+      else if(a==='start-landtransfer') beginApplication('landtransfer');
+      else if(a==='terms-cancel') closeTerms();
+      else if(a==='terms-continue') acceptTerms();
       else if(a==='view-announcement-page') go('announcement');
       else if(a==='show-announcement'){
         state.announcementModal = true;
@@ -1575,12 +2266,23 @@ function bindEvents(root){
       else if(a==='cancel-submit'){ state.submitConfirmation = false; render(); }
       else if(a==='confirm-submit') confirmSubmitRequest();
       else if(a==='save-tracking') saveTrackingNumber();
+      else if(a==='copy-tracking') copyTrackingNumber(el);
+      else if(a==='draft-later'){ draft.panel = !draft.panel; render(); }
+      else if(a==='draft-copy-link' || a==='draft-copy-code') draftCopy(el, a==='draft-copy-link' ? draftResumeUrl() : draftFormatCode(draft.code));
+      else if(a==='draft-resume') resumeDraft('');
+      else if(a==='draft-discard'){ if(confirm('Discard your unfinished application? This cannot be undone.')){ discardDraft(); render(); } }
       else if(a==='view-status') viewSubmittedStatus();
       else if(a==='track-search'){
-        const q = (document.getElementById('track-input').value||'').trim().toUpperCase();
-        state.track.query = q; state.track.searched = true;
-        state.track.result = loadRequests().find(function(r){ return r.id.toUpperCase()===q; }) || null;
-        render();
+        event.preventDefault();
+        if(!trackPrepare()) return;
+        const q = state.track.query;
+        // Demo data is local, so the lookup is instant; keep the short
+        // "Tracking…" state visible so the action feels confirmed.
+        setTimeout(function(){
+          state.track.searched = true;
+          state.track.result = loadRequests().find(function(r){ return r.id.toUpperCase()===q; }) || null;
+          render();
+        }, 350);
       }
     });
   });
@@ -1624,6 +2326,24 @@ function bindEvents(root){
       render();
     });
   });
+  const termsAgree = root.querySelector('[data-terms-agree]');
+  if(termsAgree) termsAgree.addEventListener('change', function(){
+    // Update in place so the scroll position of the terms text is kept.
+    state.terms.agreed = termsAgree.checked; state.terms.error = '';
+    const go = root.querySelector('[data-action="terms-continue"]'); if(go) go.disabled = !termsAgree.checked;
+  });
+  const termsBackdrop = root.querySelector('[data-terms-backdrop]');
+  if(termsBackdrop){
+    termsBackdrop.addEventListener('click', function(e){ if(e.target===termsBackdrop) closeTerms(); });
+    termsBackdrop.addEventListener('keydown', function(e){
+      if(e.key==='Escape'){ e.preventDefault(); closeTerms(); return; }
+      if(e.key!=='Tab') return;
+      const items = Array.prototype.filter.call(termsBackdrop.querySelectorAll('button, input, [tabindex="0"]'), function(el){ return !el.disabled; });
+      const first = items[0], last = items[items.length-1];
+      if(e.shiftKey && (document.activeElement===first || document.activeElement===termsBackdrop.querySelector('[data-terms-modal]'))){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+    });
+  }
   const ownerToggle = root.querySelector('#f-isOwner');
   if(ownerToggle){
     ownerToggle.addEventListener('change', function(){ state.formData.isOwner = ownerToggle.checked; state.errors = {}; render(); });
@@ -1656,6 +2376,7 @@ function bindEvents(root){
       const key = btn.getAttribute('data-remove-file');
       delete state.formData.files[key];
       if(typeof window.SMART_ASSESS_REMOVE_FILE === 'function') window.SMART_ASSESS_REMOVE_FILE(key);
+      draftRemoveFile(key);
       render();
     });
   });
@@ -1669,6 +2390,18 @@ function bindEvents(root){
   });
 }
 
+// Text fields update state without re-rendering; save those changes too.
+document.addEventListener('input', function(){ setTimeout(scheduleDraftSave, 0); });
+document.addEventListener('change', function(){ setTimeout(scheduleDraftSave, 0); });
+(function(){
+  const params = new URLSearchParams(location.search);
+  const code = params.get('resume');
+  if(!code) return;
+  // Remove the code from the address bar and history straight away.
+  params.delete('resume');
+  history.replaceState(null, '', location.pathname + (params.toString() ? '?'+params : '') + location.hash);
+  setTimeout(function(){ resumeDraft(code.toUpperCase().replace(/[\s-]+/g,'')); }, 0);
+})();
 render();
 // Re-render when the shown announcement expires while the page stays open.
 (function(){

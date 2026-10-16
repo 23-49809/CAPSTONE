@@ -82,11 +82,18 @@
     return element ? element.value : '';
   }
 
+  var submitting = false;
   function submitPublicRequest() {
+    if (submitting) return;   // ignore double clicks while a submission is in flight
     var page = window.SMART_ASSESS_PAGE || {};
-    var form = page.formData || {};
+    // The page's own form state is complete even for fields restored from a
+    // saved draft (they were never typed in this page load).
+    var live = typeof window.SMART_ASSESS_FORM === 'function' ? window.SMART_ASSESS_FORM() : null;
+    var form = (live && live.formData) || page.formData || {};
+    if (live && typeof live.formData.isOwner === 'boolean') isOwner = live.formData.isOwner;
     var transferType = inputValue('transferType') || formValues.transferType || form.transferType || '';
-    var flow = (transferType || document.querySelector('[data-upload="ctcTdOrTitle"]')) ? 'landtransfer' : 'docreq';
+    var flow = live && live.flow ? live.flow
+      : ((transferType || document.querySelector('[data-upload="ctcTdOrTitle"]')) ? 'landtransfer' : 'docreq');
     var identityDocuments = isOwner
       ? [{ doc_key: 'ownerId', label: 'Property Owner Valid ID' }]
       : [
@@ -134,6 +141,8 @@
       barangay: formValues.barangay || inputValue('barangay') || form.barangay || '',
       requester_barangay: formValues.requesterBarangay || inputValue('requesterBarangay') || form.requesterBarangay || '',
       documents: documents,
+      draft_token: live && live.draftCode ? live.draftCode : undefined,
+      terms_token: form.termsToken || undefined,
       is_owner: document.getElementById('f-isOwner') ?
         document.getElementById('f-isOwner').checked : isOwner
     };
@@ -143,6 +152,7 @@
     Object.keys(selectedFiles).forEach(function (key) {
       body.append('file_' + key, selectedFiles[key]);
     });
+    submitting = true;
     return fetch(config.api + '?action=submit_request', {
       method: 'POST',
       credentials: 'same-origin',
@@ -150,11 +160,27 @@
       body: body
     }).then(function (response) {
       return response.json().then(function (result) {
-        if (!response.ok || !result.ok) throw new Error(result.error || 'The request could not be submitted.');
+        if (!response.ok || !result.ok) {
+          // The saved Terms acceptance is outdated or no longer valid: the page
+          // shows the Terms popup again, records a fresh acceptance, and only
+          // then calls back to submit again. Nothing was saved by this attempt.
+          if ((result.code === 'terms_outdated' || result.code === 'terms_required') &&
+              typeof window.SMART_ASSESS_TERMS_RECOVER === 'function') {
+            submitting = false;
+            window.SMART_ASSESS_TERMS_RECOVER(result.code, submitPublicRequest);
+            return;
+          }
+          throw new Error(result.error || 'The request could not be submitted.');
+        }
+        if (typeof window.SMART_ASSESS_DRAFT_DONE === 'function') window.SMART_ASSESS_DRAFT_DONE();
         window.location.assign('/index.php?submitted=' + encodeURIComponent(result.request.reference_no));
       });
     }).catch(function (error) {
-      notice(error.message);
+      submitting = false;
+      // A network failure leaves the draft intact, so nothing is lost.
+      notice(error && /Failed to fetch|NetworkError|Load failed/i.test(String(error.message))
+        ? 'Could not reach the server. Your application is still saved; check your connection and press Submit again.'
+        : error.message);
     });
   }
 
@@ -269,7 +295,11 @@
         event.stopImmediatePropagation();
         var input = document.getElementById('track-input');
         var reference = input ? input.value.trim().toUpperCase() : '';
-        if (!reference) {
+        // The page validates the format, shows inline errors and the
+        // "Tracking…" state; older pages fall back to the plain check.
+        if (window.SMART_ASSESS_TRACK && typeof window.SMART_ASSESS_TRACK.prepare === 'function') {
+          if (!window.SMART_ASSESS_TRACK.prepare()) return;
+        } else if (!reference) {
           notice('Enter a request reference number to track.');
           return;
         }
