@@ -92,6 +92,8 @@ function sa_db(): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
         PDO::ATTR_STRINGIFY_FETCHES => false,
     ]);
+    // Store DATETIME defaults such as requests.created_at in Philippine time.
+    $pdo->exec("SET time_zone = '+08:00'");
     return $pdo;
 }
 
