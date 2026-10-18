@@ -216,7 +216,7 @@
      content and three-column layout. On phones the address spans the row and
      Contact / Office Hours sit side by side, stacking only on very narrow screens. */
   .site-footer{ background:var(--brand-900); color:#dcefe3; padding:32px 0 18px; }
-  .footer-grid{ display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:16px 32px; }
+  .footer-grid{ display:grid; grid-template-columns:1.3fr 1fr 1fr 1fr; gap:16px 32px; }
   @media (max-width:768px){ .footer-grid{ grid-template-columns:1.4fr 1fr; gap:16px 24px; } .footer-grid > div:first-child{ grid-column:1 / -1; } }
   @media (max-width:499px){ .footer-grid{ grid-template-columns:1fr; gap:14px; } }
   .footer-grid h5{ color:#fff; font-family:var(--font-body); font-weight:700; font-size:16px; margin-bottom:4px; }
@@ -559,6 +559,66 @@
     .owner-toggle{ min-height:44px; }
   }
 
+  /* ============ Notifications (bell) ============ */
+  /* The panel is anchored to the right edge of the header buttons, so it
+     never runs off the left side of a phone screen. */
+  .header-actions{ position:relative; }
+  .notif-wrap{ position:static; }
+  .notif-bell{ position:relative; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+    border-radius:50%; border:1.5px solid rgba(255,255,255,.65); background:transparent; color:#fff; cursor:pointer; }
+  .notif-bell:hover{ background:rgba(255,255,255,.12); }
+  .notif-bell:focus-visible{ outline:3px solid #a7f3d0; outline-offset:2px; }
+  .notif-bell[aria-expanded="true"]{ background:rgba(255,255,255,.18); }
+  .notif-bell .icon{ width:20px; height:20px; }
+  .notif-badge{ position:absolute; top:-3px; right:-3px; min-width:19px; height:19px; padding:0 5px; border-radius:999px; background:#d93025; color:#fff;
+    font-size:11px; font-weight:800; line-height:19px; text-align:center; box-shadow:0 0 0 2px var(--brand-900); }
+  .notif-badge[hidden]{ display:none; }
+  .notif-panel{ position:absolute; top:calc(100% + 10px); right:0; z-index:60; width:min(380px, calc(100vw - 24px)); max-height:min(70vh, 560px); overflow-y:auto;
+    overscroll-behavior:contain; background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-md);
+    box-shadow:0 18px 44px -14px rgba(0,0,0,.35); text-align:left; }
+  .notif-panel[hidden]{ display:none; }
+  .notif-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 10px 10px 16px; border-bottom:1px solid var(--line); }
+  .notif-head h2{ font-family:var(--font-body); font-size:16px; font-weight:800; }
+  .notif-close{ width:40px; height:40px; border:0; border-radius:50%; background:none; color:var(--ink-soft); font-size:22px; line-height:1; cursor:pointer; }
+  .notif-close:hover{ background:var(--surface-2); }
+  .notif-sec{ margin:0; padding:10px 16px 4px; font-family:var(--font-body); font-size:11.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--brand-700); }
+  .notif-list{ list-style:none; margin:0; padding:0 0 4px; }
+  .notif-item{ display:flex; gap:10px; padding:10px 16px 12px; border-bottom:1px solid var(--line); }
+  .notif-list:last-child .notif-item:last-child{ border-bottom:0; }
+  .notif-dot{ flex:0 0 8px; width:8px; height:8px; margin-top:7px; border-radius:50%; background:#d93025; }
+  .notif-dot.read{ background:var(--line-strong); }
+  .notif-body{ min-width:0; flex:1; }
+  .notif-title{ font-size:14.5px; font-weight:700; color:var(--ink); line-height:1.35; overflow-wrap:anywhere; }
+  .notif-text{ margin-top:2px; font-size:13.5px; color:var(--ink-soft); line-height:1.45; overflow-wrap:anywhere; }
+  .notif-meta{ margin-top:3px; font-size:12px; color:var(--ink-faint); }
+  .notif-btn{ margin-top:8px; min-height:40px; padding:8px 14px; font-size:14px; }
+  .site-header .notif-panel .btn-ghost{ color:var(--brand-700); border-color:var(--line-strong); }
+  .site-header .notif-panel .btn-ghost:hover{ background:var(--surface-2); }
+  .notif-empty{ padding:22px 16px 24px; text-align:center; color:var(--ink-soft); font-size:14px; }
+  .notif-empty strong{ display:block; color:var(--ink); font-size:15.5px; margin-bottom:2px; }
+  .track-short{ display:none; }
+  @media (max-width:430px){ .track-long{ display:none; } .track-short{ display:inline; } }
+  @media (max-width:1024px), (pointer:coarse){ .notif-btn, .notif-close{ min-height:44px; } .notif-close{ width:44px; } }
+
+  /* ============ About Us ============ */
+  .about .section-head{ margin-bottom:12px; }
+  .about-purpose{ max-width:760px; margin:0 auto 28px; text-align:center; font-size:16.5px; color:var(--ink-soft); }
+  .about-sub{ text-align:center; font-family:var(--font-display); font-size:clamp(20px,2.4vw,26px); margin-bottom:18px; scroll-margin-top:90px; }
+  .about{ scroll-margin-top:80px; }
+  .about-grid{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .about-grid li{ display:flex; gap:12px; align-items:flex-start; padding:16px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-md); }
+  .about-grid .chip-icon{ width:42px; height:42px; flex:0 0 42px; border-radius:12px; margin:0; }
+  .about-grid .chip-icon .icon{ width:20px; height:20px; }
+  .about-grid h4{ font-family:var(--font-body); font-size:16px; font-weight:700; color:var(--ink); }
+  .about-grid p{ margin-top:3px; font-size:14.5px; line-height:1.5; color:var(--ink-soft); }
+  @media (max-width:900px){ .about-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:600px){ .about-grid{ grid-template-columns:minmax(0,1fr); gap:10px; } .about-purpose{ font-size:15px; margin-bottom:20px; } .about-grid li{ padding:14px; } }
+  .footer-links{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+  .footer-links button{ min-height:36px; padding:4px 0; border:0; background:none; color:#c2ddcd; font:inherit; font-size:15px; text-align:left; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  .footer-links button:hover{ color:#fff; }
+  .footer-links button:focus-visible{ outline:3px solid #a7f3d0; outline-offset:2px; }
+  @media (max-width:1024px), (pointer:coarse){ .footer-links button{ min-height:44px; } }
+
   /* ============ Continue later popup ============ */
   body.later-open{ overflow:hidden; }
   .later-backdrop{ position:fixed; inset:0; z-index:130; display:flex; align-items:center; justify-content:center; padding:16px;
@@ -748,6 +808,7 @@
     .brand{ gap:9px; min-width:0; }
     .brand-mark{ width:32px; height:32px; }
     .brand-name{ font-size:17px; white-space:nowrap; }
+    .header-actions{ gap:8px; flex-wrap:nowrap; }
     .header-actions .btn{ min-height:44px; padding:8px 14px; font-size:14px; gap:6px; white-space:nowrap; }
     .header-actions .btn .icon{ width:16px; height:16px; }
 
@@ -905,6 +966,7 @@ const ICONS = {
   service: svg('<rect x="5" y="3" width="14" height="18" rx="1.5"/><line x1="8.5" y1="8" x2="15.5" y2="8"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="16" x2="12.5" y2="16"/>'),
   arrowRight: svg('<line x1="4" y1="12" x2="20" y2="12"/><polyline points="14 6 20 12 14 18"/>'),
   arrowLeft: svg('<line x1="20" y1="12" x2="4" y2="12"/><polyline points="10 6 4 12 10 18"/>'),
+  bell: svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'),
   search: svg('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
   alert: svg('<path d="M12 3 22 20H2z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>'),
   upload: svg('<path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><polyline points="8 9 12 5 16 9"/><line x1="12" y1="5" x2="12" y2="15"/>'),
@@ -1110,9 +1172,10 @@ function pushStatus(record, status){
 /* ======================= Navigation helpers ======================= */
 function go(view){ state.view = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function startFlow(flow, confirmed){
-  const existing = draftLocalRead();
-  if(!confirmed && existing && draftHasContent(existing) && !confirm('You have an unfinished application. Start a new one and discard it?')) return;
-  discardDraft();
+  const existing = draftLocalRead(flow);
+  if(!confirmed && existing && draftHasContent(existing) && !confirm('You have an unfinished '+draftTypeName(flow)+'. Start a new one and discard it?')) return;
+  draftReset();             // leave the other application type's draft untouched
+  discardDraft(flow);
   state.flow = flow; state.view='wizard'; state.step=1; state.maxStep=1;
   state.formData = blankFormData(); state.errors={};
   render(); window.scrollTo({top:0,behavior:'smooth'});
@@ -1206,7 +1269,11 @@ function buildingMotif(){
 function renderHeader(){
   return '<header class="site-header"><div class="wrap">'
     + '<button class="brand" data-nav="landing">'+brandMark()+'<span class="brand-name">Smart Assess</span></button>'
-    + '<div class="header-actions"><button class="btn btn-ghost" data-nav="track">'+ic('search')+' Track Request</button></div>'
+    + '<div class="header-actions">'
+      + '<div class="notif-wrap"><button type="button" class="notif-bell" data-notif-toggle aria-haspopup="true" aria-expanded="false" aria-controls="notif-panel" aria-label="Notifications">'+ic('bell')+'<span class="notif-badge" data-notif-badge hidden></span></button>'
+        + '<div class="notif-panel" id="notif-panel" role="region" aria-label="Notifications" hidden></div></div>'
+      + '<button class="btn btn-ghost" data-nav="track" aria-label="Track Request">'+ic('search')+'<span class="track-long"> Track Request</span><span class="track-short"> Track</span></button>'
+    + '</div>'
     + '</div></header>';
 }
 
@@ -1243,9 +1310,39 @@ function currentPublicAnnouncement(){
   const announcements = Array.isArray(state.announcements) ? state.announcements : [];
   return announcements.find(announcementIsVisible) || null;
 }
+/* Active (published, unexpired) announcements, newest first. */
+function activeAnnouncements(){
+  return (Array.isArray(state.announcements) ? state.announcements : []).filter(announcementIsVisible)
+    .sort(function(a,b){ return (announcementTime(b.publishedAt||b.datePosted)||0) - (announcementTime(a.publishedAt||a.datePosted)||0); });
+}
+/* Read announcements are remembered on this device (anonymous clients have no
+   account). Keyed by id + publish time, so a re-published notice is new again. */
+const READ_ANN_KEY = 'smartAssessReadAnnouncements';
+function annKey(a){ return String(a.id)+'@'+String(a.publishedAt||a.datePosted||''); }
+function readAnnouncementKeys(){ try{ const v = JSON.parse(localStorage.getItem(READ_ANN_KEY) || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } }
+function isAnnouncementRead(a){ return readAnnouncementKeys().indexOf(annKey(a)) >= 0; }
+function markAnnouncementRead(a){
+  if(!a) return;
+  const keys = readAnnouncementKeys(), k = annKey(a);
+  if(keys.indexOf(k) < 0){
+    keys.push(k);
+    const live = activeAnnouncements().map(annKey);           // forget notices that are no longer shown
+    try{ localStorage.setItem(READ_ANN_KEY, JSON.stringify(keys.filter(function(x){ return live.indexOf(x)>=0; }))); }catch(e){}
+  }
+  updateNotifBadge();
+}
+function unreadAnnouncements(){ return activeAnnouncements().filter(function(a){ return !isAnnouncementRead(a); }); }
+function announcementForModal(){
+  if(typeof state.announcementModal === 'string'){
+    const pick = activeAnnouncements().find(function(a){ return String(a.id)===state.announcementModal; });
+    if(pick) return pick;
+  }
+  return currentPublicAnnouncement();
+}
 function renderAnnouncementModal(){
   if(!state.announcementModal) return '';
-  const announcement = currentPublicAnnouncement();
+  const announcement = announcementForModal();
+  markAnnouncementRead(announcement);
   return '<div class="requirements-modal" data-action="close-announcement"><article class="requirements-modal-card announcement-detail" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title" tabindex="-1">'
     + '<div class="requirements-modal-head"><div><span class="eyebrow" style="color:var(--brand-700);margin-bottom:8px;">Important Notice</span><h3 id="announcement-modal-title">Office Announcement</h3></div><button class="requirements-close" type="button" data-action="close-announcement" aria-label="Close announcement"><img class="requirements-close-icon" src="close.png" alt=""></button></div>'
     + (announcement
@@ -1282,14 +1379,20 @@ function renderLanding(){
         + '<div class="service-actions"><button class="btn-link" data-action="start-landtransfer">Begin Land Transfer '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div></div>'
     + '</div></div></section>'
 
-  + '<section class="section section-alt"><div class="wrap">'
-    + '<div class="section-head"><h2>Why Choose SMART ASSESS?</h2>'
-    + '<p>Experience the future of municipal services with our digital platform designed for efficiency, transparency, and accessibility.</p></div>'
-    + '<div class="feature-row">'
-      + '<div><div class="chip-icon">'+ic('shield')+'</div><h4>Secure &amp; Reliable</h4><p>Your data is protected with enterprise-grade security. All transactions are encrypted and monitored.</p></div>'
-      + '<div><div class="chip-icon">'+ic('clock')+'</div><h4>Fast Processing</h4><p>Streamlined workflows ensure your requests are processed quickly with real-time status updates.</p></div>'
-      + '<div><div class="chip-icon">'+ic('headset')+'</div><h4>24/7 Support</h4><p>Access our services anytime. Our support team is here to help with any questions or concerns.</p></div>'
-    + '</div></div></section>'
+  + '<section class="section section-alt about" id="about" aria-labelledby="about-title"><div class="wrap">'
+    + '<div class="section-head"><h2 id="about-title">About Us</h2>'
+    + '<p>SMART ASSESS is the online service of the Municipal Assessor’s Office of Mabini, Batangas. It lets you request property documents and apply for land transfers from home, in a few clear steps.</p></div>'
+    + '<div class="about-purpose"><p>Our goal is to make these services more convenient, organized, accessible, and efficient — so you spend less time in line and always know where your request stands.</p></div>'
+    + '<h3 class="about-sub" id="why-choose">Why Choose SMART ASSESS</h3>'
+    + '<ul class="about-grid">'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('home')+'</span><div><h4>Convenient Access</h4><p>Apply for services online without going through a complicated process.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('checklistIcon')+'</span><div><h4>Organized Applications</h4><p>Follow a guided, step-by-step form and review everything before you submit.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('file')+'</span><div><h4>Progress Saving</h4><p>Your unfinished application is saved, so you can continue later where you left off.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('search')+'</span><div><h4>Transparent Tracking</h4><p>Check the status of a submitted request anytime with Track Request.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('bell')+'</span><div><h4>Service Updates</h4><p>See announcements from the Assessor’s Office in one place.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('user')+'</span><div><h4>User-Friendly Design</h4><p>A clear, simple layout that works on phones, tablets, and computers.</p></div></li>'
+    + '</ul>'
+  + '</div></section>'
 
   + renderRequirementsModal()
   + renderAnnouncementModal()
@@ -1297,11 +1400,13 @@ function renderLanding(){
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
     + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: mao.smartassess@gmail.com</p></div>'
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
+    + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="about">About Us</button><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button></nav>'
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
 }
 
   function renderAnnouncementPage(){
     const announcement = currentPublicAnnouncement();
+    markAnnouncementRead(announcement);
     return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><p>Official updates from the Department Head.</p></div><article class="panel-card announcement-detail">'+(announcement ? '<div class="announcement-detail-meta">Announcement date: '+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</div><h2>'+esc(announcement.title)+'</h2><p>'+esc(announcement.content)+'</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the announcement and follow any additional instructions provided by the Assessor’s Office.</p></div>' : '<div class="announcement-detail-meta">No current announcement</div><h2>No published announcements</h2><p>There are no announcements available at this time.</p>')+'</article><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">'+ic('arrowLeft')+' Back to Home</button></div></div></section>';
   }
 
@@ -1979,10 +2084,86 @@ window.SMART_ASSESS_TERMS_RECOVER = function(code, retry){
   state.formData.termsToken = '';
   openTerms(state.flow, { resume:true, renew:code, onAccepted:retry });
 };
+/* ======================= Notifications (bell) =======================
+   Built only from this device's own data: its unfinished drafts (each
+   reachable only through its own recovery code) and the active public
+   announcements the server already sends, with read state kept locally.
+   Opening the panel never changes or deletes a draft. */
+function notifCount(){ return draftsOnDevice().length + unreadAnnouncements().length; }
+function updateNotifBadge(){
+  const n = notifCount();
+  document.querySelectorAll('[data-notif-badge]').forEach(function(b){
+    b.hidden = n === 0; b.textContent = n > 9 ? '9+' : String(n);
+  });
+  document.querySelectorAll('[data-notif-toggle]').forEach(function(btn){
+    btn.setAttribute('aria-label', n ? 'Notifications, '+n+' new' : 'Notifications');
+  });
+}
+function renderNotifPanel(){
+  const drafts = draftsOnDevice(), anns = activeAnnouncements();
+  let html = '<div class="notif-head"><h2>Notifications</h2><button type="button" class="notif-close" data-notif-close aria-label="Close notifications">&times;</button></div>';
+  if(!drafts.length && !anns.length) return html + '<div class="notif-empty"><strong>You’re all caught up!</strong><span>No unfinished applications or new announcements.</span></div>';
+  if(drafts.length){
+    html += '<h3 class="notif-sec">Unfinished applications</h3><ul class="notif-list">' + drafts.map(function(d){
+      const isDoc = d.flow==='docreq', when = d.savedAt ? receiptDate(d.savedAt) : '';
+      return '<li class="notif-item"><span class="notif-dot" aria-hidden="true"></span><div class="notif-body">'
+        + '<p class="notif-title">You have an unfinished '+(isDoc ? 'Document Request' : 'Land Transfer application')+'.</p>'
+        + '<p class="notif-text">Continue where you left off.</p>'
+        + '<p class="notif-meta">'+(isDoc ? 'Document Request' : 'Land Transfer')+' · Step '+(d.step||1)+' of 4'+(when ? ' · Last saved '+esc(when) : '')+'</p>'
+        + '<button type="button" class="btn btn-primary notif-btn" data-notif-continue="'+d.flow+'">Continue Application</button></div></li>';
+    }).join('') + '</ul>';
+  }
+  if(anns.length){
+    html += '<h3 class="notif-sec">Announcements</h3><ul class="notif-list">' + anns.map(function(a){
+      const unread = !isAnnouncementRead(a), text = String(a.content||'');
+      return '<li class="notif-item'+(unread?' unread':'')+'"><span class="notif-dot'+(unread?'':' read')+'" aria-hidden="true"></span><div class="notif-body">'
+        + '<p class="notif-title">'+(unread ? '<span class="trk-sr">Unread: </span>' : '')+esc(a.title)+'</p>'
+        + '<p class="notif-text">'+esc(text.length > 110 ? text.slice(0,107).trim()+'…' : text)+'</p>'
+        + '<p class="notif-meta">'+esc(fmtDateTime(a.publishedAt || a.datePosted))+'</p>'
+        + '<button type="button" class="btn btn-ghost notif-btn" data-notif-read="'+esc(String(a.id))+'">Read announcement</button></div></li>';
+    }).join('') + '</ul>';
+  }
+  return html;
+}
+function setNotifPanel(open){
+  const panel = document.getElementById('notif-panel'), btn = document.querySelector('[data-notif-toggle]');
+  if(!panel || !btn) return;
+  if(open){
+    panel.innerHTML = renderNotifPanel(); panel.hidden = false; btn.setAttribute('aria-expanded','true');
+    panel.querySelectorAll('[data-notif-continue]').forEach(function(b){ b.addEventListener('click', function(){
+      const flow = b.getAttribute('data-notif-continue'); setNotifPanel(false);
+      if(state.view==='wizard' && state.flow===flow){ window.scrollTo({top:0, behavior:'smooth'}); return; }
+      resumeDraft('', flow);
+    }); });
+    panel.querySelectorAll('[data-notif-read]').forEach(function(b){ b.addEventListener('click', function(){
+      setNotifPanel(false); state.announcementModal = b.getAttribute('data-notif-read'); renderKeepingHomeSlideSafe();
+    }); });
+    panel.querySelector('[data-notif-close]').addEventListener('click', function(){ setNotifPanel(false, true); });
+    const first = panel.querySelector('button.notif-btn, [data-notif-close]'); if(first) first.focus();
+  } else {
+    if(panel.hidden) return;
+    panel.hidden = true; btn.setAttribute('aria-expanded','false');
+    if(arguments[1]) btn.focus();
+  }
+}
+function renderKeepingHomeSlideSafe(){ if(typeof window.SMART_ASSESS_RENDER_KEEP === 'function') window.SMART_ASSESS_RENDER_KEEP(); else render(); }
+if(!window._saNotifDoc){
+  window._saNotifDoc = true;
+  document.addEventListener('click', function(e){
+    const panel = document.getElementById('notif-panel');
+    if(panel && !panel.hidden && !e.target.closest('.notif-wrap')) setNotifPanel(false);
+  });
+  document.addEventListener('keydown', function(e){
+    const panel = document.getElementById('notif-panel');
+    if(e.key==='Escape' && panel && !panel.hidden){ e.preventDefault(); setNotifPanel(false, true); }
+  });
+  window.addEventListener('storage', function(e){ if(!e.key || e.key.indexOf(DRAFT_KEY)===0 || e.key===READ_ANN_KEY) updateNotifBadge(); });
+}
 /* Entry point for both "Begin" buttons. */
+function draftTypeName(flow){ return flow==='docreq' ? 'Document Request' : 'Land Transfer application'; }
 function beginApplication(flow){
-  const existing = draftLocalRead();
-  if(existing && draftHasContent(existing) && !confirm('You have an unfinished application. Start a new one and discard it?')) return;
+  const existing = draftLocalRead(flow);
+  if(existing && draftHasContent(existing) && !confirm('You have an unfinished '+draftTypeName(flow)+'. Start a new one and discard it?')) return;
   openTerms(flow);
 }
 /* After restoring a draft: older drafts saved before this step have no
@@ -2005,13 +2186,35 @@ const draft = { code:'', revision:0, status:'idle', savedAt:'', expiresAt:'', ti
   lastSnap:'', retryMs:0, retryTimer:null, files:{}, uploads:{}, panel:false, resumeMsg:'', notice:'' };
 function draftServer(){ const c = window.SMART_ASSESS_CONFIG; return !!(c && c.api && c.csrf); }
 function draftFields(){ const fd = Object.assign({}, state.formData); delete fd.files; return fd; }
-function draftLocalRead(){ try{ const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return d && d.flow ? d : null; }catch(e){ return null; } }
+/* One saved draft per application type, so an unfinished Document Request and
+   an unfinished Land Transfer can exist side by side. A draft saved by the
+   earlier single-draft version (DRAFT_KEY) is moved to its type's key. */
+const DRAFT_FLOWS = ['docreq','landtransfer'];
+function draftKey(flow){ return DRAFT_KEY + ':' + flow; }
+(function migrateSingleDraft(){
+  try{
+    const old = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if(old && old.flow && DRAFT_FLOWS.indexOf(old.flow)>=0 && !localStorage.getItem(draftKey(old.flow))) localStorage.setItem(draftKey(old.flow), JSON.stringify(old));
+    localStorage.removeItem(DRAFT_KEY);
+  }catch(e){}
+})();
+function draftLocalRead(flow){
+  flow = flow || state.flow; if(DRAFT_FLOWS.indexOf(flow)<0) return null;
+  try{ const d = JSON.parse(localStorage.getItem(draftKey(flow)) || 'null'); return d && d.flow===flow ? d : null; }catch(e){ return null; }
+}
+/* Unfinished drafts on this device, newest first. */
+function draftsOnDevice(){
+  return DRAFT_FLOWS.map(function(f){ return draftLocalRead(f); }).filter(function(d){ return d && draftHasContent(d); })
+    .sort(function(a,b){ return String(b.savedAt||'').localeCompare(String(a.savedAt||'')); });
+}
 function draftLocalWrite(){
-  try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({ v:1, code:draft.code, flow:state.flow, step:state.step, maxStep:state.maxStep,
+  if(DRAFT_FLOWS.indexOf(state.flow)<0) return;
+  try{ localStorage.setItem(draftKey(state.flow), JSON.stringify({ v:1, code:draft.code, flow:state.flow, step:state.step, maxStep:state.maxStep,
     fields:draftFields(), files:Object.keys(state.formData.files||{}).filter(function(k){ return draft.files[k]==='saved'; }),
     revision:draft.revision, savedAt:new Date().toISOString() })); }catch(e){}
+  updateNotifBadge();
 }
-function draftLocalClear(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} }
+function draftLocalClear(flow){ flow = flow || state.flow; try{ if(flow) localStorage.removeItem(draftKey(flow)); }catch(e){} updateNotifBadge(); }
 function draftReset(){ clearTimeout(draft.timer); clearTimeout(draft.retryTimer);
   Object.assign(draft, { code:'', revision:0, status:'idle', savedAt:'', expiresAt:'', inflight:false, again:false, lastSnap:'', retryMs:0, files:{}, uploads:{}, panel:false, notice:'' }); }
 function draftHasContent(d){
@@ -2256,13 +2459,14 @@ function renderDraftBar(){
     ;
 }
 function renderResumeCard(){
-  const d = draftLocalRead();
-  if(draft.resumeMsg && (!d || !draftHasContent(d))) return '<div class="draft-resume" role="alert"><p style="margin:0">'+esc(draft.resumeMsg)+'</p></div>';
-  if(!d || !draftHasContent(d)) return '';
-  const name = d.flow==='docreq' ? 'Document Request' : 'Land Transfer';
-  const when = d.savedAt ? receiptDate(d.savedAt) : '';
-  return '<div class="draft-resume" role="region" aria-label="Unfinished application"><div><h3>You have an unfinished '+name+'</h3><p>Step '+(d.step||1)+' of 4'+(when?' · last saved '+esc(when):'')+'</p></div>'
-    + '<div class="draft-resume-actions"><button class="btn btn-primary" data-action="draft-resume">Resume Draft</button><button class="btn btn-ghost" data-action="draft-discard">Start Over</button></div></div>';
+  const list = draftsOnDevice();
+  if(draft.resumeMsg && !list.length) return '<div class="draft-resume" role="alert"><p style="margin:0">'+esc(draft.resumeMsg)+'</p></div>';
+  return list.map(function(d){
+    const name = d.flow==='docreq' ? 'Document Request' : 'Land Transfer';
+    const when = d.savedAt ? receiptDate(d.savedAt) : '';
+    return '<div class="draft-resume" role="region" aria-label="Unfinished '+name+'"><div><h3>You have an unfinished '+name+'</h3><p>Step '+(d.step||1)+' of 4'+(when?' · last saved '+esc(when):'')+'</p></div>'
+      + '<div class="draft-resume-actions"><button class="btn btn-primary" data-action="draft-resume" data-flow="'+d.flow+'">Resume Draft</button><button class="btn btn-ghost" data-action="draft-discard" data-flow="'+d.flow+'">Start Over</button></div></div>';
+  }).join('');
 }
 function draftApplyFields(flow, step, maxStep, fields, savedFiles){
   state.flow = flow; state.view = 'wizard';
@@ -2286,9 +2490,9 @@ function draftLoadPreviews(){
     }).catch(function(){});
   });
 }
-function resumeDraft(code){
+function resumeDraft(code, flow){
   draft.resumeMsg = '';
-  const local = draftLocalRead();
+  const local = code ? null : draftLocalRead(flow);
   const useCode = code || (local && local.code) || '';
   if(!draftServer() || !useCode){
     if(local){ draftReset(); draft.code = local.code || ''; draft.revision = local.revision || 0; draftApplyFields(local.flow, local.step, local.maxStep, local.fields, []); setDraftStatus(draftServer()?'saving':'local');
@@ -2296,7 +2500,7 @@ function resumeDraft(code){
     return;
   }
   draftApi('draft_load', { draft_token:useCode }).then(function(d){
-    if(d.submitted){ draftAlreadySubmitted(d.reference_no); return; }
+    if(d.submitted){ draftAlreadySubmitted(d.reference_no, flow); return; }
     draftReset();
     draft.code = d.code.replace(/-/g,''); draft.revision = d.revision; draft.savedAt = d.saved_at; draft.expiresAt = d.expires_at;
     // This device may hold newer, unsynced changes to the same draft.
@@ -2315,23 +2519,24 @@ function resumeDraft(code){
       draftApplyFields(local.flow, local.step, local.maxStep, local.fields, []); draft.status = 'offline';
       if(draftEnterWizard()) render(); return;
     }
-    if(!code && (err.status===404 || err.status===410)) draftLocalClear();
+    if(!code && (err.status===404 || err.status===410)) draftLocalClear(flow);
     draft.resumeMsg = err.status===0 ? 'Could not reach the server. Check your connection and try again.' : err.message;
     state.view = 'landing'; render();
     requestAnimationFrame(function(){ const el = document.getElementById('services'); if(el) el.scrollIntoView({block:'center'}); });
   });
 }
-function draftAlreadySubmitted(reference){
-  draftLocalClear(); draftReset();
+function draftAlreadySubmitted(reference, flow){
+  draftLocalClear(flow); draftReset();
   draft.resumeMsg = 'This application was already submitted. Its reference number is '+reference+'. Use Track Request to check its status.';
   state.view = 'landing'; render();
 }
-function discardDraft(){
-  const local = draftLocalRead();
-  const code = draft.code || (local && local.code);
+function discardDraft(flow){
+  flow = flow || state.flow;
+  const local = draftLocalRead(flow);
+  const code = (state.flow===flow && draft.code) || (local && local.code);
   if(draftServer() && code) draftApi('draft_discard', { draft_token:code }).catch(function(){});
-  Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; });
-  draftLocalClear(); draftReset();
+  if(state.flow===flow){ Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; }); draftReset(); }
+  draftLocalClear(flow);
 }
 function draftCompleted(){ Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; }); draftLocalClear(); draftReset(); }
 window.SMART_ASSESS_DRAFT_DONE = draftCompleted;
@@ -2360,6 +2565,9 @@ function render(){
   html += renderTermsModal();
   app.innerHTML = html + (state.view==='wizard' ? '<input type="hidden" id="f-arp" data-bind="arp" value="'+esc(state.formData.arp||'')+'">' : '');
   bindEvents(app);
+  const bell = app.querySelector('[data-notif-toggle]');
+  if(bell) bell.addEventListener('click', function(e){ e.stopPropagation(); const p = document.getElementById('notif-panel'); setNotifPanel(p.hidden); });
+  updateNotifBadge();
   publishArp();
   scheduleDraftSave();
   // Narrow screens: the step bar scrolls sideways; keep the current step in view.
@@ -2379,6 +2587,7 @@ function publishArp(){
 }
 
 function bindEvents(root){
+  window.SMART_ASSESS_RENDER_KEEP = function(){ renderKeepingHomeSlide(); };
   function renderKeepingHomeSlide(){
     const slider = root.querySelector('[data-home-slider]');
     const activeSlide = slider ? slider.querySelector('.home-slide.active') : null;
@@ -2563,8 +2772,8 @@ function bindEvents(root){
       else if(a==='save-tracking') saveTrackingNumber();
       else if(a==='copy-tracking') copyTrackingNumber(el);
       else if(a==='draft-later') toggleDraftLater();
-      else if(a==='draft-resume') resumeDraft('');
-      else if(a==='draft-discard'){ if(confirm('Discard your unfinished application? This cannot be undone.')){ discardDraft(); render(); } }
+      else if(a==='draft-resume') resumeDraft('', el.getAttribute('data-flow'));
+      else if(a==='draft-discard'){ const fl = el.getAttribute('data-flow'); if(confirm('Discard your unfinished '+draftTypeName(fl)+'? This cannot be undone.')){ discardDraft(fl); render(); } }
       else if(a==='view-status') viewSubmittedStatus();
       else if(a==='track-search'){
         event.preventDefault();
@@ -2618,6 +2827,14 @@ function bindEvents(root){
       if(key==='documentType' || key==='transferType') state.formData.purpose='';
       delete state.errors[key];
       render();
+    });
+  });
+  root.querySelectorAll('[data-scroll-to]').forEach(function(b){
+    b.addEventListener('click', function(){
+      const t = document.getElementById(b.getAttribute('data-scroll-to')); if(!t) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block:'start' });
+      t.setAttribute('tabindex','-1'); t.focus({ preventScroll:true });
     });
   });
   const termsAgree = root.querySelector('[data-terms-agree]');
