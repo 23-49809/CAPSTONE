@@ -261,6 +261,9 @@
   .wizard-card-body{ padding:24px 32px 8px; max-height:min(56vh,600px); overflow-y:auto; }
   @media (max-width:640px){ .wizard-card-body{ max-height:none; } }
   .wizard-card-foot{ padding:20px 32px 26px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); margin-top:6px; }
+  .foot-actions{ display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .wizard-card-foot .btn{ min-height:48px; padding-top:10px; padding-bottom:10px; }
+  .wizard-card > .draft-panel{ margin:0 32px 14px; }
 
   .field-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px 24px; margin-bottom:22px; }
   @media (max-width:640px){ .field-grid{ grid-template-columns:1fr; } }
@@ -384,37 +387,60 @@
   .id-guidance-text{ color:var(--ink-soft); font-size:12px; line-height:1.4; }
   .id-guidance-text strong{ display:block; color:var(--ink); font-size:12.5px; margin-bottom:2px; }
 
-  /* ---- ID photo example (compact; two small examples side by side) ---- */
-  .id-guidance-panel{ margin:0 0 14px; padding:10px 12px 12px; background:var(--brand-50); border:1px solid var(--line); border-radius:var(--radius-md); }
-  .guidance-header{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-  .guidance-header .icon{ width:16px; height:16px; color:var(--brand-700); }
-  .guidance-header span{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; font-weight:800; color:var(--brand-700); }
-  .reference-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-  .reference-card{ display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
-  .reference-label{ display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; }
-  .reference-label .status-mark{ flex:0 0 18px; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; }
-  .reference-card.accept .reference-label{ color:var(--success); }
-  .reference-card.accept .status-mark{ background:var(--success); color:var(--surface); }
-  .reference-card.reject .reference-label{ color:var(--danger); }
-  .reference-card.reject .status-mark{ background:var(--danger); color:var(--surface); }
-  .sample-id{ position:relative; width:100%; aspect-ratio:16 / 9; max-height:120px; border-radius:6px; border:1px solid var(--line); background:var(--surface-2); overflow:hidden; }
-  .sample-id img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .sample-id.blur img{ filter:blur(3px) brightness(.9) saturate(.7); transform:scale(1.02); }
-  .reference-card .example-note{ font-size:12px; font-weight:600; line-height:1.35; color:var(--ink-soft); }
-  .reference-card.accept .example-note{ color:var(--success); }
-  .reference-card.reject .example-note{ color:var(--danger); }
-  .reference-note{ margin-top:8px; font-size:13px; color:var(--ink-soft); }
+  /* ---- Valid ID example panel: original size on desktop (>=1025px, the
+     pre-842d71f5 styling restored verbatim); compact below that. ---- */
+  @media (min-width:1025px){
+    .id-guidance-panel{ margin:0 0 22px; padding:18px 18px 16px; background:linear-gradient(180deg,#f7fbff 0%,#f3f5f8 100%); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:inset 0 1px 0 rgba(255,255,255,.8); }
+    .guidance-header{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+    .guidance-header .icon{ width:18px; height:18px; color:var(--brand-700); }
+    .guidance-header span{ font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:800; color:var(--brand-700); }
+    .reference-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .reference-card{ display:flex; flex-direction:column; gap:10px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); }
+    .reference-label{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .reference-label .status-mark{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; }
+    .reference-card.accept .reference-label{ color:var(--success); }
+    .reference-card.accept .status-mark{ background:var(--success); color:#fff; }
+    .reference-card.reject .reference-label{ color:var(--danger); }
+    .reference-card.reject .status-mark{ background:var(--danger); color:#fff; }
+    .sample-id{ position:relative; width:100%; height:200px; border-radius:12px; border:1px solid rgba(18,34,45,.18); background:#edf5fb; overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
+    .sample-id img{ width:100%; height:100%; object-fit:cover; display:block; }
+    .sample-id.blur img{ filter:blur(3px) brightness(.9) saturate(.7); transform:scale(1.02); }
+    .reference-card .example-note{ font-size:12px; font-weight:600; line-height:1.5; color:var(--ink-soft); }
+    .reference-card.accept .example-note{ color:var(--success); }
+    .reference-card.reject .example-note{ color:var(--danger); }
+  }
+  @media (max-width:1024px){
+    .id-guidance-panel{ margin:0 0 14px; padding:10px 12px 12px; background:var(--brand-50); border:1px solid var(--line); border-radius:var(--radius-md); }
+    .guidance-header{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .guidance-header .icon{ width:16px; height:16px; color:var(--brand-700); }
+    .guidance-header span{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; font-weight:800; color:var(--brand-700); }
+    .reference-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .reference-card{ display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
+    .reference-label{ display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; }
+    .reference-label .status-mark{ flex:0 0 18px; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; }
+    .reference-card.accept .reference-label{ color:var(--success); }
+    .reference-card.accept .status-mark{ background:var(--success); color:var(--surface); }
+    .reference-card.reject .reference-label{ color:var(--danger); }
+    .reference-card.reject .status-mark{ background:var(--danger); color:var(--surface); }
+    .sample-id{ position:relative; width:100%; aspect-ratio:16 / 9; max-height:120px; border-radius:6px; border:1px solid var(--line); background:var(--surface-2); overflow:hidden; }
+    .sample-id img{ width:100%; height:100%; object-fit:cover; display:block; }
+    .sample-id.blur img{ filter:blur(3px) brightness(.9) saturate(.7); transform:scale(1.02); }
+    .reference-card .example-note{ font-size:12px; font-weight:600; line-height:1.35; color:var(--ink-soft); }
+    .reference-card.accept .example-note{ color:var(--success); }
+    .reference-card.reject .example-note{ color:var(--danger); }
+    .reference-note{ margin-top:8px; font-size:13px; color:var(--ink-soft); }
+    .reference-label .status-mark{ display:none; }   /* the label text already starts with ✓ / ✕ */
+  }
 
   /* Review */
-  .review-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-bottom:16px; }
-  @media (max-width:640px){ .review-grid{ grid-template-columns:minmax(0,1fr); } }
-  .review-card{ background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-md); padding:18px 20px; }
-  .review-card h3{ font-size:14px; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
-  .review-card h3 .icon{ width:16px; height:16px; color:var(--brand-600); }
-  .review-row{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
-  .review-row:last-child{ border-bottom:none; }
-  .review-row .k{ color:var(--ink-soft); }
-  .review-row .v{ font-weight:600; text-align:right; min-width:0; overflow-wrap:anywhere; }
+  /* ---- Step 4 review table ---- */
+  .review-table{ width:100%; border-collapse:collapse; table-layout:fixed; border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface); font-size:14px; }
+  .review-table th, .review-table td{ padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; line-height:1.45; }
+  .review-table th[scope="row"]{ width:36%; font-weight:500; color:var(--ink-soft); }
+  .review-table td{ font-weight:600; color:var(--ink); overflow-wrap:anywhere; }
+  .review-table .rv-sec th{ padding:7px 12px; background:var(--brand-50); color:var(--brand-700); font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+  .review-table tbody:last-child tr:last-child > *{ border-bottom:0; }
+  .rv-bad{ color:var(--danger); font-weight:700; }
 
   .check-banner{ display:flex; align-items:center; gap:12px; border-radius:var(--radius-md); padding:14px 18px; margin-bottom:18px; font-size:13.5px; font-weight:600; }
   .check-banner.ok{ background:var(--success-bg); color:var(--success); }
@@ -572,7 +598,6 @@
   .draft-state.offline::before, .draft-state.error::before{ background:var(--danger); }
   .draft-state.local::before{ background:var(--info); }
   @keyframes draftPulse{ 50%{ opacity:.35; } }
-  .draft-later{ border:0; background:none; padding:4px 2px; font:inherit; font-weight:700; color:var(--brand-700); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   .draft-panel{ margin:0 0 14px; padding:16px 18px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); font-size:15px; color:var(--ink-soft); }
   .draft-panel strong{ color:var(--ink); }
   .draft-code{ display:block; margin:8px 0 10px; font-family:var(--font-mono); font-size:19px; font-weight:700; letter-spacing:.06em; color:var(--ink); overflow-wrap:anywhere; }
@@ -738,10 +763,10 @@
     .step-pill{ min-width:0; min-height:44px; flex-direction:column; justify-content:center; gap:4px; padding:6px 2px; border-radius:12px; font-size:11.5px; line-height:1.2; text-align:center; }
     .step-label{ text-align:center; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
     .step-num{ width:22px; height:22px; }
-    /* Review: label above value, full width */
-    .review-row{ flex-direction:column; gap:2px; padding:8px 0; }
-    .review-row .k{ font-size:13px; }
-    .review-row .v{ text-align:left; }
+    /* Review table: label above value on phones */
+    .review-table, .review-table tbody, .review-table tr, .review-table th, .review-table td{ display:block; width:auto; }
+    .review-table th[scope="row"]{ width:auto; padding:8px 12px 0; border-bottom:0; font-size:13px; }
+    .review-table td{ padding:2px 12px 8px; }
     .submit-modal-actions{ justify-content:stretch; }
     .submit-modal-actions .btn{ flex:1 1 140px; min-height:44px; }
     .wizard-card-head{ padding:16px 14px 2px; }
@@ -754,9 +779,12 @@
     .field input, .field select, .field textarea{ min-height:44px; font-size:15px; }
     .field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .field select:not(.barangay-native-select), .barangay-trigger, .contact-input, .arp-input{ min-height:44px; }
     .section-divider{ gap:8px; margin:6px 0 12px; }
-    .review-card{ padding:14px; }
     .wizard-card-foot{ padding:12px 14px 14px; flex-wrap:wrap; gap:10px; }
-    .wizard-card-foot .btn{ flex:1; min-width:120px; min-height:44px; }
+    .wizard-card-foot .btn{ min-height:44px; padding:10px 14px; font-size:15px; }
+    .wizard-card-foot > .btn{ flex:1 1 100px; }
+    .foot-actions{ flex:2 1 220px; }
+    .foot-actions .btn{ flex:1 1 0; white-space:nowrap; }
+    .wizard-card > .draft-panel{ margin:0 14px 12px; }
 
     /* Receipt, Track Request, popups */
     .confirm-shell{ padding:14px 12px 20px; }
@@ -780,6 +808,8 @@
     .submit-modal{ padding:18px 16px; }
   }
   @media (max-width:374px){
+    .foot-actions{ flex-wrap:wrap; }
+    .foot-actions .btn{ flex:1 1 100%; }
     .wrap{ padding-left:12px; padding-right:12px; }
     .brand-name{ font-size:15.5px; }
     .header-actions .btn{ padding:8px 11px; font-size:13.5px; }
@@ -842,6 +872,7 @@ const ICONS = {
   arrowLeft: svg('<line x1="20" y1="12" x2="4" y2="12"/><polyline points="10 6 4 12 10 18"/>'),
   search: svg('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
   alert: svg('<path d="M12 3 22 20H2z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>'),
+  upload: svg('<path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><polyline points="8 9 12 5 16 9"/><line x1="12" y1="5" x2="12" y2="15"/>'),
   checklistIcon: svg('<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><polyline points="9 13 11 15 15 11"/>'),
   timer: svg('<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="12" y1="13" x2="15" y2="14.5"/><line x1="9" y1="2" x2="15" y2="2"/>'),
   smsIcon: svg('<path d="M4 4h16v12H8l-4 4V4z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="11" x2="13" y2="11"/>'),
@@ -1355,7 +1386,7 @@ function uploadBox(key, label, fd){
   const cls = 'upload-box upl'+(file && file.valid?' filled':'')+(file && !file.valid?' flagged':'')+(err?' invalid':'');
   const thumb = file && file.preview && /^data:image\/|^blob:/.test(file.preview)
     ? '<span class="upl-thumb has-img"><img src="'+esc(file.preview)+'" alt=""></span>'
-    : '<span class="upl-thumb">'+ic(file ? 'file' : (imageOnly ? 'id' : 'doc'))+'</span>';
+    : '<span class="upl-thumb" aria-hidden="true">'+ic(file ? 'file' : 'upload')+'</span>';
   const meta = file
     ? '<span class="upl-file">'+esc(file.name)+'</span><span class="upl-size">'+fmtBytes(file.size||0)+'</span>'
       + (file.valid ? '<span class="upl-ok">'+ic('check')+(file.saved ? 'Saved' : 'Attached')+'</span>' : '<span class="upl-bad">Invalid format</span>')
@@ -1363,7 +1394,7 @@ function uploadBox(key, label, fd){
   const actions = file
     ? '<button type="button" class="upl-btn" data-replace-file="'+key+'" aria-label="Replace '+esc(label)+'">Replace</button>'
       + '<button type="button" class="upl-btn upl-remove" data-remove-file="'+key+'" aria-label="Remove '+esc(label)+'">Remove</button>'
-    : '<button type="button" class="upl-btn upl-choose" aria-label="Choose file for '+esc(label)+'">'+ic('file')+'Choose File</button>';
+    : '<button type="button" class="upl-btn upl-choose" aria-label="Choose file for '+esc(label)+'">Choose File</button>';
   return '<div class="'+cls+'" data-upload="'+key+'">'
     + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'"'+(imageOnly ? ' accept=".jpg,.jpeg,.png,image/jpeg,image/png,image/jpg"' : '')+'>'
     + '<div class="upl-row">'+thumb
@@ -1377,14 +1408,14 @@ function idReferenceCard(type){
   const accepted = type === 'accepted';
   const imageName = accepted ? './ID CLear.png' : './Blurry ID.png';
   return '<div class="reference-card '+(accepted ? 'accept' : 'reject')+'">'
-    + '<div class="reference-label"><span class="status-mark" aria-hidden="true">'+(accepted ? '✓' : '✕')+'</span><span>'+(accepted ? 'Accepted' : 'Not Accepted')+'</span></div>'
-    + '<div class="sample-id '+(accepted ? 'clear' : 'blur')+'"><img src="'+imageName+'" alt="'+(accepted ? 'Accepted ID reference' : 'Rejected blurry ID reference')+'" loading="lazy" /></div>'
+    + '<div class="reference-label"><span>'+(accepted ? '✓ Accepted' : '✕ Not Accepted')+'</span><span class="status-mark">'+(accepted ? '✓' : '✕')+'</span></div>'
+    + '<div class="sample-id '+(accepted ? 'clear' : 'blur')+'"><img src="'+imageName+'" alt="'+(accepted ? 'Accepted ID reference' : 'Rejected blurry ID reference')+'" /></div>'
     + '<div class="example-note">'+(accepted ? 'Clear, complete, readable, and valid.' : 'Blurry, unclear, or unreadable.')+'</div>'
   + '</div>';
 }
 function idGuidancePanel(){
   return '<div class="id-guidance-panel">'
-    + '<div class="guidance-header">'+ic('id')+'<span>ID photo example</span></div>'
+    + '<div class="guidance-header">'+ic('id')+'<span>Valid ID Verification</span></div>'
     + '<div class="reference-grid">'
       + idReferenceCard('accepted')
       + idReferenceCard('rejected')
@@ -1410,40 +1441,37 @@ function renderStep3(){
   + '</div>';
 }
 
+/* Step 4: one compact review table (no icons), grouped by section. */
 function renderStep4(){
   const fd = state.formData;
   const checklist = getRequirementChecklist(state.flow, fd);
   const fullName = [fd.firstName, fd.middleName, fd.lastName].filter(Boolean).join(' ') || '—';
+  const row = function(label, value){ return '<tr><th scope="row">'+label+'</th><td>'+value+'</td></tr>'; };
+  const section = function(title, rows){ return '<tbody><tr class="rv-sec"><th colspan="2" scope="colgroup">'+title+'</th></tr>'+rows+'</tbody>'; };
   const uploadedRows = checklist.map(function(c){
-    const badge = c.status==='ok' ? esc((fd.files[c.key]||{}).name||'') : (c.status==='flagged' ? 'Invalid format' : 'Not uploaded');
-    return '<div class="review-row"><span class="k">'+esc(c.label)+'</span><span class="v">'+badge+'</span></div>';
+    const value = c.status==='ok' ? esc((fd.files[c.key]||{}).name||'')
+      : (c.status==='flagged' ? '<span class="rv-bad">Invalid format</span>' : '<span class="rv-bad">Not uploaded</span>');
+    return row(esc(c.label), value);
   }).join('');
-  const docTypeRow = state.flow==='docreq'
-    ? '<div class="review-row"><span class="k">Selected Document Type</span><span class="v">'+esc(fd.documentType||'—')+'</span></div>'
-    : '<div class="review-row"><span class="k">Type of Transfer</span><span class="v">'+esc(fd.transferType||'—')+'</span></div>';
-  return '<div class="wizard-card-head"><h2>'+ic('checklistIcon')+' Review Your Request</h2><p>Confirm the details below before submitting your request to the Municipal Assessor\'s Office.</p></div>'
+  const details = state.flow==='docreq'
+    ? section('Document Request Details', row('Selected Document Type', esc(fd.documentType||'—')) + row('Purpose', esc(fd.purpose||'—')))
+    : section('Land Transfer Details', row('Type of Transfer', esc(fd.transferType||'—')));
+  return '<div class="wizard-card-head"><h2>Review Your Request</h2><p>Confirm the details below before submitting your request to the Municipal Assessor\'s Office.</p></div>'
   + '<div class="wizard-card-body">'
-    + '<div class="review-grid">'
-      + '<div class="review-card"><h3>'+ic('user')+' Personal Information</h3>'
-        + '<div class="review-row"><span class="k">Full Name</span><span class="v">'+esc(fullName)+'</span></div>'
-        + '<div class="review-row"><span class="k">Email</span><span class="v">'+esc(fd.email||'—')+'</span></div>'
-        + '<div class="review-row"><span class="k">Address</span><span class="v">'+esc(fd.addressLine)+', '+esc(fd.requesterBarangay)+', '+esc(fd.city)+', '+esc(fd.province)+'</span></div>'
-        + '<div class="review-row"><span class="k">Zip Code</span><span class="v">'+esc(fd.zip||'—')+'</span></div>'
-        + '<div class="review-row"><span class="k">Contact Number</span><span class="v">'+esc(fd.contact||'—')+'</span></div>'
-      + '</div>'
-      + '<div class="review-card"><h3>'+ic('home')+' Property Details</h3>'
-        + '<div class="review-row"><span class="k">ARP / Tax Decl. No.</span><span class="v">'+esc(fd.arp||'—')+'</span></div>'
-        + '<div class="review-row"><span class="k">Barangay</span><span class="v">'+esc(fd.barangay||'—')+'</span></div>'
-        + '<div class="review-row"><span class="k">Ownership Status</span><span class="v">'+(fd.isOwner?'Registered property owner':'Not the registered property owner')+'</span></div>'
-      + '</div>'
-      + '<div class="review-card"><h3>'+ic('doc')+' Document &amp; Ownership</h3>'
-        + docTypeRow
-        + (state.flow==='docreq' ? '<div class="review-row"><span class="k">Purpose</span><span class="v">'+esc(fd.purpose||'—')+'</span></div>' : '')
-      + '</div>'
-      + '<div class="review-card"><h3>'+ic('file')+' Uploaded Files</h3>'
-        + uploadedRows
-      + '</div>'
-    + '</div>'
+    + '<table class="review-table">'
+      + section('Personal Information',
+          row('Full Name', esc(fullName))
+          + row('Email', esc(fd.email||'—'))
+          + row('Address', esc(fd.addressLine)+', '+esc(fd.requesterBarangay)+', '+esc(fd.city)+', '+esc(fd.province))
+          + row('Zip Code', esc(fd.zip||'—'))
+          + row('Contact Number', esc(fd.contact||'—')))
+      + section('Property Information',
+          row('ARP / Tax Decl. No.', esc(fd.arp||'—'))
+          + row('Barangay', esc(fd.barangay||'—'))
+          + row('Ownership Status', fd.isOwner ? 'Registered property owner' : 'Not the registered property owner'))
+      + details
+      + section('Uploaded IDs and Documents', uploadedRows)
+    + '</table>'
   + '</div>';
 }
 
@@ -1460,11 +1488,15 @@ function renderWizard(){
     + renderDraftBar()
     + '<div class="wizard-card">'
       + body
+      + renderDraftPanel()
       + '<div class="wizard-card-foot">'
         + '<button class="btn btn-ghost" data-action="prev-step">'+ic('arrowLeft')+' Back</button>'
-        + (isLast
-            ? '<button class="btn btn-primary" data-action="submit">Submit Request '+ic('arrowRight')+'</button>'
-            : '<button class="btn btn-primary" data-action="next-step">Next '+ic('arrowRight')+'</button>')
+        + '<div class="foot-actions">'
+          + (draftServer() && draft.code ? '<button type="button" class="btn btn-ghost draft-later" data-action="draft-later" aria-expanded="'+draft.panel+'">'+(draft.panel?'Hide recovery code':'Continue later')+'</button>' : '')
+          + (isLast
+              ? '<button class="btn btn-primary" data-action="submit">Submit Request '+ic('arrowRight')+'</button>'
+              : '<button class="btn btn-primary" data-action="next-step">Next '+ic('arrowRight')+'</button>')
+        + '</div>'
       + '</div>'
     + '</div>'
     + '</div></div>' + (state.submitConfirmation ? renderSubmitConfirmationModal() : '');
@@ -1992,7 +2024,7 @@ function flushDraft(){
   draft.inflight = draftApi('draft_save', { draft_token:draft.code || '', flow:state.flow, step:state.step, max_step:state.maxStep, fields:draftFields(), revision:rev })
     .then(function(d){
       if(d.submitted){ draftAlreadySubmitted(d.reference_no); return; }
-      if(d.code) draft.code = d.code.replace(/-/g,'');
+      if(d.code){ draft.code = d.code.replace(/-/g,''); showDraftLaterButton(); }
       draft.savedAt = d.saved_at || ''; draft.expiresAt = d.expires_at || '';
       draft.retryMs = 0;
       draftLocalWrite();
@@ -2057,12 +2089,27 @@ function draftStatusText(){
 }
 function draftResumeUrl(){ return location.origin + location.pathname + '?resume=' + draftFormatCode(draft.code); }
 function draftFormatCode(c){ return String(c||'').replace(/(.{5})(?=.)/g, '$1-'); }
+/* The draft gets its code after the first save; add "Continue later" next to
+   Next straight away without re-rendering (that would steal the cursor). */
+function showDraftLaterButton(){
+  const actions = document.querySelector('.wizard-card-foot .foot-actions');
+  if(!actions || actions.querySelector('[data-action="draft-later"]') || !draftServer() || !draft.code) return;
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'btn btn-ghost draft-later';
+  btn.setAttribute('data-action', 'draft-later'); btn.setAttribute('aria-expanded', 'false');
+  btn.textContent = 'Continue later';
+  btn.addEventListener('click', function(){ draft.panel = !draft.panel; render(); });
+  actions.insertBefore(btn, actions.firstChild);
+}
 function renderDraftBar(){
-  const server = draftServer();
-  return '<div class="draft-bar'+(server && draft.code ? '' : ' bare')+'"><span class="draft-state '+draft.status+'" data-draft-state role="status" aria-live="polite">'+esc(draftStatusText())+'</span>'
-    + (server && draft.code ? '<button type="button" class="draft-later" data-action="draft-later" aria-expanded="'+draft.panel+'">'+(draft.panel?'Hide recovery code':'Continue later')+'</button>' : '')
+  return '<div class="draft-bar bare"><span class="draft-state '+draft.status+'" data-draft-state role="status" aria-live="polite">'+esc(draftStatusText())+'</span>'
     + '</div>'
     + (draft.notice ? '<div class="draft-panel" role="alert">'+esc(draft.notice)+'</div>' : '')
+    ;
+}
+/* Recovery code panel, shown above the footer when Continue later is open. */
+function renderDraftPanel(){
+  return ''
     + (draft.panel && draft.code ? '<div class="draft-panel"><strong>Continue later on any device</strong><br>Keep this recovery code or link private. Anyone with it can open this application.'
         + '<span class="draft-code">'+esc(draftFormatCode(draft.code))+'</span>'
         + '<div class="draft-panel-actions"><button type="button" class="btn btn-primary" data-action="draft-copy-link">Copy resume link</button><button type="button" class="btn btn-ghost" data-action="draft-copy-code">Copy code</button></div>'
