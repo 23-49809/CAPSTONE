@@ -201,6 +201,16 @@
   .service-card p{ color:var(--ink-soft); font-size:17px; line-height:1.6; flex:1; }
   .service-actions{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }
   .service-actions .btn-link{ flex:1 1 auto; justify-content:center; }
+  /* With a reminder in one card, keep both cards' buttons right under their text. */
+  .service-grid:has(.card-draft) .service-card p{ flex:0 0 auto; }
+  .card-draft{ display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; padding:14px 16px; background:var(--brand-50); border:1px solid var(--brand-100); border-left:4px solid var(--brand-600, var(--brand-700)); border-radius:var(--radius-md); }
+  .card-draft-icon{ flex:0 0 auto; display:inline-flex; color:var(--brand-700); }
+  .card-draft-icon .icon{ width:22px; height:22px; }
+  .card-draft-text{ flex:1 1 200px; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .card-draft-text strong{ font-size:16px; color:var(--ink); line-height:1.35; }
+  .card-draft-text span{ font-size:14px; color:var(--ink-soft); }
+  .service-card .card-draft-btn{ min-height:44px; padding:9px 18px; font-size:15px; }
+  @media (max-width:560px){ .service-card .card-draft-btn{ width:100%; justify-content:center; } }
   @media (max-width:560px){ .service-actions{ flex-direction:column; } .service-actions .btn-link{ width:100%; } }
 
   .feature-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:40px; text-align:center; }
@@ -601,8 +611,6 @@
   @media (max-width:1024px), (pointer:coarse){ .notif-btn, .notif-close{ min-height:44px; } .notif-close{ width:44px; } }
 
   /* ============ About Us ============ */
-  .about .section-head{ margin-bottom:12px; }
-  .about-purpose{ max-width:760px; margin:0 auto 28px; text-align:center; font-size:16.5px; color:var(--ink-soft); }
   .about-sub{ text-align:center; font-family:var(--font-display); font-size:clamp(20px,2.4vw,26px); margin-bottom:18px; scroll-margin-top:90px; }
   .about{ scroll-margin-top:80px; }
   .about-grid{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
@@ -621,7 +629,7 @@
   .why-grid p{ font-size:15.5px; line-height:1.55; }
   @media (max-width:900px){ .about-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
   @media (max-width:600px){ .why-grid li{ flex-direction:row; padding:14px; } .why-desc{ font-size:15.5px; } }
-  @media (max-width:600px){ .about-grid{ grid-template-columns:minmax(0,1fr); gap:10px; } .about-purpose{ font-size:15px; margin-bottom:20px; } .about-grid li{ padding:14px; } }
+  @media (max-width:600px){ .about-grid{ grid-template-columns:minmax(0,1fr); gap:10px; } .about-grid li{ padding:14px; } }
   .footer-links{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
   .footer-links button{ min-height:36px; padding:4px 0; border:0; background:none; color:#c2ddcd; font:inherit; font-size:15px; text-align:left; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   .footer-links button:hover{ color:#fff; }
@@ -1381,17 +1389,14 @@ function renderLanding(){
       + '<div class="service-card"><div class="chip-icon">'+ic('doc')+'</div>'
         + '<h3>Start Document Request</h3>'
         + '<p>Request for Certified True Copies of Tax Declarations, Certifications of Land Holdings, and more.</p>'
-        + '<div class="service-actions"><button class="btn-link" data-action="start-docreq">Begin Application '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="docreq">View Requirements '+ic('arrowRight')+'</button></div></div>'
+        + '<div class="service-actions"><button class="btn-link" data-action="start-docreq">Begin Application '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="docreq">View Requirements '+ic('arrowRight')+'</button></div>'+renderCardDraft('docreq')+'</div>'
       + '<div class="service-card"><div class="chip-icon">'+ic('swap')+'</div>'
         + '<h3>Land Transfer</h3>'
         + '<p>Submit requirements for property transfer, consolidation, or subdivision of land records.</p>'
-        + '<div class="service-actions"><button class="btn-link" data-action="start-landtransfer">Begin Land Transfer '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div></div>'
+        + '<div class="service-actions"><button class="btn-link" data-action="start-landtransfer">Begin Land Transfer '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div>'+renderCardDraft('landtransfer')+'</div>'
     + '</div></div></section>'
 
-  + '<section class="section section-alt about" id="about" aria-labelledby="about-title"><div class="wrap">'
-    + '<div class="section-head"><h2 id="about-title">About Us</h2>'
-    + '<p>SMART ASSESS is the online service of the Municipal Assessor’s Office of Mabini, Batangas. It lets you request property documents and apply for land transfers from home, in a few clear steps.</p></div>'
-    + '<div class="about-purpose"><p>Our goal is to make these services more convenient, organized, accessible, and efficient — so you spend less time in line and always know where your request stands.</p></div>'
+  + '<section class="section section-alt about" id="why" aria-labelledby="why-choose"><div class="wrap">'
     + '<div class="why-head"><h3 class="about-sub" id="why-choose">Why Choose SMART ASSESS?</h3>'
       + '<p class="why-title">A More Convenient Way to Request Property Documents</p>'
       + '<p class="why-desc">Prepare and submit your request online, then visit the Municipal Assessor’s Office to claim your documents when they are ready.</p></div>'
@@ -1409,7 +1414,7 @@ function renderLanding(){
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
     + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: mao.smartassess@gmail.com</p></div>'
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
-    + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="about">About Us</button><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button></nav>'
+    + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button></nav>'
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
 }
 
@@ -2468,14 +2473,18 @@ function renderDraftBar(){
     ;
 }
 function renderResumeCard(){
-  const list = draftsOnDevice();
-  if(draft.resumeMsg && !list.length) return '<div class="draft-resume" role="alert"><p style="margin:0">'+esc(draft.resumeMsg)+'</p></div>';
-  return list.map(function(d){
-    const name = d.flow==='docreq' ? 'Document Request' : 'Land Transfer';
-    const when = d.savedAt ? receiptDate(d.savedAt) : '';
-    return '<div class="draft-resume" role="region" aria-label="Unfinished '+name+'"><div><h3>You have an unfinished '+name+'</h3><p>Step '+(d.step||1)+' of 4'+(when?' · last saved '+esc(when):'')+'</p></div>'
-      + '<div class="draft-resume-actions"><button class="btn btn-primary" data-action="draft-resume" data-flow="'+d.flow+'">Resume Draft</button><button class="btn btn-ghost" data-action="draft-discard" data-flow="'+d.flow+'">Start Over</button></div></div>';
-  }).join('');
+  if(draft.resumeMsg && !draftsOnDevice().length) return '<div class="draft-resume" role="alert"><p style="margin:0">'+esc(draft.resumeMsg)+'</p></div>';
+  return '';
+}
+/* Unfinished-application reminder shown inside its own service card. */
+function renderCardDraft(flow){
+  const d = draftLocalRead(flow);
+  if(!d || !draftHasContent(d)) return '';
+  const name = flow==='docreq' ? 'Document Request' : 'Land Transfer';
+  const when = d.savedAt ? receiptDate(d.savedAt) : '';
+  return '<div class="card-draft" role="region" aria-label="Unfinished '+name+'"><span class="card-draft-icon" aria-hidden="true">'+ic('file')+'</span>'
+    + '<div class="card-draft-text"><strong>You have an unfinished '+name+'</strong><span>Step '+(d.step||1)+' of 4'+(when?' · last saved '+esc(when):'')+'</span></div>'
+    + '<button type="button" class="btn btn-primary card-draft-btn" data-action="draft-resume" data-flow="'+flow+'">Continue Request '+ic('arrowRight')+'</button></div>';
 }
 function draftApplyFields(flow, step, maxStep, fields, savedFiles){
   state.flow = flow; state.view = 'wizard';
