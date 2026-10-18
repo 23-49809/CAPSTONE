@@ -337,40 +337,43 @@
   .owner-toggle input:checked + .toggle-dot .icon{ opacity:1; }
   .owner-toggle-label{ font-weight:600; font-size:14.5px; }
 
-  .upload-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-bottom:8px; }
-  @media (max-width:640px){ .upload-grid{ grid-template-columns:minmax(0,1fr); } }
-  .upload-box{ min-width:0; }
-  .upload-filename, .upload-box.compact .upload-meta span{ min-width:0; overflow-wrap:anywhere; }
-  .upload-box{
-    border:1.5px dashed var(--line-strong); border-radius:var(--radius-md); padding:18px;
-    cursor:pointer; background:var(--surface); transition:border-color .15s ease, background .15s ease;
+  /* ---- Upload rows (Step 3, both forms) ---- */
+  /* Two columns only when each row gets at least 460px; otherwise a list. */
+  .upload-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap:10px; margin-bottom:14px; }
+  .upload-box{ min-width:0; border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; cursor:pointer; background:var(--surface);
+    transition:border-color .15s ease, background .15s ease; }
+  .upload-box:hover{ border-color:var(--brand-500); }
+  .upload-box.filled{ border-color:var(--brand-500); background:var(--brand-50); }
+  .upload-box.flagged, .upload-box.invalid{ border-color:var(--danger); }
+  .upload-box .field-error{ margin-top:6px; }
+  .upl-row{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .upl-thumb{ flex:0 0 40px; width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:var(--brand-50); color:var(--brand-700); overflow:hidden; }
+  .upl-thumb .icon{ width:20px; height:20px; }
+  .upl-thumb.has-img{ background:var(--surface-2); border:1px solid var(--line); }
+  .upl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .upl-text{ flex:1; min-width:0; }
+  .upl-label{ font-size:14px; font-weight:700; color:var(--ink); line-height:1.3; }
+  .upl-label .req{ color:var(--danger); margin-left:2px; }
+  .upl-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; margin-top:2px; font-size:12.5px; color:var(--ink-faint); line-height:1.35; min-width:0; }
+  .upl-file{ color:var(--ink-soft); font-weight:600; overflow-wrap:anywhere; min-width:0; }
+  .upl-ok{ display:inline-flex; align-items:center; gap:3px; color:var(--success); font-weight:700; }
+  .upl-ok .icon{ width:13px; height:13px; }
+  .upl-bad{ color:var(--danger); font-weight:700; }
+  .upl-actions{ display:flex; gap:6px; flex-shrink:0; }
+  .upl-btn{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:36px; padding:6px 12px; border:1px solid var(--line-strong); border-radius:999px;
+    background:var(--surface); color:var(--brand-700); font:inherit; font-size:13px; font-weight:700; white-space:nowrap; cursor:pointer; }
+  .upl-btn:hover{ border-color:var(--brand-600); background:var(--brand-50); }
+  .upl-btn:focus-visible{ outline:3px solid var(--brand-500); outline-offset:2px; }
+  .upl-btn .icon{ width:15px; height:15px; }
+  .upl-choose{ background:var(--brand-700); border-color:var(--brand-700); color:#fff; }
+  .upl-choose:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .upl-remove{ color:var(--danger); }
+  /* Narrow cards: buttons move under the text so the file name has room. */
+  @media (max-width:480px){
+    .upl-row{ flex-wrap:wrap; }
+    .upl-text{ flex:1 1 calc(100% - 52px); }
+    .upl-actions{ width:100%; padding-left:52px; }
   }
-  .upload-box:hover{ border-color:var(--brand-500); background:var(--brand-50); }
-  .upload-box.required{ border-color:var(--brand-500); background:var(--brand-50); }
-  .upload-box.invalid{ border-color:var(--danger); }
-  .upload-box.filled{ border-style:solid; border-color:var(--brand-500); background:var(--brand-50); }
-  .upload-head{ display:flex; align-items:center; gap:9px; font-weight:700; font-size:13.5px; margin-bottom:4px; }
-  .upload-head .icon{ width:17px; height:17px; color:var(--brand-600); }
-  .upload-hint{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-faint); margin-top:2px; }
-  .upload-mini-icon{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; color:var(--brand-600); }
-  .upload-mini-icon .icon{ width:16px; height:16px; }
-  .upload-filename{ font-size:12.5px; color:var(--brand-700); margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
-  .upload-filename .icon{ width:15px; height:15px; }
-  .upload-remove{ background:none; border:none; color:var(--danger); font-size:11.5px; font-weight:700; cursor:pointer; font-family:var(--font-body); text-decoration:underline; }
-  .upload-box.compact{ padding:0; min-height:178px; display:flex; align-items:center; justify-content:center; background:var(--surface); }
-  .upload-box.compact .upload-surface{ width:100%; min-height:178px; display:flex; align-items:center; justify-content:center; padding:20px 18px; }
-  .upload-box.compact .upload-placeholder{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:6px; color:var(--ink-soft); }
-  .upload-box.compact .upload-icon-wrap{ width:50px; height:50px; border-radius:12px; background:rgba(18,117,93,.08); border:1px solid rgba(18,117,93,.2); color:var(--brand-700); display:flex; align-items:center; justify-content:center; }
-  .upload-box.compact .upload-icon-wrap .icon{ width:24px; height:24px; }
-  .upload-box.compact .upload-title{ font-size:14px; font-weight:700; color:var(--ink); }
-  .upload-box.compact .upload-subtitle{ font-size:12px; color:var(--ink-faint); }
-  .upload-box.compact .upload-preview-wrap{ width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
-  .upload-box.compact .upload-preview{ width:100%; max-width:250px; height:150px; border-radius:12px; overflow:hidden; border:1px solid var(--line); background:var(--surface-2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.25); }
-  .upload-box.compact .upload-preview img{ display:block; width:100%; height:100%; object-fit:cover; }
-  .upload-box.compact .upload-meta{ display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; color:var(--ink-faint); font-size:12px; }
-  .upload-box.compact .upload-meta .upload-link{ color:var(--brand-700); font-weight:700; text-decoration:none; cursor:pointer; }
-  .upload-box.compact .upload-meta .upload-link:hover{ text-decoration:underline; }
-  .upload-box.compact .upload-meta .upload-sep{ color:var(--ink-faint); }
   .id-guidance{ display:flex; align-items:center; gap:12px; margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); }
   .id-photo-card{ width:54px; height:38px; flex-shrink:0; display:flex; align-items:center; gap:6px; padding:5px; border-radius:5px; background:linear-gradient(135deg,#d9f1e2,#fff); border:1px solid #a9cdb5; color:var(--brand-700); }
   .id-photo-card .icon{ width:18px; height:18px; }
@@ -381,25 +384,26 @@
   .id-guidance-text{ color:var(--ink-soft); font-size:12px; line-height:1.4; }
   .id-guidance-text strong{ display:block; color:var(--ink); font-size:12.5px; margin-bottom:2px; }
 
-  .id-guidance-panel{ margin:0 0 22px; padding:18px 18px 16px; background:linear-gradient(180deg,#f7fbff 0%,#f3f5f8 100%); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:inset 0 1px 0 rgba(255,255,255,.8); }
-  .guidance-header{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-  .guidance-header .icon{ width:18px; height:18px; color:var(--brand-700); }
-  .guidance-header span{ font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:800; color:var(--brand-700); }
-  .reference-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-  @media (max-width:640px){ .reference-grid{ grid-template-columns:1fr; } }
-  .reference-card{ display:flex; flex-direction:column; gap:10px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); }
-  .reference-label{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
-  .reference-label .status-mark{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; }
+  /* ---- ID photo example (compact; two small examples side by side) ---- */
+  .id-guidance-panel{ margin:0 0 14px; padding:10px 12px 12px; background:var(--brand-50); border:1px solid var(--line); border-radius:var(--radius-md); }
+  .guidance-header{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .guidance-header .icon{ width:16px; height:16px; color:var(--brand-700); }
+  .guidance-header span{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; font-weight:800; color:var(--brand-700); }
+  .reference-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .reference-card{ display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
+  .reference-label{ display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; }
+  .reference-label .status-mark{ flex:0 0 18px; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; }
   .reference-card.accept .reference-label{ color:var(--success); }
-  .reference-card.accept .status-mark{ background:var(--success); color:#fff; }
+  .reference-card.accept .status-mark{ background:var(--success); color:var(--surface); }
   .reference-card.reject .reference-label{ color:var(--danger); }
-  .reference-card.reject .status-mark{ background:var(--danger); color:#fff; }
-  .sample-id{ position:relative; width:100%; height:200px; border-radius:12px; border:1px solid rgba(18,34,45,.18); background:#edf5fb; overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
+  .reference-card.reject .status-mark{ background:var(--danger); color:var(--surface); }
+  .sample-id{ position:relative; width:100%; aspect-ratio:16 / 9; max-height:120px; border-radius:6px; border:1px solid var(--line); background:var(--surface-2); overflow:hidden; }
   .sample-id img{ width:100%; height:100%; object-fit:cover; display:block; }
   .sample-id.blur img{ filter:blur(3px) brightness(.9) saturate(.7); transform:scale(1.02); }
-  .reference-card .example-note{ font-size:12px; font-weight:600; line-height:1.5; color:var(--ink-soft); }
+  .reference-card .example-note{ font-size:12px; font-weight:600; line-height:1.35; color:var(--ink-soft); }
   .reference-card.accept .example-note{ color:var(--success); }
   .reference-card.reject .example-note{ color:var(--danger); }
+  .reference-note{ margin-top:8px; font-size:13px; color:var(--ink-soft); }
 
   /* Review */
   .review-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-bottom:16px; }
@@ -514,7 +518,8 @@
     .home-slide-dots button.active::before{ background:#fff; }
     .terms-head .terms-x{ width:44px; height:44px; }
     .rcpt-copy{ min-height:44px; }
-    .upload-remove, .upload-link{ display:inline-flex; align-items:center; min-height:44px; padding:0 6px; }
+    .upl-btn{ min-height:44px; }
+    .draft-later{ min-height:44px; }
     .owner-toggle{ min-height:44px; }
   }
 
@@ -737,8 +742,6 @@
     .review-row{ flex-direction:column; gap:2px; padding:8px 0; }
     .review-row .k{ font-size:13px; }
     .review-row .v{ text-align:left; }
-    .upload-meta, .upload-filename{ min-width:0; }
-    .upload-meta span, .upload-filename{ overflow-wrap:anywhere; }
     .submit-modal-actions{ justify-content:stretch; }
     .submit-modal-actions .btn{ flex:1 1 140px; min-height:44px; }
     .wizard-card-head{ padding:16px 14px 2px; }
@@ -751,8 +754,6 @@
     .field input, .field select, .field textarea{ min-height:44px; font-size:15px; }
     .field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .field select:not(.barangay-native-select), .barangay-trigger, .contact-input, .arp-input{ min-height:44px; }
     .section-divider{ gap:8px; margin:6px 0 12px; }
-    .upload-surface{ padding:14px 12px; }
-    .reference-note{ font-size:14.5px; }
     .review-card{ padding:14px; }
     .wizard-card-foot{ padding:12px 14px 14px; flex-wrap:wrap; gap:10px; }
     .wizard-card-foot .btn{ flex:1; min-width:120px; min-height:44px; }
@@ -1341,34 +1342,34 @@ function renderStep2(){
   + '</div>';
 }
 
+/* One compact upload row for every document (both forms): icon or small
+   preview, label, file name or accepted types, and Choose File / Replace /
+   Remove. Clicking anywhere on the row opens the file picker, as before; ID
+   uploads keep their image-only picker filter. */
 function uploadBox(key, label, fd){
   const file = fd.files[key];
   const err = state.errors[key];
-  const isCompactUpload = key==='ownerId' || key==='requesterId' || key==='authLetter';
-  const cls = 'upload-box'+(file && file.valid?' filled':'')+(err?' invalid':'')+(isCompactUpload ? ' compact' : '');
-
-  if(isCompactUpload){
-    const isAuthLetter = key==='authLetter';
-    const title = isAuthLetter ? 'Upload Authorization Letter' : (key==='requesterId' ? 'Upload Authorized Representative\'s Valid ID' : 'Upload Property Owner\'s Valid ID');
-    const subtitle = isAuthLetter ? 'Upload an image of the authorization letter' : 'Upload';
-    const previewMarkup = file && (file.preview || file.saved)
-      ? '<div class="upload-preview-wrap"><div class="upload-preview">'+(file.preview ? '<img src="'+esc(file.preview)+'" alt="Selected file preview" />' : '<span class="upload-saved-file" title="Saved with your application">'+ic('file')+'</span>')+'</div><div class="upload-meta"><span>'+esc(file.name)+'</span><span class="upload-sep">•</span><span class="upload-link" data-replace-file="'+key+'">Replace</span><span class="upload-sep">•</span><span class="upload-link" data-remove-file="'+key+'">Remove</span></div></div>'
-      : '<div class="upload-placeholder"><div class="upload-icon-wrap">'+ic('file')+'</div><div class="upload-title">'+title+'</div><div class="upload-subtitle">'+subtitle+'</div></div>';
-
-    return '<div class="'+cls+'" data-upload="'+key+'">'
-      + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'" accept=".jpg,.jpeg,.png,image/jpeg,image/png,image/jpg">'
-      + '<div class="upload-surface">'+previewMarkup+'</div>'
-      + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
-    + '</div>';
-  }
-
-  const filenameLine = file
-    ? ('<div class="upload-filename">'+ic('file')+esc(file.name)+' &middot; '+fmtBytes(file.size)+(file.valid?'':' &mdash; <span style="color:var(--danger)">invalid format</span>')+' <button type="button" class="upload-remove" data-remove-file="'+key+'">Remove</button></div>')
-    : '<div class="upload-hint"><span class="upload-mini-icon">'+ic('file')+'</span>Upload your ID</div>';
+  const imageOnly = key==='ownerId' || key==='requesterId' || key==='authLetter';
+  const maxMb = Math.floor(Number(window.SMART_ASSESS_CONFIG && window.SMART_ASSESS_CONFIG.maxFileUploadBytes) / (1024*1024)) || 5;
+  const types = (imageOnly ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF') + ', up to ' + maxMb + ' MB';
+  const cls = 'upload-box upl'+(file && file.valid?' filled':'')+(file && !file.valid?' flagged':'')+(err?' invalid':'');
+  const thumb = file && file.preview && /^data:image\/|^blob:/.test(file.preview)
+    ? '<span class="upl-thumb has-img"><img src="'+esc(file.preview)+'" alt=""></span>'
+    : '<span class="upl-thumb">'+ic(file ? 'file' : (imageOnly ? 'id' : 'doc'))+'</span>';
+  const meta = file
+    ? '<span class="upl-file">'+esc(file.name)+'</span><span class="upl-size">'+fmtBytes(file.size||0)+'</span>'
+      + (file.valid ? '<span class="upl-ok">'+ic('check')+(file.saved ? 'Saved' : 'Attached')+'</span>' : '<span class="upl-bad">Invalid format</span>')
+    : '<span>'+types+'</span>';
+  const actions = file
+    ? '<button type="button" class="upl-btn" data-replace-file="'+key+'" aria-label="Replace '+esc(label)+'">Replace</button>'
+      + '<button type="button" class="upl-btn upl-remove" data-remove-file="'+key+'" aria-label="Remove '+esc(label)+'">Remove</button>'
+    : '<button type="button" class="upl-btn upl-choose" aria-label="Choose file for '+esc(label)+'">'+ic('file')+'Choose File</button>';
   return '<div class="'+cls+'" data-upload="'+key+'">'
-    + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'">'
-    + '<div class="upload-head">'+ic('id')+esc(label)+'</div>'
-    + filenameLine
+    + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'"'+(imageOnly ? ' accept=".jpg,.jpeg,.png,image/jpeg,image/png,image/jpg"' : '')+'>'
+    + '<div class="upl-row">'+thumb
+      + '<div class="upl-text"><div class="upl-label">'+esc(label)+'<span class="req" aria-hidden="true">*</span></div><div class="upl-meta">'+meta+'</div></div>'
+      + '<div class="upl-actions">'+actions+'</div>'
+    + '</div>'
     + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
   + '</div>';
 }
@@ -1376,14 +1377,14 @@ function idReferenceCard(type){
   const accepted = type === 'accepted';
   const imageName = accepted ? './ID CLear.png' : './Blurry ID.png';
   return '<div class="reference-card '+(accepted ? 'accept' : 'reject')+'">'
-    + '<div class="reference-label"><span>'+(accepted ? '✓ Accepted' : '✕ Not Accepted')+'</span><span class="status-mark">'+(accepted ? '✓' : '✕')+'</span></div>'
-    + '<div class="sample-id '+(accepted ? 'clear' : 'blur')+'"><img src="'+imageName+'" alt="'+(accepted ? 'Accepted ID reference' : 'Rejected blurry ID reference')+'" /></div>'
+    + '<div class="reference-label"><span class="status-mark" aria-hidden="true">'+(accepted ? '✓' : '✕')+'</span><span>'+(accepted ? 'Accepted' : 'Not Accepted')+'</span></div>'
+    + '<div class="sample-id '+(accepted ? 'clear' : 'blur')+'"><img src="'+imageName+'" alt="'+(accepted ? 'Accepted ID reference' : 'Rejected blurry ID reference')+'" loading="lazy" /></div>'
     + '<div class="example-note">'+(accepted ? 'Clear, complete, readable, and valid.' : 'Blurry, unclear, or unreadable.')+'</div>'
   + '</div>';
 }
 function idGuidancePanel(){
   return '<div class="id-guidance-panel">'
-    + '<div class="guidance-header">'+ic('id')+'<span>Valid ID Verification</span></div>'
+    + '<div class="guidance-header">'+ic('id')+'<span>ID photo example</span></div>'
     + '<div class="reference-grid">'
       + idReferenceCard('accepted')
       + idReferenceCard('rejected')
