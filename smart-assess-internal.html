@@ -604,6 +604,11 @@
   .modal.req-detail .modal-head h3{ font-weight:600; letter-spacing:-.01em; }
   .modal.req-detail .review-row .k{ font-weight:400; }
   .modal.req-detail .review-row .v, .modal.req-detail .badge{ font-weight:500; }
+  /* Staff request details: compact Process / Complete Request action. */
+  .modal .review-row .v .btn-process{ display:inline-flex; width:auto; max-width:100%; min-height:36px; padding:7px 14px; gap:6px;
+    border-radius:var(--radius-sm); font-size:13.5px; line-height:1.2; white-space:nowrap; box-shadow:none; vertical-align:middle; }
+  .modal .review-row .v .btn-process .icon{ width:15px; height:15px; }
+  @media (max-width:1024px), (pointer:coarse){ .modal .review-row .v .btn-process{ min-height:44px; } }
   .modal.req-detail .btn, .modal.req-detail .action-btn{ font-weight:600; }
 
   /* ============ Notifications page ============ */
@@ -2418,7 +2423,7 @@ function reqProcessingActions(r){
   var terminal = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
   var actions = '';
   if(!r.processingStaffId && !terminal){
-    actions += '<button type="button" class="icon-btn action-button" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','13px')+'Accept/Process Request</button>';
+    actions += '<button type="button" class="icon-btn action-button" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','13px')+'Process Request</button>';
   } else if(Number(r.processingStaffId)===Number(account.id) && r.processingStartedAt && !r.processingCompletedAt && !terminal){
     actions += '<button type="button" class="icon-btn action-button" data-action="complete-processing" data-id="'+esc(r.id)+'">'+ic('check','13px')+'Complete Request</button>';
   }
@@ -2925,14 +2930,14 @@ function modalReqDetail(id, kind){
   var terminalStatus = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
   var processingActionHtml = '';
   if(canProcess && !r.processingStaffId && !terminalStatus){
-    processingActionHtml = '<button type="button" class="btn btn-primary" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','16px')+' Accept/Process Request</button>';
+    processingActionHtml = '<button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','15px')+' Process Request</button>';
   }
   if(r.processingStartedAt){
     processingActionHtml = processingTimerHtml(r, true);
     if(canProcess && !r.processingStaffId && !terminalStatus){
-      processingActionHtml += ' <button type="button" class="btn btn-primary" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','16px')+' Accept/Process Request</button>';
+      processingActionHtml += ' <button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','15px')+' Process Request</button>';
     } else if(isAssignedStaff && !r.processingCompletedAt && !terminalStatus){
-      processingActionHtml += '<button type="button" class="btn btn-primary" data-action="complete-processing" data-id="'+esc(r.id)+'">'+ic('check','16px')+' Complete Request</button>';
+      processingActionHtml += '<button type="button" class="btn btn-primary btn-process" data-action="complete-processing" data-id="'+esc(r.id)+'">'+ic('check','15px')+' Complete Request</button>';
     }
   }
   return '<div class="modal-head"><div><h3>'+esc(r.id)+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
