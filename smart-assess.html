@@ -611,7 +611,16 @@
   .about-grid .chip-icon .icon{ width:20px; height:20px; }
   .about-grid h4{ font-family:var(--font-body); font-size:16px; font-weight:700; color:var(--ink); }
   .about-grid p{ margin-top:3px; font-size:14.5px; line-height:1.5; color:var(--ink-soft); }
+  .why-head{ max-width:720px; margin:0 auto 22px; text-align:center; }
+  .why-head .about-sub{ margin-bottom:6px; font-family:var(--font-body); font-size:14px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--brand-700); }
+  .why-title{ font-family:var(--font-display); font-size:clamp(22px,2.8vw,30px); font-weight:700; line-height:1.25; color:var(--ink); }
+  .why-desc{ margin-top:10px; font-size:17px; line-height:1.6; color:var(--ink-soft); }
+  .why-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .why-grid li{ flex-direction:column; padding:20px 18px; }
+  .why-grid h4{ font-size:17px; }
+  .why-grid p{ font-size:15.5px; line-height:1.55; }
   @media (max-width:900px){ .about-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:600px){ .why-grid li{ flex-direction:row; padding:14px; } .why-desc{ font-size:15.5px; } }
   @media (max-width:600px){ .about-grid{ grid-template-columns:minmax(0,1fr); gap:10px; } .about-purpose{ font-size:15px; margin-bottom:20px; } .about-grid li{ padding:14px; } }
   .footer-links{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
   .footer-links button{ min-height:36px; padding:4px 0; border:0; background:none; color:#c2ddcd; font:inherit; font-size:15px; text-align:left; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
@@ -1383,14 +1392,14 @@ function renderLanding(){
     + '<div class="section-head"><h2 id="about-title">About Us</h2>'
     + '<p>SMART ASSESS is the online service of the Municipal Assessor’s Office of Mabini, Batangas. It lets you request property documents and apply for land transfers from home, in a few clear steps.</p></div>'
     + '<div class="about-purpose"><p>Our goal is to make these services more convenient, organized, accessible, and efficient — so you spend less time in line and always know where your request stands.</p></div>'
-    + '<h3 class="about-sub" id="why-choose">Why Choose SMART ASSESS</h3>'
-    + '<ul class="about-grid">'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('home')+'</span><div><h4>Convenient Access</h4><p>Apply for services online without going through a complicated process.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('checklistIcon')+'</span><div><h4>Organized Applications</h4><p>Follow a guided, step-by-step form and review everything before you submit.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('file')+'</span><div><h4>Progress Saving</h4><p>Your unfinished application is saved, so you can continue later where you left off.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('search')+'</span><div><h4>Transparent Tracking</h4><p>Check the status of a submitted request anytime with Track Request.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('bell')+'</span><div><h4>Service Updates</h4><p>See announcements from the Assessor’s Office in one place.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('user')+'</span><div><h4>User-Friendly Design</h4><p>A clear, simple layout that works on phones, tablets, and computers.</p></div></li>'
+    + '<div class="why-head"><h3 class="about-sub" id="why-choose">Why Choose SMART ASSESS?</h3>'
+      + '<p class="why-title">A More Convenient Way to Request Property Documents</p>'
+      + '<p class="why-desc">Prepare and submit your request online, then visit the Municipal Assessor’s Office to claim your documents when they are ready.</p></div>'
+    + '<ul class="about-grid why-grid">'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('file')+'</span><div><h4>Convenient Online Requests</h4><p>Submit your application online without needing to visit the office just to start your request.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('checklistIcon')+'</span><div><h4>Clear Requirements</h4><p>Review the required information and documents before submitting your application.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('search')+'</span><div><h4>Request Status Updates</h4><p>Check the status of your request and review available notifications about its progress.</p></div></li>'
+      + '<li><span class="chip-icon" aria-hidden="true">'+ic('pin')+'</span><div><h4>In-Person Document Claiming</h4><p>Once your request is ready, visit the Municipal Assessor’s Office during official office hours to claim your documents.</p></div></li>'
     + '</ul>'
   + '</div></section>'
 
