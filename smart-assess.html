@@ -363,7 +363,7 @@
   /* ---- Upload rows (Step 3, both forms) ---- */
   /* Two columns only when each row gets at least 460px; otherwise a list. */
   .upload-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap:10px; margin-bottom:14px; }
-  .upload-box{ min-width:0; border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; cursor:pointer; background:var(--surface);
+  .upload-box{ min-width:0; border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; cursor:default; background:var(--surface);
     transition:border-color .15s ease, background .15s ease; }
   .upload-box:hover{ border-color:var(--brand-500); }
   .upload-box.filled{ border-color:var(--brand-500); background:var(--brand-50); }
@@ -392,10 +392,29 @@
   .upl-choose:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
   .upl-remove{ color:var(--danger); }
   /* Narrow cards: buttons move under the text so the file name has room. */
+  /* Land Transfer document list: one tight column of rows. */
+  .doc-upload-list{ grid-template-columns:minmax(0,1fr); gap:8px; }
+  .doc-upload-list .upl{ padding:8px 10px 8px 12px; }
+  /* ID uploads inside the reference panel: centered label, file name and button. */
+  .id-guidance-panel .reference-note{ margin-top:12px; font-size:13.5px; line-height:1.45; color:var(--ink-soft); }
+  .id-upload-grid{ grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin:12px 0 0; }
+  .upl-center{ display:flex; flex-direction:column; }
+  .upl-center .upl-row{ flex:1; flex-direction:column; justify-content:flex-start; text-align:center; gap:8px; }
+  .upl-center .upl-actions{ margin-top:auto; }
+  .upl-center .upl-text{ flex:none; width:100%; }
+  .upl-center .upl-meta{ justify-content:center; }
+  .upl-center .upl-actions{ justify-content:center; }
+  .upl-center .field-error{ text-align:center; }
   @media (max-width:480px){
+    .upl-row{ gap:10px; }
+    .upl-thumb{ flex-basis:32px; width:32px; height:32px; }
+    .upl-thumb .icon{ width:17px; height:17px; }
+    .upl-label{ font-size:13.5px; }
     .upl-row{ flex-wrap:wrap; }
-    .upl-text{ flex:1 1 calc(100% - 52px); }
-    .upl-actions{ width:100%; padding-left:52px; }
+    .upl-text{ flex:1 1 0; }
+    .upl-btn{ padding:6px 12px; font-size:13px; }
+    .upl:not(.upl-center):is(.filled,.flagged) .upl-actions{ width:100%; padding-left:42px; }
+    .doc-upload-list .upl:not(.filled):not(.flagged) .upl-thumb{ display:none; }
   }
   .id-guidance{ display:flex; align-items:center; gap:12px; margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); }
   .id-photo-card{ width:54px; height:38px; flex-shrink:0; display:flex; align-items:center; gap:6px; padding:5px; border-radius:5px; background:linear-gradient(135deg,#d9f1e2,#fff); border:1px solid #a9cdb5; color:var(--brand-700); }
@@ -624,11 +643,12 @@
   .why-title{ font-family:var(--font-display); font-size:clamp(22px,2.8vw,30px); font-weight:700; line-height:1.25; color:var(--ink); }
   .why-desc{ margin-top:10px; font-size:17px; line-height:1.6; color:var(--ink-soft); }
   .why-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
-  .why-grid li{ flex-direction:column; padding:20px 18px; }
-  .why-grid h4{ font-size:17px; }
+  .why-grid li{ display:block; padding:20px 20px 22px; border-top:3px solid var(--brand-600); }
+  .why-grid h4{ font-size:17px; line-height:1.35; }
+  .why-grid p{ margin-top:6px; }
   .why-grid p{ font-size:15.5px; line-height:1.55; }
   @media (max-width:900px){ .about-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
-  @media (max-width:600px){ .why-grid li{ flex-direction:row; padding:14px; } .why-desc{ font-size:15.5px; } }
+  @media (max-width:600px){ .why-grid li{ padding:14px 16px 16px; } .why-desc{ font-size:15.5px; } }
   @media (max-width:600px){ .about-grid{ grid-template-columns:minmax(0,1fr); gap:10px; } .about-grid li{ padding:14px; } }
   .footer-links{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
   .footer-links button{ min-height:36px; padding:4px 0; border:0; background:none; color:#c2ddcd; font:inherit; font-size:15px; text-align:left; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
@@ -1401,10 +1421,10 @@ function renderLanding(){
       + '<p class="why-title">A More Convenient Way to Request Property Documents</p>'
       + '<p class="why-desc">Prepare and submit your request online, then visit the Municipal Assessor’s Office to claim your documents when they are ready.</p></div>'
     + '<ul class="about-grid why-grid">'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('file')+'</span><div><h4>Convenient Online Requests</h4><p>Submit your application online without needing to visit the office just to start your request.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('checklistIcon')+'</span><div><h4>Clear Requirements</h4><p>Review the required information and documents before submitting your application.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('search')+'</span><div><h4>Request Status Updates</h4><p>Check the status of your request and review available notifications about its progress.</p></div></li>'
-      + '<li><span class="chip-icon" aria-hidden="true">'+ic('pin')+'</span><div><h4>In-Person Document Claiming</h4><p>Once your request is ready, visit the Municipal Assessor’s Office during official office hours to claim your documents.</p></div></li>'
+      + '<li><div><h4>Convenient Online Applications</h4><p>Submit your application online without needing to visit the office just to start your request.</p></div></li>'
+      + '<li><div><h4>Clear Requirements</h4><p>Review the required information and documents before submitting your application.</p></div></li>'
+      + '<li><div><h4>Application Status Updates</h4><p>Check the status of your request and review available notifications about its progress.</p></div></li>'
+      + '<li><div><h4>In-Person Assistance and Claiming</h4><p>Once your request is ready, visit the Municipal Assessor’s Office during official office hours to claim your documents.</p></div></li>'
     + '</ul>'
   + '</div></section>'
 
@@ -1529,15 +1549,16 @@ function renderStep2(){
 
 /* One compact upload row for every document (both forms): icon or small
    preview, label, file name or accepted types, and Choose File / Replace /
-   Remove. Clicking anywhere on the row opens the file picker, as before; ID
-   uploads keep their image-only picker filter. */
-function uploadBox(key, label, fd){
+   Remove. Only those buttons open the file picker (files can still be dropped
+   on the row); ID uploads keep their image-only picker filter. `centered`
+   stacks the row with the button centered (ID uploads in the reference panel). */
+function uploadBox(key, label, fd, centered){
   const file = fd.files[key];
   const err = state.errors[key];
   const imageOnly = key==='ownerId' || key==='requesterId' || key==='authLetter';
   const maxMb = Math.floor(Number(window.SMART_ASSESS_CONFIG && window.SMART_ASSESS_CONFIG.maxFileUploadBytes) / (1024*1024)) || 5;
   const types = (imageOnly ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF') + ', up to ' + maxMb + ' MB';
-  const cls = 'upload-box upl'+(file && file.valid?' filled':'')+(file && !file.valid?' flagged':'')+(err?' invalid':'');
+  const cls = 'upload-box upl'+(centered?' upl-center':'')+(file && file.valid?' filled':'')+(file && !file.valid?' flagged':'')+(err?' invalid':'');
   const thumb = file && file.preview && /^data:image\/|^blob:/.test(file.preview)
     ? '<span class="upl-thumb has-img"><img src="'+esc(file.preview)+'" alt=""></span>'
     : '<span class="upl-thumb" aria-hidden="true">'+ic(file ? 'file' : 'upload')+'</span>';
@@ -1548,10 +1569,10 @@ function uploadBox(key, label, fd){
   const actions = file
     ? '<button type="button" class="upl-btn" data-replace-file="'+key+'" aria-label="Replace '+esc(label)+'">Replace</button>'
       + '<button type="button" class="upl-btn upl-remove" data-remove-file="'+key+'" aria-label="Remove '+esc(label)+'">Remove</button>'
-    : '<button type="button" class="upl-btn upl-choose" aria-label="Choose file for '+esc(label)+'">Choose File</button>';
+    : '<button type="button" class="upl-btn upl-choose" data-choose-file="'+key+'" aria-label="Choose file for '+esc(label)+'">Choose File</button>';
   return '<div class="'+cls+'" data-upload="'+key+'">'
     + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'"'+(imageOnly ? ' accept=".jpg,.jpeg,.png,image/jpeg,image/png,image/jpg"' : '')+'>'
-    + '<div class="upl-row">'+thumb
+    + '<div class="upl-row">'+(centered && !(file && file.preview) ? '' : thumb)
       + '<div class="upl-text"><div class="upl-label">'+esc(label)+'<span class="req" aria-hidden="true">*</span></div><div class="upl-meta">'+meta+'</div></div>'
       + '<div class="upl-actions">'+actions+'</div>'
     + '</div>'
@@ -1567,7 +1588,7 @@ function idReferenceCard(type){
     + '<div class="example-note">'+(accepted ? 'Clear, complete, readable, and valid.' : 'Blurry, unclear, or unreadable.')+'</div>'
   + '</div>';
 }
-function idGuidancePanel(){
+function idGuidancePanel(uploads){
   return '<div class="id-guidance-panel">'
     + '<div class="guidance-header">'+ic('id')+'<span>Valid ID Verification</span></div>'
     + '<div class="reference-grid">'
@@ -1575,6 +1596,7 @@ function idGuidancePanel(){
       + idReferenceCard('rejected')
     + '</div>'
     + '<div class="reference-note">Upload a clear, valid, and unexpired ID.</div>'
+    + '<div class="upload-grid id-upload-grid">' + uploads + '</div>'
   + '</div>';
 }
 function renderStep3(){
@@ -1583,15 +1605,14 @@ function renderStep3(){
   let docsBlock = '';
   if(state.flow==='landtransfer'){
     docsBlock = '<div class="section-divider">'+ic('doc')+'<span>Required Transfer Documents</span></div>'
-      + '<div class="upload-grid">' + LAND_TRANSFER_DOCS.map(function(d){ return uploadBox(d.key, d.label, fd); }).join('') + '</div>'
+      + '<div class="upload-grid doc-upload-list">' + LAND_TRANSFER_DOCS.map(function(d){ return uploadBox(d.key, d.label, fd); }).join('') + '</div>'
       + '<div class="section-divider">'+ic('id')+'<span>Identity Verification</span></div>';
   }
   return '<div class="wizard-card-head"><h2>'+ic('id')+' Valid ID Verification</h2><p>Upload a clear, valid, and unexpired ID.</p></div>'
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">'+(fd.isOwner ? 'I am the registered property owner' : 'I am not the registered property owner')+'</span></label>'
     + docsBlock
-    + idGuidancePanel()
-    + '<div class="upload-grid">' + idKeys.map(function(k){ return uploadBox(k, idLabel(state.flow,k), fd); }).join('') + '</div>'
+    + idGuidancePanel(idKeys.map(function(k){ return uploadBox(k, idLabel(state.flow,k), fd, true); }).join(''))
   + '</div>';
 }
 
@@ -2877,13 +2898,14 @@ function bindEvents(root){
   if(ownerToggle){
     ownerToggle.addEventListener('change', function(){ state.formData.isOwner = ownerToggle.checked; state.errors = {}; render(); });
   }
-  root.querySelectorAll('[data-upload]').forEach(function(box){
-    box.addEventListener('click', function(e){
-      if(e.target.closest('[data-remove-file]') || e.target.closest('[data-replace-file]')) return;
-      const key = box.getAttribute('data-upload');
-      const input = document.getElementById('file-'+key);
+  root.querySelectorAll('[data-choose-file]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      const input = document.getElementById('file-'+btn.getAttribute('data-choose-file'));
       if(input) input.click();
     });
+  });
+  root.querySelectorAll('[data-upload]').forEach(function(box){
     box.addEventListener('dragover', function(e){ e.preventDefault(); });
     box.addEventListener('drop', function(e){
       e.preventDefault();
