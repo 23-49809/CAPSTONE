@@ -34,6 +34,7 @@
       --brand-100:#152c1e; --brand-50:#101c15;
       --danger-bg:#2d1613; --warn-bg:#2c2210; --success-bg:#12291b;
       --info-bg:#122631; --neutral-bg:#1a221e;
+    --danger:#f2a49b; --warn:#f0c46a; --success:#8fdcb1; --info:#9cc6f0; --neutral:#b9c5be;
       --shadow-lg:0 24px 48px -28px rgba(0,0,0,.6); --shadow-md:0 12px 28px -16px rgba(0,0,0,.5);
     }
   }
@@ -44,6 +45,7 @@
     --brand-100:#152c1e; --brand-50:#101c15;
     --danger-bg:#2d1613; --warn-bg:#2c2210; --success-bg:#12291b;
     --info-bg:#122631; --neutral-bg:#1a221e;
+    --danger:#f2a49b; --warn:#f0c46a; --success:#8fdcb1; --info:#9cc6f0; --neutral:#b9c5be;
     --shadow-lg:0 24px 48px -28px rgba(0,0,0,.6); --shadow-md:0 12px 28px -16px rgba(0,0,0,.5);
   }
 
@@ -322,13 +324,15 @@
 
   /* Owner toggle + uploads */
   .owner-toggle{ display:flex; align-items:center; gap:12px; margin-bottom:20px; cursor:pointer; user-select:none; }
-  .owner-toggle input{ display:none; }
+  /* Visually hidden but still a real, keyboard-reachable checkbox. */
+  .owner-toggle input{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  .owner-toggle input:focus-visible + .toggle-dot{ outline:3px solid var(--brand-500); outline-offset:2px; }
   .toggle-dot{ width:22px; height:22px; border-radius:50%; border:1.5px solid var(--line-strong); display:flex; align-items:center; justify-content:center; background:var(--surface); flex-shrink:0; transition:background .15s ease, border-color .15s ease; }
   /* Sized on .icon (not the inner svg) — matches the pattern every other
      icon context uses, so this can't lose a specificity fight against the
      base ".icon svg{width:100%;height:100%}" rule the way ".toggle-dot
      svg" previously did (that's why the checkmark never showed at 12px). */
-  .toggle-dot .icon{ width:12px; height:12px; color:#fff; opacity:0; transition:opacity .1s ease; }
+  .toggle-dot .icon{ width:12px; height:12px; color:var(--surface); opacity:0; transition:opacity .1s ease; }
   .owner-toggle input:checked + .toggle-dot{ background:var(--ink); border-color:var(--ink); }
   .owner-toggle input:checked + .toggle-dot .icon{ opacity:1; }
   .owner-toggle-label{ font-weight:600; font-size:14.5px; }
@@ -496,6 +500,21 @@
   .submit-modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; flex-wrap:wrap; }
 
   /* ============ Track ============ */
+  /* ============ Touch targets (touch screens / narrow windows) ============
+     Same look; controls get at least a 44px tap area. The slider dots keep
+     their 10px appearance with a larger invisible hit area around them. */
+  @media (max-width:1024px), (pointer:coarse){
+    .brand{ min-height:44px; }
+    .home-slide-control{ width:44px; height:44px; }
+    .home-slide-dots button{ position:relative; width:44px; height:44px; margin:-17px -12px; border:0; background:none; }
+    .home-slide-dots button::before{ content:""; position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px 0 0 -5px; border:1px solid #fff; border-radius:50%; box-sizing:border-box; }
+    .home-slide-dots button.active{ background:none; }
+    .home-slide-dots button.active::before{ background:#fff; }
+    .terms-head .terms-x{ width:44px; height:44px; }
+    .rcpt-copy{ min-height:44px; }
+    .owner-toggle{ min-height:44px; }
+  }
+
   /* ============ Terms and Conditions popup ============ */
   .terms-backdrop{ position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(10,24,17,.58); }
   .terms-modal{ width:min(100%, 760px); max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); display:flex; flex-direction:column;
@@ -644,48 +663,116 @@
   .fade-in{ animation:fadeIn .25s ease both; }
   @keyframes fadeIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
 
-  /* ============ Mobile responsive tightening ============
-     The grid/column breakpoints above already stack the layout at 768px
-     and 640px. This block only trims padding/sizing that stays fixed at
-     desktop scale and would otherwise crowd or overflow a phone screen —
-     no colors, branding, typography scale, or content changes. */
-  @media (max-width:600px){
-    .site-header .wrap{ min-height:auto; padding-top:14px; padding-bottom:14px; gap:12px; }
-    .brand-mark{ width:36px; height:36px; }
-    .brand-name{ font-size:18px; }
-    .header-actions .btn{ padding:11px 18px; min-height:44px; font-size:15px; }
-
-    .hero-inner{ padding:48px 0 42px; }
-    .hero p.lede{ font-size:17px; }
-
-    .section{ padding:56px 0; }
-    .section-head{ margin-bottom:36px; }
-    .service-card{ padding:28px 24px; }
-    .site-footer{ padding:26px 0 16px; }
-
-    .wizard-shell{ padding:28px 14px 44px; }
-    .wizard-header{ padding:4px 4px 20px; }
-    .wizard-card-head{ padding:22px 20px 4px; }
-    .wizard-card-body{ padding:18px 20px 8px; }
-    .wizard-card-foot{ padding:16px 20px 20px; flex-wrap:wrap; gap:12px; }
-    .wizard-card-foot .btn{ flex:1; min-width:120px; }
-
-    .stepper{ -webkit-overflow-scrolling:touch; }
-    .step-pill{ min-width:128px; padding:10px 13px; }
-
-    .confirm-actions .btn{ width:100%; }
-
-  }
-  @media (max-width:480px){
+  /* ============ Mobile sizing (phones) ============
+     Desktop (>=1025px) and tablet sizing are unchanged. On phones the same
+     layout is set at a compact, proportionate scale: smaller header, hero,
+     headings and paddings, 12-20px gaps, 15px body text. Interactive
+     controls stay at least 44px tall (see "Touch targets"). Tiers:
+     <=767px phones, <=374px very small phones. */
+  @media (max-width:767px){
     html,body{ overflow-x:hidden; }
+    body{ font-size:15px; line-height:1.6; }
     .wrap{ padding-left:16px; padding-right:16px; }
-    .hero h1{ font-size:clamp(30px,8.5vw,40px); }
-    .hero .btn-hero,.btn-link,.wizard-card-foot .btn{ min-height:44px; }
-    .wizard-card-head h2{ align-items:flex-start; }
-    .field input,.field select,.field textarea{ min-height:44px; }
-    .section-divider{ gap:8px; }
-  }
 
+    /* Header: one compact row */
+    .site-header .wrap{ min-height:0; padding-top:8px; padding-bottom:8px; gap:10px; flex-wrap:nowrap; }
+    .brand{ gap:9px; min-width:0; }
+    .brand-mark{ width:32px; height:32px; }
+    .brand-name{ font-size:17px; white-space:nowrap; }
+    .header-actions .btn{ min-height:44px; padding:8px 14px; font-size:14px; gap:6px; white-space:nowrap; }
+    .header-actions .btn .icon{ width:16px; height:16px; }
+
+    /* Hero / carousel */
+    /* Hero: shorter photo band above the text; type per the mobile spec. */
+    .home-slider{ height:clamp(640px, 175vw, 700px); min-height:0; }
+    .home-slide .home-slide-inner{ padding:clamp(150px, 42vw, 175px) 0 64px; }
+    .home-slide-control{ top:clamp(70px, 20vw, 84px); }
+    .hero .eyebrow{ font-size:clamp(13px, 3.9vw, 15px); letter-spacing:.08em; }
+    .hero .eyebrow::after{ margin-top:8px; width:44px; }
+    .hero h1{ font-size:clamp(32px, 9.6vw, 38px); line-height:1.08; margin-bottom:8px; }
+    .home-slide h1{ margin:10px 0 8px; }
+    .home-slide .hero-tagline{ font-size:clamp(17px, 5vw, 20px); line-height:1.3; margin-bottom:8px; }
+    .home-slide p{ font-size:15px; line-height:1.55; margin-bottom:14px; }
+    .home-slide .announcement-copy h3{ font-size:20px; }
+    .hero .btn-hero{ min-height:46px; padding:10px 20px; font-size:15.5px; }
+    .home-slide-dots{ bottom:14px; }
+    .hero-inner{ padding:40px 0 36px; }
+    .hero p.lede{ font-size:15px; }
+
+    /* Sections, services, features */
+    .section{ padding:32px 0; }
+    .section-head{ margin-bottom:20px; }
+    .section-head h2{ font-size:clamp(21px,6vw,25px); }
+    .section-head p{ font-size:14.5px; }
+    .service-grid{ gap:14px; }
+    .service-card{ padding:20px 18px; }
+    .service-card .chip-icon{ margin-bottom:12px; }
+    .service-card h3{ font-size:clamp(21px, 6.2vw, 24px); margin-bottom:6px; }
+    .service-card p{ font-size:15px; line-height:1.55; margin-bottom:14px; }
+    .chip-icon{ width:56px; height:56px; border-radius:14px; }
+    .chip-icon .icon{ width:26px; height:26px; }
+    .feature-row .chip-icon{ width:56px; height:56px; margin-bottom:10px; }
+    .service-actions{ gap:8px; }
+    .btn-link{ min-height:46px; padding:8px 14px; font-size:15px; }
+    .feature-row{ gap:22px; }
+    .feature-row h3{ font-size:19px; }
+    .feature-row p{ font-size:14.5px; }
+    .draft-resume{ margin-bottom:16px; padding:14px; }
+    .draft-resume h3{ font-size:16px; }
+
+    /* Application form */
+    .wizard-shell{ padding:16px 12px 28px; }
+    .wizard-header{ padding:0 2px 12px; }
+    .wizard-header h1{ font-size:clamp(22px,6.2vw,26px); }
+    .wizard-header p{ font-size:14px; margin-top:4px; }
+    .stepper{ -webkit-overflow-scrolling:touch; margin-bottom:12px; }
+    .step-pill{ min-width:112px; padding:7px 10px; font-size:13px; }
+    .wizard-card-head{ padding:16px 14px 2px; }
+    .wizard-card-head h2{ font-size:18px; align-items:flex-start; }
+    .wizard-card-head p{ font-size:13.5px; }
+    .wizard-card-body{ padding:12px 14px 6px; }
+    .field-grid{ gap:14px 16px; margin-bottom:16px; }
+    .field-pair{ gap:14px 12px; }
+    .field label{ margin-bottom:5px; }
+    .field input, .field select, .field textarea{ min-height:44px; font-size:15px; }
+    .field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .field select:not(.barangay-native-select), .barangay-trigger, .contact-input, .arp-input{ min-height:44px; }
+    .section-divider{ gap:8px; margin:6px 0 12px; }
+    .upload-surface{ padding:14px 12px; }
+    .reference-note{ font-size:14.5px; }
+    .review-card{ padding:14px; }
+    .wizard-card-foot{ padding:12px 14px 14px; flex-wrap:wrap; gap:10px; }
+    .wizard-card-foot .btn{ flex:1; min-width:120px; min-height:44px; }
+
+    /* Receipt, Track Request, popups */
+    .confirm-shell{ padding:14px 12px 20px; }
+    .rcpt{ padding:22px 14px 14px; }
+    .rcpt-brand-name{ font-size:18px; }
+    .rcpt-ref-no{ font-size:clamp(17px,5.6vw,22px); }
+    .confirm-actions .btn{ width:100%; }
+    .trk-head{ margin-bottom:14px; }
+    .trk-head h1{ font-size:clamp(22px,6.2vw,26px); }
+    .trk-head p{ font-size:14px; }
+    .trk-card{ padding:14px; }
+    .trk-input input{ height:48px; font-size:16px; }
+    .trk-form .btn{ height:48px; }
+    .trk-ref{ font-size:20px; }
+    .trk-grid{ gap:10px; margin-top:12px; }
+    .trk-grid dd{ font-size:15px; }
+    .trk-sum{ padding-bottom:12px; }
+    .trk-card h3{ font-size:16px; margin-bottom:12px; }
+    .requirements-modal{ padding:12px; }
+    .requirements-modal-card{ padding:16px; }
+    .submit-modal{ padding:18px 16px; }
+  }
+  @media (max-width:374px){
+    .wrap{ padding-left:12px; padding-right:12px; }
+    .brand-name{ font-size:15.5px; }
+    .header-actions .btn{ padding:8px 11px; font-size:13.5px; }
+    .wizard-shell{ padding:12px 10px 24px; }
+    .wizard-card-head, .wizard-card-body, .wizard-card-foot{ padding-left:12px; padding-right:12px; }
+    .service-card{ padding:18px 16px; }
+    .trk-card{ padding:14px 12px; }
+  }
 
   /* ============ Dropdowns (shared) ============
      One rule for every native single-select: a drawn chevron 14px from the
@@ -2073,6 +2160,12 @@ function render(){
   bindEvents(app);
   publishArp();
   scheduleDraftSave();
+  // Narrow screens: the step bar scrolls sideways; keep the current step in view.
+  const stepper = app.querySelector('.stepper'), activeStep = stepper && stepper.querySelector('.step-pill.active');
+  if(activeStep && stepper.scrollWidth > stepper.clientWidth){
+    const sr = stepper.getBoundingClientRect(), ar = activeStep.getBoundingClientRect();
+    stepper.scrollLeft += (ar.left - sr.left) - (sr.width - ar.width) / 2;
+  }
 }
 /* The PHP bridge records [data-bind] values from input events; announce the
    full ARP whenever it may have changed (typing or a barangay change). */
@@ -2390,6 +2483,21 @@ function bindEvents(root){
   });
 }
 
+/* Touch screens: when a field gains focus and the on-screen keyboard would
+   cover it, scroll it into the visible area (also inside scrolling modals). */
+if(!window._saKeyboardFix){
+  window._saKeyboardFix = true;
+  document.addEventListener('focusin', function(e){
+    var el = e.target;
+    if(!el.matches || !el.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), textarea, select')) return;
+    if(!window.matchMedia('(pointer:coarse)').matches) return;
+    setTimeout(function(){
+      var vv = window.visualViewport, r = el.getBoundingClientRect();
+      var top = vv ? vv.offsetTop : 0, bottom = top + (vv ? vv.height : window.innerHeight);
+      if(r.top < top + 8 || r.bottom > bottom - 8) el.scrollIntoView({ block:'center', behavior:'smooth' });
+    }, 320);
+  });
+}
 // Text fields update state without re-rendering; save those changes too.
 document.addEventListener('input', function(){ setTimeout(scheduleDraftSave, 0); });
 document.addEventListener('change', function(){ setTimeout(scheduleDraftSave, 0); });

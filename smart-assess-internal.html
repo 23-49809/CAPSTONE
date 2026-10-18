@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Assessor's Office Management System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,6 +32,7 @@
       --brand-100:#152c1e; --brand-50:#101c15;
       --danger-bg:#2d1613; --warn-bg:#2c2210; --success-bg:#12291b;
       --info-bg:#122631; --neutral-bg:#1a221e;
+    --danger:#f2a49b; --warn:#f0c46a; --success:#8fdcb1; --info:#9cc6f0; --neutral:#b9c5be;
       --shadow-lg:0 24px 48px -28px rgba(0,0,0,.6); --shadow-md:0 12px 28px -16px rgba(0,0,0,.5);
     }
   }
@@ -40,6 +43,7 @@
     --brand-100:#152c1e; --brand-50:#101c15;
     --danger-bg:#2d1613; --warn-bg:#2c2210; --success-bg:#12291b;
     --info-bg:#122631; --neutral-bg:#1a221e;
+    --danger:#f2a49b; --warn:#f0c46a; --success:#8fdcb1; --info:#9cc6f0; --neutral:#b9c5be;
     --shadow-lg:0 24px 48px -28px rgba(0,0,0,.6); --shadow-md:0 12px 28px -16px rgba(0,0,0,.5);
   }
   *{ box-sizing:border-box; }
@@ -399,51 +403,6 @@
   .clock-card .btn-ghost-w:hover{ background:rgba(255,255,255,.26); }
   .clock-card .btn-ghost-w[disabled]{ opacity:.5; }
 
-  /* ============ Mobile responsive tightening ============
-     The sidebar already collapses to an off-canvas drawer and the grids
-     already stack at their existing breakpoints (900px/980px/560px/520px).
-     This block trims header content and fixed paddings that would
-     otherwise overflow or crowd a phone screen — no colors, branding,
-     typography scale, or content changes. */
-  @media (max-width:640px){
-    .app-header .hd-inner{ padding:0 14px; gap:8px; }
-    .hd-brand .hb-tag{ display:none; }
-    .role-tag{ display:none; }
-    .hd-avatar{ padding:4px; gap:0; }
-    .hd-avatar .hd-name, .hd-avatar .hd-role, .hd-avatar br{ display:none; }
-    .main-content{ padding:18px 14px 44px; }
-    .page-head h1{ font-size:20px; }
-
-    .login-shell{ padding:32px 14px; }
-    .login-card{ padding:26px 22px; }
-
-    .modal-overlay{ padding:14px; }
-    .modal{ padding:22px 18px; }
-    .panel-card{ padding:16px 16px; }
-
-    .toast-wrap{ left:14px; right:14px; bottom:14px; align-items:stretch; }
-    .toast{ max-width:none; }
-
-    .clock-card{ padding:18px 18px; }
-    .clock-card > div:last-child{ display:flex; gap:10px; flex-wrap:wrap; width:100%; }
-    .clock-card .btn-ghost-w{ flex:1; min-width:120px; }
-  }
-  @media (max-width:400px){
-    .hd-brand .hb-name{ font-size:15px; }
-    .stat-card .num{ font-size:23px; }
-  }
-  @media (max-width:480px){
-    html,body{ overflow-x:hidden; }
-    .login-shell{ padding-left:12px; padding-right:12px; }
-    .login-card{ padding-left:18px; padding-right:18px; }
-    .login-brand .lb-name{ font-size:16px; }
-    .field input,.field select,.field textarea{ min-height:44px; }
-    .login-card .btn{ min-height:44px; }
-    .page-head{ gap:10px; }
-    .page-head > *{ max-width:100%; }
-    .action-row .action-btn{ min-height:44px; }
-  }
-
   /* ============ Shell: full-height sidebar + light top bar ============
      The sidebar carries the brand; the top bar (still .app-header, which
      php-bridge.js hooks for the avatar) lives inside the main column so the
@@ -485,25 +444,56 @@
             mask-image:linear-gradient(to top, transparent 0%, #000 20%, #000 55%, transparent 100%); }
   @media (max-height:620px){ .sidebar-art{ display:none; } }
 
-  /* Static sidebar: always visible. Below 900px it sits above the content
-     as a full-width block instead of an off-canvas drawer. */
+  /* Desktop (>900px): static sidebar, unchanged. Up to 900px it becomes a
+     slide-out drawer opened from the header menu button. */
+  .hd-menu-btn, .hd-mobile-brand, .sb-close{ display:none; }
   @media (max-width:900px){
     .app-body{ flex-direction:column; }
-    .sidebar{ position:static; transform:none; transition:none; visibility:visible; width:auto; height:auto; box-shadow:none; padding:16px 14px 12px; overflow:visible; }
-    .sb-brand{ padding-bottom:12px; }
-    .sidebar nav{ flex-direction:row; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-    .sidebar .side-link{ width:auto; padding:9px 12px; font-size:14px; gap:8px; }
-    .sidebar .side-link .icon{ width:18px; height:18px; }
-    .sidebar-foot{ margin-top:0; padding-top:10px; }
-    .sidebar-art{ display:none; }
-    .sidebar-backdrop{ display:none !important; }
+    .sidebar{ position:fixed; top:0; left:0; bottom:0; z-index:60; width:min(86vw, 300px); height:100vh; height:100dvh; overflow-y:auto; overscroll-behavior:contain;
+      transform:translateX(-102%); visibility:hidden; transition:transform .26s ease, visibility 0s linear .26s; box-shadow:none; padding:18px 14px 16px; }
+    .sidebar.open{ transform:none; visibility:visible; transition:transform .26s ease, visibility 0s; box-shadow:0 18px 50px rgba(0,0,0,.35); }
+    .sb-brand{ padding:0 0 18px 4px; gap:10px; }
+    .sidebar .sb-brand .hb-name{ font-size:17px; white-space:normal; }
+    .sb-brand img{ width:42px; height:42px; }
+    .sb-close{ display:flex; align-items:center; justify-content:center; margin-left:auto; flex-shrink:0; width:44px; height:44px; border-radius:50%;
+      border:1px solid rgba(255,255,255,.3); background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
+    .sb-close:focus-visible, .hd-menu-btn:focus-visible{ outline:3px solid var(--gold); outline-offset:2px; }
+    .sidebar nav{ flex-direction:column; flex-wrap:nowrap; gap:4px; margin-bottom:12px; }
+    .sidebar .side-link{ width:100%; min-height:48px; padding:12px 14px; font-size:15.5px; gap:14px; }
+    .sidebar .side-link .icon{ width:20px; height:20px; }
+    .sidebar-foot{ margin-top:auto; padding-top:10px; }
+    .sidebar-backdrop{ display:block !important; position:fixed; inset:0; z-index:59; background:rgba(8,20,14,.5); opacity:0; visibility:hidden; transition:opacity .26s ease, visibility 0s linear .26s; }
+    .sidebar-backdrop.open{ opacity:1; visibility:visible; transition:opacity .26s ease, visibility 0s; }
+    body.drawer-open{ overflow:hidden; }
+    .main-content .app-header .hd-inner{ justify-content:space-between; gap:10px; }
+    .hd-menu-btn{ display:flex; align-items:center; justify-content:center; flex-shrink:0; width:44px; height:44px; border-radius:12px;
+      border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); cursor:pointer; }
+    .hd-divider{ display:none; }
+    .hd-mobile-brand{ display:flex; align-items:center; gap:8px; min-width:0; margin-right:auto; font-family:var(--font-display); font-weight:700; font-size:15px; letter-spacing:.01em; text-transform:uppercase; color:var(--ink); }
+    .hd-mobile-brand img{ width:32px; height:32px; flex-shrink:0; }
+    .hd-mobile-brand span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  }
+  @media (max-width:360px){ .hd-mobile-brand span{ display:none; } }
+
+  /* Touch screens and narrow windows: comfortable 44px touch targets. */
+  @media (max-width:1024px), (pointer:coarse){
+    .main-content .btn, .modal .btn, .login-card .btn, .icon-btn, .dash-link, .hd-bell, .password-toggle,
+    .main-content select, .modal select, .main-content input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+    .modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .login-card input:not([type="checkbox"]):not([type="radio"]),
+    .main-content textarea, .modal textarea, .side-link, .tabs button, .seg button, [role="tab"]{ min-height:44px; }
+    .icon-btn, .hd-bell, .password-toggle, .modal-close{ min-width:44px; }
+    .pager button, .sent-arrow, .send-more, .composer .composer-discard, .modal .composer-discard{ width:44px; height:44px; min-width:44px; }
+    .send-main{ min-height:44px; }
+    .modal-close{ min-height:44px; }
+    .dash-link{ display:inline-flex; align-items:center; }
+    .modal{ max-height:88dvh; }
   }
 
   .main-content{ --main-pad-x:34px; position:relative; padding:22px var(--main-pad-x) 56px; }
   .main-content > *{ position:relative; z-index:1; }
   .main-content .app-header{ position:relative; top:auto; height:auto; background:none; border:0; z-index:2; margin-bottom:10px; }
   .main-content .app-header .hd-inner{ padding:0; height:auto; min-height:52px; justify-content:flex-end; }
-  .hd-menu-btn{ display:flex; width:42px; height:42px; border-radius:12px; background:var(--surface); border:1px solid var(--line); color:var(--navy); }
+  .hd-menu-btn{ width:44px; height:44px; border-radius:12px; background:var(--surface); border:1px solid var(--line); color:var(--navy); }
   .hd-menu-btn:hover{ background:var(--surface-2); }
   .hd-menu-btn .icon{ width:20px; height:20px; }
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .hd-menu-btn, :root:not([data-theme="light"]) .hd-bell{ color:var(--ink); } }
@@ -544,7 +534,7 @@
   @media (max-width:1100px){ .dash-stats{ gap:14px; } .dash-stat{ padding:16px 18px; } }
   .dash-stats.cols-4{ grid-template-columns:repeat(4,minmax(0,1fr)); }
   @media (max-width:1100px){ .dash-stats.cols-4{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
-  @media (max-width:640px){ .dash-stats, .dash-stats.cols-4{ grid-template-columns:minmax(0,1fr); } }
+  @media (max-width:640px){ .dash-stats, .dash-stats.cols-4{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
   .dash-stat{ display:flex; flex-direction:column; gap:2px; padding:20px 22px; background:var(--surface); border:1px solid var(--line); border-radius:10px; color:inherit; text-align:left; font:inherit; cursor:pointer; transition:border-color .15s ease; }
   .dash-stat:hover{ border-color:var(--line-strong); }
   .dash-stat:hover .dash-stat-label{ color:var(--accent); }
@@ -1012,6 +1002,98 @@
   }
   select:not([multiple]):not([size]):disabled{ cursor:default; }
   select::-ms-expand{ display:none; }
+  /* ============ Mobile sizing (phones) ============
+     Desktop (>=1025px) and tablet sizing are unchanged. On phones the same
+     layout is set at a compact, proportionate scale: 12px page padding,
+     smaller titles, stat numbers and card padding, 10-16px gaps. Controls
+     stay at least 44px tall (see the touch-target rules). Selectors match
+     the specificity of the rules they adjust.
+     Tiers: <=767px phones, <=374px very small phones. */
+  @media (max-width:767px){
+    html,body{ overflow-x:hidden; }
+    .main-content{ --main-pad-x:12px; padding:8px 12px 28px; }
+    .main-content .app-header{ margin-bottom:4px; }
+    .main-content .app-header .hd-inner{ min-height:48px; }
+    .main-content .app-header .hd-avatar{ min-width:44px; min-height:44px; align-items:center; }
+    .main-content .app-header .hd-avatar .avatar-circle{ width:38px; height:38px; flex:0 0 38px; font-size:13.5px; }
+    .main-content .app-header .hd-avatar .hd-name{ font-size:13px; }
+    .hd-menu-btn{ width:44px; height:44px; border-radius:10px; }
+    .hd-mobile-brand{ font-size:14.5px; gap:7px; }
+    .hd-mobile-brand img{ width:30px; height:30px; }
+    .role-tag{ display:none; }
+
+    /* Drawer */
+    .sidebar{ padding:14px 12px 12px; }
+    .sb-brand{ padding-bottom:12px; }
+    .sb-brand img{ width:36px; height:36px; }
+    .sidebar .sb-brand .hb-name{ font-size:16px; }
+    .sidebar nav{ gap:2px; }
+    .sidebar .side-link{ min-height:44px; padding:10px 12px; font-size:14.5px; gap:12px; }
+    .sidebar .side-link .icon{ width:18px; height:18px; }
+
+    /* Page titles */
+    .main-content .page-head{ padding-top:14px; margin-bottom:16px; gap:10px; }
+    .main-content .page-head h1{ font-size:clamp(20px,5.8vw,24px); line-height:1.15; }
+    .main-content .page-head p, .main-content .page-head .dash-welcome{ font-size:13.5px; margin-top:4px; }
+    .page-head > *{ max-width:100%; }
+
+    /* Dashboards and statistics */
+    .dash-stats{ gap:10px; margin-bottom:16px; }
+    .dash-stat{ padding:12px 14px; border-radius:10px; }
+    .dash-stat-label{ font-size:13px; gap:6px; }
+    .dash-stat-num{ font-size:26px; padding-top:4px; }
+    .dash-stat-sub{ font-size:12px; }
+    .staff-dash-grid, .staff-dash-main{ gap:14px; }
+    .sysreport{ gap:14px; }
+    .sr-card{ padding:14px; border-radius:10px; }
+    .sr-stats{ gap:10px; }
+    .sr-stat{ padding:12px 14px 12px 20px; }
+    .sr-stat-num{ font-size:24px; }
+    .sr-stat-row{ margin:6px 0 2px; }
+    .notif-grid{ gap:14px; }
+    .notif-card{ padding:14px 14px 16px; }
+    .two-col{ gap:14px; }
+    .panel-card{ padding:14px; }
+    .empty-state{ padding:28px 12px; }
+    .clock-card{ padding:14px; }
+    .clock-card > div:last-child{ display:flex; gap:10px; flex-wrap:wrap; width:100%; }
+    .clock-card .btn-ghost-w{ flex:1; min-width:120px; }
+
+    /* Buttons, tables and lists */
+    .main-content .btn, .modal .btn{ padding:9px 16px; font-size:14.5px; }
+    .table-wrap table tbody td{ padding-top:6px; padding-bottom:6px; font-size:13.5px; }
+    .action-row .action-btn{ min-height:44px; }
+
+    /* Modals, composer, toasts */
+    .modal-overlay{ padding:10px; }
+    .modal{ padding:18px 14px; }
+    .modal-head h3{ font-size:18px; }
+    .modal .review-row{ padding-top:9px; padding-bottom:9px; }
+    .modal .review-row .btn{ min-height:44px; padding:8px 14px; font-size:14px; }
+    .composer-head{ padding:12px 14px; }
+    .toast-wrap{ left:12px; right:12px; bottom:12px; align-items:stretch; }
+    .toast{ max-width:none; }
+
+    /* Sign-in */
+    .login-shell{ padding:24px 12px; }
+    .login-card{ padding:22px 18px; }
+    .login-brand .lb-name{ font-size:16px; }
+    .login-card .btn{ min-height:44px; }
+  }
+  @media (max-width:640px){
+    /* Header avatar shows initials only (the live site's bridge stylesheet
+       adds the tap-to-expand name panel on top of this). */
+    .hd-brand .hb-tag{ display:none; }
+    .hd-avatar{ padding:4px; gap:0; }
+    .hd-avatar .hd-name, .hd-avatar .hd-role, .hd-avatar br{ display:none; }
+  }
+  @media (max-width:374px){
+    .main-content{ --main-pad-x:10px; padding-left:10px; padding-right:10px; }
+    .dash-stat{ padding:10px 12px; }
+    .dash-stat-num{ font-size:23px; }
+    .sr-card, .notif-card, .panel-card{ padding:12px; }
+    .modal{ padding:16px 12px; }
+  }
 </style>
 
 <div id="app"></div>
@@ -1225,6 +1307,7 @@ var SEED_NOTIFS = [
 /* ---------------- State ---------------- */
 var STORE_KEY = 'smartAssessMAOSystemV1';
 var state = loadState();
+state.sidebarOpen = false;
 
 function defaultState(){
   return {
@@ -1319,8 +1402,8 @@ function pagerHtml(key, pageInfo){
   if(pageInfo.total===0) return '';
   return '<div class="pager"><span>Showing '+((pageInfo.page-1)*8+1)+'–'+Math.min(pageInfo.page*8,pageInfo.total)+' of '+pageInfo.total+'</span>'
     + '<div class="pbtns">'
-    + '<button data-action="page" data-key="'+key+'" data-dir="prev" '+(pageInfo.page<=1?'disabled':'')+'>'+ic('chevLeft','15px')+'</button>'
-    + '<button data-action="page" data-key="'+key+'" data-dir="next" '+(pageInfo.page>=pageInfo.totalPages?'disabled':'')+'>'+ic('chevRight','15px')+'</button>'
+    + '<button data-action="page" data-key="'+key+'" data-dir="prev" aria-label="Previous page" '+(pageInfo.page<=1?'disabled':'')+'>'+ic('chevLeft','15px')+'</button>'
+    + '<button data-action="page" data-key="'+key+'" data-dir="next" aria-label="Next page" '+(pageInfo.page>=pageInfo.totalPages?'disabled':'')+'>'+ic('chevRight','15px')+'</button>'
     + '</div></div>';
 }
 
@@ -1447,8 +1530,37 @@ function formatContact(value){
 function contactIsValid(value){ return /^9\d{9}$/.test(String(value||'')); }
 
 /* ---------------- Render dispatcher ---------------- */
+/* Touch screens: when a field gains focus and the on-screen keyboard would
+   cover it, scroll it into the visible area (also inside scrolling modals). */
+if(!window._saKeyboardFix){
+  window._saKeyboardFix = true;
+  document.addEventListener('focusin', function(e){
+    var el = e.target;
+    if(!el.matches || !el.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), textarea, select')) return;
+    if(!window.matchMedia('(pointer:coarse)').matches) return;
+    setTimeout(function(){
+      var vv = window.visualViewport, r = el.getBoundingClientRect();
+      var top = vv ? vv.offsetTop : 0, bottom = top + (vv ? vv.height : window.innerHeight);
+      if(r.top < top + 8 || r.bottom > bottom - 8) el.scrollIntoView({ block:'center', behavior:'smooth' });
+    }, 320);
+  });
+}
+/* Mobile/tablet drawer (<=900px). Opening moves focus into the menu; closing
+   returns it to the menu button. Desktop ignores state.sidebarOpen. */
+function setSidebar(open){
+  state.sidebarOpen = !!open;
+  render();
+  var target = document.querySelector(open ? '#app-sidebar .side-link' : '.hd-menu-btn');
+  if(target && window.matchMedia('(max-width:900px)').matches) target.focus();
+}
+if(!window._saDrawerKeys){
+  window._saDrawerKeys = true;
+  document.addEventListener('keydown', function(ev){ if(ev.key==='Escape' && state.sidebarOpen){ setSidebar(false); } });
+  window.matchMedia('(min-width:901px)').addEventListener('change', function(e){ if(e.matches && state.sidebarOpen){ state.sidebarOpen = false; render(); } });
+}
 function render(){
   publishDueAnnouncements();
+  document.body.classList.toggle('drawer-open', !!state.sidebarOpen);
   var app = document.getElementById('app');
   if(!state.session){
     app.innerHTML = renderLogin();
@@ -1497,14 +1609,18 @@ function shellChrome(acct, innerHtml){
   }).join('');
   return ''
   + '<div class="app-body">'
-    + '<aside class="sidebar" id="app-sidebar" aria-label="Main navigation">'
+    + '<aside class="sidebar'+(state.sidebarOpen?' open':'')+'" id="app-sidebar" aria-label="Main navigation">'
       + SIDEBAR_ART
-      + '<div class="sb-brand"><img src="data:image/png;base64,'+LOGO_B64+'" alt="Bayan ng Mabini seal"><div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor’s Office System</div></div></div>'
+      + '<div class="sb-brand"><img src="data:image/png;base64,'+LOGO_B64+'" alt="Bayan ng Mabini seal"><div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor’s Office System</div></div>'
+        + '<button type="button" class="sb-close" data-action="close-sidebar" aria-label="Close menu">'+ic('x','20px')+'</button></div>'
       + '<div class="sidebar-label">Menu</div><nav>'+navHtml+'</nav>'
       + '<div class="sidebar-foot"><button class="side-link" data-action="logout">'+ic('logout','18px')+'<span>Logout</span></button></div>'
     + '</aside>'
+    + '<div class="sidebar-backdrop'+(state.sidebarOpen?' open':'')+'" data-action="close-sidebar" aria-hidden="true"></div>'
     + '<main class="main-content role-'+esc(acct.role)+'">'
       + '<header class="app-header"><div class="hd-inner">'
+        + '<button type="button" class="hd-menu-btn" data-action="toggle-sidebar" aria-controls="app-sidebar" aria-expanded="'+(state.sidebarOpen?'true':'false')+'" aria-label="Open menu">'+ic('menu','22px')+'</button>'
+        + '<div class="hd-mobile-brand" aria-hidden="true"><img src="data:image/png;base64,'+LOGO_B64+'" alt=""><span>Smart Assess</span></div>'
         + '<div class="hd-right">'
           + (acct.role==='staff' ? '<button class="hd-bell" data-action="nav" data-view="notifications" aria-label="Notifications" title="Notifications">'+ic('bell')+'</button><span class="hd-divider" aria-hidden="true"></span>' : '')
           + '<button class="hd-avatar" data-action="nav" data-view="profile"><span class="avatar-circle">'+esc(initials(acct.fullName))+'</span><span><span class="hd-name">'+esc(acct.fullName)+'</span>'+(acct.role==='admin'?'':'<br><span class="hd-role">'+esc(acct.position)+'</span>')+'</span></button>'
@@ -3272,8 +3388,21 @@ function bindEvents(){
       g.addEventListener('mouseenter', function(){ showTip(g); });
       g.addEventListener('focus', function(){ showTip(g); });
       g.addEventListener('blur', hideTip);
+      // Touch: tapping a month shows its counts; tapping it again hides them.
+      g.addEventListener('click', function(ev){ ev.stopPropagation(); if(g.classList.contains('on') && !tip.hidden) hideTip(); else showTip(g); });
     });
     srChartEl.addEventListener('mouseleave', hideTip);
+    if(!window._srChartOutsideTap){
+      // One listener for the page: a tap outside any chart hides its tooltip.
+      window._srChartOutsideTap = true;
+      document.addEventListener('click', function(ev){
+        document.querySelectorAll('[data-sr-chart]').forEach(function(c){
+          if(c.contains(ev.target)) return;
+          var t = c.querySelector('[data-sr-tip]'); if(t) t.hidden = true;
+          c.querySelectorAll('.sr-bar.on').forEach(function(o){ o.classList.remove('on'); });
+        });
+      });
+    }
   });
 
   app.querySelectorAll('tr.dash-row, .sent-item, tr.sr-row').forEach(function(row){
@@ -3458,6 +3587,10 @@ function bindEvents(){
       return;
     }
 
+    if(action==='toggle-sidebar' || action==='close-sidebar'){
+      setSidebar(action==='toggle-sidebar' ? !state.sidebarOpen : false);
+      return;
+    }
     if(action==='nav'){
       state.view = el.getAttribute('data-view');
       state.sidebarOpen = false;

@@ -372,7 +372,8 @@
       return {
         action: control.getAttribute('data-action'),
         id: control.getAttribute('data-id') || '',
-        label: (control.textContent || '').trim()
+        // Icon-only controls (e.g. Archive) have no text; use their accessible name.
+        label: (control.textContent || '').trim() || control.getAttribute('aria-label') || control.getAttribute('title') || ''
       };
     });
     var names = actions.map(function (item) { return item.action; });
