@@ -1678,7 +1678,7 @@ function renderWizard(){
       + '<div class="wizard-card-foot">'
         + '<button class="btn btn-ghost" data-action="prev-step">'+ic('arrowLeft')+' Back</button>'
         + '<div class="foot-actions">'
-          + '<button type="button" class="btn btn-ghost draft-clear" data-action="draft-clear">Clear</button>'
+          + (draftServer() && draft.code ? '<button type="button" class="btn btn-ghost draft-later" data-action="draft-later" aria-haspopup="dialog">Continue later</button>' : '')
           + (isLast
               ? '<button class="btn btn-primary" data-action="submit">Submit Request '+ic('arrowRight')+'</button>'
               : '<button class="btn btn-primary" data-action="next-step">Next '+ic('arrowRight')+'</button>')
@@ -2490,7 +2490,14 @@ function saveAndContinueLater(){
   });
 }
 function showDraftLaterButton(){
-  // The wizard now uses the explicit Clear button.
+  const actions = document.querySelector('.wizard-card-foot .foot-actions');
+  if(!actions || actions.querySelector('[data-action="draft-later"]') || !draftServer() || !draft.code) return;
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'btn btn-ghost draft-later';
+  btn.setAttribute('data-action', 'draft-later'); btn.setAttribute('aria-haspopup', 'dialog');
+  btn.textContent = 'Continue later';
+  btn.addEventListener('click', toggleDraftLater);
+  actions.insertBefore(btn, actions.firstChild);
 }
 function renderDraftBar(){
   return '<div class="draft-bar bare"><span class="draft-state '+draft.status+'" data-draft-state role="status" aria-live="polite">'+esc(draftStatusText())+'</span>'
@@ -2581,56 +2588,6 @@ function discardDraft(flow){
   if(draftServer() && code) draftApi('draft_discard', { draft_token:code }).catch(function(){});
   if(state.flow===flow){ Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; }); draftReset(); }
   draftLocalClear(flow);
-}
-async function clearCurrentDraft(){
-  const flow = state.flow;
-  if(!flow || state.view !== 'wizard') return;
-
-  if(!confirm('Clear this unfinished ' + draftTypeName(flow) +
-      '? Its saved progress and uploaded draft files will be deleted. This cannot be undone.')) return;
-
-  const local = draftLocalRead(flow);
-  const code = draft.code || (local && local.code) || '';
-
-  // Stop scheduled saves while the user confirms the clear operation.
-  clearTimeout(draft.timer);
-  clearTimeout(draft.retryTimer);
-
-  try {
-    // Finish an already-running save before asking the server to discard it.
-    if(draft.inflight) await draft.inflight;
-    clearTimeout(draft.timer);
-    clearTimeout(draft.retryTimer);
-
-    // This endpoint discards only an unsubmitted draft.
-    // If the server cannot confirm deletion, keep the form and local draft.
-    if(draftServer() && code) {
-      const result = await draftApi('draft_discard', {draft_token: code});
-      if(!result || result.discarded !== true) {
-        throw new Error('The server did not confirm draft deletion.');
-      }
-    }
-  } catch (err) {
-    alert('The unfinished application could not be cleared safely. Your form has been kept. Please check your connection and try again.');
-    return;
-  }
-
-  Object.keys(draftPendingFiles).forEach(function(k){
-    delete draftPendingFiles[k];
-  });
-
-  draftLocalClear(flow);
-  draftReset();
-  state.flow = null;
-  state.view = 'landing';
-  state.step = 1;
-  state.maxStep = 1;
-  state.formData = blankFormData();
-  state.errors = {};
-  state.submitConfirmation = false;
-
-  render();
-  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 function draftCompleted(){ Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; }); draftLocalClear(); draftReset(); }
 window.SMART_ASSESS_DRAFT_DONE = draftCompleted;
@@ -2866,7 +2823,6 @@ function bindEvents(root){
       else if(a==='save-tracking') saveTrackingNumber();
       else if(a==='copy-tracking') copyTrackingNumber(el);
       else if(a==='draft-later') toggleDraftLater();
-      else if(a==='draft-clear') clearCurrentDraft();
       else if(a==='draft-resume') resumeDraft('', el.getAttribute('data-flow'));
       else if(a==='draft-discard'){ const fl = el.getAttribute('data-flow'); if(confirm('Discard your unfinished '+draftTypeName(fl)+'? This cannot be undone.')){ discardDraft(fl); render(); } }
       else if(a==='view-status') viewSubmittedStatus();
