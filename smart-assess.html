@@ -274,7 +274,6 @@
     100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(4,120,87,0); }
   }
   @media (prefers-reduced-motion: reduce){ .draft-later.pop, .draft-later:active{ animation:none; transform:none; } }
-  .wizard-card > .draft-panel{ margin:0 32px 14px; }
 
   .field-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px 24px; margin-bottom:22px; }
   @media (max-width:640px){ .field-grid{ grid-template-columns:1fr; } }
@@ -560,6 +559,33 @@
     .owner-toggle{ min-height:44px; }
   }
 
+  /* ============ Continue later popup ============ */
+  body.later-open{ overflow:hidden; }
+  .later-backdrop{ position:fixed; inset:0; z-index:130; display:flex; align-items:center; justify-content:center; padding:16px;
+    background:rgba(10,24,17,.5); animation:laterFade .2s ease both; }
+  .later-modal{ position:relative; width:min(100%, 440px); max-height:calc(100dvh - 32px); overflow-y:auto; background:var(--surface); color:var(--ink);
+    border-radius:var(--radius-lg); box-shadow:0 24px 60px -18px rgba(0,0,0,.35); border-top:4px solid var(--brand-700); padding:24px 22px 20px; }
+  .later-modal:focus{ outline:none; }
+  .later-pop{ animation:laterPop .26s cubic-bezier(.2,.9,.3,1.15) both; }
+  @keyframes laterPop{ from{ opacity:0; transform:scale(.9); } to{ opacity:1; transform:none; } }
+  @keyframes laterFade{ from{ opacity:0; } to{ opacity:1; } }
+  .later-modal h2{ font-family:var(--font-body); font-size:21px; font-weight:800; color:var(--ink); padding-right:40px; }
+  .later-modal p{ margin:8px 0 0; font-size:15px; line-height:1.55; color:var(--ink-soft); }
+  .later-modal .draft-code{ margin:14px 0 4px; padding:10px 12px; border-radius:var(--radius-sm); background:var(--brand-50); text-align:center; font-size:18px; }
+  .later-x{ position:absolute; top:12px; right:12px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:1px solid var(--line);
+    border-radius:50%; background:var(--surface); color:var(--ink); font-size:22px; line-height:1; cursor:pointer; }
+  .later-x:disabled{ opacity:.4; cursor:not-allowed; }
+  .later-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap; }
+  .later-actions .btn{ min-height:46px; padding:10px 18px; font-size:15px; flex:1 1 150px; }
+  .later-actions .btn:disabled{ opacity:.75; cursor:not-allowed; }
+  .later-wide{ flex-basis:100% !important; }
+  .later-note{ font-size:13px !important; color:var(--ink-faint) !important; }
+  .later-error{ padding:10px 12px; border-radius:var(--radius-sm); background:var(--danger-bg); color:var(--danger) !important; font-weight:600; font-size:14px !important; }
+  .later-spin{ width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; animation:trkSpin .8s linear infinite; }
+  .later-x:focus-visible, .later-actions .btn:focus-visible{ outline:3px solid var(--brand-500); outline-offset:2px; }
+  @media (max-width:1024px), (pointer:coarse){ .later-x{ width:44px; height:44px; } }
+  @media (prefers-reduced-motion: reduce){ .later-backdrop, .later-pop{ animation:none; } }
+
   /* ============ Terms and Conditions popup ============ */
   .terms-backdrop{ position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(10,24,17,.58); }
   .terms-modal{ width:min(100%, 760px); max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); display:flex; flex-direction:column;
@@ -613,7 +639,6 @@
   .draft-panel strong{ color:var(--ink); }
   .draft-code{ display:block; margin:8px 0 10px; font-family:var(--font-mono); font-size:19px; font-weight:700; letter-spacing:.06em; color:var(--ink); overflow-wrap:anywhere; }
   .draft-panel .btn{ min-height:42px; padding:8px 16px; font-size:15px; }
-  .draft-panel-actions{ display:flex; gap:8px; flex-wrap:wrap; }
   .draft-resume{ margin:0 0 28px; padding:18px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px 18px; flex-wrap:wrap;
     background:var(--brand-50); border:1px solid var(--brand-100); border-radius:var(--radius-lg); }
   .draft-resume h3{ font-family:var(--font-body); font-size:18px; font-weight:700; color:var(--ink); }
@@ -795,7 +820,6 @@
     .wizard-card-foot > .btn{ flex:1 1 100px; }
     .foot-actions{ flex:2 1 220px; }
     .foot-actions .btn{ flex:1 1 0; white-space:nowrap; }
-    .wizard-card > .draft-panel{ margin:0 14px 12px; }
 
     /* Receipt, Track Request, popups */
     .confirm-shell{ padding:14px 12px 20px; }
@@ -1499,11 +1523,10 @@ function renderWizard(){
     + renderDraftBar()
     + '<div class="wizard-card">'
       + body
-      + renderDraftPanel()
       + '<div class="wizard-card-foot">'
         + '<button class="btn btn-ghost" data-action="prev-step">'+ic('arrowLeft')+' Back</button>'
         + '<div class="foot-actions">'
-          + (draftServer() && draft.code ? '<button type="button" class="btn btn-ghost draft-later" data-action="draft-later" aria-expanded="'+draft.panel+'">'+(draft.panel?'Hide recovery code':'Continue later')+'</button>' : '')
+          + (draftServer() && draft.code ? '<button type="button" class="btn btn-ghost draft-later" data-action="draft-later" aria-haspopup="dialog">Continue later</button>' : '')
           + (isLast
               ? '<button class="btn btn-primary" data-action="submit">Submit Request '+ic('arrowRight')+'</button>'
               : '<button class="btn btn-primary" data-action="next-step">Next '+ic('arrowRight')+'</button>')
@@ -2102,30 +2125,126 @@ function draftResumeUrl(){ return location.origin + location.pathname + '?resume
 function draftFormatCode(c){ return String(c||'').replace(/(.{5})(?=.)/g, '$1-'); }
 /* The draft gets its code after the first save; add "Continue later" next to
    Next straight away without re-rendering (that would steal the cursor). */
-/* Continue later: show/hide the recovery code and give the button a short
-   "pop". Opening the panel re-renders the footer, so the pop is started on
-   the freshly rendered button; a pop already in progress is not restarted,
-   so rapid clicks never stack or jitter. Draft saving is not affected. */
+/* ---------- Continue later: centered "Save Your Progress?" popup ----------
+   Drawn on its own layer (no re-render of the form, so nothing behind it
+   moves). Save & Continue Later forces a save through the existing draft
+   code (flushDraft), waits for uploads still in flight, and reports success
+   with the recovery code / resume link only once the server confirmed it.
+   While open, the page behind is inert; Escape / Cancel / the backdrop close
+   it except while a save is running. */
 let draftLaterPopUntil = 0;
-function toggleDraftLater(){
-  draft.panel = !draft.panel;
-  render();
-  // Keep the form still: skip the page fade-in that a re-render would replay.
-  const col = document.querySelector('.wizard-col.fade-in'); if(col) col.classList.remove('fade-in');
-  const btn = document.querySelector('.wizard-card-foot [data-action="draft-later"]');
+const laterModal = { el:null, phase:'ask', error:'', returnTo:null };
+function popDraftLaterButton(btn){
   const now = Date.now();
-  if(!btn) return;
-  if(now < draftLaterPopUntil) return;
+  if(!btn || now < draftLaterPopUntil) return;      // a pop in progress is not restarted
   draftLaterPopUntil = now + 300;
   btn.classList.add('pop');
-  setTimeout(function(){ btn.classList.remove('pop'); }, 320);   // also clears it when reduced motion skips the animation
+  setTimeout(function(){ btn.classList.remove('pop'); }, 320);
+}
+function toggleDraftLater(){
+  const btn = document.querySelector('.wizard-card-foot [data-action="draft-later"]');
+  popDraftLaterButton(btn);
+  openLaterModal(btn);
+}
+function openLaterModal(returnTo){
+  if(laterModal.el) return;
+  laterModal.phase = 'ask'; laterModal.error = ''; laterModal.returnTo = returnTo || null;
+  const el = document.createElement('div');
+  el.className = 'later-backdrop';
+  el.addEventListener('mousedown', function(e){ if(e.target===el && laterModal.phase!=='saving') closeLaterModal(); });
+  el.addEventListener('keydown', function(e){
+    if(e.key==='Escape'){ e.preventDefault(); if(laterModal.phase!=='saving') closeLaterModal(); return; }
+    if(e.key!=='Tab') return;
+    const items = Array.prototype.filter.call(el.querySelectorAll('button:not([disabled])'), function(b){ return b.offsetParent!==null; });
+    if(!items.length){ e.preventDefault(); return; }
+    const first = items[0], last = items[items.length-1];
+    if(e.shiftKey && (document.activeElement===first || !el.contains(document.activeElement))){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  });
+  document.body.appendChild(el);
+  laterModal.el = el;
+  const app = document.getElementById('app'); if(app) app.inert = true;
+  document.body.classList.add('later-open');
+  drawLaterModal(true);
+}
+function closeLaterModal(){
+  if(!laterModal.el) return;
+  laterModal.el.remove(); laterModal.el = null;
+  const app = document.getElementById('app'); if(app) app.inert = false;
+  document.body.classList.remove('later-open');
+  const back = laterModal.returnTo && document.contains(laterModal.returnTo) ? laterModal.returnTo : document.querySelector('.wizard-card-foot [data-action="draft-later"]');
+  if(back) back.focus();
+}
+function drawLaterModal(first){
+  const el = laterModal.el; if(!el) return;
+  const ph = laterModal.phase;
+  let body = '';
+  if(ph==='saved'){
+    body = '<h2 id="later-title">Progress saved</h2>'
+      + '<p id="later-desc">Your application is saved. Use this code or link to continue on any device. Keep it private — anyone with it can open this application.</p>'
+      + '<span class="draft-code">'+esc(draftFormatCode(draft.code))+'</span>'
+      + '<div class="later-actions"><button type="button" class="btn btn-ghost" data-later="copy-code">Copy code</button><button type="button" class="btn btn-primary" data-later="copy-link">Copy resume link</button></div>'
+      + '<p class="later-note">Saved applications are kept for 7 days after your last change.</p>'
+      + '<div class="later-actions"><button type="button" class="btn btn-ghost later-wide" data-later="done">Done</button></div>';
+  } else {
+    body = '<h2 id="later-title">Save Your Progress?</h2>'
+      + '<p id="later-desc">We’ll save what you’ve entered so far, including uploaded documents, so you can come back and finish your application later.</p>'
+      + (ph==='error' ? '<p class="later-error" role="alert">'+esc(laterModal.error)+'</p>' : '')
+      + '<div class="later-actions"><button type="button" class="btn btn-ghost" data-later="cancel"'+(ph==='saving'?' disabled':'')+'>Cancel</button>'
+      + '<button type="button" class="btn btn-primary" data-later="save"'+(ph==='saving'?' disabled aria-busy="true"':'')+'>'+(ph==='saving' ? '<span class="later-spin" aria-hidden="true"></span>Saving…' : (ph==='error' ? 'Try again' : 'Save &amp; Continue Later'))+'</button></div>';
+  }
+  el.innerHTML = '<div class="later-modal'+(first?' later-pop':'')+'" role="dialog" aria-modal="true" aria-labelledby="later-title" aria-describedby="later-desc">'
+    + '<button type="button" class="later-x" data-later="cancel" aria-label="Close"'+(ph==='saving'?' disabled':'')+'>&times;</button>'+body+'</div>'
+    + '<span class="trk-sr" role="status" aria-live="polite">'+(ph==='saving'?'Saving your progress…':(ph==='saved'?'Progress saved.':''))+'</span>';
+  el.querySelectorAll('[data-later]').forEach(function(b){
+    b.addEventListener('click', function(){
+      const a = b.getAttribute('data-later');
+      if(a==='cancel' || a==='done') closeLaterModal();
+      else if(a==='save') saveAndContinueLater();
+      else if(a==='copy-code') draftCopy(b, draftFormatCode(draft.code));
+      else if(a==='copy-link') draftCopy(b, draftResumeUrl());
+    });
+  });
+  const focusTarget = el.querySelector(ph==='saved' ? '[data-later="copy-link"]' : (ph==='saving' ? '.later-modal' : '[data-later="save"]'));
+  if(ph==='saving') el.querySelector('.later-modal').setAttribute('tabindex','-1');
+  if(focusTarget) focusTarget.focus();
+}
+function saveAndContinueLater(){
+  if(laterModal.phase==='saving') return;           // no duplicate saves
+  laterModal.phase = 'saving'; laterModal.error = ''; drawLaterModal(false);
+  const sleep = function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
+  draft.revision += 1;                              // force a fresh save of the current form
+  draftLocalWrite();
+  const settle = function(){
+    if(draft.inflight) return draft.inflight.then(settle);
+    if(Object.keys(draft.uploads).length) return sleep(150).then(settle);
+    return Promise.resolve();
+  };
+  const started = Date.now();
+  Promise.resolve(flushDraft()).then(function(){ return Promise.race([settle(), sleep(20000)]); }).then(function(){
+    // keep "Saving…" visible briefly so the feedback is noticeable
+    return sleep(Math.max(0, 350 - (Date.now() - started)));
+  }).then(function(){
+    if(!laterModal.el) return;
+    const failedUploads = Object.keys(draft.files).filter(function(k){ return draft.files[k]==='failed'; }).length;
+    if(draft.status==='saved' && draft.code && !failedUploads){ laterModal.phase = 'saved'; }
+    else {
+      laterModal.phase = 'error';
+      laterModal.error = draft.status==='offline' || navigator.onLine===false
+        ? 'You appear to be offline, so your progress could not be saved to the server yet. It is still kept on this device. Check your connection and try again.'
+        : (failedUploads ? 'Some documents could not be saved yet. Check your connection and try again.'
+        : (draft.status==='local' ? 'Saving to the server is not available right now. Your progress is kept on this device only.'
+        : 'Your progress could not be saved right now. Please try again.'));
+    }
+    drawLaterModal(false);
+  });
 }
 function showDraftLaterButton(){
   const actions = document.querySelector('.wizard-card-foot .foot-actions');
   if(!actions || actions.querySelector('[data-action="draft-later"]') || !draftServer() || !draft.code) return;
   const btn = document.createElement('button');
   btn.type = 'button'; btn.className = 'btn btn-ghost draft-later';
-  btn.setAttribute('data-action', 'draft-later'); btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('data-action', 'draft-later'); btn.setAttribute('aria-haspopup', 'dialog');
   btn.textContent = 'Continue later';
   btn.addEventListener('click', toggleDraftLater);
   actions.insertBefore(btn, actions.firstChild);
@@ -2135,14 +2254,6 @@ function renderDraftBar(){
     + '</div>'
     + (draft.notice ? '<div class="draft-panel" role="alert">'+esc(draft.notice)+'</div>' : '')
     ;
-}
-/* Recovery code panel, shown above the footer when Continue later is open. */
-function renderDraftPanel(){
-  return ''
-    + (draft.panel && draft.code ? '<div class="draft-panel"><strong>Continue later on any device</strong><br>Keep this recovery code or link private. Anyone with it can open this application.'
-        + '<span class="draft-code">'+esc(draftFormatCode(draft.code))+'</span>'
-        + '<div class="draft-panel-actions"><button type="button" class="btn btn-primary" data-action="draft-copy-link">Copy resume link</button><button type="button" class="btn btn-ghost" data-action="draft-copy-code">Copy code</button></div>'
-        + '<p class="field-hint" style="margin-top:10px">Saved applications are kept for 7 days after your last change.</p></div>' : '');
 }
 function renderResumeCard(){
   const d = draftLocalRead();
@@ -2452,7 +2563,6 @@ function bindEvents(root){
       else if(a==='save-tracking') saveTrackingNumber();
       else if(a==='copy-tracking') copyTrackingNumber(el);
       else if(a==='draft-later') toggleDraftLater();
-      else if(a==='draft-copy-link' || a==='draft-copy-code') draftCopy(el, a==='draft-copy-link' ? draftResumeUrl() : draftFormatCode(draft.code));
       else if(a==='draft-resume') resumeDraft('');
       else if(a==='draft-discard'){ if(confirm('Discard your unfinished application? This cannot be undone.')){ discardDraft(); render(); } }
       else if(a==='view-status') viewSubmittedStatus();
