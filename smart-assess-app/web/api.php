@@ -797,6 +797,13 @@ function sa_submit_request(array $data): array
                 );
             }
         }
+        // Confirmation SMS to the number on the request; also never fatal.
+        sa_sms_notify(
+            ['id' => $requestId, 'client_id' => $client['id'] ?? null, 'contact_number' => $values['contact_number']],
+            'sms_request_received',
+            SA_SMS_PREFIX . 'We received your ' . ($flow === 'docreq' ? 'Document Request' : 'Land Transfer request')
+                . ' ' . $reference . '. Track its status at smartassessmabini.com.'
+        );
 
         return ['reference_no' => $reference, 'status' => 'Received'];
     } catch (Throwable $exception) {
@@ -843,7 +850,7 @@ function sa_update_request_status(array $data): array
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare(
-            'SELECT id, client_id, reference_no, status, processing_started_at, processing_staff_id
+            'SELECT id, client_id, reference_no, contact_number, status, processing_started_at, processing_staff_id
              FROM requests WHERE id = :id FOR UPDATE'
         );
         $stmt->execute(['id' => $id]);
@@ -875,6 +882,11 @@ function sa_update_request_status(array $data): array
             ->execute(['user' => $user['id'], 'action' => 'Updated status to ' . $status, 'request' => $id]);
         sa_audit('staff', (int) $user['id'], (string) $user['name'], 'Request status changed', $request['reference_no']);
         $pdo->commit();
+        // SMS only when the status really changed (not for advisory-only saves).
+        $smsText = $request['status'] !== $status ? sa_sms_status_message($status, (string) $request['reference_no']) : null;
+        if ($smsText !== null) {
+            sa_sms_notify($request, 'sms_status_update', $smsText);
+        }
         return ['request_id' => (int) $id, 'status' => $status];
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
@@ -921,7 +933,7 @@ function sa_start_request_processing(array $data): array
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare(
-            'SELECT id, client_id, reference_no, status, processing_started_at,
+            'SELECT id, client_id, reference_no, contact_number, status, processing_started_at,
                     processing_completed_at, processing_duration_seconds,
                     processing_staff_id, processing_staff_name
              FROM requests WHERE id = :id FOR UPDATE'
@@ -934,6 +946,8 @@ function sa_start_request_processing(array $data): array
         if (in_array($request['status'], ['Approved', 'Rejected', 'Out for Release', 'Timed Out'], true)) {
             throw new SaHttpException(409, 'Processing cannot be started for a closed request.');
         }
+        $sendStartSms = false;
+        $previousStatus = (string) $request['status'];
         if ($request['processing_staff_id'] !== null &&
             (int) $request['processing_staff_id'] !== (int) $user['id']) {
             throw new SaHttpException(409, 'This request has already been accepted by another staff member.');
@@ -979,6 +993,7 @@ function sa_start_request_processing(array $data): array
                     'action' => 'Accepted request and started processing',
                     'request' => $id,
                 ]);
+            $sendStartSms = $isNewStart && $previousStatus !== 'Processing';
             if ($isNewStart && $request['client_id'] !== null) {
                 $pdo->prepare(
                     "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
@@ -1006,6 +1021,9 @@ function sa_start_request_processing(array $data): array
         $stmt->execute(['id' => $id]);
         $timing = $stmt->fetch();
         $pdo->commit();
+        if ($sendStartSms) {
+            sa_sms_notify($request, 'sms_status_update', (string) sa_sms_status_message('Processing', (string) $request['reference_no']));
+        }
         return ['request_id' => $id, 'status' => $request['status']] + $timing;
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
@@ -1027,7 +1045,7 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare(
-            'SELECT id, client_id, reference_no, status, processing_started_at,
+            'SELECT id, client_id, reference_no, contact_number, status, processing_started_at,
                     processing_completed_at, processing_duration_seconds,
                     processing_staff_id, processing_staff_name
              FROM requests WHERE id = :id FOR UPDATE'
@@ -1037,6 +1055,7 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
         if (!$request) {
             throw new SaHttpException(404);
         }
+        $sendCompleteSms = false;
         if ($request['processing_started_at'] === null) {
             throw new SaHttpException(409, 'Start processing before completing this request.');
         }
@@ -1100,12 +1119,16 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
                 ]);
             }
             sa_audit('staff', (int) $user['id'], (string) $user['name'], 'Request processing completed', $request['reference_no']);
+            $sendCompleteSms = true;   // first completion only; repeats send nothing
             $request['status'] = $status;
             $request['processing_completed_at'] = $timing['processing_completed_at'];
             $request['processing_completed_epoch'] = $timing['processing_completed_epoch'];
             $request['processing_duration_seconds'] = $timing['processing_duration_seconds'];
         }
         $pdo->commit();
+        if ($sendCompleteSms) {
+            sa_sms_notify($request, 'sms_status_update', (string) sa_sms_status_message($status, (string) $request['reference_no']));
+        }
         return [
             'request_id' => $id,
             'status' => $request['status'],
@@ -1124,51 +1147,236 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
     }
 }
 
+const SA_SMS_PREFIX = "SMART ASSESS - Mabini Assessor's Office: ";
+
+/** SMS is off unless the server sets SMART_ASSESS_SMS_ENABLED to 1/true/yes/on. */
+function sa_sms_enabled(): bool
+{
+    $value = getenv('SMART_ASSESS_SMS_ENABLED');
+    return $value !== false && in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
+}
+
+/** Loads IprogSmsService if its file exists; false instead of a fatal error. */
+function sa_sms_load_service(): bool
+{
+    if (!class_exists('IprogSmsService', false)) {
+        $path = dirname(__DIR__) . '/iprog-sms.php';
+        if (!is_file($path)) {
+            return false;
+        }
+        require_once $path;
+    }
+    return class_exists('IprogSmsService', false);
+}
+
+/**
+ * One IPROG SMS attempt, never retried. Returns 'sent' (IPROG accepted it; not
+ * proof it reached the phone), 'failed' (definitely not sent: SMS not
+ * configured, invalid/unsupported number, or IPROG refused it) or 'pending'
+ * (outcome unknown: timeout, server error, unrecognised reply). The log line
+ * holds only $context and the outcome, never the token, number or message.
+ */
+function sa_sms_deliver(string $phoneNumber, string $message, string $context): string
+{
+    $reason = null;
+    try {
+        if (!sa_sms_load_service()) {
+            throw new RuntimeException('SMS service file missing.');
+        }
+        IprogSmsService::fromEnvironment()->send($phoneNumber, $message);
+        return 'sent';
+    } catch (IprogSmsException $exception) {
+        $outcome = $exception->outcome() === IprogSmsException::REJECTED ? 'failed' : 'pending';
+        $reason = $outcome === 'failed' ? 'IPROG did not accept it' : 'IPROG did not confirm it';
+    } catch (InvalidArgumentException) {
+        $outcome = 'failed';
+        $reason = 'invalid or unsupported recipient number or message';
+    } catch (RuntimeException) {
+        $outcome = 'failed';
+        $reason = 'SMS service not configured or unavailable';
+    } catch (Throwable) {
+        $outcome = 'pending';
+        $reason = 'unexpected error';
+    }
+    error_log('[SMART_ASSESS_SMS] ' . $context . '; outcome ' . $outcome . ' (' . $reason . ').');
+    return $outcome;
+}
+
+/**
+ * Automatic SMS to the number on a request, sent only AFTER the request or
+ * status change has been committed, so an SMS problem never undoes it. The
+ * attempt is saved as a 'pending' notifications row (channel 'sms') first and
+ * then updated with the outcome; if it cannot be saved, nothing is sent.
+ * Never throws.
+ */
+function sa_sms_notify(array $request, string $type, string $message): string
+{
+    if (!sa_sms_enabled()) {
+        return 'disabled';   // switched off: nothing is recorded or sent
+    }
+    $context = 'request ID ' . (int) $request['id'] . '; ' . $type;
+    try {
+        $pdo = sa_db();
+        $pdo->prepare(
+            "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
+             VALUES (:client_id, :request_id, :type, :message, 'sms', 'pending')"
+        )->execute([
+            'client_id' => $request['client_id'] ?? null,
+            'request_id' => (int) $request['id'],
+            'type' => $type,
+            'message' => $message,
+        ]);
+        $notificationId = (int) $pdo->lastInsertId();
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS_SMS] ' . $context . '; not sent: the SMS record could not be saved.');
+        return 'failed';
+    }
+    $outcome = sa_sms_deliver((string) ($request['contact_number'] ?? ''), $message, $context);
+    try {
+        $pdo->prepare('UPDATE notifications SET delivery_status = :status WHERE id = :id')
+            ->execute(['status' => $outcome, 'id' => $notificationId]);
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS_SMS] ' . $context . '; outcome ' . $outcome . ' could not be saved; notification ID ' . $notificationId . ' remains pending.');
+        return 'pending';
+    }
+    return $outcome;
+}
+
+/** Client SMS text for a status staff set, or null when that status sends none. */
+function sa_sms_status_message(string $status, string $reference): ?string
+{
+    $text = match ($status) {
+        'Processing' => 'Your request ' . $reference . ' is now being processed.',
+        'Approved' => 'Your request ' . $reference . ' has been approved.',
+        'Out for Release' => 'Your request ' . $reference . ' is ready. Please claim it at the Municipal Assessor\'s Office during office hours.',
+        'Rejected' => 'Your request ' . $reference . ' was not approved. Please contact or visit the Municipal Assessor\'s Office for details.',
+        'Timed Out' => 'Your request ' . $reference . ' has timed out. Please contact the Municipal Assessor\'s Office.',
+        default => null,   // e.g. back to Received: no SMS
+    };
+    return $text === null ? null : SA_SMS_PREFIX . $text;
+}
+
+/**
+ * Staff SMS notification through IPROG SMS. The attempt is recorded as
+ * 'pending' before IPROG is contacted, so a failed database write never sends
+ * an unrecorded SMS. IPROG is called once and never retried; the row then
+ * becomes 'sent' (IPROG accepted it; not proof it reached the phone), 'failed'
+ * (IPROG definitely did not take it) or stays 'pending' (outcome unknown).
+ * The token, phone number and message are never logged or returned.
+ */
 function sa_send_notification(array $data): array
 {
     $user = sa_internal_or_fail(['STAFF']);
+    $pdo = sa_db();
     $requestId = filter_var($data['request_id'] ?? null, FILTER_VALIDATE_INT);
     if (!$requestId && isset($data['request_ref'])) {
-        $lookup = sa_db()->prepare('SELECT id FROM requests WHERE reference_no = :ref');
-        $lookup->execute(['ref' => strtoupper((string) $data['request_ref'])]);
+        $lookup = $pdo->prepare('SELECT id FROM requests WHERE reference_no = :ref');
+        $lookup->execute(['ref' => strtoupper(trim((string) $data['request_ref']))]);
         $requestId = filter_var($lookup->fetchColumn(), FILTER_VALIDATE_INT);
     }
     $message = sa_text($data, 'message', 2000, true);
     $category = sa_notification_category($data);
     if (!$requestId) {
-        throw new SaHttpException(422);
+        throw new SaHttpException(422, 'Select a valid request reference number.');
     }
-    $pdo = sa_db();
-    $stmt = $pdo->prepare('SELECT id, client_id FROM requests WHERE id = :id');
+    if (trim($message) === '' || strlen($message) > 1000) {
+        throw new SaHttpException(422, 'The SMS message is too long. Shorten it to about 1,000 characters (fewer if it has accented letters) and try again.');
+    }
+    if (!sa_has_column('request_status_log', 'delivery_status') || !sa_has_column('request_status_log', 'sms_sent_by_id')) {
+        throw new SaHttpException(503, 'SMS sending is not set up yet: the database update for SMS delivery status has not been run. Contact the administrator.');
+    }
+    if (!sa_sms_enabled()) {
+        throw new SaHttpException(503, 'SMS sending is currently turned off. Contact the administrator.');
+    }
+    try {
+        if (!sa_sms_load_service()) {
+            throw new RuntimeException('SMS service file missing.');
+        }
+        IprogSmsService::fromEnvironment();   // configured? (checked before anything is saved)
+    } catch (RuntimeException) {
+        throw new SaHttpException(503, 'SMS sending is not set up yet: the SMS service is not configured on the server. Contact the administrator.');
+    }
+
+    $stmt = $pdo->prepare('SELECT id, client_id, status, reference_no, contact_number FROM requests WHERE id = :id');
     $stmt->execute(['id' => $requestId]);
     $request = $stmt->fetch();
     if (!$request) {
-        throw new SaHttpException(404);
+        throw new SaHttpException(404, 'The selected request was not found.');
     }
-    $notificationId = null;
-    if ($request['client_id'] !== null) {
+    try {
+        IprogSmsService::normalizePhoneNumber((string) $request['contact_number']);
+    } catch (InvalidArgumentException) {
+        throw new SaHttpException(422, 'This request does not have a valid Philippine mobile number, so no SMS was sent. Check the contact number on the request.');
+    }
+
+    // Record the attempt first (one transaction). If this fails, nothing is sent.
+    $pdo->beginTransaction();
+    try {
         $insert = $pdo->prepare(
             "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
-             VALUES (:client, :request, 'staff_message', :message, 'system', 'sent')"
+             VALUES (:client, :request, 'staff_message', :message, 'sms', 'pending')"
         );
         $insert->execute(['client' => $request['client_id'], 'request' => $requestId, 'message' => $message]);
         $notificationId = (int) $pdo->lastInsertId();
+        $columns = 'request_id, status, actor, sms_body, delivery_status, sms_sent_by_id';
+        $values = ":request_id, :status, 'staff', :message, 'pending', :sent_by";
+        $params = ['request_id' => $requestId, 'status' => $request['status'], 'message' => $message, 'sent_by' => (int) $user['id']];
+        if ($category !== null && sa_has_column('request_status_log', 'sms_category')) {
+            $columns .= ', sms_category';
+            $values .= ', :category';
+            $params['category'] = $category;
+        }
+        $log = $pdo->prepare("INSERT INTO request_status_log ($columns) VALUES ($values)");
+        $log->execute($params);
+        $logId = (int) $pdo->lastInsertId();
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
     }
-    if ($category !== null && sa_has_column('request_status_log', 'sms_category')) {
-        $log = $pdo->prepare(
-            "INSERT INTO request_status_log (request_id, status, actor, sms_body, sms_category)
-             SELECT id, status, 'staff', :message, :category FROM requests WHERE id = :request_id"
-        );
-        $log->execute(['message' => $message, 'category' => $category, 'request_id' => $requestId]);
-    } else {
-        $log = $pdo->prepare(
-            "INSERT INTO request_status_log (request_id, status, actor, sms_body)
-             SELECT id, status, 'staff', :message FROM requests WHERE id = :request_id"
-        );
-        $log->execute(['message' => $message, 'request_id' => $requestId]);
+
+    // One attempt only, outside any transaction.
+    $deliveryStatus = sa_sms_deliver((string) $request['contact_number'], $message, 'request ID ' . (int) $requestId . '; sms_staff_message');
+
+    // Save the outcome. If this fails the rows stay 'pending', which is still
+    // true ("not confirmed"), and staff are told so below.
+    $recorded = true;
+    try {
+        $pdo->prepare('UPDATE request_status_log SET delivery_status = :status WHERE id = :id')
+            ->execute(['status' => $deliveryStatus, 'id' => $logId]);
+        $pdo->prepare('UPDATE notifications SET delivery_status = :status WHERE id = :id')
+            ->execute(['status' => $deliveryStatus, 'id' => $notificationId]);
+    } catch (Throwable) {
+        $recorded = false;
+        error_log('[SMART_ASSESS_SMS] Could not save the SMS outcome; log ID ' . $logId . ' remains pending; outcome ' . $deliveryStatus . '.');
     }
-    sa_audit('staff', (int) $user['id'], (string) $user['name'], 'Client notification sent', (string) $requestId);
-    return ['request_id' => (int) $requestId, 'notification_id' => $notificationId];
+    try {
+        sa_audit('staff', (int) $user['id'], (string) $user['name'], match ($deliveryStatus) {
+            'sent' => 'Client SMS accepted by IPROG',
+            'failed' => 'Client SMS rejected by IPROG',
+            default => 'Client SMS outcome unconfirmed',
+        }, (string) $requestId);
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS_SMS] Could not write the audit entry; log ID ' . $logId . '.');
+    }
+
+    $feedback = match ($deliveryStatus) {
+        'sent' => 'IPROG accepted the SMS for sending. This does not confirm that it reached the client’s phone.',
+        'failed' => 'The SMS was not sent: IPROG did not accept it. It is saved as Failed in the history. Check the message and contact number, then try again.',
+        default => 'The SMS outcome is unconfirmed (no clear answer from IPROG). It is saved as Pending. Check the IPROG account before sending again, so the client does not get it twice.',
+    };
+    if (!$recorded) {
+        $feedback .= ' The history could not be updated, so this message shows as Pending there.';
+    }
+
+    return [
+        'request_id' => (int) $requestId,
+        'notification_id' => $notificationId,
+        'delivery_status' => $recorded ? $deliveryStatus : 'pending',
+        'feedback' => $feedback,
+    ];
 }
 
 function sa_lookup_request_owner(array $data): array

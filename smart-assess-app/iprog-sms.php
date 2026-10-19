@@ -1,8 +1,33 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * A send that did not succeed. outcome() tells callers whether IPROG
+ * definitely did not take the message (REJECTED) or whether it may still have
+ * been accepted (UNCERTAIN: timeouts, dropped connections, server errors,
+ * unrecognised replies). An UNCERTAIN send must never be retried automatically.
+ */
+final class IprogSmsException extends RuntimeException
+{
+    public const REJECTED = 'rejected';
+    public const UNCERTAIN = 'uncertain';
+
+    public function __construct(string $message, private readonly string $outcome)
+    {
+        parent::__construct($message);
+    }
+
+    public function outcome(): string
+    {
+        return $this->outcome;
+    }
+}
+
 final class IprogSmsService
 {
+    /** cURL errors raised before the request reaches IPROG (DNS, connect, TLS). */
+    private const NOT_SENT_CURL_ERRORS = [6, 7, 35, 51, 58, 60, 77];
+
     private const ENDPOINT = 'https://www.iprogsms.com/api/v1/sms_messages';
 
     private function __construct(private readonly string $apiToken)
@@ -25,10 +50,10 @@ final class IprogSmsService
     public static function normalizePhoneNumber(string $phoneNumber): string
     {
         $phoneNumber = trim($phoneNumber);
-        if (preg_match('/^63\d{10}$/', $phoneNumber)) {
+        if (preg_match('/^639\d{9}$/', $phoneNumber)) {
             return $phoneNumber;
         }
-        if (preg_match('/^\+63\d{10}$/', $phoneNumber)) {
+        if (preg_match('/^\+639\d{9}$/', $phoneNumber)) {
             return substr($phoneNumber, 1);
         }
         if (preg_match('/^09\d{9}$/', $phoneNumber)) {
@@ -77,13 +102,23 @@ final class IprogSmsService
 
         if ($body === false || $curlError !== 0) {
             error_log('[IPROG_SMS] Transport failure; cURL error code ' . $curlError . '.');
-            throw new RuntimeException('IPROG SMS request failed.');
+            throw new IprogSmsException(
+                'IPROG SMS request failed.',
+                in_array($curlError, self::NOT_SENT_CURL_ERRORS, true)
+                    ? IprogSmsException::REJECTED
+                    : IprogSmsException::UNCERTAIN
+            );
         }
 
         $response = json_decode($body, true);
         if (!is_array($response)) {
             error_log('[IPROG_SMS] Invalid JSON response; HTTP ' . $httpStatus . '.');
-            throw new RuntimeException('IPROG SMS returned an invalid response.');
+            throw new IprogSmsException(
+                'IPROG SMS returned an invalid response.',
+                $httpStatus >= 400 && $httpStatus < 500
+                    ? IprogSmsException::REJECTED
+                    : IprogSmsException::UNCERTAIN
+            );
         }
 
         $providerStatusValue = $response['status'] ?? null;
@@ -92,7 +127,11 @@ final class IprogSmsService
         $messageId = $response['message_id'] ?? $data['message_id'] ?? null;
         $messageId = is_scalar($messageId) ? (string) $messageId : null;
 
-        if ($httpStatus < 200 || $httpStatus >= 300 || strtolower($providerStatus) !== 'success') {
+        // IPROG's documented success body for sms_messages is
+        // {"status": 200, "message": "...", "message_id": "iSms-..."}: status is
+        // the integer 200, not "success". Anything else is treated as a rejection.
+        $providerAccepted = $providerStatusValue === 200 || $providerStatusValue === '200';
+        if ($httpStatus < 200 || $httpStatus >= 300 || !$providerAccepted) {
             $safeStatus = preg_replace('/[^A-Za-z0-9_-]/', '', $providerStatus) ?? '';
             $safeProviderMessage = $this->safeProviderMessage(
                 $response['message'] ?? null,
@@ -100,19 +139,25 @@ final class IprogSmsService
                 $normalizedPhoneNumber,
                 $message
             );
+            $outcome = self::rejectionOutcome($httpStatus, $providerStatusValue);
+            $summary = $outcome === IprogSmsException::REJECTED
+                ? 'rejected the request'
+                : 'did not confirm the request (it may still have been queued)';
             error_log(sprintf(
-                '[IPROG_SMS] Provider rejected request; HTTP %d, status %s, message: %s',
+                '[IPROG_SMS] Provider %s; HTTP %d, status %s, message: %s',
+                $summary,
                 $httpStatus,
                 $safeStatus,
                 $safeProviderMessage
             ));
 
-            throw new RuntimeException(sprintf(
-                'IPROG SMS rejected the request (HTTP %d; provider status %s): %s',
+            throw new IprogSmsException(sprintf(
+                'IPROG SMS %s (HTTP %d; provider status %s): %s',
+                $summary,
                 $httpStatus,
                 $safeStatus !== '' ? $safeStatus : 'unavailable',
                 $safeProviderMessage
-            ));
+            ), $outcome);
         }
 
         return [
@@ -120,6 +165,32 @@ final class IprogSmsService
             'provider_status' => $providerStatus,
             'message_id' => $messageId,
         ];
+    }
+
+    /**
+     * IPROG documents only the success body, so a refusal is treated as
+     * definite only when it is explicit: an HTTP 4xx, or an HTTP 2xx whose body
+     * status is an error code (400 or above) or the word "error"/"failed".
+     * HTTP 5xx and any other body status (e.g. an undocumented "success") may
+     * still have been queued, so they are UNCERTAIN.
+     */
+    private static function rejectionOutcome(int $httpStatus, mixed $providerStatusValue): string
+    {
+        if ($httpStatus >= 400 && $httpStatus < 500) {
+            return IprogSmsException::REJECTED;
+        }
+        if ($httpStatus >= 200 && $httpStatus < 300) {
+            if (is_int($providerStatusValue) || (is_string($providerStatusValue) && ctype_digit($providerStatusValue))) {
+                if ((int) $providerStatusValue >= 400) {
+                    return IprogSmsException::REJECTED;
+                }
+            } elseif (is_string($providerStatusValue)
+                && in_array(strtolower($providerStatusValue), ['error', 'failed', 'fail'], true)) {
+                return IprogSmsException::REJECTED;
+            }
+        }
+
+        return IprogSmsException::UNCERTAIN;
     }
 
     private function safeProviderMessage(

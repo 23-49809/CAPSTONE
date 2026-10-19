@@ -16,9 +16,16 @@
   };
   window.SMART_ASSESS_NOTICE = notice;
 
-  function notice(message) {
+  function notice(message, tone) {
     var node = document.createElement('div');
     node.className = 'login-error';
+    if (tone === 'sent') {
+      node.style.color = 'var(--success)';
+      node.style.background = 'var(--success-bg)';
+    } else if (tone === 'pending') {
+      node.style.color = 'var(--warn)';
+      node.style.background = 'var(--warn-bg)';
+    }
     node.setAttribute('role', 'alert');
     node.textContent = message;
     node.style.position = 'fixed';
@@ -28,7 +35,22 @@
     node.style.transform = 'translateX(-50%)';
     node.style.maxWidth = 'min(560px, calc(100vw - 32px))';
     document.body.appendChild(node);
-    window.setTimeout(function () { node.remove(); }, 6000);
+    window.setTimeout(function () { node.remove(); }, tone ? 12000 : 6000);
+  }
+
+  // SMS result shown after the page reloads (internalSuccess redirects).
+  var SMS_FEEDBACK_KEY = 'smartAssessSmsFeedback';
+  function showStoredSmsFeedback() {
+    var stored = null;
+    try {
+      stored = JSON.parse(sessionStorage.getItem(SMS_FEEDBACK_KEY) || 'null');
+      sessionStorage.removeItem(SMS_FEEDBACK_KEY);
+    } catch (error) {
+      stored = null;
+    }
+    if (stored && typeof stored.text === 'string' && stored.text) {
+      notice(stored.text, ['sent', 'failed', 'pending'].indexOf(stored.tone) > -1 ? stored.tone : 'pending');
+    }
   }
 
   function currentInternalView() {
@@ -185,7 +207,15 @@
   }
 
   function internalSuccess(action, data) {
-    return jsonRequest(action, data).then(function () {
+    return jsonRequest(action, data).then(function (result) {
+      var outcome = result && result.data;
+      if (action === 'send_notification' && outcome && outcome.feedback) {
+        try {
+          sessionStorage.setItem(SMS_FEEDBACK_KEY, JSON.stringify({ tone: outcome.delivery_status, text: outcome.feedback }));
+        } catch (error) {
+          window.alert(outcome.feedback);
+        }
+      }
       var view = currentInternalView();
       window.location.assign('/internal.php?view=' + encodeURIComponent(view));
     }).catch(function (error) {
@@ -641,6 +671,7 @@
   }
 
   if (config.portal === 'internal') {
+    showStoredSmsFeedback();
     var internalApp = document.getElementById('app');
     if (internalApp) {
       internalApp.addEventListener('click', function (event) {
