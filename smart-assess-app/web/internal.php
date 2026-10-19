@@ -224,7 +224,14 @@ $page['notifs'] = array_map(static function (array $notification): array {
         'clientName' => $clientName !== '' ? $clientName : 'Client information unavailable',
         'category' => trim((string) ($notification['sms_category'] ?? '')) ?: 'Request Status Update',
         'message' => (string) ($notification['message'] ?? ''),
-        'sentBy' => (string) ($notification['actor'] ?? 'system'),
+        'sentBy' => trim((string) ($notification['sent_by_name'] ?? '')) ?: (string) ($notification['actor'] ?? 'system'),
+        // NULL = saved before IPROG sending existed (no SMS status).
+        'deliveryStatus' => match ((string) ($notification['delivery_status'] ?? '')) {
+            'sent' => 'Sent',
+            'failed' => 'Failed',
+            'pending' => 'Pending',
+            default => 'Recorded',
+        },
         'sentAt' => (string) ($notification['created_at'] ?? ''),
     ];
 }, $page['notifications'] ?? []);

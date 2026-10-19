@@ -673,6 +673,9 @@
   .sent-item.expanded .si-chev{ transform:rotate(90deg); }
   .si-side{ display:flex; flex-direction:column; align-items:flex-end; gap:8px; align-self:start; }
   .si-pill{ font-size:12px; font-weight:600; padding:3px 12px; border-radius:999px; background:var(--success-bg); color:var(--success); }
+  .si-pill.si-failed{ background:var(--danger-bg); color:var(--danger); }
+  .si-pill.si-pending{ background:var(--warn-bg); color:var(--warn); }
+  .si-pill.si-recorded{ background:var(--surface-2, #eef1ef); color:var(--ink-soft, #55625b); }
   .si-side time{ font-size:12px; color:var(--ink-faint); white-space:nowrap; }
   .si-chev{ color:var(--ink-faint); display:flex; transition:transform .15s ease; }
   .sent-list .empty-state{ padding:40px 10px; }
@@ -2656,13 +2659,19 @@ function renderNotifications(acct){
   var pg = paginate(list, 'sentNotifs', perPage);
   var items = pg.items.map(function(n){
     var name = n.clientName || n.applicant || 'Client information unavailable';
-    var status = n.deliveryStatus || 'Sent';
+    var status = n.deliveryStatus || 'Recorded';
+    var pillTone = {Sent:'sent', Failed:'failed', Pending:'pending'}[status] || 'recorded';
+    var pillTitle = {
+      Sent:'Accepted by IPROG for sending. This does not confirm it reached the phone.',
+      Failed:'IPROG did not accept this SMS. It was not sent.',
+      Pending:'Outcome unconfirmed. Check the IPROG account before sending again.'
+    }[status] || 'Saved before SMS sending was enabled. No SMS status is available.';
     return '<div class="sent-item" role="button" tabindex="0" aria-expanded="false" data-action="toggle-sent-item">'
       + '<div class="si-main"><div class="si-title">'+esc(notifCategoryName(n.category)||'Notification')+'</div>'
         + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')</div>'
         + '<div class="si-msg">'+esc(n.message)+'</div>'
         + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div></div>'
-      + '<div class="si-side"><span class="si-pill">'+esc(status)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
+      + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(status)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
       + '<span class="si-chev" aria-hidden="true">'+ic('chevRight','16px')+'</span></div>';
   }).join('');
   var pager = pg.totalPages > 1

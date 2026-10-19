@@ -386,15 +386,19 @@ function sa_internal_bootstrap(): array
     }
 
     $smsCategory = sa_has_column('request_status_log', 'sms_category') ? 'l.sms_category' : 'NULL';
+    $deliveryStatus = sa_has_column('request_status_log', 'delivery_status') ? 'l.delivery_status' : 'NULL';
+    $hasSentBy = sa_has_column('request_status_log', 'sms_sent_by_id');
     $notificationsQuery = $pdo->prepare(
         'SELECT l.id, l.request_id, l.status, l.actor, l.sms_body AS message,
-                ' . $smsCategory . ' AS sms_category, l.created_at, r.reference_no,
+                ' . $smsCategory . ' AS sms_category, ' . $deliveryStatus . ' AS delivery_status,
+                ' . ($hasSentBy ? 'u.name' : 'NULL') . ' AS sent_by_name, l.created_at, r.reference_no,
                 NULLIF(TRIM(CONCAT_WS(
                     \' \', NULLIF(c.first_name, \'\'), NULLIF(c.last_name, \'\')
                 )), \'\') AS client_name
          FROM request_status_log l
          LEFT JOIN requests r ON r.id = l.request_id
          LEFT JOIN clients c ON c.id = r.client_id
+         ' . ($hasSentBy ? 'LEFT JOIN users u ON u.id = l.sms_sent_by_id' : '') . '
          ORDER BY l.created_at DESC, l.id DESC LIMIT 200'
     );
     $notificationsQuery->execute();
