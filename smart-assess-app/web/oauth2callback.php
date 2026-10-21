@@ -1,4 +1,11 @@
 <?php
+// One-time Gmail authorization tool (redirects to the local dev server). It
+// replaces the office's Gmail token, so it is disabled unless the server sets
+// SMART_ASSESS_GMAIL_SETUP=1 for the setup session; otherwise it does not exist.
+if (getenv('SMART_ASSESS_GMAIL_SETUP') !== '1') {
+    http_response_code(404);
+    exit;
+}
 session_start();
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
@@ -29,11 +36,11 @@ if (!isset($_GET['code']) || !is_string($_GET['code'])) {
     exit('Missing authorization code.');
 }
 
-$credentials = getenv('HOME')
-    . '/.config/smart-assess/google-oauth-client.json';
+$credentials = (getenv('SMART_ASSESS_GMAIL_DIR') ?: getenv('HOME') . '/.config/smart-assess')
+    . '/google-oauth-client.json';
 
-$tokenPath = getenv('HOME')
-    . '/.config/smart-assess/gmail-token.json';
+$tokenPath = (getenv('SMART_ASSESS_GMAIL_DIR') ?: getenv('HOME') . '/.config/smart-assess')
+    . '/gmail-token.json';
 
 if (!is_file($credentials)) {
     http_response_code(500);

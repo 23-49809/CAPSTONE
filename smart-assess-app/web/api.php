@@ -781,28 +781,22 @@ function sa_submit_request(array $data): array
         // Email failures must not invalidate a saved request, and requests
         // submitted without an email address skip this step entirely.
         if ((string) $values['email'] !== '') {
-            try {
-                $sendConfirmation = require dirname(__DIR__) . '/gmail-mailer.php';
-                $sendConfirmation([
+            sa_email_confirmation(
+                ['id' => $requestId, 'client_id' => $client['id'] ?? null],
+                [
                     'email' => $values['email'],
                     'first_name' => $values['first_name'],
                     'last_name' => $values['last_name'],
                     'flow' => $flow,
                     'reference_no' => $reference,
-                ]);
-            } catch (Throwable $emailException) {
-                error_log(
-                    '[SMART_ASSESS] Confirmation email failed for '
-                    . $reference . ': ' . $emailException->getMessage()
-                );
-            }
+                ]
+            );
         }
         // Confirmation SMS to the number on the request; also never fatal.
         sa_sms_notify(
             ['id' => $requestId, 'client_id' => $client['id'] ?? null, 'contact_number' => $values['contact_number']],
             'sms_request_received',
-            SA_SMS_PREFIX . 'We received your ' . ($flow === 'docreq' ? 'Document Request' : 'Land Transfer request')
-                . ' ' . $reference . '. Track its status at smartassessmabini.com.'
+            sa_sms_confirmation_message($flow, $reference)
         );
 
         return ['reference_no' => $reference, 'status' => 'Received'];
@@ -1240,6 +1234,69 @@ function sa_sms_notify(array $request, string $type, string $message): string
         return 'pending';
     }
     return $outcome;
+}
+
+/**
+ * Confirmation email after a submission is committed. Recorded as a
+ * notifications row (channel 'email'): 'sent' only when Gmail accepted it,
+ * otherwise 'failed'. The log holds the request ID and a fixed reason, never
+ * the address, message or credentials. Never throws.
+ */
+function sa_email_confirmation(array $request, array $details): string
+{
+    $context = 'request ID ' . (int) $request['id'];
+    $notificationId = null;
+    try {
+        $pdo = sa_db();
+        $pdo->prepare(
+            "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
+             VALUES (:client_id, :request_id, 'email_request_received', :message, 'email', 'pending')"
+        )->execute([
+            'client_id' => $request['client_id'] ?? null,
+            'request_id' => (int) $request['id'],
+            'message' => 'Confirmation email for ' . (string) ($details['reference_no'] ?? ''),
+        ]);
+        $notificationId = (int) $pdo->lastInsertId();
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS_EMAIL] ' . $context . '; the email record could not be saved; sending anyway.');
+    }
+    $outcome = 'sent';
+    try {
+        $mailerPath = dirname(__DIR__) . '/gmail-mailer.php';
+        if (!is_file($mailerPath)) {
+            throw new RuntimeException('[mailer] Mailer file is missing.');
+        }
+        $sendConfirmation = require $mailerPath;
+        $sendConfirmation($details);
+    } catch (Throwable $exception) {
+        $outcome = 'failed';
+        $message = $exception->getMessage();
+        $reason = str_starts_with($message, '[mailer] ')
+            ? substr($message, 9)
+            : get_class($exception) . ' (code ' . (int) $exception->getCode() . ')';
+        error_log('[SMART_ASSESS_EMAIL] ' . $context . '; confirmation email failed: ' . $reason);
+    }
+    if ($notificationId !== null) {
+        try {
+            sa_db()->prepare('UPDATE notifications SET delivery_status = :status WHERE id = :id')
+                ->execute(['status' => $outcome, 'id' => $notificationId]);
+        } catch (Throwable) {
+            error_log('[SMART_ASSESS_EMAIL] ' . $context . '; outcome ' . $outcome . ' could not be saved.');
+        }
+    }
+    return $outcome;
+}
+
+/**
+ * Confirmation SMS after a submission. No web address: Philippine networks
+ * mask links in automated SMS (they arrived as "***"), so the text names the
+ * website instead. Kept within 160 characters so it is sent (and charged) as
+ * a single SMS.
+ */
+function sa_sms_confirmation_message(string $flow, string $reference): string
+{
+    return SA_SMS_PREFIX . 'We received your ' . ($flow === 'docreq' ? 'Document Request' : 'Land Transfer request')
+        . ', Ref. No. ' . $reference . '. Track it on the SMART ASSESS website.';
 }
 
 /** Client SMS text for a status staff set, or null when that status sends none. */
