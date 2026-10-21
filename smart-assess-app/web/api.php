@@ -208,7 +208,7 @@ function sa_normalize_bridge_request(array $data): array
     $aliases = [
         'name' => ['fullName'],
         'role_id' => ['role'],
-        'position_title' => ['position'],
+        'position_title' => ['position', 'positionTitle'],
         'contact_number' => ['contact'],
         'user_id' => ['id'],
         'announcement_id' => ['id'],
@@ -1749,6 +1749,45 @@ function sa_changed_identifiers(string $message, string $source, bool $ignoreOrd
     return array_values(array_unique($changed));
 }
 
+/** Optional account email: blank becomes NULL; anything else must be valid. */
+function sa_account_email(array $data): ?string
+{
+    $email = strtolower(trim((string) ($data['email'] ?? '')));
+    if ($email === '') {
+        return null;
+    }
+    if (strlen($email) > 150 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new SaHttpException(422, 'Enter a valid email address, or leave the email blank.');
+    }
+    return $email;
+}
+
+function sa_account_username(array $data): string
+{
+    $username = trim((string) ($data['username'] ?? ''));
+    if (!preg_match('/^[A-Za-z0-9._-]{3,80}$/', $username)) {
+        throw new SaHttpException(422, 'Username must be 3 to 80 characters: letters, numbers, dots, dashes, or underscores.');
+    }
+    return $username;
+}
+
+/** Clear 409 when another account (any status) already has this username/email. */
+function sa_account_assert_unique(PDO $pdo, ?string $username, ?string $email, ?int $exceptId): void
+{
+    foreach (['username' => $username, 'email' => $email] as $column => $value) {
+        if ($value === null) {
+            continue;
+        }
+        $stmt = $pdo->prepare("SELECT 1 FROM users WHERE {$column} = :value AND id <> :id LIMIT 1");
+        $stmt->execute(['value' => $value, 'id' => $exceptId ?? 0]);
+        if ($stmt->fetchColumn()) {
+            throw new SaHttpException(409, $column === 'username'
+                ? 'That username is already used by another account. Choose a different username.'
+                : 'That email address is already used by another account. Use a different email or leave it blank.');
+        }
+    }
+}
+
 function sa_admin_user_change(array $data, string $action): array
 {
     $actor = sa_internal_or_fail(['ADMIN']);
@@ -1757,16 +1796,17 @@ function sa_admin_user_change(array $data, string $action): array
 
     if ($action === 'create') {
         $name = sa_text($data, 'name', 150, true);
-        $username = sa_text($data, 'username', 80, true);
-        $email = strtolower((string) sa_text($data, 'email', 150, true));
+        $username = sa_account_username($data);
+        $email = sa_account_email($data);
         $password = (string) ($data['password'] ?? '');
         $role = sa_normalize_role($data['role_id'] ?? null);
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) ||
-            !preg_match('/^[A-Za-z0-9._-]{3,80}$/', (string) $username) ||
-            strlen($password) < 10 || strlen($password) > 4096 ||
-            !in_array($role, [2, 3, 4], true)) {
-            throw new SaHttpException(422);
+        if (strlen($password) < 10 || strlen($password) > 4096) {
+            throw new SaHttpException(422, 'The password must be at least 10 characters.');
         }
+        if (!in_array($role, [2, 3, 4], true)) {
+            throw new SaHttpException(422, 'Choose a valid role.');
+        }
+        sa_account_assert_unique($pdo, $username, $email, null);
         $stmt = $pdo->prepare(
             "INSERT INTO users (role_id, name, username, email, contact_number, position_title, password_hash, status)
              VALUES (:role, :name, :username, :email, :contact, :position, :hash, 'Active')"
@@ -1783,7 +1823,7 @@ function sa_admin_user_change(array $data, string $action): array
             ]);
         } catch (PDOException $exception) {
             if ($exception->getCode() === '23000') {
-                throw new SaHttpException(409);
+                throw new SaHttpException(409, 'That username or email address is already used by another account.');
             }
             throw $exception;
         }
@@ -1802,50 +1842,91 @@ function sa_admin_user_change(array $data, string $action): array
         throw new SaHttpException(404);
     }
     if ($action === 'edit') {
-        $name = sa_text($data, 'name', 150, true);
-        $username = sa_text($data, 'username', 80, true);
-        $email = strtolower((string) sa_text($data, 'email', 150, true));
-        $role = sa_normalize_role($data['role_id'] ?? null);
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) ||
-            !preg_match('/^[A-Za-z0-9._-]{3,80}$/', (string) $username) ||
-            !in_array($role, [2, 3, 4], true)) {
-            throw new SaHttpException(422);
+        // Only fields that were sent AND differ are written, so a password-only
+        // change leaves name, username, email, role, status, contact and
+        // position exactly as they are.
+        $currentStmt = $pdo->prepare(
+            'SELECT name, username, email, role_id, status, contact_number, position_title
+             FROM users WHERE id = :id AND deleted_at IS NULL'
+        );
+        $currentStmt->execute(['id' => $targetId]);
+        $current = $currentStmt->fetch();
+        if (!$current) {
+            throw new SaHttpException(404);
         }
-        $status = strtolower((string) ($data['status'] ?? 'active'));
-        if (!in_array($status, ['active', 'inactive'], true)) {
-            throw new SaHttpException(422);
+        $new = [];
+        if (array_key_exists('name', $data)) {
+            $new['name'] = sa_text($data, 'name', 150, true);
+        }
+        if (array_key_exists('username', $data)) {
+            $new['username'] = sa_account_username($data);
+        }
+        if (array_key_exists('email', $data)) {
+            $new['email'] = sa_account_email($data);
+        }
+        if (array_key_exists('role_id', $data)) {
+            $new['role_id'] = sa_normalize_role($data['role_id']);
+            if (!in_array($new['role_id'], [2, 3, 4], true)) {
+                throw new SaHttpException(422, 'Choose a valid role.');
+            }
+        }
+        if (array_key_exists('status', $data)) {
+            $status = strtolower(trim((string) $data['status']));
+            if (!in_array($status, ['active', 'inactive'], true)) {
+                throw new SaHttpException(422, 'Choose a valid account status.');
+            }
+            $new['status'] = ucfirst($status);
+        }
+        if (array_key_exists('contact_number', $data)) {
+            $new['contact_number'] = sa_text($data, 'contact_number', 20);
+        }
+        if (array_key_exists('position_title', $data)) {
+            $new['position_title'] = sa_text($data, 'position_title', 80);
         }
         $password = (string) ($data['password'] ?? '');
         if ($password !== '' && (strlen($password) < 10 || strlen($password) > 4096)) {
-            throw new SaHttpException(422);
+            throw new SaHttpException(422, 'The new password must be at least 10 characters, or leave it blank to keep the current one.');
         }
-        $params = [
-            'id' => $targetId,
-            'name' => $name,
-            'username' => $username,
-            'email' => $email,
-            'role' => $role,
-            'status' => ucfirst($status),
-            'contact' => sa_text($data, 'contact_number', 20),
-            'position' => sa_text($data, 'position_title', 80),
-        ];
-        $sql = 'UPDATE users SET name = :name, username = :username, email = :email, role_id = :role,
-                status = :status,
-                contact_number = :contact, position_title = :position';
-        if ($password !== '') {
-            $sql .= ', password_hash = :hash';
-            $params['hash'] = password_hash($password, PASSWORD_DEFAULT);
+        if ($targetId === (int) $actor['id'] &&
+            ((isset($new['status']) && $new['status'] !== 'Active') || (isset($new['role_id']) && $new['role_id'] !== 3))) {
+            throw new SaHttpException(422, 'You cannot deactivate your own account or remove your own Admin role.');
         }
-        $sql .= ' WHERE id = :id AND deleted_at IS NULL';
-        try {
-            $pdo->prepare($sql)->execute($params);
-        } catch (PDOException $exception) {
-            if ($exception->getCode() === '23000') {
-                throw new SaHttpException(409);
+        $changes = [];
+        foreach ($new as $column => $value) {
+            $old = $current[$column];
+            // Emails are stored lowercase, so compare them case-insensitively;
+            // every other field (including a username's case) compares exactly.
+            $same = $column === 'email'
+                ? strtolower((string) $old) === strtolower((string) $value) && ($old === null) === ($value === null)
+                : (string) $old === (string) $value && ($old === null) === ($value === null);
+            if (!$same) {
+                $changes[$column] = $value;
             }
-            throw $exception;
         }
-        sa_audit('admin', (int) $actor['id'], (string) $actor['name'], 'Internal account edited', (string) $targetId);
+        sa_account_assert_unique(
+            $pdo,
+            isset($changes['username']) ? $changes['username'] : null,
+            array_key_exists('email', $changes) ? $changes['email'] : null,
+            $targetId
+        );
+        if ($password !== '') {
+            $changes['password_hash'] = password_hash($password, PASSWORD_DEFAULT);
+        }
+        if ($changes !== []) {
+            $set = implode(', ', array_map(static fn (string $column): string => "{$column} = :{$column}", array_keys($changes)));
+            try {
+                $pdo->prepare("UPDATE users SET {$set} WHERE id = :id AND deleted_at IS NULL")
+                    ->execute($changes + ['id' => $targetId]);
+            } catch (PDOException $exception) {
+                if ($exception->getCode() === '23000') {
+                    throw new SaHttpException(409, 'That username or email address is already used by another account.');
+                }
+                throw $exception;
+            }
+            // Which fields changed (never their values) for the audit trail.
+            $fields = array_map(static fn (string $c): string => $c === 'password_hash' ? 'password' : $c, array_keys($changes));
+            sa_audit('admin', (int) $actor['id'], (string) $actor['name'], substr('Internal account edited: ' . implode(', ', $fields), 0, 120), (string) $targetId);
+        }
     } elseif ($action === 'status') {
         $status = (string) ($data['status'] ?? '');
         if (!in_array($status, ['Active', 'Inactive'], true) || $targetId === (int) $actor['id'] && $status !== 'Active') {
@@ -1909,61 +1990,79 @@ function sa_admin_toggle_user(array $data): array
 function sa_internal_update_profile(array $data): array
 {
     $user = sa_internal_or_fail(['STAFF', 'ADMIN', 'DEPARTMENT_HEAD']);
-    $name = sa_text($data, 'name', 150, true);
-    $username = sa_text($data, 'username', 80);
-    $contact = sa_text($data, 'contact_number', 20);
-    $position = array_key_exists('position_title', $data)
-        ? sa_text($data, 'position_title', 80)
-        : ($user['position_title'] ?? null);
-    $email = strtolower((string) sa_text($data, 'email', 150, true));
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        throw new SaHttpException(422);
-    }
-    if ($username !== null && !preg_match('/^[A-Za-z0-9._-]{3,80}$/', $username)) {
-        throw new SaHttpException(422);
-    }
-    $newPassword = (string) ($data['new_password'] ?? '');
-    if ($newPassword !== '' && (strlen($newPassword) < 10 || strlen($newPassword) > 4096)) {
-        throw new SaHttpException(422);
-    }
-
     $pdo = sa_db();
-    $current = $pdo->prepare('SELECT username, password_hash FROM users WHERE id = :id');
+    $current = $pdo->prepare(
+        'SELECT name, username, email, contact_number, position_title, password_hash
+         FROM users WHERE id = :id AND archived_at IS NULL AND deleted_at IS NULL'
+    );
     $current->execute(['id' => $user['id']]);
     $stored = $current->fetch();
     if (!$stored) {
         throw new SaHttpException(401);
     }
+
+    // Same rules as the Admin account edit: only fields that were sent AND
+    // differ are written; a blank email is stored as NULL.
+    $new = [];
+    if (array_key_exists('name', $data)) {
+        $new['name'] = sa_text($data, 'name', 150, true);
+    }
+    if (array_key_exists('username', $data) && trim((string) $data['username']) !== '') {
+        $new['username'] = sa_account_username($data);
+    }
+    if (array_key_exists('email', $data)) {
+        $new['email'] = sa_account_email($data);
+    }
+    if (array_key_exists('contact_number', $data)) {
+        $new['contact_number'] = sa_text($data, 'contact_number', 20);
+    }
+    if (array_key_exists('position_title', $data)) {
+        $new['position_title'] = sa_text($data, 'position_title', 80);
+    }
+    $newPassword = (string) ($data['new_password'] ?? '');
+    if ($newPassword !== '' && (strlen($newPassword) < 10 || strlen($newPassword) > 4096)) {
+        throw new SaHttpException(422, 'The new password must be at least 10 characters, or leave it blank to keep your current one.');
+    }
     if ($newPassword !== '') {
         $currentPassword = (string) ($data['current_password'] ?? '');
         if ($currentPassword === '' || !password_verify($currentPassword, $stored['password_hash'])) {
-            throw new SaHttpException(403);
+            throw new SaHttpException(403, 'Your current password is incorrect. Enter it to change your password.');
         }
     }
-    $params = [
-        'id' => $user['id'],
-        'name' => $name,
-        'email' => $email,
-        'username' => $username ?? $stored['username'],
-        'contact' => $contact,
-        'position' => $position,
-    ];
-    $sql = 'UPDATE users SET name = :name, email = :email, username = :username,
-            contact_number = :contact, position_title = :position';
+
+    $changes = [];
+    foreach ($new as $column => $value) {
+        $old = $stored[$column];
+        $same = $column === 'email'
+            ? strtolower((string) $old) === strtolower((string) $value) && ($old === null) === ($value === null)
+            : (string) $old === (string) $value && ($old === null) === ($value === null);
+        if (!$same) {
+            $changes[$column] = $value;
+        }
+    }
+    sa_account_assert_unique(
+        $pdo,
+        isset($changes['username']) ? $changes['username'] : null,
+        array_key_exists('email', $changes) ? $changes['email'] : null,
+        (int) $user['id']
+    );
     if ($newPassword !== '') {
-        $sql .= ', password_hash = :hash';
-        $params['hash'] = password_hash($newPassword, PASSWORD_DEFAULT);
+        $changes['password_hash'] = password_hash($newPassword, PASSWORD_DEFAULT);
     }
-    $sql .= ' WHERE id = :id AND archived_at IS NULL AND deleted_at IS NULL';
-    try {
-        $pdo->prepare($sql)->execute($params);
-    } catch (PDOException $exception) {
-        if ($exception->getCode() === '23000') {
-            throw new SaHttpException(409);
+    if ($changes !== []) {
+        $set = implode(', ', array_map(static fn (string $column): string => "{$column} = :{$column}", array_keys($changes)));
+        try {
+            $pdo->prepare("UPDATE users SET {$set} WHERE id = :id AND archived_at IS NULL AND deleted_at IS NULL")
+                ->execute($changes + ['id' => $user['id']]);
+        } catch (PDOException $exception) {
+            if ($exception->getCode() === '23000') {
+                throw new SaHttpException(409, 'That username or email address is already used by another account.');
+            }
+            throw $exception;
         }
-        throw $exception;
+        $fields = array_map(static fn (string $c): string => $c === 'password_hash' ? 'password' : $c, array_keys($changes));
+        sa_audit(sa_actor_type($user), (int) $user['id'], (string) $user['name'], substr('Internal profile updated: ' . implode(', ', $fields), 0, 120));
     }
-    sa_audit(sa_actor_type($user), (int) $user['id'], (string) $user['name'], 'Internal profile updated');
     return ['user_id' => (int) $user['id']];
 }
 
