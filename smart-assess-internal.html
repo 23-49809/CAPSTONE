@@ -603,21 +603,6 @@
   .modal.req-detail, .modal.req-detail *{ font-family:'Poppins', var(--font-body); }
   .modal.req-detail .modal-head h3{ font-weight:600; letter-spacing:-.01em; }
   .modal.req-detail .review-row .k{ font-weight:400; }
-  .req-files{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap:12px; }
-  .rf-item{ display:flex; flex-direction:column; gap:8px; min-width:0; padding:12px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-md); }
-  .rf-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
-  .rf-label{ font-size:13px; font-weight:600; line-height:1.35; }
-  .rf-thumb{ display:block; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--line); background:var(--surface); }
-  .rf-thumb img{ display:block; width:100%; height:150px; object-fit:contain; }
-  .rf-pdf summary{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; font-weight:600; color:var(--brand-700, var(--ink)); min-height:32px; }
-  .rf-pdf iframe{ display:block; width:100%; height:360px; margin-top:8px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
-  .rf-meta{ display:flex; flex-direction:column; gap:2px; min-width:0; font-size:12.5px; }
-  .rf-name{ font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .rf-actions{ display:flex; gap:8px; flex-wrap:wrap; }
-  .rf-empty, .rf-broken-msg{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); }
-  .rf-broken-msg{ display:none; color:var(--danger); }
-  .rf-item.rf-broken .rf-broken-msg{ display:flex; }
-  .rf-item.rf-broken .rf-thumb{ display:none; }
   .modal.req-detail .review-row .v, .modal.req-detail .badge{ font-weight:500; }
   /* Staff request details: compact Process / Complete Request action. */
   .modal .review-row .v .btn-process{ display:inline-flex; width:auto; max-width:100%; min-height:36px; padding:7px 14px; gap:6px;
@@ -627,39 +612,68 @@
   .modal .review-row .v .proc-action{ display:flex; justify-content:flex-end; }
   @media (max-width:1024px), (pointer:coarse){ .modal .review-row .v .btn-process{ min-height:44px; } }
   .modal.req-detail .btn, .modal.req-detail .action-btn{ font-weight:600; }
-  /* Staff request details: wide landscape layout. Summary and status on the
-     left, submitted files on the right; client details in their own
-     container, shown with View Details. Text labels only, no icons. */
-  .modal.req-detail{ max-width:1360px; width:96vw; max-height:92vh; padding:26px 32px 30px; }
-  .modal.req-detail .modal-section-title{ margin:0 0 10px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); }
+  .nf-draft{ margin:0 0 16px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--warn-bg); color:var(--warn); font-size:13px; line-height:1.45; }
+  .nf-channels{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:4px 0 16px; padding:0; border:0; }
+  .nf-channels legend{ width:100%; margin-bottom:6px; font-size:13px; font-weight:600; }
+  .nf-channel{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; cursor:pointer; min-height:32px; }
+  .nf-channel input{ width:18px; height:18px; margin:0; }
+  .nf-channel input:disabled + *, .nf-channel:has(input:disabled){ opacity:.55; cursor:not-allowed; }
+  /* Staff request details: wide landscape layout made of full-width tables.
+     Only the Request Summary shows until View Details reveals the client
+     details. Text labels only, no icons. */
+  .modal.req-detail{ max-width:1360px; width:96vw; max-height:92vh; min-height:min(72vh, 760px); padding:26px 32px 30px; }
   .modal.req-detail .rd-head{ position:sticky; top:-26px; z-index:2; margin:-26px -32px 22px; padding:20px 32px 16px; background:var(--surface); border-bottom:1px solid var(--line); align-items:center; }
   .rd-title{ min-width:0; }
   .rd-title h3, .rd-title p{ overflow-wrap:anywhere; }
   .rd-head-actions{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
   .modal.req-detail .rd-toggle{ min-height:34px; padding:6px 14px; font-size:13px; white-space:nowrap; }
   .modal.req-detail .rd-close{ width:34px; height:34px; font-size:22px; line-height:1; font-weight:400; }
-  .rd-client{ margin-bottom:24px; padding:18px 20px 20px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-lg); }
+  .rd-block{ margin:0 0 22px; }
+  .rd-caption{ margin:0 0 10px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); }
+  .rd-wrap{ border:1px solid var(--line); border-radius:var(--radius-md); overflow:hidden; background:var(--surface); }
+  .rd-table{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:13.5px; }
+  .rd-table th, .rd-table td{ padding:11px 16px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+  .rd-table tbody tr:last-child > *{ border-bottom:none; }
+  .rd-table tbody th{ width:18%; font-weight:400; color:var(--ink-soft); background:var(--surface-2); }
+  .rd-table tbody td{ font-weight:500; }
+  .rd-table tbody td + th{ border-left:1px solid var(--line); }
+  .rd-table thead th{ font-size:12px; font-weight:600; color:var(--ink-soft); background:var(--surface-2); }
+  .rd-files thead th:nth-child(1){ width:26%; } .rd-files thead th:nth-child(3){ width:15%; } .rd-files thead th:nth-child(4){ width:30%; }
+  .rd-files tbody th{ width:auto; color:var(--ink); font-weight:600; background:none; }
+  .rd-files .rf-name{ display:block; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rd-files .rf-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .rd-files .rf-preview-row td{ background:var(--surface-2); }
+  .rf-preview img{ display:block; max-width:100%; max-height:460px; margin:0 auto; object-fit:contain; border-radius:var(--radius-sm); }
+  .rf-preview iframe{ display:block; width:100%; height:520px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
+  .rf-preview .rf-broken-msg{ color:var(--danger); font-size:13px; }
+  .rd-proc{ display:flex; align-items:center; justify-content:space-between; gap:16px 24px; flex-wrap:wrap; }
+  .rd-status-form .rd-form-row{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .rd-status-form .field{ flex:1 1 220px; margin-bottom:0; }
+  .rd-reject{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 2fr); gap:12px 16px; margin-top:14px; }
+  .rd-reject[hidden]{ display:none; }
+  .rd-reject .field{ margin-bottom:0; }
+  .rd-reject .field-hint{ grid-column:1 / -1; margin:0; }
+  .rd-client{ padding-top:4px; }
   .rd-client[hidden]{ display:none; }
-  .rd-client .review-card{ background:var(--surface); }
-  .rd-client-title{ font-size:15px; font-weight:600; margin-bottom:14px; }
-  .rd-client-grid{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px; }
-  .rd-body{ display:grid; grid-template-columns:minmax(320px, 2fr) minmax(0, 3fr); gap:28px; align-items:start; }
-  .rd-body.rd-single{ grid-template-columns:minmax(0, 1fr); }
-  .rd-col{ display:flex; flex-direction:column; gap:22px; min-width:0; }
-  .rd-section{ min-width:0; }
-  .rd-status-form .field-row{ display:flex; flex-wrap:wrap; gap:10px; }
-  .rd-status-form .field{ flex:1 1 200px; }
-  .modal.req-detail .req-files{ grid-template-columns:repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
-  @media (max-width:1024px){
-    .rd-body{ grid-template-columns:minmax(0, 1fr); gap:24px; }
-  }
+  .rd-client-title{ font-size:15px; font-weight:600; margin:4px 0 14px; }
   @media (max-width:760px){
     .modal-overlay:has(.modal.req-detail){ padding:0; }
     .modal.req-detail{ width:100%; max-width:100%; max-height:100dvh; min-height:100dvh; border-radius:0; padding:0 14px 22px; }
     .modal.req-detail .rd-head{ top:0; margin:0 -14px 16px; padding:14px; flex-wrap:wrap; }
     .rd-head-actions{ margin-left:auto; }
-    .rd-client{ padding:14px; }
-    .rd-client-grid{ grid-template-columns:minmax(0, 1fr); gap:16px; }
+    .rd-table, .rd-table tbody, .rd-table tr{ display:block; }
+    .rd-table tbody tr{ display:grid; grid-template-columns:minmax(96px, 38%) minmax(0, 1fr); border-bottom:1px solid var(--line); }
+    .rd-table tbody tr:last-child{ border-bottom:none; }
+    .rd-table th, .rd-table td{ border-bottom:none; padding:10px 12px; }
+    .rd-table tbody th{ width:auto; }
+    .rd-table tbody td + th{ border-left:none; }
+    .rd-table td[colspan]{ grid-column:1 / -1; }
+    .rd-files thead{ display:none; }
+    .rd-files tbody tr{ grid-template-columns:minmax(0, 1fr); }
+    .rd-files tbody th, .rd-files tbody td, .rd-files td[colspan]{ grid-column:1; }
+    .rd-files td[data-label]::before{ content:attr(data-label); display:block; font-size:11.5px; color:var(--ink-soft); margin-bottom:3px; }
+    .rd-reject{ grid-template-columns:minmax(0, 1fr); }
+    .rf-preview iframe{ height:420px; }
   }
 
   /* ============ Notifications page ============ */
@@ -2691,7 +2705,41 @@ function sentPeriodRange(period, customFrom, customTo){
   }
 }
 
+/* Draft prepared after a rejection (see php-bridge.js): taken once from
+   sessionStorage and kept in state until sent, so a re-render keeps edits. */
+var REJECTION_DRAFT_TEXT = {
+  'Missing requirements': ['Missing Document', 'some required documents are missing', 'submit the missing requirements'],
+  'Incorrect information': ['Other Instruction', 'some of the information you provided is incorrect', 'check and correct your information'],
+  'Invalid or unclear documents': ['Additional Requirements', 'some uploaded documents are invalid or unclear', 'submit clear and valid copies of the documents'],
+  'Other issue': ['Other Instruction', 'of an issue found during review', 'contact our office for the details']
+};
+function takeNotifDraft(){
+  var raw = null;
+  try { raw = JSON.parse(sessionStorage.getItem('smartAssessNotifDraft') || 'null'); sessionStorage.removeItem('smartAssessNotifDraft'); } catch(e){ raw = null; }
+  if(!raw || !raw.ref || !REJECTION_DRAFT_TEXT[raw.category]) return;
+  var r = findDocReq(raw.ref) || findLandReq(raw.ref);
+  if(!r) return;
+  var d = r.details || {};
+  var name = [d.firstName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ') || r.applicant || 'Client';
+  var t = REJECTION_DRAFT_TEXT[raw.category];
+  var note = String(raw.note||'').trim();
+  state.notifDraft = {
+    ref: r.id, rejection: raw.category, category: t[0], topic: 'Request not approved: '+raw.category,
+    message: 'Good day, '+name+'. Your request '+r.id+' at the Municipal Assessor\'s Office of Mabini was not approved because '+t[1]+'.'
+      + (note ? ' Details: '+note+(/[.!?]$/.test(note)?'':'.') : '')
+      + ' Please '+t[2]+' and visit or contact our office. Thank you.'
+  };
+}
+function notifRecipient(ref){
+  var r = ref ? (findDocReq(ref) || findLandReq(ref)) : null;
+  var d = (r && r.details) || {};
+  return { name: r ? ([d.firstName, d.middleName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ') || r.applicant) : '', phone: String(d.contact||'').trim(), email: String(d.email||'').trim() };
+}
+
 function renderNotifications(acct){
+  if(state.notifDraft===undefined){ state.notifDraft = null; takeNotifDraft(); }
+  var draft = state.notifDraft;
+  var rcpt = notifRecipient(draft && draft.ref);
   var all = state.notifs.slice().sort(function(a,b){ return sentTime(b.sentAt) - sentTime(a.sentAt); });
   var allRefs = state.docRequests.map(function(r){return r.id;}).concat(state.landRequests.map(function(r){return r.id;}));
   var q = String((state.search && state.search.sentNotifs) || '').toLowerCase();
@@ -2712,17 +2760,19 @@ function renderNotifications(acct){
     var name = n.clientName || n.applicant || 'Client information unavailable';
     var status = n.deliveryStatus || 'Recorded';
     var pillTone = {Sent:'sent', Failed:'failed', Pending:'pending'}[status] || 'recorded';
-    var pillTitle = {
-      Sent:'Accepted by IPROG for sending. This does not confirm it reached the phone.',
-      Failed:'IPROG did not accept this SMS. It was not sent.',
-      Pending:'Outcome unconfirmed. Check the IPROG account before sending again.'
-    }[status] || 'Saved before SMS sending was enabled. No SMS status is available.';
+    var isEmail = n.channel==='Email';
+    var pillTitle = ({
+      Sent: isEmail ? 'Accepted by Gmail for sending.' : 'Accepted by IPROG for sending. This does not confirm it reached the phone.',
+      Failed: isEmail ? 'Gmail did not accept this email. It was not sent.' : 'IPROG did not accept this SMS. It was not sent.',
+      Pending: isEmail ? 'Outcome unconfirmed.' : 'Outcome unconfirmed. Check the IPROG account before sending again.'
+    })[status] || 'Status update shown in request tracking. No SMS or email was sent.';
+    var pillText = status==='Recorded' ? 'Tracking only' : (isEmail?'Email':'SMS')+' · '+status;
     return '<div class="sent-item" role="button" tabindex="0" aria-expanded="false" data-action="toggle-sent-item">'
       + '<div class="si-main"><div class="si-title">'+esc(notifCategoryName(n.category)||'Notification')+'</div>'
         + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')</div>'
         + '<div class="si-msg">'+esc(n.message)+'</div>'
         + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div></div>'
-      + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(status)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
+      + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(pillText)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
       + '<span class="si-chev" aria-hidden="true">'+ic('chevRight','16px')+'</span></div>';
   }).join('');
   var pager = pg.totalPages > 1
@@ -2731,28 +2781,35 @@ function renderNotifications(acct){
       + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="next" aria-label="Next page"'+(pg.page>=pg.totalPages?' disabled':'')+'>'+ic('chevRight','18px')+'</button></div>'
     : '';
   return ''
-  + '<div class="page-head"><div><h1>Notifications</h1><p>Send status and requirement updates to applicants, and review what has been sent.</p></div></div>'
+  + '<div class="page-head"><div><h1>Notifications</h1><p>Send updates to one client by SMS or email, and review what has been sent. Status changes never send SMS or email; clients see them in request tracking.</p></div></div>'
   + '<div class="notif-page"><div class="notif-grid">'
     + '<section class="notif-card notif-send">'
-      + '<div class="nc-head"><div><h3>Send a SMS Notification</h3><p>Fill in the details below to send a notification to the selected recipient.</p></div></div>'
+      + '<div class="nc-head"><div><h3>Send a Notification</h3><p>Nothing is sent until you click Send Notification. Review the recipient and message first.</p></div></div>'
+      + (draft ? '<div class="nf-draft" role="status">Draft prepared for the rejected request '+esc(draft.ref)+' ('+esc(draft.rejection)+'). Review and edit the message, choose SMS and/or email, then send.</div>' : '')
       + '<form data-form="send-notif" class="notif-form">'
         + '<div class="nf-grid">'
-          + '<div class="field"><label for="notification-reference">Reference Number</label><select id="notification-reference" name="requestRef" required><option value="">Select a request…</option>'+allRefs.map(function(id){return '<option value="'+id+'">'+id+'</option>';}).join('')+'</select></div>'
-          + '<div class="field"><label for="notification-owner-name">Property Owner / Client Name</label><output id="notification-owner-name" class="owner-name-display is-empty" aria-live="polite">Select a reference number</output></div>'
-          + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required><option value="">Select a category…</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('')+'</select></div>'
-          + '<div class="field"><label for="notification-request-type">Type of Request</label><select id="notification-request-type" disabled aria-describedby="notification-request-type-hint"><option value="">Select a reference number</option><option value="Document Request">Document Request</option><option value="Land Transfer">Land Transfer</option></select><span id="notification-request-type-hint" class="sr-only">Set automatically from the selected reference number.</span></div>'
-          + '<div class="field"><label for="notification-topic">Topic</label><input id="notification-topic" name="aiTopic" type="text" maxlength="200" placeholder="e.g. Additional documents needed" required></div>'
+          + '<div class="field"><label for="notification-reference">Reference Number</label><select id="notification-reference" name="requestRef" required><option value="">Select a request…</option>'+allRefs.map(function(id){return '<option value="'+id+'"'+(draft&&draft.ref===id?' selected':'')+'>'+id+'</option>';}).join('')+'</select></div>'
+          + '<div class="field"><label for="notification-owner-name">Property Owner / Client Name</label><output id="notification-owner-name" class="owner-name-display'+(rcpt.name?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.name||'Select a reference number')+'</output></div>'
+          + '<div class="field"><label for="notification-phone">Phone Number</label><output id="notification-phone" class="owner-name-display'+(rcpt.phone?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.phone||(draft?'No phone number on file':'Select a reference number'))+'</output></div>'
+          + '<div class="field"><label for="notification-email">Email Address</label><output id="notification-email" class="owner-name-display'+(rcpt.email?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.email||(draft?'No email address on file':'Select a reference number'))+'</output></div>'
+          + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required><option value="">Select a category…</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'"'+(draft&&draft.category===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select></div>'
+          + '<div class="field"><label for="notification-request-type">Type of Request</label><select id="notification-request-type" disabled aria-describedby="notification-request-type-hint"><option value="">Select a reference number</option><option value="Document Request"'+(draft&&findDocReq(draft.ref)?' selected':'')+'>Document Request</option><option value="Land Transfer"'+(draft&&findLandReq(draft.ref)?' selected':'')+'>Land Transfer</option></select><span id="notification-request-type-hint" class="sr-only">Set automatically from the selected reference number.</span></div>'
+          + '<div class="field"><label for="notification-topic">Topic</label><input id="notification-topic" name="aiTopic" type="text" maxlength="200" placeholder="e.g. Additional documents needed" required value="'+esc(draft?draft.topic:'')+'"></div>'
           + '<div class="field"><label for="notification-details">Relevant Details (optional)</label><textarea id="notification-details" name="aiDetails" maxlength="1000" rows="1" placeholder="Add only general, non-sensitive details"></textarea></div>'
         + '</div>'
         + '<p class="field-hint ai-privacy-hint nf-hint">Do not include client names, property details, reference numbers, uploaded documents, or other identifying information.</p>'
         + '<div class="field"><div class="ai-message-heading"><label for="notification-message">Message</label><button type="button" class="btn btn-outline btn-sm nf-ai" data-action="generate-ai-message" data-ai-type="notification">'+ic('sparkles','15px')+' Generate with AI</button></div>'
-          + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="Type the message for the applicant…" required></textarea><span class="nf-count" data-char-count aria-live="polite">0/2000</span></div></div>'
-        + '<div class="nf-actions"><button type="reset" class="btn btn-outline nf-clear">'+ic('refresh','16px')+' Clear Form</button><button type="submit" class="btn btn-primary nf-send">'+ic('send','16px')+' Send Notification</button></div>'
+          + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="Type the message for the applicant…" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
+        + '<fieldset class="nf-channels"><legend>Send by</legend><input type="hidden" name="channel_choice" value="1">'
+          + '<label class="nf-channel"><input type="checkbox" name="send_sms" value="1" checked> SMS to the phone number</label>'
+          + '<label class="nf-channel"><input type="checkbox" name="send_email" value="1"'+(rcpt.email?' checked':' disabled')+'> Email to the email address</label>'
+        + '</fieldset>'
+        + '<div class="nf-actions"><button type="reset" class="btn btn-outline nf-clear" data-action="clear-notif-draft">'+ic('refresh','16px')+' Clear Form</button><button type="submit" class="btn btn-primary nf-send">'+ic('send','16px')+' Send Notification</button></div>'
       + '</form>'
     + '</section>'
     + '<section class="notif-card notif-sent" aria-labelledby="sent-notifs-title">'
-      + '<div class="nc-head"><div><h3 id="sent-notifs-title">SMS Notification History</h3><p>View your previously sent notifications.</p></div></div>'
-      + '<div class="sent-tools"><div class="sent-tools-row"><div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by reference number, client name…" value="'+esc((state.search && state.search.sentNotifs)||'')+'" data-input="search-sent-notifs" aria-label="Search SMS notification history"></div>'
+      + '<div class="nc-head"><div><h3 id="sent-notifs-title">Notification History</h3><p>SMS and email messages sent by staff, and status updates shown in request tracking.</p></div></div>'
+      + '<div class="sent-tools"><div class="sent-tools-row"><div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by reference number, client name…" value="'+esc((state.search && state.search.sentNotifs)||'')+'" data-input="search-sent-notifs" aria-label="Search notification history"></div>'
         + '<select class="sent-period" data-input="filter-sent-period" aria-label="Sent date">'+SENT_PERIODS.map(function(o){ return '<option value="'+o[0]+'"'+(period===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></div>'
         + (period==='custom' ? '<div class="sent-filters">'
             + '<label class="sent-date"><span>Start date</span><input type="date" data-input="filter-sent-from" value="'+esc(fromF)+'" aria-label="Start date"></label>'
@@ -2976,67 +3033,85 @@ function checklistHtml(checklist){
   }).join('')+'</ul>';
 }
 
+/* Rejection reasons staff can pick (same list as SA_REJECTION_CATEGORIES in api.php). */
+var REJECTION_CATEGORIES = ['Missing requirements','Incorrect information','Invalid or unclear documents','Other issue'];
+
+/* Label/value rows for a full-width table: two pairs per row on wide screens.
+   items: [label, html, wide] — wide items take a whole row. */
+function rdTable(caption, items){
+  var rows = [], pending = null;
+  items.forEach(function(it){
+    if(!it) return;
+    var cell = '<th scope="row">'+it[0]+'</th><td'+(it[2]?' colspan="3"':'')+'>'+it[1]+'</td>';
+    if(it[2]){ if(pending){ rows.push(pending.replace('<td>','<td colspan="3">')); pending = null; } rows.push(cell); return; }
+    if(pending){ rows.push(pending + cell); pending = null; } else { pending = cell; }
+  });
+  if(pending) rows.push(pending.replace('<td>','<td colspan="3">'));
+  return '<section class="rd-block"><h4 class="rd-caption">'+caption+'</h4><div class="rd-wrap"><table class="rd-table" aria-label="'+caption+'"><tbody>'
+    + rows.map(function(r){ return '<tr>'+r+'</tr>'; }).join('') + '</tbody></table></div></section>';
+}
+
 function modalReqDetail(id, kind){
   var r = kind==='doc' ? findDocReq(id) : findLandReq(id);
-  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
-  var row = function(k, v, mono){ return '<div class="review-row"><span class="k">'+k+'</span><span class="v'+(mono?' mono':'')+'">'+v+'</span></div>'; };
-  var subInfo = kind==='doc'
-    ? row('Document Type', esc(r.docType)) + row('Purpose', esc(r.purpose))
-    : row('Transfer Type', esc(r.transferType)) + row('TCT / OCT No.', esc(r.tctNo), true);
+  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal" aria-label="Close">&times;</button></div>';
   var account = currentAccount();
   var canProcess = account && account.role==='staff';
   var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
   var terminalStatus = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
-  var processingActionHtml = '';
+  var procButton = '';
   if(canProcess && !r.processingStaffId && !terminalStatus){
-    processingActionHtml = '<button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">Process Request</button>';
+    procButton = '<button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">Process Request</button>';
+  } else if(isAssignedStaff && r.processingStartedAt && !r.processingCompletedAt && !terminalStatus){
+    procButton = '<button type="button" class="btn btn-primary btn-process" data-action="complete-processing" data-id="'+esc(r.id)+'">Complete Request</button>';
   }
-  if(r.processingStartedAt){
-    // Elapsed timer and its action button sit in one column with a gap, so
-    // the button never crowds the timer.
-    var procButton = '';
-    if(canProcess && !r.processingStaffId && !terminalStatus){
-      procButton = '<button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">Process Request</button>';
-    } else if(isAssignedStaff && !r.processingCompletedAt && !terminalStatus){
-      procButton = '<button type="button" class="btn btn-primary btn-process" data-action="complete-processing" data-id="'+esc(r.id)+'">Complete Request</button>';
-    }
-    processingActionHtml = '<span class="proc-time"><span class="proc-elapsed">'+processingTimerHtml(r, true)+'</span>'
-      + (procButton ? '<span class="proc-action">'+procButton+'</span>' : '') + '</span>';
-  }
-  // Client details live in their own container, shown only after View Details.
-  var detailsHtml = reqSubmittedDetailsHtml(r);
-  var showDetails = !!(detailsHtml && state.modal && state.modal.showDetails);
-  var filesHtml = reqSubmittedFilesHtml(r);
-  var summary = '<section class="rd-section">'
-      + '<div class="modal-section-title">Request Summary</div>'
-      + '<div class="review-card">'+subInfo
-        + row('Date Submitted', fmtDateTime(r.submitted))
-        + row('Current Status', '<span class="badge '+(STATUS_META[r.status]||STATUS_META.Received).cls+'">'+esc(statusLabel(r.status))+'</span>')
-        + (r.processingStartedAt ? row('Processing Started', fmtDateTime(r.processingStartedAt)) : '')
-        + (r.processingCompletedAt ? row('Processing Completed', fmtDateTime(r.processingCompletedAt)) : '')
-        + row('Assigned Processor', r.processingStaffId ? esc(r.processingStaffName||'Staff account #'+r.processingStaffId)+' <span class="cell-sub">(Staff ID: '+esc(r.processingStaffId)+')</span>' : 'Unassigned')
-        + (r.processingDurationSeconds!=null ? row('Final Processing Duration', formatDuration(r.processingDurationSeconds), true) : '')
-        + (processingActionHtml ? row('Processing Time', processingActionHtml) : '')
-      + '</div>'
-    + '</section>'
-    + (isAssignedStaff ? '<section class="rd-section">'
-      + '<div class="modal-section-title">Update Status</div>'
-      + '<form class="rd-status-form" data-form="update-status" data-kind="'+kind+'" data-id="'+r.id+'">'
-        + '<div class="field-row" style="align-items:end;">'
-          + '<div class="field" style="margin-bottom:0;"><select name="status" aria-label="New status">'+STATUS_ORDER.filter(function(s){ return s!=='Timed Out' || r.status==='Timed Out'; }).map(function(s){ return '<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+statusLabel(s)+'</option>'; }).join('')+'</select></div>'
-          + '<button type="submit" class="btn btn-primary" style="margin-bottom:0;">Update Status</button>'
+  // Elapsed timer and its action button sit apart, so the button never crowds the timer.
+  var processing = (r.processingStartedAt || procButton)
+    ? '<div class="rd-proc">'+(r.processingStartedAt?'<span class="proc-elapsed">'+processingTimerHtml(r, true)+'</span>':'<span class="cell-sub">Not started. Process Request sets the status to Processing.</span>')
+      + (procButton?'<span class="proc-action">'+procButton+'</span>':'')+'</div>'
+    : '';
+  var reason = r.status==='Rejected' && /^Rejected: /.test(r.advisory||'') ? esc(r.advisory.replace(/^Rejected: /,'')) : '';
+  // Staff choose only the closing statuses here: Pending and Processing are
+  // set automatically (submission / Process Request).
+  var statusForm = isAssignedStaff && !terminalStatus
+    ? '<form class="rd-status-form" data-form="update-status" data-kind="'+kind+'" data-id="'+esc(r.id)+'">'
+        + '<div class="rd-form-row">'
+          + '<div class="field"><label class="sr-only" for="rd-status-'+esc(r.id)+'">New status</label><select id="rd-status-'+esc(r.id)+'" name="status" required data-status-select>'
+            + '<option value="">Choose a new status</option>'
+            + ['Rejected','Out for Release'].map(function(s){ return '<option value="'+s+'">'+statusLabel(s)+'</option>'; }).join('')
+          + '</select></div>'
+          + '<button type="submit" class="btn btn-primary">Update Status</button>'
         + '</div>'
-      + '</form></section>' : '');
+        + '<div class="rd-reject" hidden>'
+          + '<div class="field"><label for="rd-reason-'+esc(r.id)+'">Reason for rejection</label><select id="rd-reason-'+esc(r.id)+'" name="rejection_category" data-rejection-category><option value="">Choose a reason</option>'
+            + REJECTION_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('')+'</select></div>'
+          + '<div class="field"><label for="rd-note-'+esc(r.id)+'">Details for the client (optional)</label><textarea id="rd-note-'+esc(r.id)+'" name="rejection_note" maxlength="500" rows="2" placeholder="e.g. The Tax Clearance is missing."></textarea></div>'
+          + '<p class="field-hint">Review the client details and uploaded documents yourself before rejecting: automatic document checking (OCR) is not available yet. After you reject, a notification draft opens on the Notifications page. Nothing is sent until you review it and click Send.</p>'
+        + '</div>'
+      + '</form>'
+    : '';
+  var summary = rdTable('Request Summary', [
+    [kind==='doc'?'Document Type':'Transfer Type', esc(kind==='doc'?r.docType:r.transferType)],
+    kind==='doc' ? ['Purpose', esc(r.purpose)] : ['TCT / OCT No.', '<span class="mono">'+esc(r.tctNo)+'</span>'],
+    ['Date Submitted', fmtDateTime(r.submitted)],
+    ['Current Status', '<span class="badge '+(STATUS_META[r.status]||STATUS_META.Received).cls+'">'+esc(statusLabel(r.status))+'</span>'],
+    ['Assigned Processor', r.processingStaffId ? esc(r.processingStaffName||'Staff account #'+r.processingStaffId)+' <span class="cell-sub">(Staff ID: '+esc(r.processingStaffId)+')</span>' : 'Unassigned'],
+    r.processingStartedAt ? ['Processing Started', fmtDateTime(r.processingStartedAt)] : null,
+    r.processingCompletedAt ? ['Processing Completed', fmtDateTime(r.processingCompletedAt)] : null,
+    r.processingDurationSeconds!=null ? ['Final Processing Duration', '<span class="mono">'+formatDuration(r.processingDurationSeconds)+'</span>'] : null,
+    reason ? ['Rejection Reason', reason, true] : null,
+    processing ? ['Processing', processing, true] : null,
+    statusForm ? ['Update Status', statusForm, true] : null
+  ]);
+  // Client details live in their own section, shown only after View Details.
+  var detailsHtml = reqSubmittedDetailsHtml(r) + reqSubmittedFilesHtml(r);
+  var showDetails = !!(detailsHtml && state.modal && state.modal.showDetails);
   return '<div class="modal-head rd-head"><div class="rd-title"><h3>'+esc(r.id)+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div>'
       + '<div class="rd-head-actions">'
         + (detailsHtml ? '<button type="button" class="btn btn-outline btn-sm rd-toggle" data-action="toggle-req-details" aria-expanded="'+showDetails+'" aria-controls="rd-client">'+(showDetails?'Hide Details':'View Details')+'</button>' : '')
         + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">&times;</button>'
       + '</div></div>'
-    + (detailsHtml ? '<div class="rd-client" id="rd-client"'+(showDetails?'':' hidden')+'>'+detailsHtml+'</div>' : '')
-    + '<div class="rd-body'+(filesHtml?'':' rd-single')+'">'
-      + '<div class="rd-col rd-col-main">'+summary+'</div>'
-      + (filesHtml ? '<div class="rd-col rd-col-files"><section class="rd-section">'+filesHtml+'</section></div>' : '')
-    + '</div>';
+    + summary
+    + (detailsHtml ? '<div class="rd-client" id="rd-client"'+(showDetails?'':' hidden')+'><h4 class="rd-client-title">Client Details</h4>'+detailsHtml+'</div>' : '');
 }
 
 /* Everything the client submitted (staff only: r.details/r.files are sent to
@@ -3046,30 +3121,24 @@ function reqSubmittedDetailsHtml(r){
   var d = r.details;
   if(!d) return '';
   var val = function(v){ return String(v==null?'':v).trim() ? esc(v) : '<span class="cell-sub">Not provided</span>'; };
-  var row = function(k, v, mono){ return '<div class="review-row"><span class="k">'+k+'</span><span class="v'+(mono?' mono':'')+'">'+v+'</span></div>'; };
   var fullName = [d.firstName, d.middleName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ');
   var address = [d.addressLine, d.city, d.province].filter(function(x){ return String(x||'').trim(); }).join(', ') + (String(d.zip||'').trim() ? ' '+d.zip : '');
-  return '<div class="rd-client-title">Client Details</div>'
-    + '<div class="rd-client-grid">'
-    + '<section class="rd-section"><div class="modal-section-title">Applicant Information</div>'
-    + '<div class="review-card">'
-      + row('Full Name', val(fullName))
-      + row('Contact Number', val(d.contact), true)
-      + row('Email Address', val(d.email))
-      + row('Address', val(address))
-      + row('Registered Owner', d.isOwner ? 'Yes, the applicant is the registered owner' : 'No, applying for the registered owner')
-      + (d.clientAccount ? row('Client Account', esc(d.clientAccount)) : '')
-    + '</div></section>'
-    + '<section class="rd-section"><div class="modal-section-title">Property and Request Information</div>'
-    + '<div class="review-card">'
-      + row('ARP / Tax Declaration No.', val(d.arpNumber), true)
-      + row('Property Address', val(d.propertyAddress))
-      + row('Barangay', val(d.barangay))
-      + (d.documentType ? row('Document Requested', esc(d.documentType)) : '')
-      + (d.transferType ? row('Type of Transfer', esc(d.transferType)) : '')
-      + (d.purpose ? row('Purpose', esc(d.purpose)) : '')
-    + '</div></section>'
-    + '</div>';
+  return rdTable('Applicant Information', [
+      ['Full Name', val(fullName)],
+      ['Contact Number', '<span class="mono">'+val(d.contact)+'</span>'],
+      ['Email Address', val(d.email)],
+      ['Registered Owner', d.isOwner ? 'Yes, the applicant is the registered owner' : 'No, applying for the registered owner'],
+      ['Address', val(address), true],
+      d.clientAccount ? ['Client Account', esc(d.clientAccount), true] : null
+    ])
+    + rdTable('Property and Request Information', [
+      ['ARP / Tax Declaration No.', '<span class="mono">'+val(d.arpNumber)+'</span>'],
+      ['Barangay', val(d.barangay)],
+      ['Property Address', val(d.propertyAddress), true],
+      d.documentType ? ['Document Requested', esc(d.documentType)] : null,
+      d.transferType ? ['Type of Transfer', esc(d.transferType)] : null,
+      d.purpose ? ['Purpose', esc(d.purpose)] : null
+    ]);
 }
 function reqFileSize(bytes){
   if(bytes==null) return '';
@@ -3077,30 +3146,27 @@ function reqFileSize(bytes){
 }
 function reqSubmittedFilesHtml(r){
   if(!r.files) return '';
-  var title = '<div class="modal-section-title">Submitted IDs and Documents</div>';
-  if(!r.files.length) return title + '<p class="cell-sub">No documents were recorded for this request.</p>';
+  var head = '<section class="rd-block"><h4 class="rd-caption">Submitted IDs and Documents</h4><div class="rd-wrap"><table class="rd-table rd-files" aria-label="Submitted IDs and Documents">';
+  if(!r.files.length) return head + '<tbody><tr><td>No documents were recorded for this request.</td></tr></tbody></table></div></section>';
   var kinds = {'image/jpeg':'JPG image','image/png':'PNG image','image/webp':'WEBP image','application/pdf':'PDF document'};
-  return title + '<ul class="req-files">' + r.files.map(function(f){
-    var head = '<div class="rf-head"><span class="rf-label">'+esc(f.label)+'</span>'
-      + '<span class="badge '+(f.validation==='Valid'?'green':(f.validation==='Invalid'?'red':'slate'))+'">'+esc(f.validation==='Pending'?'Pending Review':f.validation)+'</span></div>';
-    if(f.status==='missing' || !f.name){
-      return '<li class="rf-item rf-missing">'+head+'<div class="rf-empty">Not uploaded by the client.</div></li>';
-    }
-    var url = '/request-file.php?doc='+encodeURIComponent(f.docId)+'&ref='+encodeURIComponent(r.id);
-    var isImage = /^image\/(jpeg|png|webp)$/.test(f.mime), isPdf = f.mime==='application/pdf';
-    var preview = isImage
-      ? '<a class="rf-thumb" href="'+url+'" target="_blank" rel="noopener"><img src="'+url+'" alt="'+esc(f.label)+'" loading="lazy" onerror="this.closest(\'.rf-item\').classList.add(\'rf-broken\')"></a>'
-      : isPdf
-        ? '<details class="rf-pdf"><summary>Preview PDF</summary><iframe src="'+url+'" title="'+esc(f.label)+'" loading="lazy"></iframe></details>'
-        : '<div class="rf-empty">Preview is not available for this file type.</div>';
-    return '<li class="rf-item">'+head
-      + preview
-      + '<div class="rf-broken-msg">This file could not be loaded. It may be missing from storage.</div>'
-      + '<div class="rf-meta"><span class="rf-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="cell-sub">'+esc([kinds[f.mime]||f.mime, reqFileSize(f.size)].filter(Boolean).join(' · '))+'</span></div>'
-      + '<div class="rf-actions"><a class="btn btn-outline btn-sm" href="'+url+'" target="_blank" rel="noopener">Open</a>'
-      + '<a class="btn btn-outline btn-sm" href="'+url+'&amp;download=1">Download</a></div>'
-    + '</li>';
-  }).join('') + '</ul>';
+  return head + '<thead><tr><th scope="col">Document</th><th scope="col">File</th><th scope="col">Review</th><th scope="col">Actions</th></tr></thead><tbody>'
+    + r.files.map(function(f){
+      var review = '<span class="badge '+(f.validation==='Valid'?'green':(f.validation==='Invalid'?'red':'slate'))+'">'+esc(f.validation==='Pending'?'Pending Review':f.validation)+'</span>';
+      if(f.status==='missing' || !f.name){
+        return '<tr class="rf-missing"><th scope="row" data-label="Document">'+esc(f.label)+'</th><td data-label="File" colspan="3"><span class="cell-sub">Not uploaded by the client.</span></td></tr>';
+      }
+      var url = '/request-file.php?doc='+encodeURIComponent(f.docId)+'&ref='+encodeURIComponent(r.id);
+      var isImage = /^image\/(jpeg|png|webp)$/.test(f.mime), isPdf = f.mime==='application/pdf';
+      var previewId = 'rf-preview-'+esc(f.docId);
+      return '<tr><th scope="row" data-label="Document">'+esc(f.label)+'</th>'
+        + '<td data-label="File"><span class="rf-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="cell-sub">'+esc([kinds[f.mime]||f.mime, reqFileSize(f.size)].filter(Boolean).join(' · '))+'</span></td>'
+        + '<td data-label="Review">'+review+'</td>'
+        + '<td data-label="Actions"><div class="rf-actions">'
+          + ((isImage||isPdf) ? '<button type="button" class="btn btn-outline btn-sm" data-action="toggle-file-preview" aria-expanded="false" aria-controls="'+previewId+'">Preview</button>' : '')
+          + '<a class="btn btn-outline btn-sm" href="'+url+'" target="_blank" rel="noopener">Open</a>'
+          + '<a class="btn btn-outline btn-sm" href="'+url+'&amp;download=1">Download</a></div></td></tr>'
+        + ((isImage||isPdf) ? '<tr class="rf-preview-row" id="'+previewId+'" hidden><td colspan="4"><div class="rf-preview" data-src="'+esc(url)+'" data-kind="'+(isImage?'image':'pdf')+'" data-label="'+esc(f.label)+'"></div></td></tr>' : '');
+    }).join('') + '</tbody></table></div></section>';
 }
 
 function modalReqResultDetail(ref){
@@ -3485,6 +3551,8 @@ function bindEvents(){
       setTimeout(function(){
         updateCount();
         setNotifOutput(form.querySelector('#notification-owner-name'), '');
+        ['#notification-phone','#notification-email'].forEach(function(sel){ var o = form.querySelector(sel); if(o){ o.textContent = 'Select a reference number'; o.classList.add('is-empty'); } });
+        var emailBox = form.querySelector('input[name="send_email"]'); if(emailBox){ emailBox.checked = false; emailBox.disabled = true; }
         var typeSel = form.querySelector('#notification-request-type'); if(typeSel) typeSel.value = '';
         form._notifAuto = null;
         var lt = form.elements.category.querySelector('option[value="Land Transfer Status"]'); if(lt) lt.disabled = false;
@@ -3705,6 +3773,27 @@ function bindEvents(){
     syncMode();
   })();
 
+  // bindEvents runs on every render: register these document listeners once.
+  if(!window._rdFormListeners){
+  window._rdFormListeners = true;
+  // Update Status: the reason fields appear (and are required) only for Rejected.
+  document.addEventListener('change', function(ev){
+    var t = ev.target;
+    if(t && t.matches && t.matches('form[data-form="update-status"] [data-status-select]')){
+      var box = t.form.querySelector('.rd-reject'), reason = t.form.querySelector('[data-rejection-category]');
+      var rejecting = t.value==='Rejected';
+      if(box) box.hidden = !rejecting;
+      if(reason) reason.required = rejecting;
+    }
+    if(t && t.matches && t.matches('form[data-form="send-notif"] select[name="requestRef"]') && state.notifDraft && t.value!==state.notifDraft.ref){
+      state.notifDraft = null;   // a different client: the rejection draft no longer applies
+    }
+  });
+  document.addEventListener('input', function(ev){
+    var t = ev.target;
+    if(state.notifDraft && t && t.id==='notification-message') state.notifDraft.message = t.value;
+  });
+  }
   app.onclick = function(ev){
     var el = ev.target.closest('[data-action]');
     if(!el) return;
@@ -3792,6 +3881,28 @@ function bindEvents(){
       if(archivedAccount){
         doConfirm({title:'Delete Archived Account Permanently', message:'Permanently remove '+archivedAccount.fullName+' ('+archivedAccount.username+') from the system? This cannot be undone.', confirmLabel:'Delete Permanently', danger:true, action:'delete-archived-staff', id:archivedAccount.id});
       }
+    } else if(action==='toggle-file-preview'){
+      // Inline preview row under a file; loaded on first open only.
+      var previewRow = document.getElementById(el.getAttribute('aria-controls'));
+      if(previewRow){
+        var box = previewRow.querySelector('.rf-preview');
+        if(box && !box.firstChild){
+          var src = box.getAttribute('data-src'), label = box.getAttribute('data-label') || 'Document';
+          if(box.getAttribute('data-kind')==='image'){
+            var img = document.createElement('img'); img.alt = label; img.src = src;
+            img.onerror = function(){ box.innerHTML = '<p class="rf-broken-msg">This file could not be loaded. It may be missing from storage.</p>'; };
+            box.appendChild(img);
+          } else {
+            var frame = document.createElement('iframe'); frame.title = label; frame.src = src; box.appendChild(frame);
+          }
+        }
+        previewRow.hidden = !previewRow.hidden;
+        el.setAttribute('aria-expanded', String(!previewRow.hidden));
+        el.textContent = previewRow.hidden ? 'Preview' : 'Hide Preview';
+      }
+    } else if(action==='clear-notif-draft'){
+      state.notifDraft = null;
+      return;   // the reset button clears the form itself
     } else if(action==='toggle-req-details'){
       // Show or hide the client details in place (no re-render, so scroll
       // position and open PDF previews stay put); remembered on the modal.

@@ -89,6 +89,8 @@ foreach ($page['requests'] ?? [] as $request) {
             ? null : (string) $request['processing_staff_name'],
         'checklist' => $documentsByRequest[$requestId] ?? [],
         'history' => [],
+        // "Rejected: <reason>" saved when staff reject a request.
+        'advisory' => (string) ($request['advisory'] ?? ''),
     ];
     if ($isStaffViewer) {
         $clientAccount = trim((string) ($request['client_first_name'] ?? '') . ' ' . (string) ($request['client_last_name'] ?? ''));
@@ -262,6 +264,8 @@ $page['notifs'] = array_map(static function (array $notification): array {
         'category' => trim((string) ($notification['sms_category'] ?? '')) ?: 'Request Status Update',
         'message' => (string) ($notification['message'] ?? ''),
         'sentBy' => trim((string) ($notification['sent_by_name'] ?? '')) ?: (string) ($notification['actor'] ?? 'system'),
+        // Staff messages: actor 'email' marks an email; everything else is SMS or a status entry.
+        'channel' => ($notification['actor'] ?? '') === 'email' ? 'Email' : 'SMS',
         // NULL = saved before IPROG sending existed (no SMS status).
         'deliveryStatus' => match ((string) ($notification['delivery_status'] ?? '')) {
             'sent' => 'Sent',

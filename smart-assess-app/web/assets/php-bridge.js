@@ -260,6 +260,26 @@
     });
   }
 
+  // Recipient phone/email shown on the notification form; the email box can
+  // only be ticked when the request has an email address.
+  function setNotificationContact(form, phone, email, placeholder) {
+    var phoneDisplay = form.querySelector('#notification-phone');
+    var emailDisplay = form.querySelector('#notification-email');
+    var emailBox = form.querySelector('input[name="send_email"]');
+    if (phoneDisplay) {
+      phoneDisplay.textContent = phone || placeholder || 'No phone number on file';
+      phoneDisplay.classList.toggle('is-empty', !phone);
+    }
+    if (emailDisplay) {
+      emailDisplay.textContent = email || placeholder || 'No email address on file';
+      emailDisplay.classList.toggle('is-empty', !email);
+    }
+    if (emailBox) {
+      emailBox.disabled = !email;
+      emailBox.checked = !!email;
+    }
+  }
+
   function updateNotificationOwner(select) {
     var form = select.closest('form[data-form="send-notif"]');
     var nameDisplay = form && form.querySelector('#notification-owner-name');
@@ -269,10 +289,12 @@
     if (!reference) {
       nameDisplay.textContent = 'Select a reference number';
       nameDisplay.removeAttribute('title');
+      setNotificationContact(form, '', '', 'Select a reference number');
       return;
     }
     nameDisplay.textContent = 'Loading…';
     nameDisplay.removeAttribute('title');
+    setNotificationContact(form, '', '', 'Loading…');
     jsonRequest('lookup_request_owner', { reference: reference }).then(function (result) {
       if (sequence !== ownerLookupSequence || select.value !== reference) return;
       var ownerName = result.data.ownerName || 'Owner name unavailable';
@@ -280,10 +302,12 @@
       nameDisplay.textContent = ownerName;
       nameDisplay.classList.toggle('is-empty', ownerName === 'Owner name unavailable');
       nameDisplay.title = ownerType && ownerName !== 'Owner name unavailable' ? ownerType + ': ' + ownerName : ownerName;
+      setNotificationContact(form, result.data.contactNumber || '', result.data.email || '');
     }).catch(function () {
       if (sequence !== ownerLookupSequence || select.value !== reference) return;
       nameDisplay.textContent = 'Owner name unavailable';
       nameDisplay.removeAttribute('title');
+      setNotificationContact(form, '', '', 'Unavailable');
       notice('Could not load the owner/client name. You can still continue with the notification.');
     });
   }
@@ -738,6 +762,43 @@
     }
     if (type === 'update-status') {
       data.kind = form.getAttribute('data-kind') || '';
+      if (data.status === 'Rejected') {
+        // Rejected: no message is sent. Prepare a draft for the Notifications
+        // page, where staff review and edit it before sending.
+        jsonRequest('update_request_status', data).then(function () {
+          try {
+            sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({
+              ref: data.id, category: data.rejection_category || '', note: data.rejection_note || ''
+            }));
+            var saved = JSON.parse(localStorage.getItem('smartAssessMAOSystemV1') || '{}');
+            saved.view = 'notifications';
+            localStorage.setItem('smartAssessMAOSystemV1', JSON.stringify(saved));
+          } catch (error) { /* the page still opens; the draft is just not prefilled */ }
+          window.location.assign('/internal.php?view=notifications');
+        }).catch(function (error) {
+          notice(error.message);
+        });
+        return;
+      }
+    }
+    if (type === 'send-notif') {
+      // One send per click: the button stays locked until the server answers.
+      if (form.getAttribute('data-sending') === '1') return;
+      var sendButton = form.querySelector('button[type="submit"]');
+      var buttonText = sendButton ? sendButton.innerHTML : '';
+      form.setAttribute('data-sending', '1');
+      if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.textContent = 'Sending…';
+      }
+      internalSuccess(actions[type], data).finally(function () {
+        form.removeAttribute('data-sending');
+        if (sendButton) {
+          sendButton.disabled = false;
+          sendButton.innerHTML = buttonText;
+        }
+      });
+      return;
     }
     internalSuccess(actions[type], data);
   }, true);
