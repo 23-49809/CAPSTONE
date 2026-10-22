@@ -603,11 +603,28 @@
   .modal.req-detail, .modal.req-detail *{ font-family:'Poppins', var(--font-body); }
   .modal.req-detail .modal-head h3{ font-weight:600; letter-spacing:-.01em; }
   .modal.req-detail .review-row .k{ font-weight:400; }
+  .req-files{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap:12px; }
+  .rf-item{ display:flex; flex-direction:column; gap:8px; min-width:0; padding:12px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-md); }
+  .rf-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+  .rf-label{ font-size:13px; font-weight:600; line-height:1.35; }
+  .rf-thumb{ display:block; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--line); background:var(--surface); }
+  .rf-thumb img{ display:block; width:100%; height:150px; object-fit:contain; }
+  .rf-pdf summary{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; font-weight:600; color:var(--brand-700, var(--ink)); min-height:32px; }
+  .rf-pdf iframe{ display:block; width:100%; height:360px; margin-top:8px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
+  .rf-meta{ display:flex; flex-direction:column; gap:2px; min-width:0; font-size:12.5px; }
+  .rf-name{ font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rf-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .rf-empty, .rf-broken-msg{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); }
+  .rf-broken-msg{ display:none; color:var(--danger); }
+  .rf-item.rf-broken .rf-broken-msg{ display:flex; }
+  .rf-item.rf-broken .rf-thumb{ display:none; }
   .modal.req-detail .review-row .v, .modal.req-detail .badge{ font-weight:500; }
   /* Staff request details: compact Process / Complete Request action. */
   .modal .review-row .v .btn-process{ display:inline-flex; width:auto; max-width:100%; min-height:36px; padding:7px 14px; gap:6px;
     border-radius:var(--radius-sm); font-size:13.5px; line-height:1.2; white-space:nowrap; box-shadow:none; vertical-align:middle; }
   .modal .review-row .v .btn-process .icon{ width:15px; height:15px; }
+  .modal .review-row .v .proc-time{ display:inline-flex; flex-direction:column; align-items:flex-end; gap:12px; padding:2px 0 4px; }
+  .modal .review-row .v .proc-action{ display:flex; justify-content:flex-end; }
   @media (max-width:1024px), (pointer:coarse){ .modal .review-row .v .btn-process{ min-height:44px; } }
   .modal.req-detail .btn, .modal.req-detail .action-btn{ font-weight:600; }
 
@@ -2928,8 +2945,6 @@ function checklistHtml(checklist){
 function modalReqDetail(id, kind){
   var r = kind==='doc' ? findDocReq(id) : findLandReq(id);
   if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
-  var res = overallResult(r.checklist);
-  var bannerCls = res==='Complete'?'ok':(res==='Incomplete'?'bad':'invalid');
   var subInfo = kind==='doc'
     ? ('<div class="review-row"><span class="k">Document Type</span><span class="v">'+esc(r.docType)+'</span></div><div class="review-row"><span class="k">Purpose</span><span class="v">'+esc(r.purpose)+'</span></div>')
     : ('<div class="review-row"><span class="k">Transfer Type</span><span class="v">'+esc(r.transferType)+'</span></div><div class="review-row"><span class="k">TCT / OCT No.</span><span class="v mono">'+esc(r.tctNo)+'</span></div>');
@@ -2942,15 +2957,18 @@ function modalReqDetail(id, kind){
     processingActionHtml = '<button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','15px')+' Process Request</button>';
   }
   if(r.processingStartedAt){
-    processingActionHtml = processingTimerHtml(r, true);
+    // Elapsed timer and its action button sit in one column with a gap, so
+    // the button never crowds the timer.
+    var procButton = '';
     if(canProcess && !r.processingStaffId && !terminalStatus){
-      processingActionHtml += ' <button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','15px')+' Process Request</button>';
+      procButton = '<button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','15px')+' Process Request</button>';
     } else if(isAssignedStaff && !r.processingCompletedAt && !terminalStatus){
-      processingActionHtml += '<button type="button" class="btn btn-primary btn-process" data-action="complete-processing" data-id="'+esc(r.id)+'">'+ic('check','15px')+' Complete Request</button>';
+      procButton = '<button type="button" class="btn btn-primary btn-process" data-action="complete-processing" data-id="'+esc(r.id)+'">'+ic('check','15px')+' Complete Request</button>';
     }
+    processingActionHtml = '<span class="proc-time"><span class="proc-elapsed">'+processingTimerHtml(r, true)+'</span>'
+      + (procButton ? '<span class="proc-action">'+procButton+'</span>' : '') + '</span>';
   }
   return '<div class="modal-head"><div><h3>'+esc(r.id)+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
-    + '<div class="check-banner '+bannerCls+'">'+ic(res==='Complete'?'check':(res==='Incomplete'?'alert':'x'),'18px')+'<span>Requirement Checker result: <b>'+res+'</b> — '+missingCount(r.checklist)+' item(s) missing.</span></div>'
     + '<div class="review-card">'+subInfo+'<div class="review-row"><span class="k">Date Submitted</span><span class="v">'+fmtDateTime(r.submitted)+'</span></div><div class="review-row"><span class="k">Current Status</span><span class="v"><span class="badge '+(STATUS_META[r.status]||STATUS_META.Received).cls+'">'+esc(statusLabel(r.status))+'</span></span></div>'
     + (r.processingStartedAt?'<div class="review-row"><span class="k">Processing Started</span><span class="v">'+fmtDateTime(r.processingStartedAt)+'</span></div>':'')
     + (r.processingCompletedAt?'<div class="review-row"><span class="k">Processing Completed</span><span class="v">'+fmtDateTime(r.processingCompletedAt)+'</span></div>':'')
@@ -2961,14 +2979,73 @@ function modalReqDetail(id, kind){
     + (isAssignedStaff?'<div class="modal-section-title">'+ic('edit','15px')+'Update Status</div>'
     + '<form data-form="update-status" data-kind="'+kind+'" data-id="'+r.id+'">'
       + '<div class="field-row" style="align-items:end;">'
-        + '<div class="field" style="margin-bottom:0;"><select name="status">'+STATUS_ORDER.map(function(s){ return '<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+statusLabel(s)+'</option>'; }).join('')+'</select></div>'
+        + '<div class="field" style="margin-bottom:0;"><select name="status">'+STATUS_ORDER.filter(function(s){ return s!=='Timed Out' || r.status==='Timed Out'; }).map(function(s){ return '<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+statusLabel(s)+'</option>'; }).join('')+'</select></div>'
         + '<button type="submit" class="btn btn-primary" style="margin-bottom:0;">'+ic('check','16px')+' Update Status</button>'
       + '</div>'
     + '</form>':'')
-    + '<div class="action-row">'
-      + '<button class="action-btn info" data-action="nav-notify" data-ref="'+r.id+'">'+ic('sms','14px')+' Send Notification</button>'
-      + '<button class="action-btn" data-action="close-modal">Close</button>'
+    + reqSubmittedDetailsHtml(r)
+    + reqSubmittedFilesHtml(r);
+}
+
+/* Everything the client submitted (staff only: r.details/r.files are sent to
+   staff accounts only). Files open through request-file.php, which checks the
+   staff session and matches the document ID with this reference. */
+function reqSubmittedDetailsHtml(r){
+  var d = r.details;
+  if(!d) return '';
+  var val = function(v){ return String(v==null?'':v).trim() ? esc(v) : '<span class="cell-sub">Not provided</span>'; };
+  var row = function(k, v, mono){ return '<div class="review-row"><span class="k">'+k+'</span><span class="v'+(mono?' mono':'')+'">'+v+'</span></div>'; };
+  var fullName = [d.firstName, d.middleName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ');
+  var address = [d.addressLine, d.city, d.province].filter(function(x){ return String(x||'').trim(); }).join(', ') + (String(d.zip||'').trim() ? ' '+d.zip : '');
+  return '<div class="modal-section-title">'+ic('user','15px')+'Applicant Information</div>'
+    + '<div class="review-card">'
+      + row('Full Name', val(fullName))
+      + row('Contact Number', val(d.contact), true)
+      + row('Email Address', val(d.email))
+      + row('Address', val(address))
+      + row('Registered Owner', d.isOwner ? 'Yes, the applicant is the registered owner' : 'No, applying for the registered owner')
+      + (d.clientAccount ? row('Client Account', esc(d.clientAccount)) : '')
+    + '</div>'
+    + '<div class="modal-section-title">'+ic('house','15px')+'Property and Request Information</div>'
+    + '<div class="review-card">'
+      + row('ARP / Tax Declaration No.', val(d.arpNumber), true)
+      + row('Property Address', val(d.propertyAddress))
+      + row('Barangay', val(d.barangay))
+      + (d.documentType ? row('Document Requested', esc(d.documentType)) : '')
+      + (d.transferType ? row('Type of Transfer', esc(d.transferType)) : '')
+      + (d.purpose ? row('Purpose', esc(d.purpose)) : '')
     + '</div>';
+}
+function reqFileSize(bytes){
+  if(bytes==null) return '';
+  return bytes >= 1048576 ? (bytes/1048576).toFixed(1)+' MB' : Math.max(1, Math.round(bytes/1024))+' KB';
+}
+function reqSubmittedFilesHtml(r){
+  if(!r.files) return '';
+  var title = '<div class="modal-section-title">'+ic('idCard','15px')+'Submitted IDs and Documents</div>';
+  if(!r.files.length) return title + '<p class="cell-sub">No documents were recorded for this request.</p>';
+  var kinds = {'image/jpeg':'JPG image','image/png':'PNG image','image/webp':'WEBP image','application/pdf':'PDF document'};
+  return title + '<ul class="req-files">' + r.files.map(function(f){
+    var head = '<div class="rf-head"><span class="rf-label">'+esc(f.label)+'</span>'
+      + '<span class="badge '+(f.validation==='Valid'?'green':(f.validation==='Invalid'?'red':'slate'))+'">'+esc(f.validation==='Pending'?'Pending Review':f.validation)+'</span></div>';
+    if(f.status==='missing' || !f.name){
+      return '<li class="rf-item rf-missing">'+head+'<div class="rf-empty">'+ic('alert','15px')+' Not uploaded by the client.</div></li>';
+    }
+    var url = '/request-file.php?doc='+encodeURIComponent(f.docId)+'&ref='+encodeURIComponent(r.id);
+    var isImage = /^image\/(jpeg|png|webp)$/.test(f.mime), isPdf = f.mime==='application/pdf';
+    var preview = isImage
+      ? '<a class="rf-thumb" href="'+url+'" target="_blank" rel="noopener"><img src="'+url+'" alt="'+esc(f.label)+'" loading="lazy" onerror="this.closest(\'.rf-item\').classList.add(\'rf-broken\')"></a>'
+      : isPdf
+        ? '<details class="rf-pdf"><summary>'+ic('eye','14px')+' Preview PDF</summary><iframe src="'+url+'" title="'+esc(f.label)+'" loading="lazy"></iframe></details>'
+        : '<div class="rf-empty">Preview is not available for this file type.</div>';
+    return '<li class="rf-item">'+head
+      + preview
+      + '<div class="rf-broken-msg">'+ic('alert','15px')+' This file could not be loaded. It may be missing from storage.</div>'
+      + '<div class="rf-meta"><span class="rf-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="cell-sub">'+esc([kinds[f.mime]||f.mime, reqFileSize(f.size)].filter(Boolean).join(' · '))+'</span></div>'
+      + '<div class="rf-actions"><a class="btn btn-outline btn-sm" href="'+url+'" target="_blank" rel="noopener">'+ic('eye','14px')+' Open</a>'
+      + '<a class="btn btn-outline btn-sm" href="'+url+'&amp;download=1">Download</a></div>'
+    + '</li>';
+  }).join('') + '</ul>';
 }
 
 function modalReqResultDetail(ref){

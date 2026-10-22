@@ -1,0 +1,4 @@
+# Legacy upload folder inside the web root. New uploads are stored in
+# private_uploads/ (outside the web root) and served only through
+# request-file.php / the draft API, so nothing here may be fetched directly.
+Require all denied
