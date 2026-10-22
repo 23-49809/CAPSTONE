@@ -29,8 +29,22 @@ $page['accounts'] = array_map(
 $page['archivedAccounts'] = array_map($toAccount, $page['archives'] ?? []);
 $page['docRequests'] = [];
 $page['landRequests'] = [];
+// Full submitted details and the uploaded-file list are sent to staff only
+// (the only role with the request pages). Files are opened through
+// request-file.php by document ID + reference; storage paths never leave PHP.
+$isStaffViewer = $user && (int) $user['role_id'] === 2;
 $documentsByRequest = [];
+$filesByRequest = [];
 foreach ($page['documents'] ?? [] as $document) {
+    $filesByRequest[(int) $document['request_id']][] = [
+        'docId' => (int) $document['id'],
+        'label' => (string) $document['label'],
+        'name' => (string) ($document['original_name'] ?? ''),
+        'mime' => (string) ($document['mime_type'] ?? ''),
+        'size' => $document['file_size'] === null ? null : (int) $document['file_size'],
+        'status' => (string) ($document['file_status'] ?? 'missing'),
+        'validation' => ucfirst(strtolower((string) ($document['validation_status'] ?? 'pending'))),
+    ];
     $validation = strtolower((string) ($document['validation_status'] ?? 'pending'));
     $documentsByRequest[(int) $document['request_id']][] = [
         'name' => (string) $document['label'],
@@ -76,6 +90,29 @@ foreach ($page['requests'] ?? [] as $request) {
         'checklist' => $documentsByRequest[$requestId] ?? [],
         'history' => [],
     ];
+    if ($isStaffViewer) {
+        $clientAccount = trim((string) ($request['client_first_name'] ?? '') . ' ' . (string) ($request['client_last_name'] ?? ''));
+        $record['details'] = [
+            'firstName' => (string) $request['first_name'],
+            'middleName' => (string) ($request['middle_name'] ?? ''),
+            'lastName' => (string) $request['last_name'],
+            'contact' => (string) ($request['contact_number'] ?? ''),
+            'email' => (string) ($request['email'] ?? ''),
+            'addressLine' => (string) ($request['address_line'] ?? ''),
+            'city' => (string) ($request['city'] ?? ''),
+            'province' => (string) ($request['province'] ?? ''),
+            'zip' => (string) ($request['zip_code'] ?? ''),
+            'arpNumber' => (string) ($request['arp_number'] ?? ''),
+            'propertyAddress' => (string) ($request['property_address'] ?? ''),
+            'barangay' => (string) ($request['barangay'] ?? ''),
+            'isOwner' => (bool) $request['is_owner'],
+            'documentType' => (string) ($request['document_type'] ?? ''),
+            'transferType' => (string) ($request['transfer_type'] ?? ''),
+            'purpose' => (string) ($request['purpose'] ?? ''),
+            'clientAccount' => $clientAccount !== '' ? $clientAccount : null,
+        ];
+        $record['files'] = $filesByRequest[$requestId] ?? [];
+    }
     $requestByReference[$reference] = $record;
     if ($request['flow'] === 'docreq') {
         $page['docRequests'][] = $record;
