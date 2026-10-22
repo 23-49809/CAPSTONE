@@ -25,7 +25,9 @@ $toPublicRequest = static function (array $request): array {
     }
     $timestamps = [];
     foreach ($request['history'] ?? [] as $entry) {
-        $timestamps[(string) $entry['status']] = (string) $entry['created_at'];
+        // First entry per status = when the request reached it (later entries
+        // with the same status are staff messages, not status changes).
+        $timestamps[(string) $entry['status']] ??= (string) $entry['created_at'];
     }
     return [
         'id' => (string) $request['reference_no'],

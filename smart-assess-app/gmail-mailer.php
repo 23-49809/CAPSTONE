@@ -1,7 +1,9 @@
 <?php
 
 /**
- * Sends the "request received" confirmation email through the Gmail API.
+ * Sends one email through the Gmail API: either a staff-written message to a
+ * client ($details['message'] set; used by the Notifications page) or the
+ * "request received" confirmation.
  * Throws on any failure (the caller records it as failed); error messages
  * starting with "[mailer]" are fixed text and safe to log.
  *
@@ -19,25 +21,45 @@ return static function (array $details, ?callable $transport = null): void {
     $clean = static fn (mixed $value): string => trim((string) preg_replace('/[\x00-\x1F\x7F]+/u', ' ', (string) $value));
     $name = trim($clean($details['first_name'] ?? '') . ' ' . $clean($details['last_name'] ?? ''));
 
+    $isStaffMessage = array_key_exists('message', $details);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) ||
         !preg_match('/^[A-Z0-9-]{1,30}$/i', $reference) ||
-        !in_array($flow, ['docreq', 'landtransfer'], true)) {
-        throw new RuntimeException('[mailer] Invalid confirmation email details.');
+        (!$isStaffMessage && !in_array($flow, ['docreq', 'landtransfer'], true))) {
+        throw new RuntimeException('[mailer] Invalid ' . ($isStaffMessage ? 'notification' : 'confirmation') . ' email details.');
     }
 
-    $requestType = $flow === 'docreq' ? 'Document Request' : 'Land Transfer request';
-    $subject = 'SMART ASSESS: We received your ' . $requestType . ' (' . $reference . ')';
+    if ($isStaffMessage) {
+        // Staff text kept as written; only control characters other than line
+        // breaks are removed, and line breaks are normalised.
+        $text = trim((string) preg_replace('/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]+/u', ' ', (string) $details['message']));
+        $text = (string) preg_replace('/\r\n|\r|\n/', "\r\n", $text);
+        if ($text === '' || strlen($text) > 4000) {
+            throw new RuntimeException('[mailer] Invalid notification email details.');
+        }
+        $subject = 'SMART ASSESS: Update on your request (' . $reference . ')';
+        $body = 'Dear ' . ($name !== '' ? $name : 'Client') . ",\r\n\r\n"
+            . $text . "\r\n\r\n"
+            . "Reference Number: {$reference}\r\n"
+            . "Check the status of your request on the SMART ASSESS website:\r\n"
+            . 'https://smartassessmabini.com/?track=' . rawurlencode($reference) . "\r\n\r\n"
+            . "Thank you,\r\n"
+            . "SMART ASSESS\r\n"
+            . "Municipal Assessor's Office, Mabini, Batangas";
+    } else {
+        $requestType = $flow === 'docreq' ? 'Document Request' : 'Land Transfer request';
+        $subject = 'SMART ASSESS: We received your ' . $requestType . ' (' . $reference . ')';
 
-    // Plain text with short paragraphs: readable in any mail app and on phones.
-    $body = 'Dear ' . ($name !== '' ? $name : 'Client') . ",\r\n\r\n"
-        . 'We received your ' . $requestType . " at the Municipal Assessor's Office of Mabini, Batangas.\r\n\r\n"
-        . "Reference Number: {$reference}\r\n\r\n"
-        . "Please keep this number. You can use it to check the status of your request on the SMART ASSESS website:\r\n"
-        . 'https://smartassessmabini.com/?track=' . rawurlencode($reference) . "\r\n\r\n"
-        . "When your request is ready, please claim it in person at the Municipal Assessor's Office during office hours.\r\n\r\n"
-        . "Thank you,\r\n"
-        . "SMART ASSESS\r\n"
-        . "Municipal Assessor's Office, Mabini, Batangas";
+        // Plain text with short paragraphs: readable in any mail app and on phones.
+        $body = 'Dear ' . ($name !== '' ? $name : 'Client') . ",\r\n\r\n"
+            . 'We received your ' . $requestType . " at the Municipal Assessor's Office of Mabini, Batangas.\r\n\r\n"
+            . "Reference Number: {$reference}\r\n\r\n"
+            . "Please keep this number. You can use it to check the status of your request on the SMART ASSESS website:\r\n"
+            . 'https://smartassessmabini.com/?track=' . rawurlencode($reference) . "\r\n\r\n"
+            . "When your request is ready, please claim it in person at the Municipal Assessor's Office during office hours.\r\n\r\n"
+            . "Thank you,\r\n"
+            . "SMART ASSESS\r\n"
+            . "Municipal Assessor's Office, Mabini, Batangas";
+    }
 
     $mime = "To: {$email}\r\n"
         . "Subject: {$subject}\r\n"

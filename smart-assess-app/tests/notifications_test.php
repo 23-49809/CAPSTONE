@@ -2,8 +2,10 @@
 declare(strict_types=1);
 
 /*
- * Repeatable tests for client notifications: the confirmation email (Gmail)
- * and SMS (IPROG), using the real code from gmail-mailer.php and web/api.php.
+ * Repeatable tests for client notifications: email (Gmail) and SMS (IPROG),
+ * using the real code from gmail-mailer.php and web/api.php. SMS and email are
+ * sent only when staff send a notification; submissions and status changes
+ * never send either (checked below).
  *
  * Never sends a real email or SMS and never uses SMS credits:
  *  - HOME is cleared and SMART_ASSESS_GMAIL_DIR points at an empty temporary
@@ -135,10 +137,9 @@ $extract = static function (string $name) use ($api): string {
     }
     throw new RuntimeException("Could not read {$name}");
 };
-preg_match('/^const SA_SMS_PREFIX = .*;$/m', $api, $prefix);
-$code = $prefix[0] . "\n";
-foreach (['sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_sms_notify', 'sa_email_confirmation',
-          'sa_sms_confirmation_message', 'sa_sms_status_message'] as $function) {
+$code = '';
+foreach (['sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_email_config_dir', 'sa_email_configured',
+          'sa_email_deliver'] as $function) {
     $code .= $extract($function) . "\n";
 }
 $code = str_replace("dirname(__DIR__) . '/iprog-sms.php'", var_export($iprogCopy, true), $code);
@@ -210,61 +211,76 @@ try {
 }
 putenv('SMART_ASSESS_GMAIL_DIR=' . $work . '/empty-gmail-dir');
 
+// Staff message mode (the Notifications page).
+$staff = ['email' => 'juana.test@example.invalid', 'first_name' => 'Juana', 'last_name' => 'Dela Cruz', 'reference_no' => 'DR-2026-TEST0001',
+          'message' => "Your request was not approved.\nPlease submit the missing Tax Clearance."];
+$captured = null;
+$mailer($staff, static function (string $raw) use (&$captured): void { $captured = $raw; });
+[$head, $body] = $decode((string) $captured);
+$check('staff email: recipient and subject', str_contains($head, "To: juana.test@example.invalid\r\n") && str_contains($head, 'Subject: SMART ASSESS: Update on your request (DR-2026-TEST0001)'), $head);
+$check('staff email: greeting, staff text with its line break, reference, tracking link', str_contains($body, 'Dear Juana Dela Cruz,')
+    && str_contains($body, "Your request was not approved.\r\nPlease submit the missing Tax Clearance.") && str_contains($body, 'Reference Number: DR-2026-TEST0001')
+    && str_contains($body, 'https://smartassessmabini.com/?track=DR-2026-TEST0001'), $body);
+$captured = null;
+$mailer(['message' => "Hello\r\nBcc: attacker@example.invalid"] + $staff, static function (string $raw) use (&$captured): void { $captured = $raw; });
+$check('staff email: line breaks in the message cannot add headers', $headerLines($decode((string) $captured)[0]) === ['To', 'Subject', 'MIME-Version', 'Content-Type', 'Content-Transfer-Encoding']);
+foreach (['empty message' => ['message' => "  \n "], 'invalid email' => ['email' => 'nope'], 'invalid reference' => ['reference_no' => "DR\r\nX"]] as $label => $override) {
+    try {
+        $mailer($override + $staff, static function (): void {});
+        $check("staff email: {$label} rejected", false, 'accepted');
+    } catch (RuntimeException $e) {
+        $check("staff email: {$label} rejected", $e->getMessage() === '[mailer] Invalid notification email details.', $e->getMessage());
+    }
+}
+
+$check('email setup: empty settings folder -> not configured', sa_email_configured() === false);
+file_put_contents($work . '/empty-gmail-dir/gmail-token.json', '{}');
+file_put_contents($work . '/empty-gmail-dir/google-oauth-client.json', '{}');
+$check('email setup: token and client files present -> configured', sa_email_configured() === true);
+unlink($work . '/empty-gmail-dir/gmail-token.json');
+unlink($work . '/empty-gmail-dir/google-oauth-client.json');
+
 $reset();
-$outcome = sa_email_confirmation(['id' => 11, 'client_id' => null], $details);
-$check('email outcome: Gmail accepted -> recorded "sent"', $outcome === 'sent' && $rows() === [['channel' => 'email', 'type' => 'email_request_received', 'delivery_status' => 'sent', 'message' => 'Confirmation email for DR-2026-TEST0001']], $rows());
-$check('email outcome: record holds no email address', !str_contains(json_encode($rows()), '@'));
-$reset();
+$check('email deliver: Gmail accepted -> "sent", nothing logged with the address', sa_email_deliver($staff, 'request ID 11; staff_message email') === 'sent' && count(file($work . '/mail.log')) === 1);
 $GLOBALS['SA_TEST_MAILER'] = $app . '/gmail-mailer.php';
-$outcome = sa_email_confirmation(['id' => 12, 'client_id' => null], $details);
-$check('email outcome: no credentials -> recorded "failed", never "sent"', $outcome === 'failed' && $rows()[0]['delivery_status'] === 'failed', $rows());
+$check('email deliver: no credentials -> "failed", never "sent"', sa_email_deliver($staff, 'request ID 12; staff_message email') === 'failed');
 $GLOBALS['SA_TEST_MAILER'] = $work . '/no-such-mailer.php';
-$reset();
-$check('email outcome: missing mailer file -> "failed" (no fatal error)', sa_email_confirmation(['id' => 13, 'client_id' => null], $details) === 'failed' && $rows()[0]['delivery_status'] === 'failed');
+$check('email deliver: missing mailer file -> "failed" (no fatal error)', sa_email_deliver($staff, 'request ID 13; staff_message email') === 'failed');
 $GLOBALS['SA_TEST_MAILER'] = $fakeMailer;
 
-// ================= SMS =================
-$texts = ['confirmation (document)' => sa_sms_confirmation_message('docreq', 'DR-2026-ABCDEF12'),
-          'confirmation (land transfer)' => sa_sms_confirmation_message('landtransfer', 'LT-2026-ABCDEF12')];
-foreach (['Processing', 'Approved', 'Out for Release', 'Rejected', 'Timed Out'] as $status) {
-    $texts["status {$status}"] = (string) sa_sms_status_message($status, 'DR-2026-ABCDEF12');
+// ================= No automatic sending =================
+foreach (['sa_submit_request', 'sa_update_request_status', 'sa_start_request_processing', 'sa_complete_request_processing'] as $function) {
+    $source = $extract($function);
+    $check("no automatic SMS/email in {$function}", !preg_match('/sa_sms_deliver|sa_email_deliver|sa_send_notification|gmail-mailer|IprogSmsService/', $source));
 }
-foreach ($texts as $label => $text) {
-    $check("sms text ({$label}): reference, no link or masking characters", str_contains($text, '-2026-ABCDEF12')
-        && !preg_match('~https?:|www\.|\.com|\*~i', $text), $text);
-}
-foreach ($texts as $label => $text) {
-    $check("sms text ({$label}): one SMS (160 characters or fewer, plain characters)", strlen($text) <= 160 && !preg_match('/[^\x20-\x7E]/', $text), strlen($text));
-}
-$check('sms text: back to Received sends nothing', sa_sms_status_message('Received', 'DR-2026-ABCDEF12') === null);
+$check('only sa_send_notification sends', substr_count($api, 'sa_sms_deliver(') === 2 && substr_count($api, 'sa_email_deliver(') === 2
+    && str_contains($extract('sa_send_notification'), 'sa_sms_deliver(') && str_contains($extract('sa_send_notification'), 'sa_email_deliver('));
 
-$request = ['id' => 21, 'client_id' => null, 'contact_number' => '+639171234567'];
-$message = sa_sms_confirmation_message('docreq', 'DR-2026-ABCDEF12');
-$reset();
-$check('sms switched off: nothing recorded or sent', sa_sms_notify($request, 'sms_request_received', $message) === 'disabled' && $rows() === [] && $hits() === []);
+// ================= SMS =================
+$message = 'SMART ASSESS test message for DR-2026-ABCDEF12.';
 putenv('SMART_ASSESS_SMS_ENABLED=1');
 $reset();
-$check('sms token missing: "failed", IPROG not contacted', sa_sms_notify($request, 'sms_request_received', $message) === 'failed' && $rows()[0]['delivery_status'] === 'failed' && $hits() === [], $rows());
+$check('sms token missing: "failed", IPROG not contacted', sa_sms_deliver('+639171234567', $message, 'request ID 21') === 'failed' && $hits() === []);
 putenv('IPROG_API_TOKEN=TEST-TOKEN-ONLY');
 $reset();
-$outcome = sa_sms_notify($request, 'sms_request_received', $message);
+$outcome = sa_sms_deliver('+639171234567', $message, 'request ID 21');
 $sent = $hits();
-$check('sms accepted: recorded "sent"', $outcome === 'sent' && $rows()[0]['channel'] === 'sms' && $rows()[0]['delivery_status'] === 'sent', $rows());
+$check('sms accepted: "sent"', $outcome === 'sent', $outcome);
 $check('sms accepted: one request to IPROG, normalised number, exact text', count($sent) === 1 && $sent[0]['phone'] === '639171234567' && $sent[0]['message'] === $message, $sent);
 $check('sms token: sent only as the api_token field', ($sent[0]['token'] ?? '') === 'TEST-TOKEN-ONLY' && ($sent[0]['fields'] ?? []) === ['api_token', 'phone_number', 'message'], $sent[0]['fields'] ?? []);
 foreach (['http_401' => 'failed', 'invalid_token' => 'failed', 'undocumented' => 'pending'] as $case => $expected) {
     file_put_contents($work . '/iprog/case.txt', $case);
     $reset();
-    $outcome = sa_sms_notify($request, 'sms_status_update', $message);
-    $check("sms IPROG reply '{$case}' -> \"{$expected}\"", $outcome === $expected && $rows()[0]['delivery_status'] === $expected && count($hits()) === 1, [$outcome, $rows()]);
+    $outcome = sa_sms_deliver('+639171234567', $message, 'request ID 21');
+    $check("sms IPROG reply '{$case}' -> \"{$expected}\" (one attempt, no retry)", $outcome === $expected && count($hits()) === 1, $outcome);
 }
 file_put_contents($work . '/iprog/case.txt', 'ok');
 $reset();
-$check('sms landline number: "failed", IPROG not contacted', sa_sms_notify(['contact_number' => '+632123456789'] + $request, 'sms_request_received', $message) === 'failed' && $hits() === []);
+$check('sms landline number: "failed", IPROG not contacted', sa_sms_deliver('+632123456789', $message, 'request ID 21') === 'failed' && $hits() === []);
 
 // ================= Logs =================
 $log = (string) @file_get_contents($errorLog);
-$check('logs: no token, phone number, email address, or message text', !preg_match('/TEST-TOKEN-ONLY|639171234567|9171234567|@example\.invalid|We received your/', $log), $log);
+$check('logs: no token, phone number, email address, or message text', !preg_match('/TEST-TOKEN-ONLY|639171234567|9171234567|@example\.invalid|We received your|missing Tax Clearance|SMART ASSESS test message/', $log), $log);
 $check('logs: failures are explained', str_contains($log, '[SMART_ASSESS_EMAIL]') && str_contains($log, '[SMART_ASSESS_SMS]'), $log);
 
 $failed = 0;
