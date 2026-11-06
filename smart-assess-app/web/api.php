@@ -1097,13 +1097,17 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
                     'request' => $id,
                 ]);
             if ($request['client_id'] !== null) {
+                $notificationMessage = 'Your request ' . $request['reference_no'] . ' is now ' . $status . '.';
+                if ($status === 'Rejected' && $reason !== null) {
+                    $notificationMessage .= ' Reason: ' . substr($reason, strlen('Rejected: '));
+                }
                 $pdo->prepare(
                     "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
                      VALUES (:client_id, :request_id, 'status_update', :message, 'system', 'sent')"
                 )->execute([
                     'client_id' => $request['client_id'],
                     'request_id' => $id,
-                    'message' => 'Your request ' . $request['reference_no'] . ' is now ' . $status . '.',
+                    'message' => $notificationMessage,
                 ]);
             }
             sa_audit('staff', (int) $user['id'], (string) $user['name'], 'Request processing completed', $request['reference_no']);

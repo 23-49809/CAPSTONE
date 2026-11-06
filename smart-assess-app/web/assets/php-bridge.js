@@ -892,24 +892,26 @@
     }
     if (type === 'update-status') {
       data.kind = form.getAttribute('data-kind') || '';
-      if (data.status === 'Rejected') {
-        // Rejected: no message is sent. Prepare a draft for the Notifications
-        // page, where staff review and edit it before sending.
-        jsonRequest('update_request_status', data).then(function () {
+      jsonRequest('update_request_status', data).then(function (result) {
+        if (data.status === 'Rejected') {
           try {
             sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({
               ref: data.id, category: data.rejection_category || '', note: data.rejection_note || ''
             }));
-            var saved = JSON.parse(localStorage.getItem('smartAssessMAOSystemV1') || '{}');
-            saved.view = 'notifications';
-            localStorage.setItem('smartAssessMAOSystemV1', JSON.stringify(saved));
-          } catch (error) { /* the page still opens; the draft is just not prefilled */ }
-          window.location.assign('/internal.php?view=notifications');
-        }).catch(function (error) {
-          notice(error.message);
-        });
-        return;
-      }
+          } catch (error) { /* the saved status notification is unaffected */ }
+        }
+        var refreshRequest = window.SMART_ASSESS_STATUS_UPDATED;
+        if (typeof refreshRequest !== 'function' || !refreshRequest(data, result.data)) {
+          notice('The status was saved, but the request details could not be refreshed. Reload this page to see the latest details.');
+          return;
+        }
+        notice(data.status === 'Rejected'
+          ? 'Request ' + data.id + ' was rejected.'
+          : 'Request ' + data.id + ' status updated to "' + data.status + '".', 'sent');
+      }).catch(function (error) {
+        notice(error.message);
+      });
+      return;
     }
     if (type === 'send-notif') {
       // One send per click: the button stays locked until the server answers.
