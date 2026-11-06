@@ -268,7 +268,8 @@ $page['notifs'] = array_map(static function (array $notification): array {
         'channel' => ($notification['actor'] ?? '') === 'email' ? 'Email' : 'SMS',
         // NULL = saved before IPROG sending existed (no SMS status).
         'deliveryStatus' => match ((string) ($notification['delivery_status'] ?? '')) {
-            'sent' => 'Sent',
+            // IPROG accepting an SMS is not proof it was delivered.
+            'sent' => ($notification['actor'] ?? '') === 'email' ? 'Sent' : 'Accepted',
             'failed' => 'Failed',
             'pending' => 'Pending',
             default => 'Recorded',

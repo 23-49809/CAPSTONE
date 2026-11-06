@@ -32,6 +32,11 @@ final class IprogSmsService
 
     private const CREDITS_ENDPOINT = 'https://www.iprogsms.com/api/v1/account/sms_credits';
 
+    private const STATUS_ENDPOINT = 'https://www.iprogsms.com/api/v1/sms_messages/status';
+
+    /** Reasons IPROG refuses a send for. Whole words, so "content" or "SMART ASSESS" never match. */
+    private const KNOWN_REFUSAL = '/invalid token|unauthori[sz]ed|\\b(?:smart(?!\\s+assess)|tnt)\\b|shared sender|sender name|insufficient|not enough|no (?:sms )?credits?|invalid (?:phone|mobile|number|recipient)/i';
+
     private function __construct(private readonly string $apiToken)
     {
         if ($this->apiToken === '') {
@@ -67,16 +72,56 @@ final class IprogSmsService
 
     /**
      * Checks the token and credits without sending or spending anything.
-     * token_ok is null and credits null when IPROG could not be asked or the
-     * reply was not understood; the token is never logged or returned.
+     * reachable is false when IPROG could not be asked at all; token_ok and
+     * credits are null when its reply did not say. The token is never logged
+     * or returned.
      *
-     * @return array{token_ok:?bool, credits:?int}
+     * @return array{reachable:bool, token_ok:?bool, credits:?int}
      */
     public function accountStatus(): array
     {
-        $handle = curl_init(self::CREDITS_ENDPOINT . '?' . http_build_query(['api_token' => $this->apiToken]));
+        $status = ['reachable' => false, 'token_ok' => null, 'credits' => null];
+        $response = $this->getJson(self::CREDITS_ENDPOINT, ['api_token' => $this->apiToken], $status['reachable']);
+        if ($response === null) {
+            return $status;
+        }
+        if (is_string($response['message'] ?? null) && stripos($response['message'], 'invalid token') !== false) {
+            $status['token_ok'] = false;
+            return $status;
+        }
+        $providerStatus = $response['status'] ?? null;
+        if ($providerStatus === 'success' || $providerStatus === 200 || $providerStatus === '200') {
+            $status['token_ok'] = true;
+        }
+        $balance = is_array($response['data'] ?? null) ? ($response['data']['load_balance'] ?? null) : null;
+        if (is_numeric($balance)) {
+            $status['token_ok'] = true;
+            $status['credits'] = (int) floor((float) $balance);
+        }
+        return $status;
+    }
+
+    /**
+     * IPROG's current status for a message it accepted ("pending", "completed",
+     * ...), lowercased, or null when it cannot say. Spends nothing, sends nothing.
+     */
+    public function messageStatus(string $messageId): ?string
+    {
+        $reachable = false;
+        $response = $this->getJson(self::STATUS_ENDPOINT, ['api_token' => $this->apiToken, 'message_id' => $messageId], $reachable);
+        $status = $response['message_status'] ?? null;
+        return is_string($status) && $status !== '' ? strtolower(trim($status)) : null;
+    }
+
+    /** GET a JSON reply from IPROG. Null when unreachable or unreadable; the URL holds the token, so it is never logged. */
+    private function getJson(string $url, array $query, bool &$reachable): ?array
+    {
+        if (!function_exists('curl_init')) {
+            return null;
+        }
+        $handle = curl_init($url . '?' . http_build_query($query));
         if ($handle === false) {
-            return ['token_ok' => null, 'credits' => null];
+            return null;
         }
         curl_setopt_array($handle, [
             CURLOPT_RETURNTRANSFER => true,
@@ -87,21 +132,12 @@ final class IprogSmsService
             CURLOPT_SSL_VERIFYHOST => 2,
         ]);
         $body = curl_exec($handle);
-        $response = is_string($body) ? json_decode($body, true) : null;
-        if (!is_array($response)) {
-            return ['token_ok' => null, 'credits' => null];
+        if (!is_string($body)) {
+            return null;
         }
-        if (is_string($response['message'] ?? null) && stripos($response['message'], 'invalid token') !== false) {
-            return ['token_ok' => false, 'credits' => null];
-        }
-        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
-        foreach (['load_balance', 'sms_credits', 'credits', 'balance'] as $key) {
-            $value = $data[$key] ?? $response[$key] ?? null;
-            if (is_numeric($value)) {
-                return ['token_ok' => true, 'credits' => (int) $value];
-            }
-        }
-        return ['token_ok' => null, 'credits' => null];
+        $reachable = true;
+        $response = json_decode($body, true);
+        return is_array($response) ? $response : null;
     }
 
     /**
@@ -113,6 +149,9 @@ final class IprogSmsService
             throw new InvalidArgumentException('SMS message must contain 1 to 1000 bytes.');
         }
         $normalizedPhoneNumber = self::normalizePhoneNumber($phoneNumber);
+        if (!function_exists('curl_init')) {
+            throw new RuntimeException('The PHP cURL extension is not installed.');
+        }
 
         $handle = curl_init(self::ENDPOINT);
         if ($handle === false) {
@@ -156,7 +195,7 @@ final class IprogSmsService
             error_log('[IPROG_SMS] Invalid JSON response; HTTP ' . $httpStatus . '.');
             throw new IprogSmsException(
                 'IPROG SMS returned an invalid response.',
-                $httpStatus >= 400 && $httpStatus < 500
+                $httpStatus === 401 || $httpStatus === 403
                     ? IprogSmsException::REJECTED
                     : IprogSmsException::UNCERTAIN
             );
@@ -180,7 +219,7 @@ final class IprogSmsService
                 $normalizedPhoneNumber,
                 $message
             );
-            $outcome = self::rejectionOutcome($httpStatus, $providerStatusValue);
+            $outcome = self::rejectionOutcome($httpStatus, $providerStatusValue, $safeProviderMessage);
             $summary = $outcome === IprogSmsException::REJECTED
                 ? 'rejected the request'
                 : 'did not confirm the request (it may still have been queued)';
@@ -209,29 +248,28 @@ final class IprogSmsService
     }
 
     /**
-     * IPROG documents only the success body, so a refusal is treated as
-     * definite only when it is explicit: an HTTP 4xx, or an HTTP 2xx whose body
-     * status is an error code (400 or above) or the word "error"/"failed".
-     * HTTP 5xx and any other body status (e.g. an undocumented "success") may
-     * still have been queued, so they are UNCERTAIN.
+     * "Not sent" is claimed only when IPROG says so unmistakably: HTTP 401/403,
+     * or an error reply whose reason is one it is known to refuse a send for.
+     * Everything else (HTTP 5xx, an unrecognised reason or reply) may still have
+     * been queued, so it is UNCERTAIN and must never be retried automatically.
      */
-    private static function rejectionOutcome(int $httpStatus, mixed $providerStatusValue): string
+    private static function rejectionOutcome(int $httpStatus, mixed $providerStatusValue, string $providerMessage): string
     {
+        if ($httpStatus === 401 || $httpStatus === 403) {
+            return IprogSmsException::REJECTED;
+        }
+        if ($httpStatus >= 500 || !preg_match(self::KNOWN_REFUSAL, $providerMessage)) {
+            return IprogSmsException::UNCERTAIN;
+        }
         if ($httpStatus >= 400 && $httpStatus < 500) {
             return IprogSmsException::REJECTED;
         }
-        if ($httpStatus >= 200 && $httpStatus < 300) {
-            if (is_int($providerStatusValue) || (is_string($providerStatusValue) && ctype_digit($providerStatusValue))) {
-                if ((int) $providerStatusValue >= 400) {
-                    return IprogSmsException::REJECTED;
-                }
-            } elseif (is_string($providerStatusValue)
-                && in_array(strtolower($providerStatusValue), ['error', 'failed', 'fail'], true)) {
-                return IprogSmsException::REJECTED;
-            }
+        if (is_int($providerStatusValue) || (is_string($providerStatusValue) && ctype_digit($providerStatusValue))) {
+            return (int) $providerStatusValue >= 400 ? IprogSmsException::REJECTED : IprogSmsException::UNCERTAIN;
         }
-
-        return IprogSmsException::UNCERTAIN;
+        return is_string($providerStatusValue) && in_array(strtolower($providerStatusValue), ['error', 'failed', 'fail'], true)
+            ? IprogSmsException::REJECTED
+            : IprogSmsException::UNCERTAIN;
     }
 
     private function safeProviderMessage(

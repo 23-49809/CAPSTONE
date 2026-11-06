@@ -613,6 +613,11 @@
   @media (max-width:1024px), (pointer:coarse){ .modal .review-row .v .btn-process{ min-height:44px; } }
   .modal.req-detail .btn, .modal.req-detail .action-btn{ font-weight:600; }
   .nf-draft{ margin:0 0 16px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--warn-bg); color:var(--warn); font-size:13px; line-height:1.45; }
+  .nf-override{ margin:16px 0; padding:16px; border:1px solid var(--danger); border-radius:var(--radius-sm); background:var(--danger-bg); font-size:13.5px; line-height:1.5; }
+  .nf-override h4{ margin:0 0 6px; font-size:15px; color:var(--danger); }
+  .nf-override .field{ margin:10px 0; }
+  .nf-override .nf-channel{ align-items:flex-start; }
+  .nf-override .nf-actions{ margin-top:12px; }
   .nf-services{ display:flex; flex-direction:column; gap:4px; margin:0 0 16px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); font-size:13px; line-height:1.45; }
   .nf-services .is-down{ color:var(--danger); font-weight:600; }
   .nf-channels{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:4px 0 16px; padding:0; border:0; }
@@ -2766,12 +2771,13 @@ function renderNotifications(acct){
   var items = pg.items.map(function(n){
     var name = n.clientName || n.applicant || 'Client information unavailable';
     var status = n.deliveryStatus || 'Recorded';
-    var pillTone = {Sent:'sent', Failed:'failed', Pending:'pending'}[status] || 'recorded';
+    var pillTone = {Sent:'sent', Accepted:'sent', Failed:'failed', Pending:'pending'}[status] || 'recorded';
     var isEmail = n.channel==='Email';
     var pillTitle = ({
-      Sent: isEmail ? 'Accepted by Gmail for sending.' : 'Accepted by IPROG for sending. This does not confirm it reached the phone.',
+      Sent: 'Accepted by Gmail for sending.',
+      Accepted: 'Accepted by IPROG for sending. This does not confirm it reached the phone.',
       Failed: isEmail ? 'Gmail did not accept this email. It was not sent.' : 'IPROG did not accept this SMS. It was not sent.',
-      Pending: isEmail ? 'Outcome unconfirmed.' : 'Outcome unconfirmed. Check the IPROG account before sending again.'
+      Pending: isEmail ? 'Outcome unconfirmed.' : 'Outcome unconfirmed. It may have reached the client, so further SMS for this request are blocked.'
     })[status] || 'Status update shown in request tracking. No SMS or email was sent.';
     var pillText = status==='Recorded' ? 'Tracking only' : (isEmail?'Email':'SMS')+' · '+status;
     return '<div class="sent-item" role="button" tabindex="0" aria-expanded="false" data-action="toggle-sent-item">'
