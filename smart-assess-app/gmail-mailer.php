@@ -10,10 +10,13 @@
  * Credentials: SMART_ASSESS_GMAIL_DIR (folder with google-oauth-client.json
  * and gmail-token.json), else $HOME/.config/smart-assess. Keep it outside the
  * web root and readable/writable only by the web server user.
- * $transport is for tests only: it receives the encoded message instead of
- * Gmail.
+ * $details['check_only'] verifies the Gmail authorization without sending.
+ * $transport and $refresher are for tests only: they replace Gmail and Google's
+ * token refresh.
  */
-return static function (array $details, ?callable $transport = null): void {
+return static function (array $details, ?callable $transport = null, ?callable $refresher = null): void {
+    $checkOnly = !empty($details['check_only']);
+    if (!$checkOnly) {
     // Validate and build the message before touching any credentials.
     $email = (string) ($details['email'] ?? '');
     $reference = (string) ($details['reference_no'] ?? '');
@@ -74,6 +77,9 @@ return static function (array $details, ?callable $transport = null): void {
         $transport($raw);
         return;
     }
+    } elseif ($transport !== null) {
+        return;
+    }
 
     $configDir = getenv('SMART_ASSESS_GMAIL_DIR');
     if ($configDir === false || trim($configDir) === '') {
@@ -113,10 +119,21 @@ return static function (array $details, ?callable $transport = null): void {
             throw new RuntimeException('[mailer] Gmail authorization must be renewed.');
         }
 
-        $newToken = $client->fetchAccessTokenWithRefreshToken($refreshToken);
+        try {
+            $newToken = $refresher !== null
+                ? $refresher($refreshToken)
+                : $client->fetchAccessTokenWithRefreshToken($refreshToken);
+        } catch (Throwable) {
+            throw new RuntimeException('[mailer] Could not reach Google to refresh the Gmail authorization.');
+        }
 
         if (isset($newToken['error'])) {
-            throw new RuntimeException('[mailer] Gmail access-token refresh failed.');
+            // invalid_grant: Google will never accept this token again, so a retry cannot help.
+            if ($newToken['error'] === 'invalid_grant') {
+                throw new RuntimeException('[mailer] Gmail authorization has expired or been revoked (invalid_grant). An administrator must re-authorize Gmail.');
+            }
+            $code = preg_replace('/[^a-z_]/', '', strtolower((string) $newToken['error']));
+            throw new RuntimeException('[mailer] Google refused the Gmail token refresh (' . $code . '). An administrator must check the Gmail OAuth client.');
         }
 
         if (empty($newToken['refresh_token'])) {
@@ -126,28 +143,45 @@ return static function (array $details, ?callable $transport = null): void {
         $token = array_merge($token, $newToken);
         $tempPath = $tokenPath . '.tmp.' . bin2hex(random_bytes(4));
 
-        if (file_put_contents(
+        // The new access token is valid whether or not it can be saved: a folder
+        // the web server cannot write to only means it is refreshed again next time.
+        $saved = @file_put_contents(
             $tempPath,
-            json_encode($token, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            (string) json_encode($token, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
             LOCK_EX
-        ) === false) {
-            throw new RuntimeException('[mailer] Could not save the refreshed Gmail token.');
+        ) !== false;
+        if ($saved) {
+            @chmod($tempPath, 0600);
+            $saved = @rename($tempPath, $tokenPath);
+            if ($saved) {
+                @chmod($tokenPath, 0600);
+            } else {
+                @unlink($tempPath);
+            }
         }
-
-        chmod($tempPath, 0600);
-
-        if (!rename($tempPath, $tokenPath)) {
-            @unlink($tempPath);
-            throw new RuntimeException('[mailer] Could not update the private Gmail token.');
+        if (!$saved) {
+            error_log('[SMART_ASSESS_EMAIL] The refreshed Gmail token could not be saved; check that the web server owns the Gmail settings folder.');
         }
-
-        chmod($tokenPath, 0600);
         $client->setAccessToken($token);
+    }
+
+    if ($checkOnly) {
+        return;
     }
 
     $gmail = new Google\Service\Gmail($client);
     $message = new Google\Service\Gmail\Message();
     $message->setRaw($raw);
 
-    $gmail->users_messages->send('me', $message);
+    try {
+        $gmail->users_messages->send('me', $message);
+    } catch (Google\Service\Exception $exception) {
+        $status = (int) $exception->getCode();
+        if ($status >= 400 && $status < 500) {
+            throw new RuntimeException('[mailer] Gmail refused the message (HTTP ' . $status . ').');
+        }
+        throw new RuntimeException('[mailer] Gmail did not confirm the message (HTTP ' . $status . ').');
+    } catch (Throwable) {
+        throw new RuntimeException('[mailer] Gmail did not confirm the message (no reply from Google).');
+    }
 };

@@ -1158,7 +1158,7 @@ function sa_sms_load_service(): bool
  * (outcome unknown: timeout, server error, unrecognised reply). The log line
  * holds only $context and the outcome, never the token, number or message.
  */
-function sa_sms_deliver(string $phoneNumber, string $message, string $context): string
+function sa_sms_deliver(string $phoneNumber, string $message, string $context, ?string &$staffReason = null): string
 {
     $reason = null;
     try {
@@ -1170,18 +1170,32 @@ function sa_sms_deliver(string $phoneNumber, string $message, string $context): 
     } catch (IprogSmsException $exception) {
         $outcome = $exception->outcome() === IprogSmsException::REJECTED ? 'failed' : 'pending';
         $reason = $outcome === 'failed' ? 'IPROG did not accept it' : 'IPROG did not confirm it';
+        $staffReason = sa_sms_failure_reason($exception->getMessage());
     } catch (InvalidArgumentException) {
         $outcome = 'failed';
         $reason = 'invalid or unsupported recipient number or message';
+        $staffReason = 'The phone number or message is not valid for SMS.';
     } catch (RuntimeException) {
         $outcome = 'failed';
         $reason = 'SMS service not configured or unavailable';
+        $staffReason = 'The SMS service is not configured on the server.';
     } catch (Throwable) {
         $outcome = 'pending';
         $reason = 'unexpected error';
     }
     error_log('[SMART_ASSESS_SMS] ' . $context . '; outcome ' . $outcome . ' (' . $reason . ').');
     return $outcome;
+}
+
+/** Fixed staff wording for an IPROG refusal; provider text is never shown as-is. */
+function sa_sms_failure_reason(string $providerMessage): string
+{
+    return match (true) {
+        (bool) preg_match('/invalid token|unauthori[sz]ed/i', $providerMessage) => 'IPROG says the API token on the server is invalid. An administrator must update it.',
+        (bool) preg_match('/credit|balance|insufficient/i', $providerMessage) => 'The IPROG account does not have enough credits. An administrator must top it up.',
+        (bool) preg_match('/sender/i', $providerMessage) => 'IPROG refused the sender name. An administrator must check it in the IPROG account.',
+        default => 'IPROG did not accept it. Check the message and number, then try again.',
+    };
 }
 
 /**
@@ -1211,7 +1225,7 @@ function sa_email_configured(): bool
  * 'failed' otherwise. Logs the context and a fixed reason only, never the
  * address, message or credentials. Never throws.
  */
-function sa_email_deliver(array $details, string $context): string
+function sa_email_deliver(array $details, string $context, ?string &$staffReason = null): string
 {
     try {
         $mailerPath = dirname(__DIR__) . '/gmail-mailer.php';
@@ -1227,8 +1241,81 @@ function sa_email_deliver(array $details, string $context): string
             ? substr($message, 9)
             : get_class($exception) . ' (code ' . (int) $exception->getCode() . ')';
         error_log('[SMART_ASSESS_EMAIL] ' . $context . '; email failed: ' . $reason);
-        return 'failed';
+        $staffReason = str_starts_with($message, '[mailer] ') ? $reason : 'The email service failed on the server.';
+        return str_contains($message, 'did not confirm') ? 'pending' : 'failed';
     }
+}
+
+/**
+ * Can email be sent right now? Reads the configuration the web server really
+ * has and asks Google to confirm the authorization (refreshing an expired
+ * access token), without sending. Reports fixed text only. Never throws.
+ *
+ * @return array{ready:bool, message:string}
+ */
+function sa_email_status(): array
+{
+    $dir = sa_email_config_dir();
+    if ($dir === null) {
+        return ['ready' => false, 'message' => 'Email is not set up: SMART_ASSESS_GMAIL_DIR is not set on the web server.'];
+    }
+    if (!sa_email_configured()) {
+        return ['ready' => false, 'message' => 'Email is not set up: the web server cannot read the Gmail OAuth client and token files in its Gmail settings folder.'];
+    }
+    $reason = null;
+    try {
+        $check = require dirname(__DIR__) . '/gmail-mailer.php';
+        $check(['check_only' => true]);
+        return ['ready' => true, 'message' => 'Gmail is authorized and ready.'];
+    } catch (Throwable $exception) {
+        $reason = $exception->getMessage();
+    }
+    error_log('[SMART_ASSESS_EMAIL] Status check failed: ' . (str_starts_with($reason, '[mailer] ') ? substr($reason, 9) : 'unexpected error'));
+    return ['ready' => false, 'message' => str_starts_with($reason, '[mailer] ') ? substr($reason, 9) : 'The email service failed on the server.'];
+}
+
+/**
+ * Can SMS be sent right now? Reads the web server's real configuration and
+ * asks IPROG about the token and credits, without sending or spending
+ * anything. Reports fixed text only, never the token. Never throws.
+ *
+ * @return array{ready:bool, message:string, credits:?int}
+ */
+function sa_sms_status(): array
+{
+    $problem = static fn (string $message): array => ['ready' => false, 'message' => $message, 'credits' => null];
+    if (!sa_sms_enabled()) {
+        return $problem('SMS is turned off: SMART_ASSESS_SMS_ENABLED is not set to 1 on the web server.');
+    }
+    if (!sa_has_column('request_status_log', 'delivery_status') || !sa_has_column('request_status_log', 'sms_sent_by_id')) {
+        return $problem('SMS is not set up: the database update 20261019_add_sms_delivery_status.sql has not been run.');
+    }
+    if (!sa_sms_load_service()) {
+        return $problem('SMS is not set up: the SMS service file is missing.');
+    }
+    try {
+        $account = IprogSmsService::fromEnvironment()->accountStatus();
+    } catch (RuntimeException) {
+        return $problem('SMS is not set up: IPROG_API_TOKEN is not set on the web server.');
+    } catch (Throwable) {
+        return ['ready' => true, 'message' => 'SMS is set up, but IPROG could not be checked just now.', 'credits' => null];
+    }
+    if ($account['token_ok'] === false) {
+        return $problem('IPROG says the API token on the server is invalid. An administrator must update it.');
+    }
+    if ($account['credits'] === null) {
+        return ['ready' => true, 'message' => 'SMS is set up. IPROG did not report the credit balance.', 'credits' => null];
+    }
+    return ['ready' => true, 'credits' => $account['credits'], 'message' => $account['credits'] > 0
+        ? 'SMS is ready. IPROG credits: ' . $account['credits'] . '.'
+        : 'IPROG reports 0 credits, so SMS will fail until the account is topped up.'];
+}
+
+/** Service status for the Notifications page (staff only). */
+function sa_notification_status(): array
+{
+    sa_internal_or_fail(['STAFF']);
+    return ['sms' => sa_sms_status(), 'email' => sa_email_status()];
 }
 
 /**
@@ -1312,6 +1399,10 @@ function sa_send_notification(array $data): array
         if (!sa_email_configured()) {
             throw new SaHttpException(503, 'Email sending is not set up on the server yet, so nothing was sent. Contact the administrator, or send by SMS only.');
         }
+        $emailStatus = sa_email_status();
+        if (!$emailStatus['ready']) {
+            throw new SaHttpException(503, $emailStatus['message'] . ' Nothing was sent. You can send by SMS only.');
+        }
     }
 
     // One send at a time per request, and no repeat of the same message.
@@ -1370,15 +1461,16 @@ function sa_send_notification(array $data): array
 
             // One attempt only, outside any transaction.
             $context = 'request ID ' . (int) $requestId . '; staff_message ' . $channel;
+            $reason = null;
             $outcome = $channel === 'sms'
-                ? sa_sms_deliver((string) $request['contact_number'], $message, $context)
+                ? sa_sms_deliver((string) $request['contact_number'], $message, $context, $reason)
                 : sa_email_deliver([
                     'email' => (string) $request['email'],
                     'first_name' => (string) $request['first_name'],
                     'last_name' => (string) $request['last_name'],
                     'reference_no' => (string) $request['reference_no'],
                     'message' => $message,
-                ], $context);
+                ], $context, $reason);
 
             $recorded = true;
             try {
@@ -1401,7 +1493,7 @@ function sa_send_notification(array $data): array
             } catch (Throwable) {
                 error_log('[SMART_ASSESS_NOTIFY] Could not write the audit entry; log ID ' . $logId . '.');
             }
-            $outcomes[$channel] = ['status' => $recorded ? $outcome : 'pending', 'notification_id' => $notificationId];
+            $outcomes[$channel] = ['status' => $recorded ? $outcome : 'pending', 'notification_id' => $notificationId, 'reason' => $reason];
         }
     } finally {
         $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lockName) . ')');
@@ -1411,14 +1503,16 @@ function sa_send_notification(array $data): array
     if (isset($outcomes['sms'])) {
         $lines[] = match ($outcomes['sms']['status']) {
             'sent' => 'SMS: accepted by IPROG for sending (this does not confirm it reached the phone).',
-            'failed' => 'SMS: NOT sent. IPROG did not accept it. Check the message and number, then try again.',
+            'failed' => 'SMS: NOT sent. ' . ($outcomes['sms']['reason'] ?? 'IPROG did not accept it.'),
             default => 'SMS: outcome unconfirmed. Check the IPROG account before sending again, so the client does not get it twice.',
         };
     }
     if (isset($outcomes['email'])) {
-        $lines[] = $outcomes['email']['status'] === 'sent'
-            ? 'Email: sent through Gmail.'
-            : 'Email: NOT sent. Gmail did not accept it. Try again later or contact the administrator.';
+        $lines[] = match ($outcomes['email']['status']) {
+            'sent' => 'Email: accepted by Gmail for sending.',
+            'failed' => 'Email: NOT sent. ' . ($outcomes['email']['reason'] ?? 'Gmail did not accept it.'),
+            default => 'Email: outcome unconfirmed. Check the Sent folder of the office Gmail account before sending again.',
+        };
     }
     $statuses = array_column($outcomes, 'status');
     $overall = in_array('failed', $statuses, true) ? 'failed' : (in_array('pending', $statuses, true) ? 'pending' : 'sent');
@@ -1471,7 +1565,13 @@ function sa_lookup_request_owner(array $data): array
             return ['ownerName' => $clientName, 'ownerType' => 'Client'] + $contact;
         }
     }
-    return ['ownerName' => 'Owner name unavailable', 'ownerType' => null] + $contact;
+    // Not the owner and no client account: the applicant on the request is the recipient.
+    $applicant = trim(implode(' ', array_filter([
+        trim((string) ($request['first_name'] ?? '')),
+        trim((string) ($request['middle_name'] ?? '')),
+        trim((string) ($request['last_name'] ?? '')),
+    ], static fn(string $part): bool => $part !== '')));
+    return ['ownerName' => $applicant !== '' ? $applicant : 'Owner name unavailable', 'ownerType' => $applicant !== '' ? 'Applicant' : null] + $contact;
 }
 
 function sa_generate_ai_message(array $data): array
@@ -2626,6 +2726,7 @@ try {
         'complete_processing' => sa_complete_request_processing($data),
         'send_notification' => sa_send_notification($data),
         'lookup_request_owner' => sa_lookup_request_owner($data),
+        'notification_status' => sa_notification_status(),
         'generate_ai_message' => sa_generate_ai_message($data),
         'admin_create_user' => sa_admin_user_change($data, 'create'),
         'admin_edit_user' => sa_admin_user_change($data, 'edit'),
