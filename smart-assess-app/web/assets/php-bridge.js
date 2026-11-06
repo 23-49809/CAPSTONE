@@ -892,14 +892,25 @@
     }
     if (type === 'update-status') {
       data.kind = form.getAttribute('data-kind') || '';
-      jsonRequest('update_request_status', data).then(function (result) {
-        if (data.status === 'Rejected') {
+      if (data.status === 'Rejected') {
+        jsonRequest('update_request_status', data).then(function (result) {
+          if (!result.data || result.data.status !== 'Rejected') {
+            notice('The request status was not updated to Rejected. Please try again.');
+            return;
+          }
           try {
-            sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({
-              ref: data.id, category: data.rejection_category || '', note: data.rejection_note || ''
-            }));
-          } catch (error) { /* the saved status notification is unaffected */ }
-        }
+            sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({ ref: data.id }));
+            var saved = JSON.parse(localStorage.getItem('smartAssessMAOSystemV1') || '{}');
+            saved.view = 'notifications';
+            localStorage.setItem('smartAssessMAOSystemV1', JSON.stringify(saved));
+          } catch (error) { /* the Notifications view still opens from its URL */ }
+          window.location.assign('/internal.php?view=notifications');
+        }).catch(function (error) {
+          notice(error.message);
+        });
+        return;
+      }
+      jsonRequest('update_request_status', data).then(function (result) {
         var refreshRequest = window.SMART_ASSESS_STATUS_UPDATED;
         if (typeof refreshRequest !== 'function' || !refreshRequest(data, result.data)) {
           notice('The status was saved, but the request details could not be refreshed. Reload this page to see the latest details.');

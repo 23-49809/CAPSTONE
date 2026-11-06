@@ -89,8 +89,6 @@ foreach ($page['requests'] ?? [] as $request) {
             ? null : (string) $request['processing_staff_name'],
         'checklist' => $documentsByRequest[$requestId] ?? [],
         'history' => [],
-        // "Rejected: <reason>" saved when staff reject a request.
-        'advisory' => (string) ($request['advisory'] ?? ''),
     ];
     if ($isStaffViewer) {
         $clientAccount = trim((string) ($request['client_first_name'] ?? '') . ' ' . (string) ($request['client_last_name'] ?? ''));

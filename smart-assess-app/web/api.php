@@ -113,25 +113,6 @@ const SA_NOTIFICATION_CATEGORIES = [
     'Other Instruction',
 ];
 
-/** Reasons staff can choose when rejecting a request (stored in requests.advisory). */
-const SA_REJECTION_CATEGORIES = [
-    'Missing requirements',
-    'Incorrect information',
-    'Invalid or unclear documents',
-    'Other issue',
-];
-
-/** "Rejected: <category>" plus the optional staff note, or 422 when no valid category was chosen. */
-function sa_rejection_reason(array $data): string
-{
-    $category = trim((string) ($data['rejection_category'] ?? ''));
-    if (!in_array($category, SA_REJECTION_CATEGORIES, true)) {
-        throw new SaHttpException(422, 'Select the reason for rejecting this request.');
-    }
-    $note = sa_text($data, 'rejection_note', 500);
-    return 'Rejected: ' . $category . ($note !== null && trim($note) !== '' ? ' - ' . trim($note) : '');
-}
-
 /** The SMS category staff picked, or null when none was sent. */
 function sa_notification_category(array $data): ?string
 {
@@ -836,8 +817,7 @@ function sa_update_request_status(array $data): array
         return sa_start_request_processing(['request_id' => $id]);
     }
     if (in_array($status, ['Approved', 'Rejected', 'Out for Release'], true)) {
-        $reason = $status === 'Rejected' ? sa_rejection_reason($data) : null;
-        return sa_complete_request_processing(['request_id' => $id], $status, $reason);
+        return sa_complete_request_processing(['request_id' => $id], $status);
     }
     $advisory = sa_text($data, 'advisory', 2000);
     $pdo = sa_db();
@@ -1018,7 +998,7 @@ function sa_start_request_processing(array $data): array
     }
 }
 
-function sa_complete_request_processing(array $data, string $status = 'Out for Release', ?string $reason = null): array
+function sa_complete_request_processing(array $data, string $status = 'Out for Release'): array
 {
     $user = sa_internal_or_fail(['STAFF']);
     if (!in_array($status, ['Approved', 'Rejected', 'Out for Release'], true)) {
@@ -1058,10 +1038,6 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
                      processing_duration_seconds = TIMESTAMPDIFF(SECOND, processing_started_at, CURRENT_TIMESTAMP)
                  WHERE id = :id AND processing_completed_at IS NULL'
             )->execute(['status' => $status, 'id' => $id]);
-            if ($reason !== null) {
-                $pdo->prepare('UPDATE requests SET advisory = :reason WHERE id = :id')
-                    ->execute(['reason' => $reason, 'id' => $id]);
-            }
             $duration = $pdo->prepare(
                 'SELECT processing_completed_at, UNIX_TIMESTAMP(processing_completed_at) AS processing_completed_epoch,
                         processing_duration_seconds
@@ -1081,7 +1057,7 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
                 $hours,
                 $minutes,
                 $seconds
-            ) . ($reason !== null ? ' ' . $reason . '.' : '');
+            );
             $pdo->prepare(
                 'INSERT INTO request_status_log (request_id, status, actor, sms_body)
                  VALUES (:id, :status, :actor, :message)'
@@ -1097,17 +1073,13 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
                     'request' => $id,
                 ]);
             if ($request['client_id'] !== null) {
-                $notificationMessage = 'Your request ' . $request['reference_no'] . ' is now ' . $status . '.';
-                if ($status === 'Rejected' && $reason !== null) {
-                    $notificationMessage .= ' Reason: ' . substr($reason, strlen('Rejected: '));
-                }
                 $pdo->prepare(
                     "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
                      VALUES (:client_id, :request_id, 'status_update', :message, 'system', 'sent')"
                 )->execute([
                     'client_id' => $request['client_id'],
                     'request_id' => $id,
-                    'message' => $notificationMessage,
+                    'message' => 'Your request ' . $request['reference_no'] . ' is now ' . $status . '.',
                 ]);
             }
             sa_audit('staff', (int) $user['id'], (string) $user['name'], 'Request processing completed', $request['reference_no']);
