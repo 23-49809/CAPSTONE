@@ -63,12 +63,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') file_put_contents(__DIR__ . '/hits.lo
     'token' => $_POST['api_token'] ?? '', 'fields' => array_keys($_POST),
 ]) . "\n", FILE_APPEND);
 header('Content-Type: application/json');
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {   // credits check: never logged as a send
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {   // status checks: never logged as a send
+    if (isset($_GET['message_id'])) {
+        file_put_contents(__DIR__ . '/status-checks.log', $_GET['message_id'] . "\n", FILE_APPEND);
+        echo json_encode(['status' => 200, 'message_status' => match ($case) {
+            'status_failed' => 'failed', 'status_completed' => 'completed', 'status_garbled' => 123, default => 'pending',
+        }]);
+        return;
+    }
     echo match ($case) {
         'invalid_token' => '{"status":500,"message":"Invalid Token"}',
         'credits_zero' => '{"status":200,"data":{"load_balance":0}}',
         'garbled' => 'not json',
-        default => '{"status":200,"data":{"load_balance":42}}',
+        'no_balance' => '{"status":"success","message":"Account found.","data":{}}',
+        default => '{"status":"success","message":"Account found.","data":{"load_balance":42}}',
     };
     return;
 }
@@ -76,6 +84,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {   // credits check: never logged as 
     'http_401' => [401, '{"status":"error","message":"Unauthorized"}'],
     'invalid_token' => [200, '{"status":500,"message":"Invalid Token"}'],
     'no_credits' => [200, '{"status":500,"message":"Insufficient credits"}'],
+    'smart_tnt' => [422, '{"status":"error","message":"Smart/TNT networks do not accept shared sender names."}'],
+    'bad_sender' => [200, '{"status":500,"message":"Sender name is not approved"}'],
+    'other_refusal' => [200, '{"status":500,"message":"Message contains a blocked word"}'],
+    'http_500' => [500, 'server error'],
+    'body_error_unknown' => [200, '{"status":"error","message":"Temporary provider problem"}'],
+    'http_400_unknown' => [400, '{"status":"error","message":"Rejected for review"}'],
+    'not_json' => [400, 'not json'],
+    'echo_secrets' => [200, '{"status":500,"message":"Bad request for 639171234567 using TEST-TOKEN-ONLY"}'],
     'undocumented' => [200, '{"status":"success","message":"queued"}'],
     default => [200, '{"status":200,"message":"Your SMS message has been successfully added to the queue and will be processed shortly.","message_id":"iSms-TEST1"}'],
 };
@@ -99,16 +115,14 @@ for ($i = 0; $i < 50 && @file_get_contents('http://127.0.0.1:' . $port . '/stub.
 // Copy of iprog-sms.php pointed at the fake IPROG (the only change).
 $iprogCopy = $work . '/iprog-sms-test-copy.php';
 $iprogSource = (string) file_get_contents($app . '/iprog-sms.php');
-$replaced = 0;
-$iprogSource = str_replace('https://www.iprogsms.com/api/v1/sms_messages', 'http://127.0.0.1:' . $port . '/stub.php', $iprogSource, $replaced);
-if ($replaced !== 1) {
-    fwrite(STDERR, "Could not redirect the IPROG copy to the fake server; refusing to continue.\n");
-    exit(2);
-}
-$iprogSource = str_replace('https://www.iprogsms.com/api/v1/account/sms_credits', 'http://127.0.0.1:' . $port . '/stub.php', $iprogSource, $replaced);
-if ($replaced !== 1) {
-    fwrite(STDERR, "Could not redirect the IPROG credits check to the fake server; refusing to continue.\n");
-    exit(2);
+// Longest addresses first: the status address starts with the send address.
+foreach (['sms_messages/status', 'account/sms_credits', 'sms_messages'] as $path) {
+    $replaced = 0;
+    $iprogSource = str_replace('https://www.iprogsms.com/api/v1/' . $path, 'http://127.0.0.1:' . $port . '/stub.php', $iprogSource, $replaced);
+    if ($replaced !== 1) {
+        fwrite(STDERR, "Could not redirect the IPROG copy to the fake server; refusing to continue.\n");
+        exit(2);
+    }
 }
 file_put_contents($iprogCopy, $iprogSource);
 
@@ -155,7 +169,7 @@ $extract = static function (string $name) use ($api): string {
     throw new RuntimeException("Could not read {$name}");
 };
 $code = '';
-foreach (['sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_sms_failure_reason', 'sa_sms_status', 'sa_email_config_dir',
+foreach (['sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_sms_failure_reason', 'sa_sms_provider_detail', 'sa_sms_unconfirmed_reason', 'sa_sms_status', 'sa_email_config_dir',
           'sa_email_configured', 'sa_email_deliver', 'sa_email_status'] as $function) {
     $code .= $extract($function) . "\n";
 }
@@ -297,11 +311,43 @@ $check('sms landline number: "failed", IPROG not contacted', sa_sms_deliver('+63
 
 // ================= Failure reasons shown to staff =================
 putenv('IPROG_API_TOKEN=TEST-TOKEN-ONLY');
-foreach (['invalid_token' => 'API token', 'no_credits' => 'credits'] as $case => $word) {
+foreach (['invalid_token' => 'API token', 'no_credits' => 'credits', 'smart_tnt' => 'Smart or TNT', 'bad_sender' => 'sender name'] as $case => $word) {
     file_put_contents($work . '/iprog/case.txt', $case);
     $reason = null;
     $outcome = sa_sms_deliver('+639171234567', $message, 'request ID 22', $reason);
     $check("sms failure '{$case}': \"failed\" with a clear reason and no secret", $outcome === 'failed' && str_contains((string) $reason, $word) && !str_contains((string) $reason, 'TEST-TOKEN-ONLY'), $reason);
+}
+file_put_contents($work . '/iprog/case.txt', 'echo_secrets');
+$reason = null;
+sa_sms_deliver('+639171234567', $message, 'request ID 22', $reason);
+$check('sms reply text from IPROG is shown without the number or token', !preg_match('/TEST-TOKEN-ONLY|9171234567/', (string) $reason), $reason);
+
+// ================= Unknown replies are never proof that nothing was sent =================
+foreach (['other_refusal' => 'blocked word', 'http_500' => 'no clear answer', 'body_error_unknown' => 'Temporary', 'http_400_unknown' => 'Rejected for review', 'undocumented' => 'queued', 'not_json' => 'no clear answer'] as $case => $word) {
+    file_put_contents($work . '/iprog/case.txt', $case);
+    $reason = null;
+    $outcome = sa_sms_deliver('+639171234567', $message, 'request ID 24', $reason);
+    $check("sms unknown reply '{$case}': \"pending\", never says nothing was sent", $outcome === 'pending' && !str_contains((string) $reason, 'Nothing was sent') && (str_contains((string) $reason, $word) || str_contains((string) $reason, 'no clear answer')), [$outcome, $reason]);
+}
+
+// ================= Smart/TNT matching uses whole words =================
+foreach (['Smart/TNT networks do not accept shared sender names.', 'TNT is not supported', 'SMART numbers are blocked'] as $text) {
+    $check("sms reason names Smart/TNT for: {$text}", str_contains(sa_sms_failure_reason('IPROG SMS rejected (HTTP 422): ' . $text), 'Smart or TNT'));
+}
+foreach (['Smartphone app required', 'Attntion needed', 'Message for SMART ASSESS rejected', 'contents blocked'] as $text) {
+    $check("sms reason does not claim Smart/TNT for: {$text}", !str_contains(sa_sms_failure_reason('IPROG SMS rejected (HTTP 422): ' . $text), 'Smart or TNT'));
+}
+
+// ================= After IPROG accepts: one status look, never a second send =================
+$statusChecks = static fn (): array => is_file($work . '/iprog/status-checks.log') ? file($work . '/iprog/status-checks.log', FILE_IGNORE_NEW_LINES) : [];
+foreach (['ok' => ['sent', 'queued'], 'status_completed' => ['sent', 'completed'], 'status_failed' => ['pending', 'reported it as failed'], 'status_garbled' => ['sent', 'queued']] as $case => [$expected, $word]) {
+    file_put_contents($work . '/iprog/case.txt', $case);
+    $reset();
+    @unlink($work . '/iprog/status-checks.log');
+    $reason = null;
+    $outcome = sa_sms_deliver('+639171234567', $message, 'request ID 23', $reason);
+    $check("sms status after accept '{$case}' -> \"{$expected}\", says so", $outcome === $expected && str_contains((string) $reason, $word), [$outcome, $reason]);
+    $check("sms status after accept '{$case}': one send, one look with the message id", count($hits()) === 1 && $statusChecks() === ['iSms-TEST1'], [$hits(), $statusChecks()]);
 }
 file_put_contents($work . '/iprog/case.txt', 'ok');
 
@@ -314,19 +360,27 @@ putenv('IPROG_API_TOKEN');
 $check('sms status: missing token is reported', sa_sms_status()['ready'] === false && str_contains(sa_sms_status()['message'], 'IPROG_API_TOKEN is not set'));
 putenv('IPROG_API_TOKEN=TEST-TOKEN-ONLY');
 $status = sa_sms_status();
-$check('sms status: token accepted, credits shown', $status['ready'] === true && $status['credits'] === 42, $status);
+$check('sms status: token accepted, credits shown, sender limit stated', $status['ready'] === true && $status['credits'] === 42 && !isset($status['warning']) && str_contains($status['message'], 'Smart and TNT'), $status);
 file_put_contents($work . '/iprog/case.txt', 'invalid_token');
 $status = sa_sms_status();
 $check('sms status: token IPROG rejects -> not ready', $status['ready'] === false && str_contains($status['message'], 'invalid'), $status);
 $check('sms status: never contains the token', !str_contains(json_encode($status), 'TEST-TOKEN-ONLY'));
 file_put_contents($work . '/iprog/case.txt', 'credits_zero');
 $status = sa_sms_status();
-$check('sms status: zero credits are reported', $status['credits'] === 0 && str_contains($status['message'], '0 credits'), $status);
+$check('sms status: zero credits lock SMS and say why', $status['ready'] === false && $status['credits'] === 0 && str_contains($status['message'], '0 credits'), $status);
+file_put_contents($work . '/iprog/case.txt', 'no_balance');
+$status = sa_sms_status();
+$check('sms status: no confirmed balance is a warning, not success', $status['ready'] === true && ($status['warning'] ?? false) === true && str_contains($status['message'], 'may fail'), $status);
 file_put_contents($work . '/iprog/case.txt', 'garbled');
 $status = sa_sms_status();
-$check('sms status: unreadable reply does not claim credits', $status['ready'] === true && $status['credits'] === null, $status);
+$check('sms status: unreadable reply is a warning, not success', $status['ready'] === true && ($status['warning'] ?? false) === true && $status['credits'] === null, $status);
 file_put_contents($work . '/iprog/case.txt', 'ok');
 $check('sms status: checks never send an SMS', $hits() === []);
+$serverDown = str_replace('127.0.0.1:' . $port, '127.0.0.1:9', (string) file_get_contents($iprogCopy));
+file_put_contents($work . '/iprog-unreachable.php', str_replace('class IprogSmsException', 'class IprogDownException', str_replace('class IprogSmsService', 'class IprogDownService', $serverDown)));
+require $work . '/iprog-unreachable.php';
+$account = IprogDownService::fromEnvironment()->accountStatus();
+$check('iprog unreachable: reported as not reachable, never as success', $account === ['reachable' => false, 'token_ok' => null, 'credits' => null], $account);
 
 // ================= Gmail authorization =================
 $gmailDir = $work . '/gmail-auth';

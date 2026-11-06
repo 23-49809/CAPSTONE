@@ -9,8 +9,6 @@ sa_legal_header(
     'November 6, 2026'
 );
 ?>
-<p>These terms apply when you use SMART ASSESS, the online system of the Municipal Assessor's Office of Mabini, Batangas (the "Office"). You do not need an account to apply. Before starting an application you are asked to accept the Terms and Conditions, which cover the same points as this page. If you do not agree, please do not submit an application; you may ask the Office about other ways to transact.</p>
-
 <nav class="legal-toc" aria-labelledby="toc-title">
   <h2 id="toc-title">Contents</h2>
   <ol>
@@ -29,6 +27,8 @@ sa_legal_header(
     <li><a href="#contact">Contact</a></li>
   </ol>
 </nav>
+<article class="legal-article">
+<p>These terms apply when you use SMART ASSESS, the online system of the Municipal Assessor's Office of Mabini, Batangas (the "Office"). You do not need an account to apply. Before starting an application you are asked to accept the Terms and Conditions, which cover the same points as this page. If you do not agree, please do not submit an application; you may ask the Office about other ways to transact.</p>
 
 <h2 id="services">1. The services</h2>
 <p><strong>Document requests.</strong> You may request:</p>

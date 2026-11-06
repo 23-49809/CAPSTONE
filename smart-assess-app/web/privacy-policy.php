@@ -9,8 +9,6 @@ sa_legal_header(
     'November 6, 2026'
 );
 ?>
-<p>SMART ASSESS is the online system of the Municipal Assessor's Office of Mabini, Batangas (the "Office") for property document requests and land transfer applications. This policy explains what information the system handles, why, who can access it, and what choices you have.</p>
-
 <nav class="legal-toc" aria-labelledby="toc-title">
   <h2 id="toc-title">Contents</h2>
   <ol>
@@ -29,6 +27,8 @@ sa_legal_header(
     <li><a href="#changes">Changes to this policy</a></li>
   </ol>
 </nav>
+<article class="legal-article">
+<p>SMART ASSESS is the online system of the Municipal Assessor's Office of Mabini, Batangas (the "Office") for property document requests and land transfer applications. This policy explains what information the system handles, why, who can access it, and what choices you have.</p>
 
 <h2 id="collect">1. Information we collect</h2>
 <p>You do not need an account to apply. When you submit a document request or land transfer application, the system collects:</p>

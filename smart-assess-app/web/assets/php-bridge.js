@@ -77,7 +77,11 @@
         // A non-JSON reply means the server failed before answering properly.
         throw new Error('The server could not process this request (HTTP ' + response.status + '). Please try again; if it keeps happening, contact the system administrator.');
       }).then(function (body) {
-        if (!response.ok || !body.ok) throw new Error(body.error || 'The request could not be completed.');
+        if (!response.ok || !body.ok) {
+          var failure = new Error(body.error || 'The request could not be completed.');
+          failure.code = body.code || '';
+          throw failure;
+        }
         return body;
       });
     }, function () {
@@ -206,7 +210,7 @@
     });
   }
 
-  function internalSuccess(action, data) {
+  function internalSuccess(action, data, onError) {
     return jsonRequest(action, data).then(function (result) {
       var outcome = result && result.data;
       if (action === 'send_notification' && outcome && outcome.feedback) {
@@ -219,8 +223,85 @@
       var view = currentInternalView();
       window.location.assign('/internal.php?view=' + encodeURIComponent(view));
     }).catch(function (error) {
-      notice(error.message);
+      if (!onError || !onError(error)) notice(error.message);
     });
+  }
+
+  // An earlier SMS may already have reached this client. Sending anyway takes a
+  // deliberate, audited step: reason, typed reference, password, risk accepted.
+  function showSmsOverride(form, data, message) {
+    var existing = document.getElementById('sms-override');
+    if (existing) existing.remove();
+    var panel = document.createElement('section');
+    panel.id = 'sms-override';
+    panel.className = 'nf-override';
+    panel.setAttribute('role', 'alert');
+    var field = function (label, control) {
+      var wrap = document.createElement('div');
+      wrap.className = 'field';
+      var title = document.createElement('label');
+      title.textContent = label;
+      title.appendChild(control);
+      control.style.display = 'block';
+      control.style.width = '100%';
+      control.style.marginTop = '4px';
+      wrap.appendChild(title);
+      return wrap;
+    };
+    var heading = document.createElement('h4');
+    heading.textContent = 'SMS blocked: possible duplicate';
+    var text = document.createElement('p');
+    text.textContent = message;
+    var warning = document.createElement('p');
+    warning.textContent = 'Overriding can send this client a second SMS and spend another credit. Checking the IPROG account does not prove a resend is safe. Your name and reason are recorded.';
+    var reason = document.createElement('textarea');
+    reason.rows = 2;
+    reason.maxLength = 500;
+    var reference = document.createElement('input');
+    reference.type = 'text';
+    reference.autocomplete = 'off';
+    var password = document.createElement('input');
+    password.type = 'password';
+    password.autocomplete = 'current-password';
+    var ackLabel = document.createElement('label');
+    ackLabel.className = 'nf-channel';
+    var ack = document.createElement('input');
+    ack.type = 'checkbox';
+    ackLabel.appendChild(ack);
+    ackLabel.appendChild(document.createTextNode(' I accept that the client may receive a duplicate SMS.'));
+    var actions = document.createElement('div');
+    actions.className = 'nf-actions';
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn-outline';
+    cancel.textContent = 'Cancel';
+    var confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'btn btn-primary';
+    confirm.textContent = 'Send anyway';
+    actions.appendChild(cancel);
+    actions.appendChild(confirm);
+    [heading, text, warning, field('Reason for overriding', reason), field('Type the reference number (' + data.requestRef + ')', reference),
+      field('Your password', password), ackLabel, actions].forEach(function (node) { panel.appendChild(node); });
+    form.parentNode.insertBefore(panel, form.nextSibling);
+    cancel.addEventListener('click', function () { panel.remove(); });
+    confirm.addEventListener('click', function () {
+      confirm.disabled = true;
+      confirm.textContent = 'Sending…';
+      internalSuccess('send_notification', Object.assign({}, data, {
+        override_unconfirmed: true,
+        override_reason: reason.value,
+        override_reference: reference.value,
+        override_password: password.value,
+        override_acknowledged: ack.checked
+      })).finally(function () {
+        password.value = '';
+        confirm.disabled = false;
+        confirm.textContent = 'Send anyway';
+      });
+    });
+    panel.scrollIntoView({ block: 'center' });
+    reason.focus();
   }
 
   function generateAiMessage(button) {
@@ -298,7 +379,7 @@
       }
       var line = panel.querySelector('[data-service="' + pair[0] + '"]');
       if (line && line.textContent !== status.message) line.textContent = status.message;
-      if (line) line.classList.toggle('is-down', !status.ready);
+      if (line) line.classList.toggle('is-down', !status.ready || !!status.warning);
     });
   }
   function loadChannelStatus() {
@@ -840,7 +921,11 @@
         sendButton.disabled = true;
         sendButton.textContent = 'Sending…';
       }
-      internalSuccess(actions[type], data).finally(function () {
+      internalSuccess(actions[type], data, function (error) {
+        if (error.code !== 'sms_unconfirmed') return false;
+        showSmsOverride(form, data, error.message);
+        return true;
+      }).finally(function () {
         form.removeAttribute('data-sending');
         if (sendButton) {
           sendButton.disabled = false;

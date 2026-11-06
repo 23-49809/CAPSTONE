@@ -1165,12 +1165,33 @@ function sa_sms_deliver(string $phoneNumber, string $message, string $context, ?
         if (!sa_sms_load_service()) {
             throw new RuntimeException('SMS service file missing.');
         }
-        IprogSmsService::fromEnvironment()->send($phoneNumber, $message);
+        $service = IprogSmsService::fromEnvironment();
+        $sent = $service->send($phoneNumber, $message);
+        // Accepted only means queued. Look once at what IPROG did with it; this
+        // never sends again, and a problem here cannot undo the accepted send.
+        $staffReason = 'It is queued at IPROG, which does not confirm it reached the phone.';
+        try {
+            usleep(1500000);
+            $providerStatus = $sent['message_id'] !== null ? $service->messageStatus($sent['message_id']) : null;
+        } catch (Throwable) {
+            $providerStatus = null;
+        }
+        if ($providerStatus !== null && preg_match('/^(failed|fail|rejected|undelivered|error|cancell?ed)$/', $providerStatus)) {
+            // It was accepted, so "failed" here is not proof it can be sent again safely.
+            $staffReason = 'IPROG accepted it, then reported it as ' . $providerStatus . '.';
+            error_log('[SMART_ASSESS_SMS] ' . $context . '; outcome pending (IPROG reported the accepted message as ' . $providerStatus . ').');
+            return 'pending';
+        }
+        if ($providerStatus === 'completed') {
+            $staffReason = 'IPROG reports it as completed.';
+        }
         return 'sent';
     } catch (IprogSmsException $exception) {
         $outcome = $exception->outcome() === IprogSmsException::REJECTED ? 'failed' : 'pending';
         $reason = $outcome === 'failed' ? 'IPROG did not accept it' : 'IPROG did not confirm it';
-        $staffReason = sa_sms_failure_reason($exception->getMessage());
+        $staffReason = $outcome === 'failed'
+            ? sa_sms_failure_reason($exception->getMessage())
+            : sa_sms_unconfirmed_reason($exception->getMessage());
     } catch (InvalidArgumentException) {
         $outcome = 'failed';
         $reason = 'invalid or unsupported recipient number or message';
@@ -1178,24 +1199,101 @@ function sa_sms_deliver(string $phoneNumber, string $message, string $context, ?
     } catch (RuntimeException) {
         $outcome = 'failed';
         $reason = 'SMS service not configured or unavailable';
-        $staffReason = 'The SMS service is not configured on the server.';
+        $staffReason = 'The SMS service is not configured on the server. Nothing was sent.';
     } catch (Throwable) {
         $outcome = 'pending';
         $reason = 'unexpected error';
+        $staffReason = 'An unexpected error happened during the send.';
     }
     error_log('[SMART_ASSESS_SMS] ' . $context . '; outcome ' . $outcome . ' (' . $reason . ').');
     return $outcome;
 }
 
-/** Fixed staff wording for an IPROG refusal; provider text is never shown as-is. */
+/**
+ * Staff wording for an IPROG refusal. Known causes get fixed text; anything
+ * else shows IPROG's own reason, which IprogSmsService has already stripped of
+ * the token, phone number and message.
+ */
 function sa_sms_failure_reason(string $providerMessage): string
 {
-    return match (true) {
-        (bool) preg_match('/invalid token|unauthori[sz]ed/i', $providerMessage) => 'IPROG says the API token on the server is invalid. An administrator must update it.',
-        (bool) preg_match('/credit|balance|insufficient/i', $providerMessage) => 'The IPROG account does not have enough credits. An administrator must top it up.',
-        (bool) preg_match('/sender/i', $providerMessage) => 'IPROG refused the sender name. An administrator must check it in the IPROG account.',
-        default => 'IPROG did not accept it. Check the message and number, then try again.',
-    };
+    $notSent = ' Nothing was sent.';
+    if (preg_match('/\b(?:smart(?!\s+assess)|tnt)\b|shared sender/i', $providerMessage)) {
+        return 'This is a Smart or TNT number. IPROG only delivers to those networks with an approved custom sender name on the IPROG account.' . $notSent;
+    }
+    if (preg_match('/sender/i', $providerMessage)) {
+        return 'IPROG rejected the sender name. An administrator must check it in the IPROG account.' . $notSent;
+    }
+    if (preg_match('/invalid token|unauthori[sz]ed/i', $providerMessage)) {
+        return 'IPROG says the API token on the server is invalid. An administrator must update it.' . $notSent;
+    }
+    if (preg_match('/credits?\b|insufficient|not enough/i', $providerMessage)) {
+        return 'The IPROG account does not have enough credits. An administrator must top it up.' . $notSent;
+    }
+    if (str_contains($providerMessage, 'IPROG SMS request failed')) {
+        return 'The server could not connect to IPROG.' . $notSent;
+    }
+    $detail = sa_sms_provider_detail($providerMessage);
+    return 'IPROG refused it' . ($detail !== '' ? ': ' . rtrim($detail, '.') . '.' : '.') . $notSent;
+}
+
+/** IPROG's own reason from an IprogSmsException message (already stripped of the token, number and text). */
+function sa_sms_provider_detail(string $providerMessage): string
+{
+    $position = strrpos($providerMessage, '): ');
+    return $position === false ? '' : substr(trim(substr($providerMessage, $position + 3)), 0, 160);
+}
+
+/** Staff wording when IPROG's reply does not settle whether the SMS was taken. */
+function sa_sms_unconfirmed_reason(string $providerMessage): string
+{
+    $detail = sa_sms_provider_detail($providerMessage);
+    return $detail !== ''
+        ? 'IPROG gave a reply SMART ASSESS does not recognise: ' . rtrim($detail, '.') . '.'
+        : 'IPROG gave no clear answer.';
+}
+
+/** Unconfirmed staff SMS still holding back further SMS for this request. */
+function sa_sms_unconfirmed_ids(PDO $pdo, int $requestId): array
+{
+    $stmt = $pdo->prepare(
+        "SELECT id FROM notifications
+         WHERE request_id = :request AND channel = 'sms' AND type = 'staff_message' AND delivery_status = 'pending'
+         ORDER BY id"
+    );
+    $stmt->execute(['request' => $requestId]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * The only way past an unconfirmed SMS. Checking the IPROG account is not proof
+ * by itself, so this needs the signed-in user's password, the typed reference,
+ * a written reason and an acknowledgement of the duplicate risk. Refusals are
+ * audited and rate-limited. Returns the reason.
+ */
+function sa_sms_authorize_override(array $user, array $request, array $data): string
+{
+    $tooMany = 'Too many override attempts from this connection. Wait 15 minutes and try again.';
+    if (sa_drafts_enabled()) {
+        sa_draft_rate_check('sms_override', 5, 15, $tooMany);
+        sa_draft_rate_hit('sms_override');
+    }
+    $reason = trim((string) sa_text($data, 'override_reason', 500));
+    if (strlen($reason) < 10) {
+        throw new SaHttpException(422, 'Write the reason for overriding, at least 10 characters. Nothing was sent.');
+    }
+    if (strtoupper(trim((string) ($data['override_reference'] ?? ''))) !== strtoupper((string) $request['reference_no'])) {
+        throw new SaHttpException(422, 'Type this request\'s reference number exactly to confirm. Nothing was sent.');
+    }
+    if (!filter_var($data['override_acknowledged'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+        throw new SaHttpException(422, 'Tick the box to accept the risk of a duplicate SMS. Nothing was sent.');
+    }
+    $stmt = sa_db()->prepare('SELECT password_hash FROM users WHERE id = :id');
+    $stmt->execute(['id' => $user['id']]);
+    if (!password_verify((string) ($data['override_password'] ?? ''), (string) $stmt->fetchColumn())) {
+        sa_audit('staff', (int) $user['id'], (string) $user['name'], 'SMS duplicate-risk override refused: wrong password', (string) $request['reference_no']);
+        throw new SaHttpException(403, 'That password is not correct. Nothing was sent.');
+    }
+    return $reason;
 }
 
 /**
@@ -1279,7 +1377,7 @@ function sa_email_status(): array
  * asks IPROG about the token and credits, without sending or spending
  * anything. Reports fixed text only, never the token. Never throws.
  *
- * @return array{ready:bool, message:string, credits:?int}
+ * @return array{ready:bool, message:string, credits:?int, warning?:bool}
  */
 function sa_sms_status(): array
 {
@@ -1293,22 +1391,31 @@ function sa_sms_status(): array
     if (!sa_sms_load_service()) {
         return $problem('SMS is not set up: the SMS service file is missing.');
     }
+    if (!function_exists('curl_init')) {
+        return $problem('SMS is not set up: the PHP cURL extension is not installed on the web server.');
+    }
     try {
         $account = IprogSmsService::fromEnvironment()->accountStatus();
     } catch (RuntimeException) {
         return $problem('SMS is not set up: IPROG_API_TOKEN is not set on the web server.');
     } catch (Throwable) {
-        return ['ready' => true, 'message' => 'SMS is set up, but IPROG could not be checked just now.', 'credits' => null];
+        return ['ready' => true, 'warning' => true, 'message' => 'The server could not check IPROG just now. SMS may fail.', 'credits' => null];
     }
     if ($account['token_ok'] === false) {
         return $problem('IPROG says the API token on the server is invalid. An administrator must update it.');
     }
-    if ($account['credits'] === null) {
-        return ['ready' => true, 'message' => 'SMS is set up. IPROG did not report the credit balance.', 'credits' => null];
+    if (!$account['reachable']) {
+        return ['ready' => true, 'warning' => true, 'credits' => null, 'message' => 'The server could not reach IPROG to check the token and credits. SMS may fail.'];
     }
-    return ['ready' => true, 'credits' => $account['credits'], 'message' => $account['credits'] > 0
-        ? 'SMS is ready. IPROG credits: ' . $account['credits'] . '.'
-        : 'IPROG reports 0 credits, so SMS will fail until the account is topped up.'];
+    if ($account['credits'] === null) {
+        return ['ready' => true, 'warning' => true, 'credits' => null, 'message' => 'IPROG answered but did not confirm the token or credit balance. SMS may fail.'];
+    }
+    if ($account['credits'] < 1) {
+        return ['ready' => false, 'credits' => $account['credits'], 'message' => 'The IPROG account has 0 credits. An administrator must top it up before SMS can be sent.'];
+    }
+    // IPROG has no API for the account's sender name, so this cannot be checked here.
+    return ['ready' => true, 'credits' => $account['credits'], 'message' => 'IPROG accepted the token. Credits: ' . $account['credits']
+        . '. Smart and TNT numbers also need an approved custom sender name on the IPROG account, which cannot be checked from here.'];
 }
 
 /** Service status for the Notifications page (staff only). */
@@ -1411,10 +1518,28 @@ function sa_send_notification(array $data): array
         throw new SaHttpException(409, 'Another notification for this request is being sent. Wait a moment, then check the history before trying again.');
     }
     try {
+        // An SMS that may already have gone out holds back every further SMS for
+        // this request, whatever the wording and however long ago.
+        $overrideIds = [];
+        $overrideReason = null;
+        $unconfirmed = in_array('sms', $channels, true) ? sa_sms_unconfirmed_ids($pdo, (int) $requestId) : [];
+        $wantsOverride = filter_var($data['override_unconfirmed'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($unconfirmed !== [] && !$wantsOverride) {
+            throw new SaHttpException(409, 'An earlier SMS for this request has an unconfirmed outcome and may already have reached the client, so no further SMS can be sent for it. Nothing was sent. Check the IPROG account. You can still send by email only.', 'sms_unconfirmed');
+        }
+        if ($wantsOverride) {
+            if ($unconfirmed === []) {
+                throw new SaHttpException(409, 'This request has no unconfirmed SMS to override. Nothing was sent.');
+            }
+            $overrideReason = sa_sms_authorize_override($user, $request, $data);
+            $overrideIds = $unconfirmed;
+        }
+
         $placeholders = implode(', ', array_map(static fn (string $c): string => $pdo->quote($c), $channels));
+        $excludeOverridden = $overrideIds === [] ? '' : ' AND id NOT IN (' . implode(', ', $overrideIds) . ')';
         $recent = $pdo->prepare(
             "SELECT channel FROM notifications
-             WHERE request_id = :request AND type = 'staff_message' AND message = :message
+             WHERE request_id = :request AND type = 'staff_message' AND message = :message$excludeOverridden
                AND channel IN ($placeholders) AND delivery_status IN ('sent', 'pending')
                AND created_at >= NOW() - INTERVAL 10 MINUTE
              LIMIT 1"
@@ -1422,7 +1547,7 @@ function sa_send_notification(array $data): array
         $recent->execute(['request' => $requestId, 'message' => $message]);
         $repeated = $recent->fetchColumn();
         if ($repeated !== false) {
-            throw new SaHttpException(409, 'This same message was already sent to this client by ' . ($repeated === 'email' ? 'email' : 'SMS')
+            throw new SaHttpException(409, 'This same message was already ' . ($repeated === 'email' ? 'sent by email' : 'accepted for SMS')
                 . ' in the last 10 minutes, so it was not sent again. Check the history, or change the message if a new one is needed.');
         }
 
@@ -1431,6 +1556,21 @@ function sa_send_notification(array $data): array
             // Record the attempt first (one transaction). If this fails, nothing is sent.
             $pdo->beginTransaction();
             try {
+                if ($channel === 'sms' && $overrideIds !== []) {
+                    // Released only together with this attempt being recorded. The old
+                    // rows keep their "pending" status; only their hold is released.
+                    $pdo->exec("UPDATE notifications SET type = 'staff_message_overridden' WHERE id IN (" . implode(', ', $overrideIds) . ')');
+                    $pdo->prepare(
+                        "INSERT INTO request_status_log (request_id, status, actor, sms_body)
+                         VALUES (:request_id, :status, 'staff', :body)"
+                    )->execute([
+                        'request_id' => $requestId,
+                        'status' => $request['status'],
+                        'body' => 'Duplicate-risk SMS override by ' . (string) $user['name'] . ' (unconfirmed SMS record ' . implode(', ', $overrideIds) . '): ' . $overrideReason,
+                    ]);
+                    sa_audit('staff', (int) $user['id'], (string) $user['name'], substr('SMS duplicate-risk override: ' . $overrideReason, 0, 120),
+                        substr($request['reference_no'] . '; unconfirmed SMS record ' . implode(', ', $overrideIds), 0, 150));
+                }
                 $pdo->prepare(
                     "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
                      VALUES (:client, :request, 'staff_message', :message, :channel, 'pending')"
@@ -1502,9 +1642,10 @@ function sa_send_notification(array $data): array
     $lines = [];
     if (isset($outcomes['sms'])) {
         $lines[] = match ($outcomes['sms']['status']) {
-            'sent' => 'SMS: accepted by IPROG for sending (this does not confirm it reached the phone).',
+            'sent' => 'SMS: accepted by IPROG. ' . ($outcomes['sms']['reason'] ?? ''),
             'failed' => 'SMS: NOT sent. ' . ($outcomes['sms']['reason'] ?? 'IPROG did not accept it.'),
-            default => 'SMS: outcome unconfirmed. Check the IPROG account before sending again, so the client does not get it twice.',
+            default => 'SMS: outcome unconfirmed. ' . ($outcomes['sms']['reason'] ?? 'IPROG gave no clear answer.')
+                . ' It may have reached the client, so further SMS for this request are blocked. Check the IPROG account.',
         };
     }
     if (isset($outcomes['email'])) {
