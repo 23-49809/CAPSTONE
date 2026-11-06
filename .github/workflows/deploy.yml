@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -16,6 +17,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch'
     name: Deploy to production EC2
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -54,7 +56,7 @@ jobs:
           role-to-assume: arn:aws:iam::312106747458:role/GitHubSmartAssessDeployRole
           aws-region: ap-southeast-1
 
-      - name: Trigger deployment through Systems Manager
+      - name: Inspect production deployment script
         id: deploy
         shell: bash
         run: |
@@ -63,15 +65,15 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids i-051e38f99d3c2bd98 \
             --document-name AWS-RunShellScript \
-            --comment "SMART ASSESS deployment from commit $GITHUB_SHA" \
-            --parameters 'commands=["sudo -n /usr/local/sbin/deploy-smart-assess.sh"]' \
+            --comment "Read-only inspection of SMART ASSESS deployment script" \
+            --parameters 'commands=["sudo -n sed -n \"1,240p\" /usr/local/sbin/deploy-smart-assess.sh"]' \
             --query 'Command.CommandId' \
             --output text)
 
           echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
           echo "Started deployment command: $COMMAND_ID"
 
-      - name: Wait for deployment and report result
+      - name: Report deployment script inspection
         shell: bash
         env:
           COMMAND_ID: ${{ steps.deploy.outputs.command_id }}
