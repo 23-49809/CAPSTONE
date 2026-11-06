@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/drafts.php';
-require_once __DIR__ . '/terms.php';
+require_once __DIR__ . '/terms-acceptance.php';
 
 /** Short random reference shown to the user and written to the log, so a
  *  reported error can be matched to its diagnostic entry. */

@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SMART ASSESS</title>
+<title>SMART ASSESS | Municipal Assessor's Office of Mabini, Batangas</title>
+<meta name="description" content="SMART ASSESS is the online property document request and land transfer service of the Municipal Assessor's Office of Mabini, Batangas.">
 <style>
   /* ============ Tokens ============ */
   :root{
@@ -241,6 +242,8 @@
   .footer-grid{ display:grid; grid-template-columns:1.3fr 1fr 1fr 1fr; gap:16px 32px; }
   @media (max-width:768px){ .footer-grid{ grid-template-columns:1.4fr 1fr; gap:16px 24px; } .footer-grid > div:first-child{ grid-column:1 / -1; } }
   @media (max-width:499px){ .footer-grid{ grid-template-columns:1fr; gap:14px; } }
+  .footer-links a{ display:block; color:#c2ddcd; font-size:15px; line-height:1.55; padding:2px 0; text-decoration:underline; }
+  .footer-links a:hover{ color:#fff; }
   .footer-grid h5{ color:#fff; font-family:var(--font-body); font-weight:700; font-size:16px; margin-bottom:4px; }
   .footer-grid p, .footer-grid div{ font-size:15px; line-height:1.55; color:#c2ddcd; }
   .footer-bottom{ margin-top:22px; padding-top:14px; border-top:1px solid rgba(255,255,255,.15); font-size:13.5px; line-height:1.5; color:#a8cbb8; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 10px; }
@@ -644,6 +647,12 @@
   /* ============ About Us ============ */
   .about-sub{ text-align:center; font-family:var(--font-display); font-size:clamp(20px,2.4vw,26px); margin-bottom:18px; scroll-margin-top:90px; }
   .about{ scroll-margin-top:80px; }
+  .about-grid.about-five{ grid-template-columns:repeat(6,minmax(0,1fr)); }
+  .about-five li{ grid-column:span 2; }
+  .about-five li:nth-child(n+4){ grid-column:span 3; }
+  @media (max-width:900px){ .about-grid.about-five{ grid-template-columns:minmax(0,1fr); } .about-five li, .about-five li:nth-child(n+4){ grid-column:auto; } }
+  .static-home{ padding-top:32px; padding-bottom:32px; }
+  .static-legal{ display:flex; gap:18px; flex-wrap:wrap; }
   .about-grid{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
   .about-grid li{ display:flex; gap:12px; align-items:flex-start; padding:16px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-md); }
   .about-grid .chip-icon{ width:42px; height:42px; flex:0 0 42px; border-radius:12px; margin:0; }
@@ -990,7 +999,7 @@
   .field .contact-input > input, .field .arp-input > input{ min-height:0; }
 </style>
 
-<div id="app"></div>
+<div id="app"><main class="wrap static-home"><h1>SMART ASSESS</h1><p><strong>Municipal Assessor’s Office of Mabini, Batangas</strong></p><p>SMART ASSESS is the online system of the Municipal Assessor’s Office of Mabini, Batangas. It lets applicants prepare and submit property document requests and land transfer applications online, without needing an account.</p><ul class="about-grid about-five"><li><div><h4>Property Document Requests</h4><p>Request Certified True Copies of Tax Declarations and certifications on improvements, property holdings, liens and encumbrances, and assessments.</p></div></li><li><div><h4>Land Transfer Services</h4><p>Apply for land transfers by sale, donation or inheritance.</p></div></li><li><div><h4>Requirements and Supporting Documents</h4><p>See what each service needs, then upload your ID and supporting documents as JPG, PNG, WEBP or PDF files of up to 5 MB each.</p></div></li><li><div><h4>Request Processing and Status Tracking</h4><p>Authorized Office staff review your submission. Use your reference number on the Track Request page to see whether it is Pending, Processing, Out for Release, Rejected or Timed Out.</p></div></li><li><div><h4>How You Receive Notifications</h4><p>Status changes appear in request tracking. Staff may also message you about your request by SMS, or by email if you gave an address. Completed documents are claimed in person at the Office.</p></div></li></ul><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines. Phone: (043) 487-0123. Email: mao.smartassess@gmail.com</p><nav class="static-legal" aria-label="Legal"><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav></main></div>
 
 <script>
 (function(){
@@ -1428,6 +1437,12 @@ function renderLanding(){
         + '<div class="service-actions"><button class="btn-link" data-action="start-landtransfer">Begin Land Transfer '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div>'+renderCardDraft('landtransfer')+'</div>'
     + '</div></div></section>'
 
+  + '<section class="section" id="about" aria-labelledby="about-title"><div class="wrap">'
+    + '<div class="why-head"><h3 class="about-sub" id="about-title">About SMART ASSESS</h3>'
+      + '<p class="why-desc">SMART ASSESS is the online system of the Municipal Assessor’s Office of Mabini, Batangas. It lets applicants prepare and submit property document requests and land transfer applications online, without needing an account.</p></div>'
+    + '<ul class="about-grid about-five"><li><div><h4>Property Document Requests</h4><p>Request Certified True Copies of Tax Declarations and certifications on improvements, property holdings, liens and encumbrances, and assessments.</p></div></li><li><div><h4>Land Transfer Services</h4><p>Apply for land transfers by sale, donation or inheritance.</p></div></li><li><div><h4>Requirements and Supporting Documents</h4><p>See what each service needs, then upload your ID and supporting documents as JPG, PNG, WEBP or PDF files of up to 5 MB each.</p></div></li><li><div><h4>Request Processing and Status Tracking</h4><p>Authorized Office staff review your submission. Use your reference number on the Track Request page to see whether it is Pending, Processing, Out for Release, Rejected or Timed Out.</p></div></li><li><div><h4>How You Receive Notifications</h4><p>Status changes appear in request tracking. Staff may also message you about your request by SMS, or by email if you gave an address. Completed documents are claimed in person at the Office.</p></div></li></ul>'
+  + '</div></section>'
+
   + '<section class="section section-alt about" id="why" aria-labelledby="why-choose"><div class="wrap">'
     + '<div class="why-head"><h3 class="about-sub" id="why-choose">Why Choose SMART ASSESS?</h3>'
       + '<p class="why-title">A More Convenient Way to Request Property Documents</p>'
@@ -1446,7 +1461,7 @@ function renderLanding(){
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
     + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: mao.smartassess@gmail.com</p></div>'
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
-    + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button></nav>'
+    + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav>'
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
 }
 
@@ -2046,10 +2061,9 @@ window.SMART_ASSESS_TRACK = { prepare: function(){ return trackPrepare(); } };
    the application and its saved draft, so the client is not asked again
    while moving between steps or after resuming. The server refuses a final
    submission without a valid acceptance. TERMS_VERSION must match
-   SA_TERMS_VERSION in web/terms.php.
-   REVIEW NOTE: the data-retention period in section 13 is still to be
-   confirmed by the Municipal Assessor's Office. */
-const TERMS_VERSION = '2026-10-16';
+   SA_TERMS_VERSION in web/terms-acceptance.php. Keep this text consistent with
+   the public web/terms.php and web/privacy-policy.php pages. */
+const TERMS_VERSION = '2026-11-06';
 const TERMS_AGREE_TEXT = 'I have read, understood, and agree to the Terms and Conditions of SMART ASSESS.';
 function termsList(items){ return '<ul>'+items.map(function(i){ return '<li>'+i+'</li>'; }).join('')+'</ul>'; }
 function renderTermsContent(){
@@ -2064,13 +2078,13 @@ function renderTermsContent(){
     + sec(5,'Submitting Documents','<p>Depending on your request, you may need to upload documents such as:</p>'+termsList(['Certified True Copy of Tax Declaration or Title','Vicinity Map','Tax Clearance','Notarial Deed of Sale or Donation','Certification of No Improvement','A valid ID, and an authorization letter if you are applying on behalf of the property owner'])+'<p>All documents you submit must be genuine, complete, and clearly readable.</p>')
     + sec(6,'Accuracy of Information','<p>You must give true, correct, and up-to-date information. False, misleading, incomplete, or fraudulent information or documents may cause your request to be delayed or rejected, and may be dealt with under applicable laws and regulations.</p>')
     + sec(7,'Processing and Verification','<p>Authorized personnel of the '+MAO+' will review and verify what you submit. Submitting a request does not mean it is approved or completed. Every request remains subject to the Office’s requirements, verification, evaluation, and approval procedures.</p>')
-    + sec(8,'Request Status and Notifications','<p>After submitting, you will receive a reference number. Use it on the Track Request page to check your request’s status. Keep it safe, because anyone with your reference number can view the status of your request.</p><p>The Office may send SMS updates to the contact number you provide, and an email confirmation if you provide an email address. Please make sure your contact number is valid and active.</p>')
+    + sec(8,'Request Status and Notifications','<p>After submitting, you will receive a reference number. Use it on the Track Request page to check your request’s status. Keep it safe, because anyone with your reference number can view your request’s status, the applicant’s name, and the service requested.</p><p>Status changes appear in request tracking and do not automatically send an SMS or email. Staff may choose to message you about your request by SMS, or by email if you provide an address. Please make sure your contact number is valid and active.</p>')
     + sec(9,'Saved Applications and Your Responsibility','<p>Your application is saved automatically while you fill it in, so you can continue later. You may receive a recovery code or resume link to open your saved application on another device.</p>'
         + termsList(['Keep your recovery code, resume link, and reference number private. Anyone who has them can open your saved application or view your request’s status.','Do not use another person’s reference number, recovery code, or resume link without their permission.','Saved applications that are not submitted are deleted automatically 7 days after your last change.','If you believe someone has accessed your application without permission, report it to the '+MAO+' right away.']))
-    + sec(10,'Who Can Access Your Information','<p>Only authorized users can access submitted information, according to their roles:</p>'+termsList(['<strong>Client</strong> – submits and monitors their own requests;','<strong>Staff</strong> – processes and manages assigned requests;','<strong>Head</strong> – reviews and manages transactions within their responsibilities; and','<strong>Administrator</strong> – manages system accounts and system functions.']))
-    + sec(11,'Personal Information and Privacy','<p>SMART ASSESS collects personal and property-related information only as needed to provide its services. This information is used to:</p>'+termsList(['Process your request or transaction;','Verify your information and documents;','Identify you and the property involved;','Track the status of your request;','Contact you about your request; and','Keep the Office’s transaction records.'])+'<p>Your personal information is handled in accordance with the Data Privacy Act of 2012 (Republic Act No. 10173) and other applicable laws, rules, and policies. For questions or concerns about your personal information, you may contact the '+MAO+'.</p>')
-    + sec(12,'Data Storage and Security','<p>Information you submit is stored in the SMART ASSESS database. Reasonable security measures are used to protect it from unauthorized access, disclosure, alteration, loss, or destruction, and access is limited to authorized personnel.</p>')
-    + sec(13,'Data Retention','<p>Submitted requests and their records are kept in accordance with applicable laws, regulations, and the records-retention policies of the '+MAO+'.</p><p><em>Specific retention period: To be confirmed by the '+MAO+'.</em></p>')
+    + sec(10,'Who Can Access Your Information','<p>Only authorized users can access submitted information, according to their roles:</p>'+termsList(['<strong>Client</strong> – submits and monitors their own requests;','<strong>Staff</strong> – processes and manages assigned requests;','<strong>Head</strong> – reviews transactions and reports within their responsibilities; and','<strong>Administrator</strong> – manages system accounts and system functions, and can access request information.']))
+    + sec(11,'Personal Information and Privacy','<p>SMART ASSESS collects personal and property-related information only as needed to provide its services. This information is used to:</p>'+termsList(['Process your request or transaction;','Verify your information and documents;','Identify you and the property involved;','Track the status of your request;','Contact you about your request; and','Keep the Office’s transaction records.'])+'<p>You may have rights over your personal information under the Data Privacy Act of 2012 (Republic Act No. 10173). Read the full <a href="/privacy-policy.php" target="_blank" rel="noopener">Privacy Policy</a> and <a href="/terms.php" target="_blank" rel="noopener">Terms of Service</a>. For questions or concerns about your personal information, you may contact the '+MAO+'.</p>')
+    + sec(12,'Data Storage and Security','<p>Information you submit is stored by SMART ASSESS on a cloud server. Sign-in, role-based access, and restricted storage for uploaded files are used to protect it, but no system is completely secure.</p>')
+    + sec(13,'Data Retention','<p>SMART ASSESS does not automatically delete submitted requests and their documents. They are kept as transaction records of the '+MAO+', subject to applicable records rules. You may ask the Office about the retention of your records.</p>')
     + sec(14,'Prohibited Activities','<p>You must not:</p>'+termsList(['Provide false or fraudulent information;','Submit documents that do not belong to you or were obtained unlawfully;','Use another person’s reference number, recovery code, or resume link without permission;','Try to access information belonging to another client;','Try to bypass or interfere with the system’s security;','Damage, disrupt, or misuse the system; or','Use the system for purposes unrelated to the services of the '+MAO+'.']))
     + sec(15,'System Availability','<p>The Office will make reasonable efforts to keep SMART ASSESS available. Temporary interruptions may still happen because of maintenance, technical problems, connectivity issues, or other causes beyond the Office’s control.</p>')
     + sec(16,'Changes to These Terms','<p>These Terms and Conditions may be updated to reflect changes in the system, office procedures, laws, regulations, or policies. When they change, you will be asked to read and accept the updated version before your next application.</p>')
