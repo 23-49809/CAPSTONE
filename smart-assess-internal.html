@@ -1661,6 +1661,27 @@ function render(){
   bindEvents();
 }
 
+window.SMART_ASSESS_STATUS_UPDATED = function(data, result){
+  var request = data.kind==='doc' ? findDocReq(data.id) : findLandReq(data.id);
+  if(!request || !result) return false;
+  request.status = result.status;
+  if(result.processing_started_at !== undefined){
+    request.processingStartedAt = result.processing_started_at;
+    request.processingStartedEpoch = result.processing_started_epoch;
+  }
+  if(result.processing_completed_at !== undefined){
+    request.processingCompletedAt = result.processing_completed_at;
+    request.processingCompletedEpoch = result.processing_completed_epoch;
+    request.processingDurationSeconds = result.processing_duration_seconds;
+  }
+  if(result.status==='Rejected'){
+    request.advisory = 'Rejected: ' + data.rejection_category
+      + (data.rejection_note && data.rejection_note.trim() ? ' - ' + data.rejection_note.trim() : '');
+  }
+  render();
+  return true;
+};
+
 function renderLogin(){
   var err = state.loginError;
   return ''
@@ -3099,7 +3120,7 @@ function modalReqDetail(id, kind){
           + '<div class="field"><label for="rd-reason-'+esc(r.id)+'">Reason for rejection</label><select id="rd-reason-'+esc(r.id)+'" name="rejection_category" data-rejection-category><option value="">Choose a reason</option>'
             + REJECTION_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('')+'</select></div>'
           + '<div class="field"><label for="rd-note-'+esc(r.id)+'">Details for the client (optional)</label><textarea id="rd-note-'+esc(r.id)+'" name="rejection_note" maxlength="500" rows="2" placeholder="e.g. The Tax Clearance is missing."></textarea></div>'
-          + '<p class="field-hint">Review the client details and uploaded documents yourself before rejecting: automatic document checking (OCR) is not available yet. After you reject, a notification draft opens on the Notifications page. Nothing is sent until you review it and click Send.</p>'
+          + '<p class="field-hint">Review the client details and uploaded documents yourself before rejecting: automatic document checking (OCR) is not available yet. The client will receive a status notification with the rejection reason.</p>'
         + '</div>'
       + '</form>'
     : '';
