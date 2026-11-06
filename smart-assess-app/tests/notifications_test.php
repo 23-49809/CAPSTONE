@@ -14,7 +14,7 @@ declare(strict_types=1);
  *  - The real iprog-sms.php is never loaded. A copy whose only change is the
  *    API address (a fake IPROG on 127.0.0.1) is used, with a fake token.
  * Uses ONLY a dedicated test database (name must end in "_test"); it drops and
- * recreates just the `notifications` table there.
+ * recreates just the `notifications` and `request_status_log` tables there.
  *
  *   SMART_ASSESS_TEST_DB=smart_assess_test DB_HOST=127.0.0.1 DB_PORT=3306 \
  *   DB_USER=root SMART_ASSESS_DB_PASS='...' php tests/notifications_test.php
@@ -58,14 +58,24 @@ file_put_contents($work . '/iprog/case.txt', 'ok');
 file_put_contents($work . '/iprog/stub.php', <<<'PHP'
 <?php
 $case = trim((string) @file_get_contents(__DIR__ . '/case.txt'));
-file_put_contents(__DIR__ . '/hits.log', json_encode([
+if ($_SERVER['REQUEST_METHOD'] === 'POST') file_put_contents(__DIR__ . '/hits.log', json_encode([
     'phone' => $_POST['phone_number'] ?? '', 'message' => $_POST['message'] ?? '',
     'token' => $_POST['api_token'] ?? '', 'fields' => array_keys($_POST),
 ]) . "\n", FILE_APPEND);
 header('Content-Type: application/json');
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {   // credits check: never logged as a send
+    echo match ($case) {
+        'invalid_token' => '{"status":500,"message":"Invalid Token"}',
+        'credits_zero' => '{"status":200,"data":{"load_balance":0}}',
+        'garbled' => 'not json',
+        default => '{"status":200,"data":{"load_balance":42}}',
+    };
+    return;
+}
 [$http, $body] = match ($case) {
     'http_401' => [401, '{"status":"error","message":"Unauthorized"}'],
     'invalid_token' => [200, '{"status":500,"message":"Invalid Token"}'],
+    'no_credits' => [200, '{"status":500,"message":"Insufficient credits"}'],
     'undocumented' => [200, '{"status":"success","message":"queued"}'],
     default => [200, '{"status":200,"message":"Your SMS message has been successfully added to the queue and will be processed shortly.","message_id":"iSms-TEST1"}'],
 };
@@ -95,6 +105,11 @@ if ($replaced !== 1) {
     fwrite(STDERR, "Could not redirect the IPROG copy to the fake server; refusing to continue.\n");
     exit(2);
 }
+$iprogSource = str_replace('https://www.iprogsms.com/api/v1/account/sms_credits', 'http://127.0.0.1:' . $port . '/stub.php', $iprogSource, $replaced);
+if ($replaced !== 1) {
+    fwrite(STDERR, "Could not redirect the IPROG credits check to the fake server; refusing to continue.\n");
+    exit(2);
+}
 file_put_contents($iprogCopy, $iprogSource);
 
 // Fake mailer for the success path: real message building, recorded instead of sent.
@@ -107,6 +122,8 @@ $GLOBALS['SA_TEST_MAILER'] = $fakeMailer;
 // ---- Load the real notification functions from web/api.php ----
 require $app . '/web/bootstrap.php';
 $pdo = sa_db();
+$pdo->exec('DROP TABLE IF EXISTS request_status_log');
+$pdo->exec('CREATE TABLE request_status_log (id INT AUTO_INCREMENT PRIMARY KEY, delivery_status VARCHAR(20) NULL, sms_sent_by_id INT NULL) ENGINE=InnoDB');
 $pdo->exec('DROP TABLE IF EXISTS notifications');
 $pdo->exec("CREATE TABLE notifications (
     id INT AUTO_INCREMENT PRIMARY KEY, client_id INT NULL, request_id INT NULL, type VARCHAR(40) NOT NULL, message TEXT NOT NULL,
@@ -138,8 +155,8 @@ $extract = static function (string $name) use ($api): string {
     throw new RuntimeException("Could not read {$name}");
 };
 $code = '';
-foreach (['sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_email_config_dir', 'sa_email_configured',
-          'sa_email_deliver'] as $function) {
+foreach (['sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_sms_failure_reason', 'sa_sms_status', 'sa_email_config_dir',
+          'sa_email_configured', 'sa_email_deliver', 'sa_email_status'] as $function) {
     $code .= $extract($function) . "\n";
 }
 $code = str_replace("dirname(__DIR__) . '/iprog-sms.php'", var_export($iprogCopy, true), $code);
@@ -278,9 +295,94 @@ file_put_contents($work . '/iprog/case.txt', 'ok');
 $reset();
 $check('sms landline number: "failed", IPROG not contacted', sa_sms_deliver('+632123456789', $message, 'request ID 21') === 'failed' && $hits() === []);
 
+// ================= Failure reasons shown to staff =================
+putenv('IPROG_API_TOKEN=TEST-TOKEN-ONLY');
+foreach (['invalid_token' => 'API token', 'no_credits' => 'credits'] as $case => $word) {
+    file_put_contents($work . '/iprog/case.txt', $case);
+    $reason = null;
+    $outcome = sa_sms_deliver('+639171234567', $message, 'request ID 22', $reason);
+    $check("sms failure '{$case}': \"failed\" with a clear reason and no secret", $outcome === 'failed' && str_contains((string) $reason, $word) && !str_contains((string) $reason, 'TEST-TOKEN-ONLY'), $reason);
+}
+file_put_contents($work . '/iprog/case.txt', 'ok');
+
+// ================= Service status: SMS =================
+$reset();
+putenv('SMART_ASSESS_SMS_ENABLED');
+$check('sms status: switched off is reported', sa_sms_status()['ready'] === false && str_contains(sa_sms_status()['message'], 'SMART_ASSESS_SMS_ENABLED'));
+putenv('SMART_ASSESS_SMS_ENABLED=1');
+putenv('IPROG_API_TOKEN');
+$check('sms status: missing token is reported', sa_sms_status()['ready'] === false && str_contains(sa_sms_status()['message'], 'IPROG_API_TOKEN is not set'));
+putenv('IPROG_API_TOKEN=TEST-TOKEN-ONLY');
+$status = sa_sms_status();
+$check('sms status: token accepted, credits shown', $status['ready'] === true && $status['credits'] === 42, $status);
+file_put_contents($work . '/iprog/case.txt', 'invalid_token');
+$status = sa_sms_status();
+$check('sms status: token IPROG rejects -> not ready', $status['ready'] === false && str_contains($status['message'], 'invalid'), $status);
+$check('sms status: never contains the token', !str_contains(json_encode($status), 'TEST-TOKEN-ONLY'));
+file_put_contents($work . '/iprog/case.txt', 'credits_zero');
+$status = sa_sms_status();
+$check('sms status: zero credits are reported', $status['credits'] === 0 && str_contains($status['message'], '0 credits'), $status);
+file_put_contents($work . '/iprog/case.txt', 'garbled');
+$status = sa_sms_status();
+$check('sms status: unreadable reply does not claim credits', $status['ready'] === true && $status['credits'] === null, $status);
+file_put_contents($work . '/iprog/case.txt', 'ok');
+$check('sms status: checks never send an SMS', $hits() === []);
+
+// ================= Gmail authorization =================
+$gmailDir = $work . '/gmail-auth';
+mkdir($gmailDir, 0700);
+file_put_contents($gmailDir . '/google-oauth-client.json', '{"web":{"client_id":"test-id","client_secret":"TEST-CLIENT-SECRET","redirect_uris":["http://127.0.0.1/"],"auth_uri":"https://example.invalid/a","token_uri":"https://example.invalid/t"}}');
+$expired = '{"access_token":"OLD-ACCESS","refresh_token":"TEST-REFRESH-TOKEN","created":1000,"expires_in":3600}';
+file_put_contents($gmailDir . '/gmail-token.json', $expired);
+putenv('SMART_ASSESS_GMAIL_DIR=' . $gmailDir);
+$attempt = static function (callable $refresher) use ($mailer): ?string {
+    try {
+        $mailer(['check_only' => true], null, $refresher);
+        return null;
+    } catch (RuntimeException $e) {
+        return $e->getMessage();
+    }
+};
+$error = $attempt(static fn () => ['error' => 'invalid_grant', 'error_description' => 'Token has been expired or revoked.']);
+$check('gmail invalid_grant: named, not hidden as a generic failure', str_contains((string) $error, 'expired or been revoked (invalid_grant)') && str_contains((string) $error, 're-authorize'), $error);
+$error = $attempt(static fn () => ['error' => 'invalid_client']);
+$check('gmail other refusal: Google error code reported', str_contains((string) $error, '(invalid_client)'), $error);
+$error = $attempt(static function (): array { throw new RuntimeException('network TEST-REFRESH-TOKEN'); });
+$check('gmail refresh network failure: fixed text, no secret', $error === '[mailer] Could not reach Google to refresh the Gmail authorization.', $error);
+$error = $attempt(static fn () => ['access_token' => 'NEW-ACCESS', 'expires_in' => 3600, 'created' => time()]);
+$saved = json_decode((string) file_get_contents($gmailDir . '/gmail-token.json'), true);
+$check('gmail refresh ok: new token saved, refresh token kept, private file', $error === null && $saved['access_token'] === 'NEW-ACCESS' && $saved['refresh_token'] === 'TEST-REFRESH-TOKEN'
+    && (fileperms($gmailDir . '/gmail-token.json') & 0777) === 0600, [$error, array_keys((array) $saved)]);
+$called = false;
+$error = $attempt(static function () use (&$called): array { $called = true; return []; });
+$check('gmail valid token: no refresh requested', $error === null && $called === false, $error);
+file_put_contents($gmailDir . '/gmail-token.json', $expired);
+chmod($gmailDir, 0500);
+$error = $attempt(static fn () => ['access_token' => 'NEW-ACCESS', 'expires_in' => 3600, 'created' => time()]);
+chmod($gmailDir, 0700);
+$check('gmail folder not writable: send still allowed, problem logged', $error === null && str_contains((string) file_get_contents($errorLog), 'could not be saved'), $error);
+
+file_put_contents($gmailDir . '/gmail-token.json', $expired);
+file_put_contents($work . '/revoked-mailer.php', '<?php $real = require ' . var_export($app . '/gmail-mailer.php', true) . ';'
+    . ' return static function (array $d) use ($real): void { $real($d, null, static fn () => ["error" => "invalid_grant"]); };');
+$GLOBALS['SA_TEST_MAILER'] = $work . '/revoked-mailer.php';
+$status = sa_email_status();
+$check('email status: revoked authorization -> not ready, says why', $status['ready'] === false && str_contains($status['message'], 'invalid_grant'), $status);
+$reason = null;
+$outcome = sa_email_deliver($staff, 'request ID 31', $reason);
+$check('email deliver: revoked authorization -> "failed" with the reason for staff', $outcome === 'failed' && str_contains((string) $reason, 'invalid_grant'), [$outcome, $reason]);
+$GLOBALS['SA_TEST_MAILER'] = $fakeMailer;
+$check('email status: authorized -> ready', sa_email_status()['ready'] === true, sa_email_status());
+$check('email status: never contains credentials', !preg_match('/TEST-CLIENT-SECRET|TEST-REFRESH-TOKEN|OLD-ACCESS/', json_encode(sa_email_status())));
+putenv('SMART_ASSESS_GMAIL_DIR=' . $work . '/empty-gmail-dir');
+$check('email status: unreadable files are reported', sa_email_status()['ready'] === false && str_contains(sa_email_status()['message'], 'cannot read'));
+putenv('SMART_ASSESS_GMAIL_DIR');
+$check('email status: folder setting missing is reported', sa_email_status()['ready'] === false && str_contains(sa_email_status()['message'], 'SMART_ASSESS_GMAIL_DIR'));
+putenv('SMART_ASSESS_GMAIL_DIR=' . $work . '/empty-gmail-dir');
+
 // ================= Logs =================
 $log = (string) @file_get_contents($errorLog);
-$check('logs: no token, phone number, email address, or message text', !preg_match('/TEST-TOKEN-ONLY|639171234567|9171234567|@example\.invalid|We received your|missing Tax Clearance|SMART ASSESS test message/', $log), $log);
+$check('logs: no token, phone number, email address, or message text', !preg_match('/TEST-TOKEN-ONLY|TEST-CLIENT-SECRET|TEST-REFRESH-TOKEN|639171234567|9171234567|@example\.invalid|We received your|missing Tax Clearance|SMART ASSESS test message/', $log), $log);
 $check('logs: failures are explained', str_contains($log, '[SMART_ASSESS_EMAIL]') && str_contains($log, '[SMART_ASSESS_SMS]'), $log);
 
 $failed = 0;

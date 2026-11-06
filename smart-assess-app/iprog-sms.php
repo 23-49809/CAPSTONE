@@ -30,6 +30,8 @@ final class IprogSmsService
 
     private const ENDPOINT = 'https://www.iprogsms.com/api/v1/sms_messages';
 
+    private const CREDITS_ENDPOINT = 'https://www.iprogsms.com/api/v1/account/sms_credits';
+
     private function __construct(private readonly string $apiToken)
     {
         if ($this->apiToken === '') {
@@ -61,6 +63,45 @@ final class IprogSmsService
         }
 
         throw new InvalidArgumentException('Recipient must be a Philippine mobile number.');
+    }
+
+    /**
+     * Checks the token and credits without sending or spending anything.
+     * token_ok is null and credits null when IPROG could not be asked or the
+     * reply was not understood; the token is never logged or returned.
+     *
+     * @return array{token_ok:?bool, credits:?int}
+     */
+    public function accountStatus(): array
+    {
+        $handle = curl_init(self::CREDITS_ENDPOINT . '?' . http_build_query(['api_token' => $this->apiToken]));
+        if ($handle === false) {
+            return ['token_ok' => null, 'credits' => null];
+        }
+        curl_setopt_array($handle, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+        $body = curl_exec($handle);
+        $response = is_string($body) ? json_decode($body, true) : null;
+        if (!is_array($response)) {
+            return ['token_ok' => null, 'credits' => null];
+        }
+        if (is_string($response['message'] ?? null) && stripos($response['message'], 'invalid token') !== false) {
+            return ['token_ok' => false, 'credits' => null];
+        }
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        foreach (['load_balance', 'sms_credits', 'credits', 'balance'] as $key) {
+            $value = $data[$key] ?? $response[$key] ?? null;
+            if (is_numeric($value)) {
+                return ['token_ok' => true, 'credits' => (int) $value];
+            }
+        }
+        return ['token_ok' => null, 'credits' => null];
     }
 
     /**

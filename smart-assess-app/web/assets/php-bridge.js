@@ -275,9 +275,51 @@
       emailDisplay.classList.toggle('is-empty', !email);
     }
     if (emailBox) {
-      emailBox.disabled = !email;
-      emailBox.checked = !!email;
+      var emailUsable = !!email && !(channelStatus && !channelStatus.email.ready);
+      emailBox.disabled = !emailUsable;
+      emailBox.checked = emailUsable;
     }
+    applyChannelStatus(form);
+  }
+
+  // Live SMS/email service status on the Notifications page: a channel that
+  // cannot work is unticked and locked, so it never blocks the other one.
+  var channelStatus = null;
+  var channelStatusLoading = false;
+  function applyChannelStatus(form) {
+    var panel = document.getElementById('notification-services');
+    if (!panel || !channelStatus) return;
+    [['sms', 'send_sms'], ['email', 'send_email']].forEach(function (pair) {
+      var status = channelStatus[pair[0]];
+      var box = form.querySelector('input[name="' + pair[1] + '"]');
+      if (box && !status.ready) {
+        box.checked = false;
+        box.disabled = true;
+      }
+      var line = panel.querySelector('[data-service="' + pair[0] + '"]');
+      if (line && line.textContent !== status.message) line.textContent = status.message;
+      if (line) line.classList.toggle('is-down', !status.ready);
+    });
+  }
+  function loadChannelStatus() {
+    var form = document.querySelector('form[data-form="send-notif"]');
+    if (!form) return;
+    if (channelStatus) {
+      applyChannelStatus(form);
+      return;
+    }
+    if (channelStatusLoading) return;
+    channelStatusLoading = true;
+    jsonRequest('notification_status', {}).then(function (result) {
+      channelStatus = result.data;
+      var current = document.querySelector('form[data-form="send-notif"]');
+      if (current) applyChannelStatus(current);
+    }).catch(function () {
+      var current = document.querySelector('#notification-services [data-service="sms"]');
+      if (current) current.textContent = 'Could not check the SMS and email services. You can still try to send.';
+      var email = document.querySelector('#notification-services [data-service="email"]');
+      if (email) email.textContent = '';
+    });
   }
 
   function updateNotificationOwner(select) {
@@ -720,7 +762,14 @@
       var internalRowsObserver = new MutationObserver(function () {
         enhanceProfileAvatar(internalApp);
         enhanceInternalTables(internalApp);
+        loadChannelStatus();
       });
+      document.addEventListener('reset', function (event) {
+        if (event.target.matches && event.target.matches('form[data-form="send-notif"]')) {
+          window.setTimeout(loadChannelStatus, 20);
+        }
+      });
+      loadChannelStatus();
       internalRowsObserver.observe(internalApp, { childList: true, subtree: true });
       enhanceProfileAvatar(internalApp);
       enhanceInternalTables(internalApp);

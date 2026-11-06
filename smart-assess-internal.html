@@ -613,6 +613,8 @@
   @media (max-width:1024px), (pointer:coarse){ .modal .review-row .v .btn-process{ min-height:44px; } }
   .modal.req-detail .btn, .modal.req-detail .action-btn{ font-weight:600; }
   .nf-draft{ margin:0 0 16px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--warn-bg); color:var(--warn); font-size:13px; line-height:1.45; }
+  .nf-services{ display:flex; flex-direction:column; gap:4px; margin:0 0 16px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); font-size:13px; line-height:1.45; }
+  .nf-services .is-down{ color:var(--danger); font-weight:600; }
   .nf-channels{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:4px 0 16px; padding:0; border:0; }
   .nf-channels legend{ width:100%; margin-bottom:6px; font-size:13px; font-weight:600; }
   .nf-channel{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; cursor:pointer; min-height:32px; }
@@ -2640,7 +2642,12 @@ function applyNotifTemplate(form, force){
   var tpl = notifTemplate(category, notifRequestInfo(form.elements.requestRef.value));
   if(force || topic.value===auto.topic) topic.value = tpl.topic;
   if(force || details.value===auto.details) details.value = tpl.details;
-  form._notifAuto = { topic:tpl.topic, details:tpl.details };
+  // Message starts from the template with the client's name and reference.
+  // Staff text is never overwritten, and nothing is sent until they click Send.
+  var ref = form.elements.requestRef.value, info = ref ? notifRequestInfo(ref) : null, msg = form.elements.message;
+  var autoMsg = info && tpl.details ? 'Good day, '+(info.owner||'Client').replace(/\s+/g,' ').trim()+'. Regarding your request '+ref+': '+tpl.details : '';
+  if(msg && (msg.value==='' || msg.value===auto.message) && msg.value!==autoMsg){ msg.value = autoMsg; msg.dispatchEvent(new Event('input',{bubbles:true})); }
+  form._notifAuto = { topic:tpl.topic, details:tpl.details, message:autoMsg };
   var custom = category==='Other Instruction';
   topic.placeholder = custom ? 'Enter a custom topic' : 'e.g. Additional documents needed';
   details.placeholder = custom ? 'Enter custom instructions (general, non-sensitive)' : 'Add only general, non-sensitive details';
@@ -2786,6 +2793,7 @@ function renderNotifications(acct){
     + '<section class="notif-card notif-send">'
       + '<div class="nc-head"><div><h3>Send a Notification</h3><p>Nothing is sent until you click Send Notification. Review the recipient and message first.</p></div></div>'
       + (draft ? '<div class="nf-draft" role="status">Draft prepared for the rejected request '+esc(draft.ref)+' ('+esc(draft.rejection)+'). Review and edit the message, choose SMS and/or email, then send.</div>' : '')
+      + '<div class="nf-services" id="notification-services" aria-live="polite"><strong>Service status</strong><span data-service="sms">Checking SMS…</span><span data-service="email">Checking email…</span></div>'
       + '<form data-form="send-notif" class="notif-form">'
         + '<div class="nf-grid">'
           + '<div class="field"><label for="notification-reference">Reference Number</label><select id="notification-reference" name="requestRef" required><option value="">Select a request…</option>'+allRefs.map(function(id){return '<option value="'+id+'"'+(draft&&draft.ref===id?' selected':'')+'>'+id+'</option>';}).join('')+'</select></div>'
