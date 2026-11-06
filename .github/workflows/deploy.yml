@@ -62,11 +62,19 @@ jobs:
         run: |
           set -euo pipefail
 
+          REMOTE_COMMAND=$(cat <<'REMOTE'
+          sudo -n sed -E 's/^([[:space:]]*SetEnv[[:space:]]+)([A-Za-z0-9_]+)([[:space:]]+).*/\1\2 <redacted>/' \
+            /etc/apache2/conf-enabled/smart-assess-env.conf | grep -E 'DB_|SMART_ASSESS_DB_PASS'
+          command -v mysqldump
+          df -h /var/backups
+          REMOTE
+          )
+          PARAMETERS=$(printf '%s' "$REMOTE_COMMAND" | python3 -c 'import json, sys; print(json.dumps({"commands": [sys.stdin.read()]}))')
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids i-051e38f99d3c2bd98 \
             --document-name AWS-RunShellScript \
-            --comment "Read-only inspection of SMART ASSESS deployment script" \
-            --parameters 'commands=["sudo -n sh -c \"grep -RIl SMART_ASSESS_DB_PASS /etc/apache2 /etc/systemd/system /etc/environment /etc/default 2>/dev/null || true; command -v mysqldump; df -h /var/backups\""]' \
+            --comment "Read-only inspection of SMART ASSESS database configuration" \
+            --parameters "$PARAMETERS" \
             --query 'Command.CommandId' \
             --output text)
 
