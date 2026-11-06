@@ -63,8 +63,27 @@ jobs:
           set -euo pipefail
 
           REMOTE_COMMAND=$(cat <<'REMOTE'
-          sudo -n sed -E 's/^([[:space:]]*SetEnv[[:space:]]+)([A-Za-z0-9_]+)([[:space:]]+).*/\1\2 <redacted>/' \
-            /etc/apache2/conf-enabled/smart-assess-env.conf | grep -E 'DB_|SMART_ASSESS_DB_PASS'
+          sudo -n python3 - <<'PY'
+          import pathlib, re, shlex
+          wanted = {"DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "SMART_ASSESS_DB_PASS"}
+          values = {}
+          for line in pathlib.Path("/etc/apache2/conf-enabled/smart-assess-env.conf").read_text().splitlines():
+              try:
+                  parts = shlex.split(line, comments=True)
+              except ValueError:
+                  continue
+              if len(parts) == 3 and parts[0] == "SetEnv" and parts[1] in wanted:
+                  values[parts[1]] = parts[2]
+          for key in sorted(wanted):
+              value = values.get(key, "")
+              print(f"{key}: present={bool(value)}, length={len(value)}")
+          if not re.fullmatch(r"[A-Za-z0-9_]+", values.get("DB_NAME", "")):
+              raise SystemExit("DB_NAME is absent or not a simple identifier")
+          if not values.get("SMART_ASSESS_DB_PASS"):
+              raise SystemExit("Database password is absent")
+          PY
+          sudo -n du -sh /var/www/capstone/smart-assess-app /var/www/capstone/smart-assess.html /var/www/capstone/smart-assess-internal.html
+          sudo -n apache2ctl -S 2>&1 | grep -E 'namevhost|port 80|port 443' | head -20
           command -v mysqldump
           df -h /var/backups
           REMOTE
