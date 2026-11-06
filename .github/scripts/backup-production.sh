@@ -19,6 +19,8 @@ install -d -o root -g root -m 700 "$BACKUP_DIR"
 MYSQL_CONFIG="$BACKUP_DIR/.mysql.cnf"
 FILES_BACKUP="$BACKUP_DIR/application-files.tar.gz"
 DATABASE_BACKUP="$BACKUP_DIR/database.sql.gz"
+APP_DUMP_ERROR="$BACKUP_DIR/.application-dump.err"
+SYSTEM_DUMP_ERROR="$BACKUP_DIR/.system-dump.err"
 trap 'rm -f -- "$MYSQL_CONFIG"' EXIT
 
 DB_NAME=$(python3 - "$ENV_FILE" "$MYSQL_CONFIG" <<'PY'
@@ -75,9 +77,26 @@ PY
 printf 'Creating protected production backup: %s\n' "$BACKUP_DIR"
 tar -czpf "$FILES_BACKUP" -C "$WEB_PARENT" \
     smart-assess-app smart-assess.html smart-assess-internal.html
-mysqldump --defaults-extra-file="$MYSQL_CONFIG" \
-    --single-transaction --routines --triggers --events --databases "$DB_NAME" |
-    gzip -c > "$DATABASE_BACKUP"
+DUMP_ARGS=(--single-transaction --routines --triggers --events --no-tablespaces --databases "$DB_NAME")
+if mysqldump --defaults-extra-file="$MYSQL_CONFIG" "${DUMP_ARGS[@]}" \
+    > "$BACKUP_DIR/database.sql" 2> "$APP_DUMP_ERROR"; then
+    :
+else
+    if [[ ! -r /etc/mysql/debian.cnf ]]; then
+        cat "$APP_DUMP_ERROR" >&2
+        echo "Application database credentials cannot create a complete dump, and local MySQL maintenance credentials are unavailable." >&2
+        exit 1
+    fi
+    echo "Application database credentials lack full-schema privileges; retrying with local MySQL maintenance credentials."
+    if ! mysqldump --defaults-extra-file=/etc/mysql/debian.cnf "${DUMP_ARGS[@]}" \
+        > "$BACKUP_DIR/database.sql" 2> "$SYSTEM_DUMP_ERROR"; then
+        cat "$SYSTEM_DUMP_ERROR" >&2
+        echo "Local MySQL maintenance credentials could not create a complete database dump." >&2
+        exit 1
+    fi
+fi
+gzip -c "$BACKUP_DIR/database.sql" > "$DATABASE_BACKUP"
+rm -f -- "$BACKUP_DIR/database.sql" "$APP_DUMP_ERROR" "$SYSTEM_DUMP_ERROR"
 
 test -s "$FILES_BACKUP"
 test -s "$DATABASE_BACKUP"
