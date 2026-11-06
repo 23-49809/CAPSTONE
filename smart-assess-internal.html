@@ -1674,10 +1674,6 @@ window.SMART_ASSESS_STATUS_UPDATED = function(data, result){
     request.processingCompletedEpoch = result.processing_completed_epoch;
     request.processingDurationSeconds = result.processing_duration_seconds;
   }
-  if(result.status==='Rejected'){
-    request.advisory = 'Rejected: ' + data.rejection_category
-      + (data.rejection_note && data.rejection_note.trim() ? ' - ' + data.rejection_note.trim() : '');
-  }
   render();
   return true;
 };
@@ -2738,29 +2734,19 @@ function sentPeriodRange(period, customFrom, customTo){
   }
 }
 
-/* Draft prepared after a rejection (see php-bridge.js): taken once from
+/* Draft prepared after rejection (see php-bridge.js): taken once from
    sessionStorage and kept in state until sent, so a re-render keeps edits. */
-var REJECTION_DRAFT_TEXT = {
-  'Missing requirements': ['Missing Document', 'some required documents are missing', 'submit the missing requirements'],
-  'Incorrect information': ['Other Instruction', 'some of the information you provided is incorrect', 'check and correct your information'],
-  'Invalid or unclear documents': ['Additional Requirements', 'some uploaded documents are invalid or unclear', 'submit clear and valid copies of the documents'],
-  'Other issue': ['Other Instruction', 'of an issue found during review', 'contact our office for the details']
-};
 function takeNotifDraft(){
   var raw = null;
   try { raw = JSON.parse(sessionStorage.getItem('smartAssessNotifDraft') || 'null'); sessionStorage.removeItem('smartAssessNotifDraft'); } catch(e){ raw = null; }
-  if(!raw || !raw.ref || !REJECTION_DRAFT_TEXT[raw.category]) return;
+  if(!raw || !raw.ref) return;
   var r = findDocReq(raw.ref) || findLandReq(raw.ref);
   if(!r) return;
   var d = r.details || {};
   var name = [d.firstName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ') || r.applicant || 'Client';
-  var t = REJECTION_DRAFT_TEXT[raw.category];
-  var note = String(raw.note||'').trim();
   state.notifDraft = {
-    ref: r.id, rejection: raw.category, category: t[0], topic: 'Request not approved: '+raw.category,
-    message: 'Good day, '+name+'. Your request '+r.id+' at the Municipal Assessor\'s Office of Mabini was not approved because '+t[1]+'.'
-      + (note ? ' Details: '+note+(/[.!?]$/.test(note)?'':'.') : '')
-      + ' Please '+t[2]+' and visit or contact our office. Thank you.'
+    ref: r.id, rejection: 'Rejected', category: 'Request Status Update', topic: 'Request rejected: '+r.id,
+    message: 'Good day, '+name+'. Your request '+r.id+' at the Municipal Assessor\'s Office of Mabini was rejected. Please contact the office for more information. Thank you.'
   };
 }
 function notifRecipient(ref){
@@ -3068,9 +3054,6 @@ function checklistHtml(checklist){
   }).join('')+'</ul>';
 }
 
-/* Rejection reasons staff can pick (same list as SA_REJECTION_CATEGORIES in api.php). */
-var REJECTION_CATEGORIES = ['Missing requirements','Incorrect information','Invalid or unclear documents','Other issue'];
-
 /* Label/value rows for a full-width table: two pairs per row on wide screens.
    items: [label, html, wide] — wide items take a whole row. */
 function rdTable(caption, items){
@@ -3104,23 +3087,16 @@ function modalReqDetail(id, kind){
     ? '<div class="rd-proc">'+(r.processingStartedAt?'<span class="proc-elapsed">'+processingTimerHtml(r, true)+'</span>':'<span class="cell-sub">Not started. Process Request sets the status to Processing.</span>')
       + (procButton?'<span class="proc-action">'+procButton+'</span>':'')+'</div>'
     : '';
-  var reason = r.status==='Rejected' && /^Rejected: /.test(r.advisory||'') ? esc(r.advisory.replace(/^Rejected: /,'')) : '';
   // Staff choose only the closing statuses here: Pending and Processing are
   // set automatically (submission / Process Request).
   var statusForm = isAssignedStaff && !terminalStatus
     ? '<form class="rd-status-form" data-form="update-status" data-kind="'+kind+'" data-id="'+esc(r.id)+'">'
         + '<div class="rd-form-row">'
-          + '<div class="field"><label class="sr-only" for="rd-status-'+esc(r.id)+'">New status</label><select id="rd-status-'+esc(r.id)+'" name="status" required data-status-select>'
+          + '<div class="field"><label class="sr-only" for="rd-status-'+esc(r.id)+'">New status</label><select id="rd-status-'+esc(r.id)+'" name="status" required>'
             + '<option value="">Choose a new status</option>'
             + ['Rejected','Out for Release'].map(function(s){ return '<option value="'+s+'">'+statusLabel(s)+'</option>'; }).join('')
           + '</select></div>'
           + '<button type="submit" class="btn btn-primary">Update Status</button>'
-        + '</div>'
-        + '<div class="rd-reject" hidden>'
-          + '<div class="field"><label for="rd-reason-'+esc(r.id)+'">Reason for rejection</label><select id="rd-reason-'+esc(r.id)+'" name="rejection_category" data-rejection-category><option value="">Choose a reason</option>'
-            + REJECTION_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('')+'</select></div>'
-          + '<div class="field"><label for="rd-note-'+esc(r.id)+'">Details for the client (optional)</label><textarea id="rd-note-'+esc(r.id)+'" name="rejection_note" maxlength="500" rows="2" placeholder="e.g. The Tax Clearance is missing."></textarea></div>'
-          + '<p class="field-hint">Review the client details and uploaded documents yourself before rejecting: automatic document checking (OCR) is not available yet. The client will receive a status notification with the rejection reason.</p>'
         + '</div>'
       + '</form>'
     : '';
@@ -3133,7 +3109,6 @@ function modalReqDetail(id, kind){
     r.processingStartedAt ? ['Processing Started', fmtDateTime(r.processingStartedAt)] : null,
     r.processingCompletedAt ? ['Processing Completed', fmtDateTime(r.processingCompletedAt)] : null,
     r.processingDurationSeconds!=null ? ['Final Processing Duration', '<span class="mono">'+formatDuration(r.processingDurationSeconds)+'</span>'] : null,
-    reason ? ['Rejection Reason', reason, true] : null,
     processing ? ['Processing', processing, true] : null,
     statusForm ? ['Update Status', statusForm, true] : null
   ]);
@@ -3811,15 +3786,8 @@ function bindEvents(){
   // bindEvents runs on every render: register these document listeners once.
   if(!window._rdFormListeners){
   window._rdFormListeners = true;
-  // Update Status: the reason fields appear (and are required) only for Rejected.
   document.addEventListener('change', function(ev){
     var t = ev.target;
-    if(t && t.matches && t.matches('form[data-form="update-status"] [data-status-select]')){
-      var box = t.form.querySelector('.rd-reject'), reason = t.form.querySelector('[data-rejection-category]');
-      var rejecting = t.value==='Rejected';
-      if(box) box.hidden = !rejecting;
-      if(reason) reason.required = rejecting;
-    }
     if(t && t.matches && t.matches('form[data-form="send-notif"] select[name="requestRef"]') && state.notifDraft && t.value!==state.notifDraft.ref){
       state.notifDraft = null;   // a different client: the rejection draft no longer applies
     }
@@ -4179,8 +4147,12 @@ function bindEvents(){
       var req = kind==='doc' ? findDocReq(rid) : findLandReq(rid);
       if(req){
         req.status = fd.get('status');
+        if(req.status==='Rejected'){
+          try { sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({ref:rid})); } catch(e){}
+          state.view = 'notifications';
+        }
         if(kind==='land'){ req.history = req.history||[]; req.history.push({status:req.status, when:new Date().toISOString()}); }
-        pushToast(rid+' status updated to "'+req.status+'".', 'check');
+        if(req.status!=='Rejected') pushToast(rid+' status updated to "'+req.status+'".', 'check');
       }
       state.modal = null; render();
 
