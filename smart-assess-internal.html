@@ -1514,7 +1514,13 @@ var NAV = {
   ]
 };
 var ROLE_LABEL = {admin:'Assessor Admin', head:'Assessor Head', staff:'Assessor Staff'};
-var POSITION_OPTIONS = ['Assessor Admin','Assessor Head','Assessment Clerk','Records Officer'];
+var POSITION_GROUPS = [
+  {label:'Administrative and Assessment Records Management', positions:['Assessment Clerk III','Assessment Clerk II','Assessment Clerk I','Administrative Aide II','Job Order']},
+  {label:'Tax Mapping Operations Division', positions:['Tax Mapper I','Draftsman I','Administrative Aide IV','Administrative Aide I','Job Order']},
+  {label:'Appraisal & Assessment Division', positions:['LAOO II','LAOO I','Administrative Aide II']},
+  {label:'Office Head', positions:['Municipal Assessor']}
+];
+var POSITION_OPTIONS = POSITION_GROUPS.reduce(function(options, group){ return options.concat(group.positions); }, []);
 
 var REPORT_TYPE_LABEL = {document:'Document Requests', 'land-transfer':'Land Transfer', requirement:'Requirement Checker', summary:'Summary'};
 
@@ -1898,7 +1904,11 @@ function positionTitleField(value){
   var legacyOption = selected && POSITION_OPTIONS.indexOf(selected)===-1
     ? '<option value="'+esc(selected)+'" selected>'+esc(selected)+'</option>' : '';
   return '<div class="field"><label>Position Title</label><select name="positionTitle" required><option value=""'+(selected?'':' selected')+'>Select Position</option>'
-    + legacyOption + POSITION_OPTIONS.map(function(position){ return '<option value="'+esc(position)+'"'+(selected===position?' selected':'')+'>'+esc(position)+'</option>'; }).join('')
+    + legacyOption + POSITION_GROUPS.map(function(group){
+      return '<optgroup label="'+esc(group.label)+'">'+group.positions.map(function(position){
+        return '<option value="'+esc(position)+'"'+(selected===position?' selected':'')+'>'+esc(position)+'</option>';
+      }).join('')+'</optgroup>';
+    }).join('')
     + '</select></div>';
 }
 
