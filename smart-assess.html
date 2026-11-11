@@ -999,7 +999,7 @@
   .field .contact-input > input, .field .arp-input > input{ min-height:0; }
 </style>
 
-<div id="app"><main class="wrap static-home"><h1>SMART ASSESS</h1><p><strong>Municipal Assessor’s Office of Mabini, Batangas</strong></p><p>SMART ASSESS is the online system of the Municipal Assessor’s Office of Mabini, Batangas. It lets applicants prepare and submit property document requests and land transfer applications online, without needing an account.</p><ul class="about-grid about-five"><li><div><h4>Property Document Requests</h4><p>Request Certified True Copies of Tax Declarations and certifications on improvements, property holdings, liens and encumbrances, and assessments.</p></div></li><li><div><h4>Land Transfer Services</h4><p>Apply for land transfers by sale, donation or inheritance.</p></div></li><li><div><h4>Requirements and Supporting Documents</h4><p>See what each service needs, then upload your ID and supporting documents as JPG, PNG, WEBP or PDF files of up to 5 MB each.</p></div></li><li><div><h4>Request Processing and Status Tracking</h4><p>Authorized Office staff review your submission. Use your reference number on the Track Request page to see whether it is Pending, Processing, Out for Release, Rejected or Timed Out.</p></div></li><li><div><h4>How You Receive Notifications</h4><p>Status changes appear in request tracking. Staff may also message you about your request by SMS, or by email if you gave an address. Completed documents are claimed in person at the Office.</p></div></li></ul><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines. Phone: (043) 487-0123. Email: mao.smartassess@gmail.com</p><nav class="static-legal" aria-label="Legal"><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav></main></div>
+<div id="app"><main class="wrap static-home"><h1>SMART ASSESS</h1><p><strong>Municipal Assessor’s Office of Mabini, Batangas</strong></p><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines. Phone: 09989695966. Email: mao.smartassess@gmail.com</p><nav class="static-legal" aria-label="Legal"><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav></main></div>
 
 <script>
 (function(){
@@ -1427,21 +1427,15 @@ function renderLanding(){
     + '<div class="section-head"><h2>How Can We Help You?</h2>'
     + '<p>Choose the service that best matches your needs. We offer two main pathways to access municipal property assessment services:</p></div>'
     + '<div class="service-grid">'
-      + '<div class="service-card"><div class="service-title"><div class="chip-icon">'+ic('doc')+'</div>'
+      + '<div class="service-card"><div class="service-title">'
         + '<h3>Document Request</h3></div>'
         + '<p>Request for Certified True Copies of Tax Declarations, Certifications of Land Holdings, and more.</p>'
-        + '<div class="service-actions"><button class="btn-link" data-action="start-docreq">Begin Application '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="docreq">View Requirements '+ic('arrowRight')+'</button></div>'+renderCardDraft('docreq')+'</div>'
-      + '<div class="service-card"><div class="service-title"><div class="chip-icon">'+ic('swap')+'</div>'
+        + '<div class="service-actions"><button class="btn-link" data-action="start-docreq">Begin Application</button><button class="btn-link" data-action="show-requirements" data-requirements="docreq">View Requirements</button></div>'+renderCardDraft('docreq')+'</div>'
+      + '<div class="service-card"><div class="service-title">'
         + '<h3>Land Transfer</h3></div>'
         + '<p>Submit requirements for property transfer, consolidation, or subdivision of land records.</p>'
-        + '<div class="service-actions"><button class="btn-link" data-action="start-landtransfer">Begin Land Transfer '+ic('arrowRight')+'</button><button class="btn-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements '+ic('arrowRight')+'</button></div>'+renderCardDraft('landtransfer')+'</div>'
+        + '<div class="service-actions"><button class="btn-link" data-action="start-landtransfer">Begin Land Transfer</button><button class="btn-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements</button></div>'+renderCardDraft('landtransfer')+'</div>'
     + '</div></div></section>'
-
-  + '<section class="section" id="about" aria-labelledby="about-title"><div class="wrap">'
-    + '<div class="why-head"><h3 class="about-sub" id="about-title">About SMART ASSESS</h3>'
-      + '<p class="why-desc">SMART ASSESS is the online system of the Municipal Assessor’s Office of Mabini, Batangas. It lets applicants prepare and submit property document requests and land transfer applications online, without needing an account.</p></div>'
-    + '<ul class="about-grid about-five"><li><div><h4>Property Document Requests</h4><p>Request Certified True Copies of Tax Declarations and certifications on improvements, property holdings, liens and encumbrances, and assessments.</p></div></li><li><div><h4>Land Transfer Services</h4><p>Apply for land transfers by sale, donation or inheritance.</p></div></li><li><div><h4>Requirements and Supporting Documents</h4><p>See what each service needs, then upload your ID and supporting documents as JPG, PNG, WEBP or PDF files of up to 5 MB each.</p></div></li><li><div><h4>Request Processing and Status Tracking</h4><p>Authorized Office staff review your submission. Use your reference number on the Track Request page to see whether it is Pending, Processing, Out for Release, Rejected or Timed Out.</p></div></li><li><div><h4>How You Receive Notifications</h4><p>Status changes appear in request tracking. Staff may also message you about your request by SMS, or by email if you gave an address. Completed documents are claimed in person at the Office.</p></div></li></ul>'
-  + '</div></section>'
 
   + '<section class="section section-alt about" id="why" aria-labelledby="why-choose"><div class="wrap">'
     + '<div class="why-head"><h3 class="about-sub" id="why-choose">Why Choose SMART ASSESS?</h3>'
@@ -1459,7 +1453,7 @@ function renderLanding(){
   + renderAnnouncementModal()
   + '<footer class="site-footer"><div class="wrap"><div class="footer-grid">'
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
-    + '<div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: mao.smartassess@gmail.com</p></div>'
+    + '<div><h5>Contact</h5><p>Phone: 09989695966<br>Email: mao.smartassess@gmail.com</p></div>'
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
     + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav>'
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
