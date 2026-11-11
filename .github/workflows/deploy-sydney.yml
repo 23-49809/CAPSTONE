@@ -1,0 +1,40 @@
+name: Deploy SMART ASSESS to Sydney
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smart-assess-sydney-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, x64]
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify deployment target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "23-49809/CAPSTONE"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git show-ref --verify refs/remotes/origin/main
+          test -z "$(git status --porcelain)"
+          echo "Repository, branch, commit, and checkout verified."
+
+      - name: Deploy to Sydney
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/local/sbin/deploy-smart-assess.sh

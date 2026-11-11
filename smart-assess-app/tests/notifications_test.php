@@ -209,7 +209,7 @@ $mailer($details, static function (string $raw) use (&$captured): void { $captur
 $check('email: recipient and subject', str_contains($head, "To: juana.test@example.invalid\r\n") && str_contains($head, 'Subject: SMART ASSESS: We received your Document Request (DR-2026-TEST0001)'), $head);
 $check('email: plain UTF-8 text', str_contains($head, 'Content-Type: text/plain; charset=UTF-8'));
 $check('email: name, reference, tracking link, claim note', str_contains($body, 'Dear Juana Dela Cruz,') && str_contains($body, 'Reference Number: DR-2026-TEST0001')
-    && str_contains($body, 'https://smartassessmabini.com/?track=DR-2026-TEST0001') && str_contains($body, 'claim it in person'), $body);
+    && str_contains($body, 'https://smartassess-mabini.com/?track=DR-2026-TEST0001') && str_contains($body, 'claim it in person'), $body);
 $captured = null;
 $mailer(['flow' => 'landtransfer', 'reference_no' => 'LT-2026-TEST0002'] + $details, static function (string $raw) use (&$captured): void { $captured = $raw; });
 $check('email: land transfer wording', str_contains($decode((string) $captured)[0], 'We received your Land Transfer request (LT-2026-TEST0002)'));
@@ -251,7 +251,7 @@ $mailer($staff, static function (string $raw) use (&$captured): void { $captured
 $check('staff email: recipient and subject', str_contains($head, "To: juana.test@example.invalid\r\n") && str_contains($head, 'Subject: SMART ASSESS: Update on your request (DR-2026-TEST0001)'), $head);
 $check('staff email: greeting, staff text with its line break, reference, tracking link', str_contains($body, 'Dear Juana Dela Cruz,')
     && str_contains($body, "Your request was not approved.\r\nPlease submit the missing Tax Clearance.") && str_contains($body, 'Reference Number: DR-2026-TEST0001')
-    && str_contains($body, 'https://smartassessmabini.com/?track=DR-2026-TEST0001'), $body);
+    && str_contains($body, 'https://smartassess-mabini.com/?track=DR-2026-TEST0001'), $body);
 $captured = null;
 $mailer(['message' => "Hello\r\nBcc: attacker@example.invalid"] + $staff, static function (string $raw) use (&$captured): void { $captured = $raw; });
 $check('staff email: line breaks in the message cannot add headers', $headerLines($decode((string) $captured)[0]) === ['To', 'Subject', 'MIME-Version', 'Content-Type', 'Content-Transfer-Encoding']);

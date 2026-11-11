@@ -44,7 +44,7 @@ return static function (array $details, ?callable $transport = null, ?callable $
             . $text . "\r\n\r\n"
             . "Reference Number: {$reference}\r\n"
             . "Check the status of your request on the SMART ASSESS website:\r\n"
-            . 'https://smartassessmabini.com/?track=' . rawurlencode($reference) . "\r\n\r\n"
+            . 'https://smartassess-mabini.com/?track=' . rawurlencode($reference) . "\r\n\r\n"
             . "Thank you,\r\n"
             . "SMART ASSESS\r\n"
             . "Municipal Assessor's Office, Mabini, Batangas";
@@ -57,7 +57,7 @@ return static function (array $details, ?callable $transport = null, ?callable $
             . 'We received your ' . $requestType . " at the Municipal Assessor's Office of Mabini, Batangas.\r\n\r\n"
             . "Reference Number: {$reference}\r\n\r\n"
             . "Please keep this number. You can use it to check the status of your request on the SMART ASSESS website:\r\n"
-            . 'https://smartassessmabini.com/?track=' . rawurlencode($reference) . "\r\n\r\n"
+            . 'https://smartassess-mabini.com/?track=' . rawurlencode($reference) . "\r\n\r\n"
             . "When your request is ready, please claim it in person at the Municipal Assessor's Office during office hours.\r\n\r\n"
             . "Thank you,\r\n"
             . "SMART ASSESS\r\n"
