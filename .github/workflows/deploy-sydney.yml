@@ -1,4 +1,4 @@
-name: Deploy SMART ASSESS to Sydney
+name: Deploy SMART ASSESS-MABINI
 
 on:
   workflow_dispatch:
