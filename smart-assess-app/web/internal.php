@@ -38,6 +38,7 @@ $filesByRequest = [];
 foreach ($page['documents'] ?? [] as $document) {
     $filesByRequest[(int) $document['request_id']][] = [
         'docId' => (int) $document['id'],
+        'key' => (string) $document['doc_key'],
         'label' => (string) $document['label'],
         'name' => (string) ($document['original_name'] ?? ''),
         'mime' => (string) ($document['mime_type'] ?? ''),
@@ -112,6 +113,11 @@ foreach ($page['requests'] ?? [] as $request) {
             'clientAccount' => $clientAccount !== '' ? $clientAccount : null,
         ];
         $record['files'] = $filesByRequest[$requestId] ?? [];
+        // AI document check for this request (null when none has been queued).
+        $record['ai'] = $page['ai_verifications'][$requestId] ?? null;
+        // Whether the AI check may run for this request; when not, why (Staff only).
+        $record['aiEligibility'] = $page['ai_eligibility'][$requestId]
+            ?? ['eligible' => false, 'reason' => AiVerification::INELIGIBLE_NOT_ENABLED, 'effectiveFrom' => null];
     }
     $requestByReference[$reference] = $record;
     if ($request['flow'] === 'docreq') {
@@ -264,6 +270,8 @@ $page['notifs'] = array_map(static function (array $notification): array {
         'sentBy' => trim((string) ($notification['sent_by_name'] ?? '')) ?: (string) ($notification['actor'] ?? 'system'),
         // Staff messages: actor 'email' marks an email; everything else is SMS or a status entry.
         'channel' => ($notification['actor'] ?? '') === 'email' ? 'Email' : 'SMS',
+        // Masked destination; empty for status entries, which go nowhere.
+        'destination' => (string) ($notification['destination'] ?? ''),
         // NULL = saved before IPROG sending existed (no SMS status).
         'deliveryStatus' => match ((string) ($notification['delivery_status'] ?? '')) {
             // IPROG accepting an SMS is not proof it was delivered.
@@ -309,5 +317,13 @@ $page['filters'] = [
     'annStatus' => 'all',
 ];
 $page['pages'] = [];
+
+// Already attached to each Staff request record above; not sent a second time.
+unset($page['ai_verifications'], $page['ai_eligibility']);
+
+// The raw rows were only needed to build the lists above; the page never uses
+// them, so they are not sent. Contact details are already absent for roles
+// other than Staff (sa_internal_bootstrap), and are only ever sent to Staff.
+unset($page['requests'], $page['documents'], $page['notifications'], $page['archives'], $page['audit_logs']);
 
 sa_emit_prototype('smart-assess-internal.html', $page, 'internal');

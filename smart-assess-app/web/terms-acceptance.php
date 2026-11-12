@@ -15,7 +15,7 @@ declare(strict_types=1);
  * text changes; acceptances of an older version are then refused.
  */
 
-const SA_TERMS_VERSION = '2026-11-06';
+const SA_TERMS_VERSION = '2026-11-11';
 const SA_TERMS_VALID_DAYS = 30;   // same as the longest a draft can live
 
 function sa_terms_enabled(): bool

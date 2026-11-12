@@ -174,7 +174,17 @@ return static function (array $details, ?callable $transport = null, ?callable $
     $message->setRaw($raw);
 
     try {
-        $gmail->users_messages->send('me', $message);
+        $response = $gmail->users_messages->send('me', $message);
+
+$messageId = is_object($response) && method_exists($response, 'getId')
+    ? trim((string) $response->getId())
+    : '';
+
+if ($messageId === '') {
+    throw new RuntimeException('[mailer] Gmail did not confirm the message (no message ID returned).');
+}
+
+error_log('[SMART_ASSESS_EMAIL] Gmail accepted message ID ' . $messageId . '.');
     } catch (Google\Service\Exception $exception) {
         $status = (int) $exception->getCode();
         if ($status >= 400 && $status < 500) {

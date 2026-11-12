@@ -307,7 +307,7 @@ function sa_draft_upload(array $data): array
         throw new SaHttpException(422, 'Select a file to upload.');
     }
     sa_draft_rate_check('upload', 80, 60, 'Too many uploads from this connection. Please wait a few minutes and try again.');
-    [$original, $mime, $size, $extension] = sa_validate_upload($_FILES['file']);
+    [$original, $mime, $size, $extension] = sa_validate_upload($_FILES['file'], $key);
     $dir = sa_draft_dir();
     $storedName = 'd' . bin2hex(random_bytes(16)) . '.' . $extension;
     if (!move_uploaded_file((string) $_FILES['file']['tmp_name'], $dir . DIRECTORY_SEPARATOR . $storedName)) {

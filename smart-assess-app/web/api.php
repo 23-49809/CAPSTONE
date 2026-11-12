@@ -4,6 +4,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/drafts.php';
 require_once __DIR__ . '/terms-acceptance.php';
+// Server-side document requirements, file types and size limit for every upload.
+require_once dirname(__DIR__) . '/app/services/DocumentRequirements.php';
 
 /** Short random reference shown to the user and written to the log, so a
  *  reported error can be matched to its diagnostic entry. */
@@ -24,7 +26,9 @@ function sa_log_api_failure(int $status, string $action, Throwable $exception, ?
         'ref' => sa_request_ref(),
         'status' => $status,
         'action' => $action !== '' ? $action : 'unknown',
-        'error' => $exception->getMessage(),
+        // Database messages can quote submitted values (for example "Duplicate
+        // entry '<email>'"), so for those only the SQLSTATE below is logged.
+        'error' => $exception instanceof PDOException ? 'Database error' : $exception->getMessage(),
         'session' => [
             'cookie_sent' => $cookieSid !== '',
             'cookie_matches_session' => $cookieSid !== '' && $cookieSid === session_id(),
@@ -422,7 +426,8 @@ function sa_login_client(array $data): array
     $_SESSION['sa_client_id'] = (int) $client['id'];
     $_SESSION['sa_client_session_id'] = sa_user_session('client', (int) $client['id']);
     $name = trim($client['first_name'] . ' ' . $client['last_name']);
-    sa_audit('client', (int) $client['id'], $name, 'Client login', $client['email']);
+    // The account ID identifies the client; the email address is not written to the audit log.
+    sa_audit('client', (int) $client['id'], $name, 'Client login', 'Client account #' . (int) $client['id']);
     unset($client['password_hash']);
     return ['client' => $client, 'csrf' => sa_csrf_token()];
 }
@@ -459,8 +464,17 @@ function sa_register_client(array $data): array
     return sa_login_client(['email' => $email, 'password' => $password]);
 }
 
-function sa_validate_upload(array $file): array
+/**
+ * Validates one uploaded file for document $key, using the same rules as
+ * DocumentRequirements and OCR: strictly smaller than 5 MB, and a real file
+ * type allowed for that document (IDs and the authorization letter: JPG/PNG).
+ */
+function sa_validate_upload(array $file, string $key): array
 {
+    $allowedForKey = DocumentRequirements::allowedMimeTypes($key);
+    if ($allowedForKey === []) {
+        throw new SaHttpException(422, 'This document is not part of this request.');
+    }
     $uploadError = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($uploadError !== UPLOAD_ERR_OK) {
         $message = match ($uploadError) {
@@ -478,8 +492,8 @@ function sa_validate_upload(array $file): array
         throw new SaHttpException(422, 'The uploaded file could not be verified. Please select it again.');
     }
     $size = (int) ($file['size'] ?? 0);
-    if ($size < 1 || $size > 5 * 1024 * 1024) {
-        throw new SaHttpException(422, 'Each uploaded file must be 5 MB or smaller.');
+    if (!DocumentRequirements::acceptsSize($size)) {
+        throw new SaHttpException(422, 'Each uploaded file must be smaller than 5 MB.');
     }
     $original = basename(str_replace('\\', '/', (string) ($file['name'] ?? 'upload')));
     $original = preg_replace('/[\x00-\x1F\x7F]/u', '', $original) ?? 'upload';
@@ -493,8 +507,12 @@ function sa_validate_upload(array $file): array
         'image/png' => 'png',
         'image/webp' => 'webp',
     ];
-    if (!is_string($mime) || !isset($allowed[$mime]) || $extension !== $allowed[$mime] && !($mime === 'image/jpeg' && $extension === 'jpeg')) {
-        throw new SaHttpException(422, 'Upload a JPG, PNG, WEBP, or PDF file with a matching file extension.');
+    $identity = in_array($key, DocumentRequirements::IDENTITY_KEYS, true);
+    if (!is_string($mime) || !isset($allowed[$mime]) || !in_array($mime, $allowedForKey, true)
+        || $extension !== $allowed[$mime] && !($mime === 'image/jpeg' && $extension === 'jpeg')) {
+        throw new SaHttpException(422, $identity
+            ? 'Upload IDs and the authorization letter as a JPG or PNG image with a matching file extension.'
+            : 'Upload a JPG, PNG, WEBP, or PDF file with a matching file extension.');
     }
     return [$original, $mime, $size, $allowed[$mime]];
 }
@@ -571,38 +589,24 @@ function sa_submit_request(array $data): array
         }
         $files[$key] = $file;
     }
-    $documents = [];
-    $submittedDocuments = $data['documents'] ?? [];
-    if (!is_array($submittedDocuments)) {
-        throw new SaHttpException(422);
-    }
-    foreach ($submittedDocuments as $key => $entry) {
-        if (is_int($key) && is_array($entry)) {
-            $key = (string) ($entry['doc_key'] ?? '');
+    // The required documents and their labels come only from the server
+    // (DocumentRequirements). A "documents" list sent by the browser is ignored,
+    // so it can neither drop a requirement nor add or relabel a document.
+    $documents = DocumentRequirements::requirementsFor($flow, (bool) $values['is_owner']);
+    foreach (array_keys($files) as $key) {
+        if (!isset($documents[$key])) {
+            throw new SaHttpException(422, 'One of the uploaded files is not a document this request needs. Remove it and try again.');
         }
-        if (!is_string($key) || !preg_match('/^[A-Za-z0-9_-]{1,40}$/', $key)) {
-            throw new SaHttpException(422);
-        }
-        $label = is_array($entry) ? sa_text($entry, 'label', 150, true) : (string) $entry;
-        if ($label === '' || strlen($label) > 150) {
-            throw new SaHttpException(422);
-        }
-        $documents[$key] = $label;
-    }
-    foreach ($files as $key => $_file) {
-        $documents[$key] ??= $key;
-    }
-    if (count($documents) > 40) {
-        throw new SaHttpException(422);
     }
     $preparedFiles = [];
     foreach ($files as $key => $file) {
-        $preparedFiles[$key] = sa_validate_upload($file);
+        $preparedFiles[$key] = sa_validate_upload($file, $key);
     }
 
     $pdo = sa_db();
     $storedFiles = [];
     $movedDraftFiles = [];
+    $unusedDraftFiles = [];
     $draftCode = isset($data['draft_token']) && sa_drafts_enabled() ? sa_draft_normalize_code($data['draft_token']) : null;
     try {
         $pdo->beginTransaction();
@@ -628,8 +632,19 @@ function sa_submit_request(array $data): array
                         $draftFiles[(string) $row['doc_key']] = $row + ['path' => $path];
                     }
                 }
-                foreach ($draftFiles as $key => $_draftFile) {
-                    $documents[$key] ??= $key;
+                // A saved draft file counts only for a document this request needs,
+                // and must meet the same type and size rules as a new upload.
+                foreach ($draftFiles as $key => $draftFile) {
+                    if (!isset($documents[$key])) {
+                        $unusedDraftFiles[] = (string) $draftFile['path'];
+                        unset($draftFiles[$key]);
+                        continue;
+                    }
+                    $realMime = (new finfo(FILEINFO_MIME_TYPE))->file((string) $draftFile['path']);
+                    if (!in_array($realMime, DocumentRequirements::allowedMimeTypes($key), true)
+                        || !DocumentRequirements::acceptsSize((int) filesize((string) $draftFile['path']))) {
+                        throw new SaHttpException(422, 'Upload "' . $documents[$key] . '" again: saved files must be smaller than 5 MB, and IDs and the authorization letter must be JPG or PNG images.');
+                    }
                 }
             }
         }
@@ -775,7 +790,25 @@ function sa_submit_request(array $data): array
             )->execute(['rid' => $requestId, 'ref' => $reference, 'id' => $draft['id']]);
             $pdo->prepare('DELETE FROM request_draft_files WHERE draft_id = :id')->execute(['id' => $draft['id']]);
         }
+        // AI document check: queued with the request and processed later by the
+        // private AI worker, so the client never waits for it. Only when the
+        // Privacy Policy that describes it is in effect for this submission
+        // (SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT); otherwise nothing is queued.
+        // If queueing fails, the submission still succeeds.
+        if (AiVerification::available($pdo)) {
+            try {
+                AiVerification::enqueueIfEligible($pdo, $requestId);
+            } catch (Throwable) {
+                error_log('[SMART_ASSESS_AI] Could not queue the AI check for request ID ' . $requestId . '.');
+            }
+        }
         $pdo->commit();
+        // Saved draft files for documents this request does not need are not kept.
+        foreach ($unusedDraftFiles as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
 
         // No automatic email or SMS: the client sees the new request in
         // request tracking; staff contact clients from the Notifications page.
@@ -1409,8 +1442,12 @@ function sa_notification_status(): array
  * attempt is recorded as 'pending' first, then updated: 'sent' (accepted by
  * IPROG/Gmail; not proof of delivery), 'failed', or 'pending' (unconfirmed).
  * The same message to the same request is refused for 10 minutes after a
- * successful or unconfirmed send, so a double click or resend cannot repeat it.
- * Tokens, numbers, addresses and message text are never logged or returned.
+ * confirmed send. Unconfirmed outcomes block further sends on that channel
+ * until reviewed (SMS has a separately audited override).
+ * The recipient is always the selected request's own contact_number and email.
+ * Nothing in the submitted form can supply or change a destination.
+ * Tokens and message text are never logged or returned; numbers and addresses
+ * are never logged, and are returned to staff masked.
  */
 function sa_send_notification(array $data): array
 {
@@ -1452,6 +1489,11 @@ function sa_send_notification(array $data): array
     $request = $stmt->fetch();
     if (!$request) {
         throw new SaHttpException(404, 'The selected request was not found.');
+    }
+    // An ID and a reference that disagree could reach the wrong client: send to neither.
+    $submittedRef = strtoupper(trim((string) ($data['request_ref'] ?? $data['requestRef'] ?? '')));
+    if ($submittedRef !== '' && $submittedRef !== strtoupper((string) $request['reference_no'])) {
+        throw new SaHttpException(422, 'The request ID and reference number do not match, so nothing was sent. Reload the page and try again.');
     }
 
     // Check every chosen channel before sending anything.
@@ -1509,6 +1551,23 @@ function sa_send_notification(array $data): array
             }
             $overrideReason = sa_sms_authorize_override($user, $request, $data);
             $overrideIds = $unconfirmed;
+        }
+
+        if (in_array('email', $channels, true)) {
+            $pendingEmail = $pdo->prepare(
+                "SELECT id FROM notifications
+                 WHERE request_id = :request AND type = 'staff_message'
+                   AND channel = 'email' AND delivery_status = 'pending'
+                 ORDER BY id LIMIT 1"
+            );
+            $pendingEmail->execute(['request' => $requestId]);
+            if ($pendingEmail->fetchColumn() !== false) {
+                throw new SaHttpException(
+                    409,
+                    'An earlier email for this request has an unconfirmed outcome and may already have reached the client, so no further email can be sent for it. Nothing was sent. Check the office Gmail Sent folder first. You can still send by SMS only.',
+                    'email_unconfirmed'
+                );
+            }
         }
 
         $placeholders = implode(', ', array_map(static fn (string $c): string => $pdo->quote($c), $channels));
@@ -1572,7 +1631,13 @@ function sa_send_notification(array $data): array
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
-                throw $exception;
+                if ($outcomes === []) {
+                    throw $exception;   // nothing has gone out on any channel
+                }
+                // An earlier channel has already gone out, so its result must still reach staff.
+                error_log('[SMART_ASSESS_NOTIFY] Could not record the ' . $channel . ' attempt for request ID ' . (int) $requestId . '; it was not sent.');
+                $outcomes[$channel] = ['status' => 'failed', 'notification_id' => null, 'reason' => 'It could not be recorded, so it was not sent.'];
+                continue;
             }
 
             // One attempt only, outside any transaction.
@@ -1588,15 +1653,21 @@ function sa_send_notification(array $data): array
                     'message' => $message,
                 ], $context, $reason);
 
+            // Both records change together, so history and the duplicate check cannot disagree.
             $recorded = true;
             try {
+                $pdo->beginTransaction();
                 if ($hasDeliveryColumns) {
                     $pdo->prepare('UPDATE request_status_log SET delivery_status = :status WHERE id = :id')
                         ->execute(['status' => $outcome, 'id' => $logId]);
                 }
                 $pdo->prepare('UPDATE notifications SET delivery_status = :status WHERE id = :id')
                     ->execute(['status' => $outcome, 'id' => $notificationId]);
+                $pdo->commit();
             } catch (Throwable) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 $recorded = false;
                 error_log('[SMART_ASSESS_NOTIFY] Could not save the ' . $channel . ' outcome; log ID ' . $logId . ' remains pending; outcome ' . $outcome . '.');
             }
@@ -1612,23 +1683,30 @@ function sa_send_notification(array $data): array
             $outcomes[$channel] = ['status' => $recorded ? $outcome : 'pending', 'notification_id' => $notificationId, 'reason' => $reason];
         }
     } finally {
-        $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lockName) . ')');
+        try {
+            $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lockName) . ')');
+        } catch (Throwable) {
+            // The lock ends with the connection. This must not hide the send results.
+            error_log('[SMART_ASSESS_NOTIFY] Could not release the send lock for request ID ' . (int) $requestId . '.');
+        }
     }
 
-    $lines = [];
+    $lines = ['Request ' . $request['reference_no'] . '.'];
+    $smsTo = 'SMS to ' . sa_mask_phone((string) $request['contact_number']);
+    $emailTo = 'Email to ' . sa_mask_email((string) $request['email']);
     if (isset($outcomes['sms'])) {
         $lines[] = match ($outcomes['sms']['status']) {
-            'sent' => 'SMS: accepted by IPROG. ' . ($outcomes['sms']['reason'] ?? ''),
-            'failed' => 'SMS: NOT sent. ' . ($outcomes['sms']['reason'] ?? 'IPROG did not accept it.'),
-            default => 'SMS: outcome unconfirmed. ' . ($outcomes['sms']['reason'] ?? 'IPROG gave no clear answer.')
+            'sent' => $smsTo . ': accepted by IPROG. ' . ($outcomes['sms']['reason'] ?? ''),
+            'failed' => $smsTo . ': NOT sent. ' . ($outcomes['sms']['reason'] ?? 'IPROG did not accept it.'),
+            default => $smsTo . ': outcome unconfirmed. ' . ($outcomes['sms']['reason'] ?? 'IPROG gave no clear answer.')
                 . ' It may have reached the client, so further SMS for this request are blocked. Check the IPROG account.',
         };
     }
     if (isset($outcomes['email'])) {
         $lines[] = match ($outcomes['email']['status']) {
-            'sent' => 'Email: accepted by Gmail for sending.',
-            'failed' => 'Email: NOT sent. ' . ($outcomes['email']['reason'] ?? 'Gmail did not accept it.'),
-            default => 'Email: outcome unconfirmed. Check the Sent folder of the office Gmail account before sending again.',
+            'sent' => $emailTo . ': accepted by Gmail for sending.',
+            'failed' => $emailTo . ': NOT sent. ' . ($outcomes['email']['reason'] ?? 'Gmail did not accept it.'),
+            default => $emailTo . ': outcome unconfirmed. Check the Sent folder of the office Gmail account before sending again.',
         };
     }
     $statuses = array_column($outcomes, 'status');
@@ -1636,10 +1714,69 @@ function sa_send_notification(array $data): array
 
     return [
         'request_id' => (int) $requestId,
+        'reference_no' => (string) $request['reference_no'],
         'channels' => array_map(static fn (array $o): string => $o['status'], $outcomes),
         'delivery_status' => $overall,
         'feedback' => implode(' ', $lines),
     ];
+}
+
+/** The request a Staff AI action refers to, by reference number. */
+function sa_ai_request(PDO $pdo, array $data): array
+{
+    $reference = strtoupper(trim((string) ($data['reference'] ?? '')));
+    if (!preg_match('/^(?:DR|LT)-\d{4}-[A-Z0-9]{1,12}$/', $reference)) {
+        throw new SaHttpException(422, 'Select a valid request.');
+    }
+    $stmt = $pdo->prepare('SELECT id, reference_no FROM requests WHERE reference_no = :ref');
+    $stmt->execute(['ref' => $reference]);
+    $request = $stmt->fetch();
+    if (!$request) {
+        throw new SaHttpException(404, 'The selected request was not found.');
+    }
+    return $request;
+}
+
+/**
+ * Staff: run the AI document check for a request (again). The check is advice
+ * for Staff; it never changes the request's status.
+ */
+function sa_ai_verification_requeue(array $data): array
+{
+    $user = sa_internal_or_fail(['STAFF']);
+    $pdo = sa_db();
+    if (!AiVerification::available($pdo)) {
+        throw new SaHttpException(503, 'AI document checking is not set up on this server yet.');
+    }
+    $request = sa_ai_request($pdo, $data);
+    $outcome = AiVerification::requeue($pdo, (int) $request['id']);
+    if ($outcome === AiVerification::INELIGIBLE_NOT_ENABLED) {
+        throw new SaHttpException(503, 'AI document checking is not enabled: the Privacy Policy effective date has not been set on this server.');
+    }
+    if ($outcome === AiVerification::INELIGIBLE_BEFORE_EFFECTIVE_DATE) {
+        throw new SaHttpException(409, 'This request was submitted before the Privacy Policy described the AI document check, so it cannot be checked by AI. Inspect its documents manually.');
+    }
+    if ($outcome === 'in_progress') {
+        throw new SaHttpException(409, 'The AI check for this request is running now. Wait for it to finish, then reload the page.');
+    }
+    sa_audit('staff', (int) $user['id'], (string) $user['name'], 'AI document check queued', (string) $request['reference_no']);
+    return ['queued' => true];
+}
+
+/** Staff: record that they have looked at a finished AI check. */
+function sa_ai_verification_reviewed(array $data): array
+{
+    $user = sa_internal_or_fail(['STAFF']);
+    $pdo = sa_db();
+    if (!AiVerification::available($pdo)) {
+        throw new SaHttpException(503, 'AI document checking is not set up on this server yet.');
+    }
+    $request = sa_ai_request($pdo, $data);
+    if (!AiVerification::markReviewed($pdo, (int) $request['id'], (int) $user['id'])) {
+        throw new SaHttpException(409, 'There is no finished AI check for this request to mark as reviewed.');
+    }
+    sa_audit('staff', (int) $user['id'], (string) $user['name'], 'AI document check reviewed', (string) $request['reference_no']);
+    return ['reviewed' => true];
 }
 
 function sa_lookup_request_owner(array $data): array
@@ -1661,7 +1798,9 @@ function sa_lookup_request_owner(array $data): array
     }
     // Recipient details shown on the notification form (staff only).
     $contact = ['contactNumber' => trim((string) ($request['contact_number'] ?? '')) ?: null,
-                'email' => trim((string) ($request['email'] ?? '')) ?: null];
+                'email' => trim((string) ($request['email'] ?? '')) ?: null,
+                // Whose contact details these are; can differ from a client account holder.
+                'recipientName' => trim(trim((string) ($request['first_name'] ?? '')) . ' ' . trim((string) ($request['last_name'] ?? ''))) ?: null];
 
     $isOwner = filter_var($request['is_owner'], FILTER_VALIDATE_BOOLEAN);
     if ($isOwner) {
@@ -2843,6 +2982,8 @@ try {
         'complete_processing' => sa_complete_request_processing($data),
         'send_notification' => sa_send_notification($data),
         'lookup_request_owner' => sa_lookup_request_owner($data),
+        'ai_verification_requeue' => sa_ai_verification_requeue($data),
+        'ai_verification_reviewed' => sa_ai_verification_reviewed($data),
         'notification_status' => sa_notification_status(),
         'generate_ai_message' => sa_generate_ai_message($data),
         'admin_create_user' => sa_admin_user_change($data, 'create'),

@@ -1,0 +1,75 @@
+# SMART ASSESS - AI document check dispatcher (Sydney web server).
+#
+# Sends queued AI document checks to the private AI worker and stores the
+# validated results. It never changes a request's status. Started every minute
+# by smart-assess-ai-dispatch.timer; a new run starts only after the previous
+# one has finished, so runs never overlap.
+#
+# NOT INSTALLED. To install (only with approval, after the migration):
+#   sudo install -o root -g root -m 0644 smart-assess-ai-dispatch.service smart-assess-ai-dispatch.timer /etc/systemd/system/
+#   sudo install -o root -g root -m 0600 /dev/null /etc/smart-assess/ai-dispatch.env   # then fill it in (see ai-dispatch.env.example)
+#   sudo systemd-analyze verify /etc/systemd/system/smart-assess-ai-dispatch.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl start smart-assess-ai-dispatch.service      # one manual run first; check: journalctl -u smart-assess-ai-dispatch
+#   sudo systemctl enable --now smart-assess-ai-dispatch.timer
+# To stop AI checking (submissions keep working; jobs stay queued):
+#   sudo systemctl disable --now smart-assess-ai-dispatch.timer
+#
+# Paths assume the application root /var/www/smart-assess (the smart-assess-app
+# folder of the repository). Confirm it in the readiness report before installing.
+#
+# Exit codes (see bin/ai-verification-dispatch.php): 0 done or nothing to do;
+# 2 not configured; 3 the worker refused the shared secret; 75 the worker is not
+# ready (jobs wait). A non-zero code marks the run as failed in
+# "systemctl status", which is how an outage becomes visible.
+
+[Unit]
+Description=SMART ASSESS AI document check dispatcher
+Documentation=file:///var/www/smart-assess/docs/AI_DOCUMENT_VERIFICATION.md
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+# Database and worker settings for the dispatcher only (KEY=VALUE lines).
+# root:root 0600: systemd reads it before switching to www-data.
+EnvironmentFile=/etc/smart-assess/ai-dispatch.env
+WorkingDirectory=/var/www/smart-assess
+# Up to 20 jobs, starting new ones for at most 30 minutes. Errors go to the journal.
+ExecStart=/usr/bin/php -d memory_limit=512M -d display_errors=0 -d log_errors=1 -d error_log= /var/www/smart-assess/bin/ai-verification-dispatch.php --limit=20 --max-seconds=1800
+# 1800 s of starting jobs + one job's lease (worker timeout 900 s + 120 s) + margin.
+# If it is ever stopped mid-job, the job's lease runs out and it is claimed again.
+TimeoutStartSec=3000
+
+# Resource limits: one job holds up to 10 documents of < 5 MiB each, read,
+# base64-encoded and sent once (about 250 MB at the peak). Lower priority than Apache.
+MemoryMax=640M
+CPUQuota=50%
+TasksMax=16
+Nice=10
+IOSchedulingClass=idle
+
+# Hardening: reads the application and uploads, writes nothing to disk.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+UMask=0077
+ReadOnlyPaths=/var/www/smart-assess

@@ -1128,11 +1128,11 @@ function fileMetaFromFile(f, preview){ return { name:f.name, size:f.size, type:f
 function processUploadedFile(key, file){
   if(!file) return;
   const maxBytes = Number(window.SMART_ASSESS_CONFIG && window.SMART_ASSESS_CONFIG.maxFileUploadBytes);
-  if(Number.isFinite(maxBytes) && file.size > maxBytes){
+  if(Number.isFinite(maxBytes) && file.size >= maxBytes){   // must be smaller than the limit, as the server checks
     if(typeof window.SMART_ASSESS_REMOVE_FILE === 'function') window.SMART_ASSESS_REMOVE_FILE(key);
     delete state.formData.files[key];
     const maxMb = Math.floor(maxBytes / (1024 * 1024)) || 1;
-    state.errors[key] = 'This file is too large. The maximum size is '+maxMb+' MB per file. Choose a smaller file to continue.';
+    state.errors[key] = 'This file is too large. Each file must be smaller than '+maxMb+' MB. Choose a smaller file to continue.';
     if(typeof window.SMART_ASSESS_NOTICE === 'function') window.SMART_ASSESS_NOTICE(state.errors[key]);
     render();
     return;
@@ -1578,7 +1578,7 @@ function uploadBox(key, label, fd, centered){
   const err = state.errors[key];
   const imageOnly = key==='ownerId' || key==='requesterId' || key==='authLetter';
   const maxMb = Math.floor(Number(window.SMART_ASSESS_CONFIG && window.SMART_ASSESS_CONFIG.maxFileUploadBytes) / (1024*1024)) || 5;
-  const types = (imageOnly ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF') + ', up to ' + maxMb + ' MB';
+  const types = (imageOnly ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF') + ', smaller than ' + maxMb + ' MB';
   const cls = 'upload-box upl'+(centered?' upl-center':'')+(file && file.valid?' filled':'')+(file && !file.valid?' flagged':'')+(err?' invalid':'');
   const thumb = file && file.preview && /^data:image\/|^blob:/.test(file.preview)
     ? '<span class="upl-thumb has-img"><img src="'+esc(file.preview)+'" alt=""></span>'
@@ -2057,7 +2057,7 @@ window.SMART_ASSESS_TRACK = { prepare: function(){ return trackPrepare(); } };
    submission without a valid acceptance. TERMS_VERSION must match
    SA_TERMS_VERSION in web/terms-acceptance.php. Keep this text consistent with
    the public web/terms.php and web/privacy-policy.php pages. */
-const TERMS_VERSION = '2026-11-06';
+const TERMS_VERSION = '2026-11-11';
 const TERMS_AGREE_TEXT = 'I have read, understood, and agree to the Terms and Conditions of SMART ASSESS.';
 function termsList(items){ return '<ul>'+items.map(function(i){ return '<li>'+i+'</li>'; }).join('')+'</ul>'; }
 function renderTermsContent(){
@@ -2069,7 +2069,7 @@ function renderTermsContent(){
     + sec(2,'Information You Provide','<p>To process your request, you may be asked for:</p>'+termsList(['Your first, middle, and last name','Contact number','Email address (optional)','Address','ARP / Tax Declaration Number','Property address and the barangay where the property is located'])+'<p>Other information may be needed depending on the service you request.</p>')
     + sec(3,'Document Request Services','<p>You may use SMART ASSESS to request:</p>'+termsList(['Certified True Copy of Tax Declaration (CTC-TD)','Certification of No/With Existing Improvement','Certification of Property/No Property Holdings','Certification of No Liens and Encumbrances','Certification of Assessment'])+'<p>You are responsible for providing the information and documents required for your request.</p>')
     + sec(4,'Land Transfer Services','<p>You may use SMART ASSESS for land transfers by sale, donation, or inheritance. Additional information and supporting documents may be required depending on the type of transfer.</p>')
-    + sec(5,'Submitting Documents','<p>Depending on your request, you may need to upload documents such as:</p>'+termsList(['Certified True Copy of Tax Declaration or Title','Vicinity Map','Tax Clearance','Notarial Deed of Sale or Donation','Certification of No Improvement','A valid ID, and an authorization letter if you are applying on behalf of the property owner'])+'<p>All documents you submit must be genuine, complete, and clearly readable.</p>')
+    + sec(5,'Submitting Documents','<p>Depending on your request, you may need to upload documents such as:</p>'+termsList(['Certified True Copy of Tax Declaration or Title','Vicinity Map','Tax Clearance','Notarial Deed of Sale or Donation','Certification of No Improvement','A valid ID, and an authorization letter if you are applying on behalf of the property owner'])+'<p>All documents you submit must be genuine, complete, and clearly readable.</p><p>Uploaded files must be smaller than 5 MiB each. Government-issued IDs and authorization letters must be in JPG or PNG format. Other supporting documents may be submitted in JPG, PNG, WEBP, or PDF format.</p>')
     + sec(6,'Accuracy of Information','<p>You must give true, correct, and up-to-date information. False, misleading, incomplete, or fraudulent information or documents may cause your request to be delayed or rejected, and may be dealt with under applicable laws and regulations.</p>')
     + sec(7,'Processing and Verification','<p>Authorized personnel of the '+MAO+' will review and verify what you submit. Submitting a request does not mean it is approved or completed. Every request remains subject to the Office’s requirements, verification, evaluation, and approval procedures.</p>')
     + sec(8,'Request Status and Notifications','<p>After submitting, you will receive a reference number. Use it on the Track Request page to check your request’s status. Keep it safe, because anyone with your reference number can view your request’s status, the applicant’s name, and the service requested.</p><p>Status changes appear in request tracking and do not automatically send an SMS or email. Staff may choose to message you about your request by SMS, or by email if you provide an address. Please make sure your contact number is valid and active.</p>')

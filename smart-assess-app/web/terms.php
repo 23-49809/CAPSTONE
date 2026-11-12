@@ -6,7 +6,7 @@ require_once __DIR__ . '/legal-layout.php';
 sa_legal_header(
     'Terms of Service',
     "The terms for using SMART ASSESS, the online document request and land transfer service of the Municipal Assessor's Office of Mabini, Batangas.",
-    'November 6, 2026'
+    'November 11, 2026'
 );
 ?>
 <nav class="legal-toc" aria-labelledby="toc-title">
@@ -48,7 +48,7 @@ sa_legal_header(
 <h2 id="documents">3. Document requirements</h2>
 <p>Depending on your request, you may need to upload documents such as a valid ID, an authorization letter if you are applying for the property owner, a Certified True Copy of a Tax Declaration or Title, a Notarial Deed of Sale or Donation, a Vicinity Map, a Tax Clearance, or a Certification of No Improvement.</p>
 <ul>
-  <li>Files must be JPG, PNG, WEBP or PDF, up to 5 MB each.</li>
+  <li>Uploaded files must be smaller than 5 MiB each. Government-issued IDs and authorization letters must be in JPG or PNG format. Other supporting documents may be submitted in JPG, PNG, WEBP, or PDF format.</li>
   <li>Documents must be genuine, complete and clearly readable.</li>
   <li>Only submit documents you are entitled to use.</li>
   <li>The Office may ask for further documents or for originals.</li>

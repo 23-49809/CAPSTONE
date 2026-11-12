@@ -195,6 +195,19 @@
   .badge.red{ background:var(--danger-bg); color:var(--danger); }
   .badge.blue{ background:var(--info-bg); color:var(--info); }
   .badge.slate{ background:var(--neutral-bg); color:var(--neutral); }
+  /* AI document check (Staff request details) */
+  .ai-outcome{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--surface-2); }
+  .ai-outcome strong{ font-size:15px; font-weight:600; }
+  .ai-outcome.tone-green{ border-color:var(--success); }
+  .ai-outcome.tone-amber{ border-color:var(--warn); }
+  .ai-outcome.tone-red{ border-color:var(--danger); }
+  .ai-note{ margin:10px 0 0; font-size:12.5px; color:var(--ink-soft); }
+  .ai-findings{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+  .ai-findings li{ padding:10px 12px; border:1px solid var(--line); border-radius:10px; }
+  .ai-findings .ai-f-head{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; font-size:13px; font-weight:600; }
+  .ai-findings p{ margin:6px 0 0; font-size:13px; }
+  .ai-findings q{ display:block; margin-top:4px; font-size:12px; color:var(--ink-soft); }
+  .ai-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center; }
 
   .icon-btn{ background:none; border:1.5px solid var(--line-strong); border-radius:var(--radius-sm); padding:6px 10px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; color:var(--ink); }
   .icon-btn:hover{ background:var(--surface-2); }
@@ -2799,7 +2812,7 @@ function renderNotifications(acct){
     var pillText = status==='Recorded' ? 'Tracking only' : (isEmail?'Email':'SMS')+' · '+status;
     return '<div class="sent-item" role="button" tabindex="0" aria-expanded="false" data-action="toggle-sent-item">'
       + '<div class="si-main"><div class="si-title">'+esc(notifCategoryName(n.category)||'Notification')+'</div>'
-        + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')</div>'
+        + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')'+(n.destination?' &middot; '+esc(n.destination):'')+'</div>'
         + '<div class="si-msg">'+esc(n.message)+'</div>'
         + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div></div>'
       + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(pillText)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
@@ -2815,7 +2828,9 @@ function renderNotifications(acct){
   + '<div class="notif-page"><div class="notif-grid">'
     + '<section class="notif-card notif-send">'
       + '<div class="nc-head"><div><h3>Send a Notification</h3><p>Nothing is sent until you click Send Notification. Review the recipient and message first.</p></div></div>'
-      + (draft ? '<div class="nf-draft" role="status">Draft prepared for the rejected request '+esc(draft.ref)+' ('+esc(draft.rejection)+'). Review and edit the message, choose SMS and/or email, then send.</div>' : '')
+      + (draft ? '<div class="nf-draft" role="status">'+(draft.fromRequest
+          ? 'Notification for request '+esc(draft.ref)+'. It goes only to the phone number and email address on this request. Write the message, choose SMS and/or email, then send.'
+          : 'Draft prepared for the rejected request '+esc(draft.ref)+' ('+esc(draft.rejection)+'). Review and edit the message, choose SMS and/or email, then send.')+'</div>' : '')
       + '<div class="nf-services" id="notification-services" aria-live="polite"><strong>Service status</strong><span data-service="sms">Checking SMS…</span><span data-service="email">Checking email…</span></div>'
       + '<form data-form="send-notif" class="notif-form">'
         + '<div class="nf-grid">'
@@ -2832,7 +2847,7 @@ function renderNotifications(acct){
         + '<div class="field"><div class="ai-message-heading"><label for="notification-message">Message</label><button type="button" class="btn btn-outline btn-sm nf-ai" data-action="generate-ai-message" data-ai-type="notification">'+ic('sparkles','15px')+' Generate with AI</button></div>'
           + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="Type the message for the applicant…" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
         + '<fieldset class="nf-channels"><legend>Send by</legend><input type="hidden" name="channel_choice" value="1">'
-          + '<label class="nf-channel"><input type="checkbox" name="send_sms" value="1" checked> SMS to the phone number</label>'
+          + '<label class="nf-channel"><input type="checkbox" name="send_sms" value="1"'+(draft&&!rcpt.phone?' disabled':' checked')+'> SMS to the phone number</label>'
           + '<label class="nf-channel"><input type="checkbox" name="send_email" value="1"'+(rcpt.email?' checked':' disabled')+'> Email to the email address</label>'
         + '</fieldset>'
         + '<div class="nf-actions"><button type="reset" class="btn btn-outline nf-clear" data-action="clear-notif-draft">'+ic('refresh','16px')+' Clear Form</button><button type="submit" class="btn btn-primary nf-send">'+ic('send','16px')+' Send Notification</button></div>'
@@ -3127,12 +3142,30 @@ function modalReqDetail(id, kind){
   var showDetails = !!(detailsHtml && state.modal && state.modal.showDetails);
   return '<div class="modal-head rd-head"><div class="rd-title"><h3>'+esc(r.id)+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div>'
       + '<div class="rd-head-actions">'
+        + (canProcess ? '<button type="button" class="btn btn-primary btn-sm rd-notify" data-action="nav-notify" data-ref="'+esc(r.id)+'">'+ic('send','15px')+' Send Notification</button>' : '')
         + (detailsHtml ? '<button type="button" class="btn btn-outline btn-sm rd-toggle" data-action="toggle-req-details" aria-expanded="'+showDetails+'" aria-controls="rd-client">'+(showDetails?'Hide Details':'View Details')+'</button>' : '')
         + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">&times;</button>'
       + '</div></div>'
     + summary
+    + (canProcess && ('ai' in r) ? reqAiHtml(r) : '')
+    + (canProcess ? reqNotifHistoryHtml(r) : '')
     + (detailsHtml ? '<div class="rd-client" id="rd-client"'+(showDetails?'':' hidden')+'><h4 class="rd-client-title">Client Details</h4>'+detailsHtml+'</div>' : '');
 }
+
+/* SMS and email already sent for this one request, so staff can check before sending again. */
+function reqNotifHistoryHtml(r){
+  var sent = (state.notifs||[]).filter(function(n){ return n.requestRef===r.id && n.deliveryStatus && n.deliveryStatus!=='Recorded'; })
+    .sort(function(a,b){ return sentTime(b.sentAt) - sentTime(a.sentAt); });
+  if(!sent.length) return '';
+  return '<section class="rd-block"><h4 class="rd-caption">Notification History</h4><div class="rd-wrap"><table class="rd-table" aria-label="Notification History"><tbody>'
+    + sent.map(function(n){
+        var tone = {Sent:'sent', Accepted:'sent', Failed:'failed', Pending:'pending'}[n.deliveryStatus] || 'recorded';
+        return '<tr><th scope="row">'+esc(fmtDateTime(n.sentAt))+'</th><td><span class="si-pill si-'+tone+'">'+esc(n.channel+' · '+n.deliveryStatus)+'</span> '+esc(n.destination||'')
+          + '<div class="cell-sub">'+esc(n.message)+'</div><div class="cell-sub">Sent by '+esc(n.sentBy||'system')+'</div></td></tr>';
+      }).join('')
+    + '</tbody></table></div></section>';
+}
+
 
 /* Everything the client submitted (staff only: r.details/r.files are sent to
    staff accounts only). Files open through request-file.php, which checks the
@@ -3164,6 +3197,80 @@ function reqFileSize(bytes){
   if(bytes==null) return '';
   return bytes >= 1048576 ? (bytes/1048576).toFixed(1)+' MB' : Math.max(1, Math.round(bytes/1024))+' KB';
 }
+/* AI document check: advice for Staff only (r.ai is sent to Staff accounts
+   only). Every value is escaped; the original files open through
+   request-file.php, which checks the Staff session. */
+function reqAiHtml(r){
+  var ai = r.ai;
+  var head = '<section class="rd-block" aria-labelledby="ai-check-'+esc(r.id)+'"><h4 class="rd-caption" id="ai-check-'+esc(r.id)+'">AI Document Check</h4>';
+  var disclaimer = '<p class="ai-note">The AI check reads the uploaded files with OCR and points out possible problems. It can be wrong. It never approves or rejects a request and cannot tell whether a document, signature or seal is genuine. Always open the original documents and decide yourself.</p>';
+  // The server decides whether AI may check this request (Privacy Policy effective date) and refuses otherwise.
+  var elig = r.aiEligibility || {eligible:false, reason:'not_enabled'};
+  var blocked = elig.eligible ? '' : '<p class="ai-note"><strong>'+esc(elig.reason==='before_effective_date'
+      ? 'Not checked by AI: this request was submitted before the Privacy Policy described the AI document check'+(elig.effectiveFrom ? ' (in effect from '+fmtDateTime(elig.effectiveFrom)+')' : '')+'. Inspect its documents manually.'
+      : 'AI document checking is not enabled on this server yet.')+'</strong></p>';
+  var runBtn = function(text){ return elig.eligible ? '<button type="button" class="btn btn-outline btn-sm" data-action="ai-requeue" data-ref="'+esc(r.id)+'">'+esc(text)+'</button>' : ''; };
+  if(!ai){
+    return head + (elig.eligible ? '<div class="ai-outcome"><span>No AI check has been run for this request.</span></div><div class="ai-actions">'+runBtn('Run AI check')+'</div>' : blocked)+disclaimer+'</section>';
+  }
+  var statusText = {pending:'Waiting in the queue', processing:'Checking now', completed:'Finished', failed:'Could not finish', needs_manual_review:'Finished with problems'}[ai.status] || ai.status;
+  var outcome = {passed:['Passed','green','The required documents appear present and readable, and no inconsistency was detected.'],
+    needs_review:['Needs review','amber','Something needs a closer look by Staff.'],
+    missing_information:['Missing information','red','A required document or detail appears to be missing.']}[ai.outcome];
+  var html = head;
+  if(outcome && (ai.status==='completed' || ai.status==='needs_manual_review')){
+    html += '<div class="ai-outcome tone-'+outcome[1]+'"><span class="badge '+outcome[1]+'">'+esc(outcome[0])+'</span><strong>'+esc(outcome[2])+'</strong></div>'
+      + '<p class="ai-note">'+esc(ai.reason)+'</p>'
+      + (ai.outcome!=='passed' ? '<p class="ai-note"><strong>Manual review recommended.</strong></p>' : '');
+  } else {
+    html += '<div class="ai-outcome"><span class="badge '+(ai.status==='failed'?'red':'slate')+'">'+esc(statusText)+'</span>'
+      + '<span>'+esc(ai.status==='pending' ? 'The check runs in the background. Reload the page later to see the result.' : (ai.status==='processing' ? 'The documents are being checked now.' : 'The automatic check did not finish. Inspect the documents manually.'))+'</span></div>';
+  }
+  if(ai.error) html += '<p class="ai-note">'+esc(ai.error)+(ai.status==='pending' && ai.nextAttemptAt ? ' Next try: '+esc(fmtDateTime(ai.nextAttemptAt))+'.' : '')+'</p>';
+
+  var fileByKey = {};
+  (r.files||[]).forEach(function(f){ if(f.key) fileByKey[f.key] = f; });
+  if(ai.documents && ai.documents.length){
+    var reqText = {missing:'Not uploaded', uploaded_valid_format:'Uploaded', uploaded_invalid_format:'Uploaded, unusual file type'};
+    var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
+    var typeText = {yes:'Yes', no:'No', unclear:'Unclear'};
+    html += '<div class="rd-wrap"><table class="rd-table" aria-label="AI document checklist"><thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th><th scope="col">Text reading</th><th scope="col">Looks like this document</th><th scope="col">Original</th></tr></thead><tbody>'
+      + ai.documents.map(function(d){
+          var f = fileByKey[d.key];
+          var open = f && f.name ? '<a class="btn btn-outline btn-sm" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener">Open</a>' : '<span class="cell-sub">—</span>';
+          return '<tr><th scope="row" data-label="Document">'+esc(d.label)+'</th><td data-label="Uploaded">'+esc(reqText[d.requirement]||'—')+'</td>'
+            + '<td data-label="Text reading">'+esc(d.ocr_status==='failed' ? 'Could not be read' : (readText[d.readability]||'—'))+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</td>'
+            + '<td data-label="Looks like this document">'+esc(typeText[d.expected_type_match]||'—')+(d.note ? '<div class="cell-sub">'+esc(d.note)+'</div>' : '')+'</td>'
+            + '<td data-label="Original">'+open+'</td></tr>';
+        }).join('') + '</tbody></table></div>';
+  }
+  if(ai.findings && ai.findings.length){
+    var catText = {missing_information:['Missing information','red'], possible_inconsistency:['Possible inconsistency','amber'], ocr_uncertainty:['Reading problem','amber'], cannot_verify:['Cannot be verified from text','slate']};
+    var srcText = {requirements:'Requirement check', ocr:'Text reading', rule:'Automatic comparison', model:'AI model'};
+    html += '<h5 class="rd-caption" style="margin-top:14px">Findings</h5><ul class="ai-findings">'
+      + ai.findings.map(function(f){
+          var c = (f.category==='missing_information' && f.source!=='requirements') ? ['Possibly missing (not confirmed)','amber'] : (catText[f.category] || [f.category,'slate']);
+          return '<li><div class="ai-f-head"><span class="badge '+c[1]+'">'+esc(c[0])+'</span>'+(f.documents && f.documents.length ? '<span>'+esc(f.documents.join(', '))+'</span>' : '')
+            + '<span class="cell-sub">'+esc(srcText[f.source]||f.source)+'</span></div><p>'+esc(f.explanation)+'</p>'+(f.evidence ? '<q>'+esc(f.evidence)+'</q>' : '')+'</li>';
+        }).join('') + '</ul>';
+  } else if(ai.status==='completed'){
+    html += '<p class="ai-note">No findings.</p>';
+  }
+  var meta = [];
+  if(ai.model) meta.push('Model: '+ai.model);
+  if(ai.ocrEngine) meta.push('OCR: '+ai.ocrEngine);
+  if(ai.completedAt) meta.push('Checked: '+fmtDateTime(ai.completedAt));
+  meta.push('Attempts: '+ai.attempts+' of '+ai.maxAttempts);
+  html += '<p class="ai-note">'+esc(meta.join(' · '))+'</p>';
+  var finished = ai.status==='completed' || ai.status==='needs_manual_review';
+  html += '<div class="ai-actions">'
+    + (ai.status!=='processing' ? runBtn(ai.status==='pending' ? 'Queued, run again' : 'Run check again') : '')
+    + (finished && !ai.reviewed ? '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button>' : '')
+    + (ai.reviewed ? '<span class="cell-sub">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>' : '')
+    + '</div>' + blocked + disclaimer + '</section>';
+  return html;
+}
+
 function reqSubmittedFilesHtml(r){
   if(!r.files) return '';
   var head = '<section class="rd-block"><h4 class="rd-caption">Submitted IDs and Documents</h4><div class="rd-wrap"><table class="rd-table rd-files" aria-label="Submitted IDs and Documents">';
@@ -3573,6 +3680,7 @@ function bindEvents(){
         setNotifOutput(form.querySelector('#notification-owner-name'), '');
         ['#notification-phone','#notification-email'].forEach(function(sel){ var o = form.querySelector(sel); if(o){ o.textContent = 'Select a reference number'; o.classList.add('is-empty'); } });
         var emailBox = form.querySelector('input[name="send_email"]'); if(emailBox){ emailBox.checked = false; emailBox.disabled = true; }
+        var smsBox = form.querySelector('input[name="send_sms"]'); if(smsBox){ smsBox.checked = true; smsBox.disabled = false; }
         var typeSel = form.querySelector('#notification-request-type'); if(typeSel) typeSel.value = '';
         form._notifAuto = null;
         var lt = form.elements.category.querySelector('option[value="Land Transfer Status"]'); if(lt) lt.disabled = false;
@@ -3847,10 +3955,12 @@ function bindEvents(){
     } else if(action==='nav-notify'){
       state.modal = null;
       state.view = 'notifications';
-      state.prefillNotifRef = el.getAttribute('data-ref');
+      // Kept in state like a rejection draft, so a re-render keeps this request selected.
+      state.notifDraft = { ref: el.getAttribute('data-ref'), fromRequest: true, category: '', topic: '', message: '' };
       render();
       var sel = document.querySelector('select[name="requestRef"]');
-      if(sel && state.prefillNotifRef){ sel.value = state.prefillNotifRef; }
+      if(sel) sel.dispatchEvent(new Event('change', { bubbles: true }));
+      window.scrollTo(0, 0);
     } else if(action==='dash-ann-toggle'){
       var annCard = el.closest('.dash-ann');
       if(annCard){
