@@ -813,6 +813,9 @@ function sa_submit_request(array $data): array
         // No automatic email or SMS: the client sees the new request in
         // request tracking; staff contact clients from the Notifications page.
 
+        // This browser session submitted it, so its receipt and tracking show the
+        // full applicant name (the duplicate return above records nothing).
+        sa_remember_submitted_reference($reference);
         return ['reference_no' => $reference, 'status' => 'Received'];
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
@@ -2926,6 +2929,9 @@ try {
     }
     $result = match ($action) {
         'submit_request' => sa_submit_request($data),
+        // The applicant left the receipt: this browser stops seeing the full name (shared computers).
+        // Affects only this browser's own session; "forgotten" says whether this browser had it.
+        'receipt_done' => ['forgotten' => sa_forget_submitted_reference(substr(trim((string) ($data['reference'] ?? '')), 0, 20))],
         'terms_accept' => sa_terms_accept($data),
         'draft_save' => sa_draft_save($data),
         'draft_upload' => sa_draft_upload($data),

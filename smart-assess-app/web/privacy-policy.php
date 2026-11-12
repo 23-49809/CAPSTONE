@@ -105,14 +105,14 @@ sa_legal_header(
 
 <h2 id="access">3. Who can access it</h2>
 <ul>
-  <li><strong>Staff</strong> of the Office review and process requests, and can view your details and uploaded documents.</li>
-  <li><strong>Administrator and department head accounts</strong> can access request information for their oversight and reporting duties. Uploaded files are opened through a viewer limited to Staff accounts, and automatic document check results are shown only to Staff.</li>
+  <li><strong>Staff</strong> of the Office review and process requests. They can view your details, including your mobile number, email address and home address, and your uploaded documents, and they use your number or email address to send you messages about your request.</li>
+  <li><strong>Administrator and department head accounts</strong> can access request records for their oversight and reporting duties, such as the applicant's name, the property and service details, and the request's status. They do not receive your mobile number, email address, home address, client account name, or the names of your uploaded files. Uploaded files are opened through a viewer limited to Staff accounts, and automatic document check results are shown only to Staff.</li>
   <li><strong>People who maintain the server</strong> may have technical access to stored information when keeping the system running.</li>
 </ul>
 <p>We may also disclose information when the law or a competent authority requires it.</p>
 
 <h2 id="tracking">4. Reference numbers and tracking</h2>
-<p>Request tracking does not require signing in. <strong>Anyone who has your reference number can see the applicant's name, the service requested and the request's status.</strong> Keep your reference number, and any recovery code or resume link for a saved application, private.</p>
+<p>Request tracking does not require signing in. <strong>Anyone who has your reference number can see the service requested, the request's status and the applicant's initials.</strong> The browser used to submit the request can show the applicant's full name for up to 15 minutes after submission. This ends sooner if the applicant leaves the receipt page, for example by going to the home page or starting another request; saving the receipt, copying the reference number or viewing the request's status does not end it. After that, that browser also shows only the initials. The receipt already shown on screen, and any receipt image the applicant saved, remain usable. Contact details are never shown in request tracking. Keep your reference number, and any recovery code or resume link for a saved application, private.</p>
 
 <h2 id="providers">5. Service providers</h2>
 <p>We share information only as far as these services need it to work:</p>
@@ -165,7 +165,7 @@ sa_legal_header(
 </ul>
 
 <h2 id="browser">10. Cookies and browser storage</h2>
-<p>The site uses one session cookie, which keeps the site working and keeps staff signed in; it is not used for tracking across websites. Your browser's local storage may hold your unfinished-application details and recovery code, and which announcements you have read. On a shared device, clear this data or finish your application.</p>
+<p>The site uses one session cookie, which keeps the site working, keeps staff signed in, and remembers, for up to 15 minutes, which requests were submitted from your browser so that their full applicant name can be shown there; it is not used for tracking across websites. Your browser's local storage may hold your unfinished-application details and recovery code, and which announcements you have read. On a shared device, clear this data or finish your application.</p>
 
 <h2 id="rights">11. Your rights</h2>
 <p>Under the Data Privacy Act of 2012 (Republic Act No. 10173), you may have the right to:</p>

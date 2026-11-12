@@ -8,6 +8,7 @@
     --paper:#f6f7f3; --surface:#ffffff; --surface-2:#eef2ec;
     --ink:#152018; --ink-soft:#333c35; --ink-faint:#5b665e;
     --line:#dde3da; --line-strong:#c4cec0;
+    --ink-placeholder:#848e87;   /* example text: clearly lighter than typed answers */
 
     --brand-900:#064e3b; --brand-800:#065f46; --brand-700:#047857;
     --brand-600:#059669; --brand-500:#10b981; --brand-100:#d1fae5; --brand-50:#ecfdf5;
@@ -30,7 +31,7 @@
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --paper:#0a130e; --surface:#101c15; --surface-2:#152219;
-      --ink:#edf3ee; --ink-soft:#a9b8ae; --ink-faint:#7c8c81;
+      --ink:#edf3ee; --ink-soft:#a9b8ae; --ink-faint:#7c8c81; --ink-placeholder:#66766c;
       --line:#213228; --line-strong:#2c4032;
       --brand-100:#152c1e; --brand-50:#101c15;
       --danger-bg:#2d1613; --warn-bg:#2c2210; --success-bg:#12291b;
@@ -41,7 +42,7 @@
   }
   :root[data-theme="dark"]{
     --paper:#0a130e; --surface:#101c15; --surface-2:#152219;
-    --ink:#edf3ee; --ink-soft:#a9b8ae; --ink-faint:#7c8c81;
+    --ink:#edf3ee; --ink-soft:#a9b8ae; --ink-faint:#7c8c81; --ink-placeholder:#66766c;
     --line:#213228; --line-strong:#2c4032;
     --brand-100:#152c1e; --brand-50:#101c15;
     --danger-bg:#2d1613; --warn-bg:#2c2210; --success-bg:#12291b;
@@ -92,17 +93,19 @@
      applied consistently instead of ad hoc per button. */
   .btn{ display:inline-flex; align-items:center; justify-content:center; gap:10px; font-family:var(--font-body); font-weight:700; font-size:17px; cursor:pointer; border-radius:999px; border:2px solid transparent; padding:15px 26px; min-height:52px; text-decoration:none; line-height:1.2; transition:transform .15s ease, background .15s ease, box-shadow .15s ease, border-color .15s ease; }
   .btn .icon{ width:18px; height:18px; }
-  .btn-primary{ background:var(--brand-700); color:#fff; box-shadow:var(--shadow-md); }
-  .btn-primary:hover{ background:var(--brand-600); transform:translateY(-1px); }
+  .btn-primary{ background:var(--brand-700); color:#fff; }
+  .btn-primary:hover{ background:var(--brand-600); }
   .btn-primary:disabled{ background:var(--line-strong); color:var(--ink-faint); box-shadow:none; cursor:not-allowed; transform:none; }
   .btn-ghost{ background:transparent; color:var(--ink); border-color:var(--line-strong); min-height:48px; padding:12px 22px; }
   .btn-ghost:hover{ background:var(--surface-2); }
   .btn-hero{ background:var(--brand-900); color:#fff; padding:18px 32px; font-size:19px; min-height:60px; }
-  .btn-hero:hover{ background:#043b2c; transform:translateY(-1px); }
+  .btn-hero:hover{ background:#043b2c; }
   .btn-hero .icon{ width:20px; height:20px; }
-  .btn-link{ display:inline-flex; align-items:center; gap:8px; background:var(--brand-50); border:2px solid var(--brand-100); padding:13px 20px; border-radius:999px; color:var(--brand-700); font-weight:700; font-size:16px; cursor:pointer; text-decoration:none; min-height:48px; }
-  .btn-link:hover{ background:var(--brand-100); }
-  .btn-link .icon{ width:16px; height:16px; }
+  /* Service cards: one clear primary action and a plain text link. */
+  .svc-link{ display:inline-flex; align-items:center; min-height:44px; padding:8px 4px; background:none; border:0; font-family:var(--font-body); font-size:16px; font-weight:700; color:var(--brand-700); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+  .svc-link:hover{ color:var(--brand-900); }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .svc-link{ color:#6ee7b7; } }
+  :root[data-theme="dark"] .svc-link{ color:#6ee7b7; }
 
   /* ============ Hero ============ */
   /* Light, split hero: copy on the paper colour at left, the real Mabini
@@ -136,7 +139,6 @@
   .hero-inner{ position:relative; padding:96px 0 88px; max-width:620px; }
   .eyebrow{ font-size:14px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#c3ecd4; margin-bottom:22px; display:block; }
   .hero .eyebrow{ color:var(--hero-text); font-size:15px; margin-bottom:0; }
-  .hero .eyebrow::after{ content:""; display:block; width:56px; height:3px; margin-top:16px; border-radius:2px; background:var(--hero-accent); }
   .hero h1{ color:var(--hero-ink); font-size:clamp(36px,4vw,48px); line-height:1.12; letter-spacing:-.01em; font-weight:700; margin-bottom:22px; }
   .hero p.lede{ font-size:20px; line-height:1.6; color:var(--hero-text); max-width:600px; margin-bottom:38px; }
   @media (max-width:768px){ .hero-inner{ padding:64px 0 56px; } }
@@ -147,7 +149,7 @@
   .home-slide .home-slide-inner{ max-width:560px; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:40px 0 110px; }
   .home-slide h1{ margin:22px 0 14px; }
   .home-slide p{ color:var(--hero-text); font-size:19px; line-height:1.7; font-weight:500; max-width:540px; margin-bottom:28px; }
-  .home-slide .hero-tagline{ font-family:var(--font-body); font-style:italic; font-weight:700; font-size:22px; color:var(--hero-accent); margin-bottom:16px; }
+  .home-slide .hero-tagline{ font-family:var(--font-body); font-style:normal; font-weight:600; font-size:22px; color:var(--hero-accent); margin-bottom:16px; }
   .home-slide .hero-requirements{ font-size:18px; color:var(--hero-text); margin-top:-16px; }
   .home-slide .announcement-copy{ margin-bottom:24px; }
   .home-slide .announcement-copy h3{ color:var(--hero-ink); font-size:24px; margin-bottom:7px; }
@@ -184,7 +186,7 @@
   .announcement-detail-note strong{ color:var(--ink); }
   .announcement-detail-note p{ margin-top:5px; }
   @keyframes homeSlideIn{ from{ opacity:0; transform:translateX(15px); } to{ opacity:1; transform:none; } }
-  @media (max-width:768px){ .home-slider{ height:840px; min-height:840px; } .hero-photo{ background-position:60% 50%; } .hero-photo::after{ background:linear-gradient(180deg, rgba(var(--hero-scrim),0) 0%, rgba(var(--hero-scrim),0) 22%, rgba(var(--hero-scrim),.9) 35%, rgba(var(--hero-scrim),.94) 100%); } .hero-wave{ width:90%; } .home-slide .home-slide-inner{ justify-content:flex-start; padding:300px 0 92px; } .home-slide p{ font-size:18px; } .home-slide .hero-tagline{ font-size:20px; } .home-slide-control{ top:150px; width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
+  @media (max-width:768px){ .home-slider{ height:840px; min-height:840px; } .hero-photo{ background-position:60% 50%; } .hero-photo::after{ background:linear-gradient(180deg, rgba(var(--hero-scrim),0) 0%, rgba(var(--hero-scrim),.15) 10%, rgba(var(--hero-scrim),.92) 22%, rgba(var(--hero-scrim),.95) 100%); } .hero-wave{ width:90%; } .home-slide .home-slide-inner{ justify-content:flex-start; padding:300px 0 92px; } .home-slide p{ font-size:18px; } .home-slide .hero-tagline{ font-size:20px; } .home-slide-control{ top:150px; width:40px; height:40px; } .home-slide-control.prev{ left:9px; } .home-slide-control.next{ right:9px; } }
 
   /* ============ Services / cards ============ */
   .section{ padding:88px 0; }
@@ -194,19 +196,17 @@
 
   .service-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:28px; }
   @media (max-width:768px){ .service-grid{ grid-template-columns:1fr; } }
-  .service-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); padding:40px 36px; box-shadow:var(--shadow-md); display:flex; flex-direction:column; gap:18px; transition:transform .18s ease, box-shadow .18s ease; }
-  .service-card:hover{ transform:translateY(-3px); box-shadow:var(--shadow-lg); }
+  .service-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); padding:40px 36px; display:flex; flex-direction:column; gap:18px; transition:border-color .15s ease; }
+  .service-card:hover{ border-color:var(--line-strong); }
   .chip-icon{ width:64px; height:64px; border-radius:16px; background:var(--brand-100); color:var(--brand-700); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .chip-icon .icon{ width:32px; height:32px; }
   .service-card h3{ font-size:24px; }
   .service-card p{ color:var(--ink-soft); font-size:17px; line-height:1.6; flex:1; }
-  .service-actions{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }
-  .service-actions .btn-link{ flex:1 1 auto; justify-content:center; }
+  .service-actions{ display:flex; align-items:center; gap:10px 22px; flex-wrap:wrap; }
+  .service-actions .svc-begin{ min-height:48px; padding:12px 24px; font-size:16px; }
   /* With a reminder in one card, keep both cards' buttons right under their text. */
   .service-grid:has(.card-draft) .service-card p{ flex:0 0 auto; }
   .card-draft{ display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; padding:14px 16px; background:var(--brand-50); border:1px solid var(--brand-100); border-left:4px solid var(--brand-600, var(--brand-700)); border-radius:var(--radius-md); }
-  .card-draft-icon{ flex:0 0 auto; display:inline-flex; color:var(--brand-700); }
-  .card-draft-icon .icon{ width:22px; height:22px; }
   .card-draft-text{ flex:1 1 200px; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .card-draft-text strong{ font-size:16px; color:var(--ink); line-height:1.35; }
   .card-draft-text span{ font-size:14px; color:var(--ink-soft); }
@@ -217,12 +217,8 @@
   .service-title .chip-icon .icon{ width:24px; height:24px; }
   .service-title h3{ min-width:0; font-size:22px; line-height:1.25; }
   @media (max-width:560px){
-    .service-actions{ flex-direction:row; flex-wrap:nowrap; gap:8px; }
-    .service-actions .btn-link{
-      flex:1 1 0; min-width:0; width:auto; padding:10px 6px;
-      font-size:12px; line-height:1.3; white-space:normal;
-      text-align:center; overflow-wrap:anywhere;
-    }
+    .service-actions{ gap:6px 18px; }
+    .service-actions .svc-begin{ flex:1 1 100%; justify-content:center; font-size:15.5px; }
     .service-title h3{ font-size:20px; }
   }
 
@@ -278,13 +274,11 @@
   .step-pill.done .step-num svg{ width:12px; height:12px; }
   .step-label{ text-align:left; overflow:hidden; text-overflow:ellipsis; }
 
-  .wizard-card{ min-width:0; max-width:100%; background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:hidden; }
+  .wizard-card{ min-width:0; max-width:100%; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; }
   .wizard-card-head{ padding:28px 32px 4px; }
   .wizard-card-head h2{ font-size:21px; display:flex; align-items:center; gap:10px; margin-bottom:6px; }
-  .wizard-card-head h2 .icon{ width:21px; height:21px; color:var(--brand-600); }
-  .wizard-card-head p{ color:var(--ink-soft); font-size:13.5px; }
-  .wizard-card-body{ padding:24px 32px 8px; max-height:min(56vh,600px); overflow-y:auto; }
-  @media (max-width:640px){ .wizard-card-body{ max-height:none; } }
+  .wizard-card-head p{ color:var(--ink-soft); font-size:15px; }
+  .wizard-card-body{ padding:24px 32px 8px; }
   .wizard-card-foot{ padding:20px 32px 26px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); margin-top:6px; }
   .foot-actions{ display:flex; align-items:center; gap:10px; margin-left:auto; }
   .wizard-card-foot .btn{ min-height:48px; padding-top:10px; padding-bottom:10px; }
@@ -330,7 +324,7 @@
   .arp-input .arp-code.empty{ color:var(--ink-faint); font-weight:600; }
   .barangay-option .barangay-code{ margin-left:auto; font-size:12px; font-weight:600; color:var(--ink-faint); font-variant-numeric:tabular-nums; }
   .field .arp-input > input:focus{ border:0; box-shadow:none; outline:none; }
-  .field input::placeholder{ color:var(--ink-faint); }
+  .field input::placeholder, .field textarea::placeholder{ color:var(--ink-placeholder); opacity:1; font-weight:400; }
   .field input:focus, .field select:focus{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); outline:none; }
   .field input.invalid, .field select.invalid{ border-color:var(--danger); }
   .barangay-dropdown{ position:relative; width:100%; }
@@ -351,9 +345,8 @@
   .barangay-native-select{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
   @media (max-width:640px){ .barangay-menu{ max-height:240px; } .barangay-option{ min-height:46px; padding:11px 12px; } }
   .field-error{ font-size:12.5px; color:var(--danger); }
-  .field-hint{ font-size:12px; color:var(--ink-faint); }
+  .field-hint{ font-size:15px; line-height:1.45; color:var(--ink-faint); }
   .section-divider{ display:flex; align-items:center; gap:8px; margin:6px 0 18px; color:var(--brand-600); }
-  .section-divider .icon{ width:15px; height:15px; }
   .section-divider span{ font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
   .section-divider::after{ content:""; flex:1; height:1px; background:var(--line); }
 
@@ -381,7 +374,7 @@
   .upload-box{ min-width:0; border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; cursor:default; background:var(--surface);
     transition:border-color .15s ease, background .15s ease; }
   .upload-box:hover{ border-color:var(--brand-500); }
-  .upload-box.filled{ border-color:var(--brand-500); background:var(--brand-50); }
+  .upload-box.filled{ border-color:var(--line-strong); background:var(--surface); }
   .upload-box.flagged, .upload-box.invalid{ border-color:var(--danger); }
   .upload-box .field-error{ margin-top:6px; }
   .upl-row{ display:flex; align-items:center; gap:12px; min-width:0; }
@@ -392,7 +385,7 @@
   .upl-text{ flex:1; min-width:0; }
   .upl-label{ font-size:14px; font-weight:700; color:var(--ink); line-height:1.3; }
   .upl-label .req{ color:var(--danger); margin-left:2px; }
-  .upl-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; margin-top:2px; font-size:12.5px; color:var(--ink-faint); line-height:1.35; min-width:0; }
+  .upl-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; margin-top:2px; font-size:15px; color:var(--ink-faint); line-height:1.35; min-width:0; }
   .upl-file{ color:var(--ink-soft); font-weight:600; overflow-wrap:anywhere; min-width:0; }
   .upl-ok{ display:inline-flex; align-items:center; gap:3px; color:var(--success); font-weight:700; }
   .upl-ok .icon{ width:13px; height:13px; }
@@ -664,7 +657,7 @@
   .why-title{ font-family:var(--font-display); font-size:clamp(22px,2.8vw,30px); font-weight:700; line-height:1.25; color:var(--ink); }
   .why-desc{ margin-top:10px; font-size:17px; line-height:1.6; color:var(--ink-soft); }
   .why-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
-  .why-grid li{ display:block; padding:20px 20px 22px; border-top:3px solid var(--brand-600); }
+  .why-grid li{ display:block; padding:20px 20px 22px; }
   .why-grid h4{ font-size:17px; line-height:1.35; }
   .why-grid p{ margin-top:6px; }
   .why-grid p{ font-size:15.5px; line-height:1.55; }
@@ -773,7 +766,8 @@
   .trk-head{ text-align:center; margin-bottom:22px; }
   .trk-head h1{ font-size:clamp(30px,4vw,40px); color:#fff; }
   .trk-head p{ margin-top:8px; font-size:17px; color:#d7ecdf; }
-  .trk-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:26px 28px; }
+  .trk-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); padding:26px 28px; }
+  .trk-dd-note{ display:block; margin-top:2px; font-size:13px; font-weight:400; color:var(--ink-faint); }
   .trk-card + .trk-card, .trk-results > .trk-card:first-child{ margin-top:16px; }
   .trk-label{ display:block; font-size:15px; font-weight:700; color:var(--ink); margin-bottom:8px; }
   .trk-form{ display:flex; gap:10px; }
@@ -788,7 +782,7 @@
   .trk-form .btn[aria-busy="true"]{ opacity:.85; cursor:progress; }
   .trk-spin{ width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; animation:trkSpin .8s linear infinite; }
   @keyframes trkSpin{ to{ transform:rotate(360deg); } }
-  .trk-hint{ margin-top:10px; font-size:14px; color:var(--ink-faint); }
+  .trk-hint{ margin-top:10px; font-size:15px; color:var(--ink-faint); }
   .trk-error{ margin-top:10px; font-size:14.5px; font-weight:600; color:var(--danger); }
   .trk-empty{ text-align:center; padding:30px 28px; }
   .trk-empty h2{ font-family:var(--font-body); font-size:20px; font-weight:700; color:var(--ink); }
@@ -876,7 +870,6 @@
     .home-slide .home-slide-inner{ padding:clamp(150px, 42vw, 175px) 0 64px; }
     .home-slide-control{ top:clamp(70px, 20vw, 84px); }
     .hero .eyebrow{ font-size:clamp(13px, 3.9vw, 15px); letter-spacing:.08em; }
-    .hero .eyebrow::after{ margin-top:8px; width:44px; }
     .hero h1{ font-size:clamp(32px, 9.6vw, 38px); line-height:1.08; margin-bottom:8px; }
     .home-slide h1{ margin:10px 0 8px; }
     .home-slide .hero-tagline{ font-size:clamp(17px, 5vw, 20px); line-height:1.3; margin-bottom:8px; }
@@ -901,7 +894,6 @@
     .chip-icon .icon{ width:26px; height:26px; }
     .feature-row .chip-icon{ width:56px; height:56px; margin-bottom:10px; }
     .service-actions{ gap:8px; }
-    .btn-link{ min-height:46px; padding:8px 14px; font-size:15px; }
     .feature-row{ gap:22px; }
     .feature-row h3{ font-size:19px; }
     .feature-row p{ font-size:14.5px; }
@@ -926,7 +918,7 @@
     .submit-modal-actions .btn{ flex:1 1 140px; min-height:44px; }
     .wizard-card-head{ padding:16px 14px 2px; }
     .wizard-card-head h2{ font-size:18px; align-items:flex-start; }
-    .wizard-card-head p{ font-size:13.5px; }
+    .wizard-card-head p{ font-size:15px; }
     .wizard-card-body{ padding:12px 14px 6px; }
     .field-grid{ gap:14px 16px; margin-bottom:16px; }
     .field-pair{ gap:14px 12px; }
@@ -1124,11 +1116,25 @@ function buildArp(barangay, serial){
   return code ? '14-'+code+'-'+digits : (digits ? '14--'+digits : '');
 }
 
-function fileMetaFromFile(f, preview){ return { name:f.name, size:f.size, type:f.type, valid: VALID_FILE_RE.test(f.type) && f.size>0 && f.size < 15*1024*1024, preview: preview || null }; }
+/* Same rules as the server (DocumentRequirements): IDs and the authorization
+   letter are JPG or PNG only; other documents JPG, PNG, WEBP or PDF; every file
+   must be smaller than the upload limit (5 MiB). The server checks again. */
+const IMAGE_ONLY_KEYS = ['ownerId','requesterId','authLetter'];
+const IMAGE_FILE_RE = /^image\/(jpeg|png)$/;
+function isImageOnlyKey(key){ return IMAGE_ONLY_KEYS.indexOf(key) !== -1; }
+function fileTypesFor(key){ return isImageOnlyKey(key) ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF'; }
+function uploadLimitBytes(){
+  const maxBytes = Number(window.SMART_ASSESS_CONFIG && window.SMART_ASSESS_CONFIG.maxFileUploadBytes);
+  return Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : 5*1024*1024;
+}
+function fileMetaFromFile(key, f, preview){
+  const typeOk = (isImageOnlyKey(key) ? IMAGE_FILE_RE : VALID_FILE_RE).test(f.type);
+  return { name:f.name, size:f.size, type:f.type, valid: typeOk && f.size>0 && f.size < uploadLimitBytes(), preview: preview || null };
+}
 function processUploadedFile(key, file){
   if(!file) return;
-  const maxBytes = Number(window.SMART_ASSESS_CONFIG && window.SMART_ASSESS_CONFIG.maxFileUploadBytes);
-  if(Number.isFinite(maxBytes) && file.size >= maxBytes){   // must be smaller than the limit, as the server checks
+  const maxBytes = uploadLimitBytes();
+  if(file.size >= maxBytes){   // must be smaller than the limit, as the server checks
     if(typeof window.SMART_ASSESS_REMOVE_FILE === 'function') window.SMART_ASSESS_REMOVE_FILE(key);
     delete state.formData.files[key];
     const maxMb = Math.floor(maxBytes / (1024 * 1024)) || 1;
@@ -1141,7 +1147,7 @@ function processUploadedFile(key, file){
   draftQueueFile(key, file);
   const reader = new FileReader();
   reader.onload = function(){
-    state.formData.files[key] = fileMetaFromFile(file, reader.result);
+    state.formData.files[key] = fileMetaFromFile(key, file, reader.result);
     delete state.errors[key];
     render();
   };
@@ -1206,7 +1212,7 @@ function checklistIsComplete(items){ return items.every(function(i){ return i.st
 function validateUploads(flow, fd, errors){
   getRequirementChecklist(flow, fd).forEach(function(item){
     if(item.status==='missing') errors[item.key] = item.label+' upload is required.';
-    else if(item.status==='flagged') errors[item.key] = 'This file is not a valid scan (use JPG, PNG, or PDF).';
+    else if(item.status==='flagged') errors[item.key] = 'This file cannot be accepted here. Upload a '+fileTypesFor(item.key)+' file smaller than '+(Math.floor(uploadLimitBytes() / (1024*1024)) || 5)+' MB.';
   });
 }
 function getAdvisory(flow, fd){
@@ -1416,8 +1422,8 @@ function renderLanding(){
   + '<section class="hero home-slider" data-home-slider aria-label="Assessor Office updates">'
     + '<div class="hero-photo" role="img" aria-label="Mabini Municipal Assessor’s Office building"></div>'
     + '<svg class="hero-wave" viewBox="0 0 760 200" preserveAspectRatio="none" aria-hidden="true"><path class="wave-light" d="M0 40 C 180 110, 360 190, 760 200 L0 200 Z"/><path class="wave-dark" d="M0 95 C 160 150, 300 192, 540 200 L0 200 Z"/></svg>'
-    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">MABINI MUNICIPAL ASSESSOR’S OFFICE</span><h1>Welcome to<br>SMART ASSESS</h1><p class="hero-tagline">Your Digital Gateway to Assessor Services</p><p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p><button class="btn btn-hero" data-action="get-started">Explore Services '+ic('arrowRight')+'</button></div></div></div>'
-    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">LATEST UPDATES</span><h1>Announcements</h1><div class="announcement-copy"><h3>'+esc(announcement ? announcement.title : 'No published announcements')+'</h3><p>'+esc(announcement ? announcement.content : 'There are no current announcements from the Assessor’s Office.')+'</p><time>'+(announcement ? esc(fmtDateTime(announcement.publishedAt || announcement.datePosted)) : '')+'</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement '+ic('arrowRight')+'</button></div></div></div>'
+    + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">MABINI MUNICIPAL ASSESSOR’S OFFICE</span><h1>Welcome to<br>SMART ASSESS</h1><p class="hero-tagline">Your Digital Gateway to Assessor Services</p><p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p><button class="btn btn-hero" data-action="get-started">Explore Services</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">LATEST UPDATES</span><h1>Announcements</h1><div class="announcement-copy"><h3>'+esc(announcement ? announcement.title : 'No published announcements')+'</h3><p>'+esc(announcement ? announcement.content : 'There are no current announcements from the Assessor’s Office.')+'</p><time>'+(announcement ? esc(fmtDateTime(announcement.publishedAt || announcement.datePosted)) : '')+'</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement</button></div></div></div>'
     + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
     + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Welcome to SMART ASSESS slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Announcements slide"></button></div>'
   + '</section>'
@@ -1430,11 +1436,11 @@ function renderLanding(){
       + '<div class="service-card"><div class="service-title">'
         + '<h3>Document Request</h3></div>'
         + '<p>Request for Certified True Copies of Tax Declarations, Certifications of Land Holdings, and more.</p>'
-        + '<div class="service-actions"><button class="btn-link" data-action="start-docreq">Begin Application</button><button class="btn-link" data-action="show-requirements" data-requirements="docreq">View Requirements</button></div>'+renderCardDraft('docreq')+'</div>'
+        + '<div class="service-actions"><button class="btn btn-primary svc-begin" data-action="start-docreq">Begin Application</button><button class="svc-link" data-action="show-requirements" data-requirements="docreq">View Requirements</button></div>'+renderCardDraft('docreq')+'</div>'
       + '<div class="service-card"><div class="service-title">'
         + '<h3>Land Transfer</h3></div>'
         + '<p>Submit requirements for property transfer, consolidation, or subdivision of land records.</p>'
-        + '<div class="service-actions"><button class="btn-link" data-action="start-landtransfer">Begin Land Transfer</button><button class="btn-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements</button></div>'+renderCardDraft('landtransfer')+'</div>'
+        + '<div class="service-actions"><button class="btn btn-primary svc-begin" data-action="start-landtransfer">Begin Land Transfer</button><button class="svc-link" data-action="show-requirements" data-requirements="landtransfer">View Requirements</button></div>'+renderCardDraft('landtransfer')+'</div>'
     + '</div></div></section>'
 
   + '<section class="section section-alt about" id="why" aria-labelledby="why-choose"><div class="wrap">'
@@ -1456,13 +1462,13 @@ function renderLanding(){
     + '<div><h5>Contact</h5><p>Phone: 09989695966<br>Email: mao.smartassess@gmail.com</p></div>'
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
     + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav>'
-    + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span><span>Smart Assess</span></div></div></footer>';
+    + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span></div></div></footer>';
 }
 
   function renderAnnouncementPage(){
     const announcement = currentPublicAnnouncement();
     markAnnouncementRead(announcement);
-    return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><p>Official updates from the Department Head.</p></div><article class="panel-card announcement-detail">'+(announcement ? '<div class="announcement-detail-meta">Announcement date: '+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</div><h2>'+esc(announcement.title)+'</h2><p>'+esc(announcement.content)+'</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the announcement and follow any additional instructions provided by the Assessor’s Office.</p></div>' : '<div class="announcement-detail-meta">No current announcement</div><h2>No published announcements</h2><p>There are no announcements available at this time.</p>')+'</article><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">'+ic('arrowLeft')+' Back to Home</button></div></div></section>';
+    return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><p>Official updates from the Department Head.</p></div><article class="panel-card announcement-detail">'+(announcement ? '<div class="announcement-detail-meta">Announcement date: '+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</div><h2>'+esc(announcement.title)+'</h2><p>'+esc(announcement.content)+'</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the announcement and follow any additional instructions provided by the Assessor’s Office.</p></div>' : '<div class="announcement-detail-meta">No current announcement</div><h2>No published announcements</h2><p>There are no announcements available at this time.</p>')+'</article><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">Back to Home</button></div></div></section>';
   }
 
 /* ---------- Wizard ---------- */
@@ -1506,18 +1512,18 @@ function arpField(fd){
 
 function renderStep1(){
   const fd = state.formData;
-  return '<div class="wizard-card-head"><h2>'+ic('user')+' Enter Personal Information</h2><p>Provide applicant details to proceed with '+(state.flow==='docreq'?'document request and land transfer support':'your land transfer request')+'.</p></div>'
+  return '<div class="wizard-card-head"><h2>Enter Personal Information</h2><p>Provide applicant details to proceed with '+(state.flow==='docreq'?'document request and land transfer support':'your land transfer request')+'.</p></div>'
   + '<div class="wizard-card-body">'
     + '<div class="field-grid">'
-      + '<div class="field"><label>First Name<span class="req">*</span></label><input id="f-firstName" class="'+(inv('firstName')?'invalid':'')+'" type="text" value="'+esc(fd.firstName)+'" data-bind="firstName" placeholder="Juan">' + fieldError('firstName') + '</div>'
-      + '<div class="field"><label>Last Name<span class="req">*</span></label><input id="f-lastName" class="'+(inv('lastName')?'invalid':'')+'" type="text" value="'+esc(fd.lastName)+'" data-bind="lastName" placeholder="Dela Cruz">' + fieldError('lastName') + '</div>'
-      + '<div class="field"><label>Middle Name</label><input id="f-middleName" type="text" value="'+esc(fd.middleName)+'" data-bind="middleName" placeholder="Santos"></div>'
+      + '<div class="field"><label>First Name<span class="req">*</span></label><input id="f-firstName" class="'+(inv('firstName')?'invalid':'')+'" type="text" value="'+esc(fd.firstName)+'" data-bind="firstName" placeholder="e.g. Juan">' + fieldError('firstName') + '</div>'
+      + '<div class="field"><label>Last Name<span class="req">*</span></label><input id="f-lastName" class="'+(inv('lastName')?'invalid':'')+'" type="text" value="'+esc(fd.lastName)+'" data-bind="lastName" placeholder="e.g. Dela Cruz">' + fieldError('lastName') + '</div>'
+      + '<div class="field"><label>Middle Name</label><input id="f-middleName" type="text" value="'+esc(fd.middleName)+'" data-bind="middleName" placeholder="e.g. Santos"></div>'
       + '<div class="field"><label>Contact Number<span class="req">*</span></label><div class="contact-input"><span>+63</span><input id="f-contact" class="'+(inv('contact')?'invalid':'')+'" type="tel" value="'+esc(fd.contact.replace(/^\+63/,''))+'" data-bind="contact" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX"></div>' + fieldError('contact') + '</div>'
-      + '<div class="field" style="grid-column:1/-1"><label for="f-email">Email Address <span class="opt">(optional)</span></label><input id="f-email" class="'+(inv('email')?'invalid':'')+'" type="text" value="'+esc(fd.email)+'" data-bind="email" placeholder="juan.delacruz@gmail.com" aria-describedby="email-hint"><div class="field-hint" id="email-hint">Add your email to receive a confirmation of your request.</div>' + fieldError('email') + '</div>'
+      + '<div class="field" style="grid-column:1/-1"><label for="f-email">Email Address <span class="opt">(optional)</span></label><input id="f-email" class="'+(inv('email')?'invalid':'')+'" type="text" value="'+esc(fd.email)+'" data-bind="email" placeholder="e.g. juan.delacruz@gmail.com" aria-describedby="email-hint"><div class="field-hint" id="email-hint">Optional. Staff may use it to send you messages about your request.</div>' + fieldError('email') + '</div>'
     + '</div>'
-    + '<div class="section-divider">'+ic('pin')+'<span>Address Information</span></div>'
+    + '<div class="section-divider"><span>Address Information</span></div>'
     + '<div class="field-grid">'
-      + '<div class="field"><label>House No. / Street<span class="req">*</span></label><input id="f-addressLine" class="'+(inv('addressLine')?'invalid':'')+'" type="text" value="'+esc(fd.addressLine)+'" data-bind="addressLine" placeholder="123 Rizal St.">' + fieldError('addressLine') + '</div>'
+      + '<div class="field"><label>House No. / Street<span class="req">*</span></label><input id="f-addressLine" class="'+(inv('addressLine')?'invalid':'')+'" type="text" value="'+esc(fd.addressLine)+'" data-bind="addressLine" placeholder="e.g. 123 Rizal St.">' + fieldError('addressLine') + '</div>'
       + '<div class="field"><label>Barangay<span class="req">*</span></label>'+barangaySelect(fd, 'requesterBarangay') + fieldError('requesterBarangay') + '</div>'
       + '<div class="field"><label>Province<span class="req">*</span></label><input id="f-province" class="'+(inv('province')?'invalid':'')+'" type="text" value="'+esc(fd.province)+'" data-bind="province">' + fieldError('province') + '</div>'
       + '<div class="field-pair">'
@@ -1533,7 +1539,7 @@ function renderStep2(){
   const advisory = getAdvisory(state.flow, fd);
   const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd, 'barangay') + fieldError('barangay') + '</div>';
   if(state.flow==='docreq'){
-    return '<div class="wizard-card-head"><h2>'+ic('home')+' Enter Property Information</h2><p>Fill in document and property details. Additional files are required when filing on behalf of the owner.</p></div>'
+    return '<div class="wizard-card-head"><h2>Enter Property Information</h2><p>Fill in document and property details. Additional files are required when filing on behalf of the owner.</p></div>'
     + '<div class="wizard-card-body">'
       + '<div class="field" style="margin-bottom:20px"><label>Document Type<span class="req">*</span></label>'
         + '<select id="f-documentType" class="'+(inv('documentType')?'invalid':'')+'" data-bind-select="documentType">'
@@ -1554,7 +1560,7 @@ function renderStep2(){
       + '</div>'
     + '</div>';
   }
-  return '<div class="wizard-card-head"><h2>'+ic('home')+' Enter Property &amp; Transfer Details</h2><p>Provide property information and transfer details. Additional files are required when filing on behalf of the owner.</p></div>'
+  return '<div class="wizard-card-head"><h2>Enter Property &amp; Transfer Details</h2><p>Provide property information and transfer details. Additional files are required when filing on behalf of the owner.</p></div>'
   + '<div class="wizard-card-body">'
     + '<div class="field" style="margin-bottom:20px"><label>Type of Transfer<span class="req">*</span></label>'
       + '<select id="f-transferType" class="'+(inv('transferType')?'invalid':'')+'" data-bind-select="transferType">'
@@ -1576,9 +1582,9 @@ function renderStep2(){
 function uploadBox(key, label, fd, centered){
   const file = fd.files[key];
   const err = state.errors[key];
-  const imageOnly = key==='ownerId' || key==='requesterId' || key==='authLetter';
-  const maxMb = Math.floor(Number(window.SMART_ASSESS_CONFIG && window.SMART_ASSESS_CONFIG.maxFileUploadBytes) / (1024*1024)) || 5;
-  const types = (imageOnly ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF') + ', smaller than ' + maxMb + ' MB';
+  const imageOnly = isImageOnlyKey(key);
+  const maxMb = Math.floor(uploadLimitBytes() / (1024*1024)) || 5;
+  const types = fileTypesFor(key) + ', smaller than ' + maxMb + ' MB';
   const cls = 'upload-box upl'+(centered?' upl-center':'')+(file && file.valid?' filled':'')+(file && !file.valid?' flagged':'')+(err?' invalid':'');
   const thumb = file && file.preview && /^data:image\/|^blob:/.test(file.preview)
     ? '<span class="upl-thumb has-img"><img src="'+esc(file.preview)+'" alt=""></span>'
@@ -1625,11 +1631,11 @@ function renderStep3(){
   const idKeys = requiredIdKeys(fd);
   let docsBlock = '';
   if(state.flow==='landtransfer'){
-    docsBlock = '<div class="section-divider">'+ic('doc')+'<span>Required Transfer Documents</span></div>'
+    docsBlock = '<div class="section-divider"><span>Required Transfer Documents</span></div>'
       + '<div class="upload-grid doc-upload-list">' + LAND_TRANSFER_DOCS.map(function(d){ return uploadBox(d.key, d.label, fd); }).join('') + '</div>'
-      + '<div class="section-divider">'+ic('id')+'<span>Identity Verification</span></div>';
+      + '<div class="section-divider"><span>Identity Verification</span></div>';
   }
-  return '<div class="wizard-card-head"><h2>'+ic('id')+' Valid ID Verification</h2><p>Upload a clear, valid, and unexpired ID.</p></div>'
+  return '<div class="wizard-card-head"><h2>Valid ID Verification</h2><p>Upload a clear, valid, and unexpired ID.</p></div>'
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">'+(fd.isOwner ? 'I am the registered property owner' : 'I am not the registered property owner')+'</span></label>'
     + docsBlock
@@ -1685,12 +1691,12 @@ function renderWizard(){
     + '<div class="wizard-card">'
       + body
       + '<div class="wizard-card-foot">'
-        + '<button class="btn btn-ghost" data-action="prev-step">'+ic('arrowLeft')+' Back</button>'
+        + '<button class="btn btn-ghost" data-action="prev-step">Back</button>'
         + '<div class="foot-actions">'
           + (draftServer() && draft.code ? '<button type="button" class="btn btn-ghost draft-later" data-action="draft-later" aria-haspopup="dialog">Continue later</button>' : '')
           + (isLast
-              ? '<button class="btn btn-primary" data-action="submit">Submit Request '+ic('arrowRight')+'</button>'
-              : '<button class="btn btn-primary" data-action="next-step">Next '+ic('arrowRight')+'</button>')
+              ? '<button class="btn btn-primary" data-action="submit">Submit Request</button>'
+              : '<button class="btn btn-primary" data-action="next-step">Next</button>')
         + '</div>'
       + '</div>'
     + '</div>'
@@ -1957,7 +1963,7 @@ function trackRefError(q){
   if(!TRACK_REF_RE.test(q)) return 'That doesn’t look like a reference number. It should look like DR-2026-00001 or LT-2026-00001.';
   return '';
 }
-const TRACK_STATUS_TONE = {'Received':'s-info','Processing':'s-warn','Approved':'s-ok','Out for Release':'s-ok','Rejected':'s-bad','Timed Out':'s-neutral'};
+const TRACK_STATUS_TONE = {'Received':'s-ok','Processing':'s-warn','Approved':'s-ok','Out for Release':'s-ok','Rejected':'s-bad','Timed Out':'s-neutral'};
 /* Steps from submission to completion. A request ends either at "Ready for
    Release" (Out for Release) or at Rejected / Timed Out after processing. */
 function trackSteps(r){
@@ -2006,7 +2012,7 @@ function renderTrack(){
           + '<dl class="trk-grid">'
             + '<div><dt>Request Type</dt><dd>'+(r.flow==='docreq'?'Document Request':'Land Transfer')+'</dd></div>'
             + '<div><dt>Service</dt><dd>'+esc(r.docType || '—')+'</dd></div>'
-            + '<div><dt>Applicant</dt><dd>'+esc(r.applicant || '—')+'</dd></div>'
+            + '<div><dt>Applicant</dt><dd>'+esc(r.applicant || '—')+(r.applicantInitialsOnly ? '<small class="trk-dd-note">Initials only, to protect the applicant’s privacy</small>' : '')+'</dd></div>'
             + '<div><dt>Date Submitted</dt><dd>'+esc(receiptDate(r.submittedAt))+'</dd></div>'
           + '</dl>'
           + (!r.requirementComplete && missing.length ? '<div class="trk-note"><strong>Requirements need attention</strong>'+esc(missing.join(', '))+'</div>' : '')
@@ -2048,6 +2054,32 @@ function trackPrepare(){
 }
 window.SMART_ASSESS_TRACK = { prepare: function(){ return trackPrepare(); } };
 
+/* Shared computers: when the applicant leaves the receipt (anything except
+   saving it, copying the number or viewing its status), the server is told to
+   stop showing this browser the full name; the server also ends it by itself
+   after 15 minutes. The receipt already on screen and the saved image keep it. */
+const RECEIPT_KEEP_ACTIONS = ['save-tracking','copy-tracking','view-status'];
+let receiptDoneSent = '';
+function receiptDone(){
+  const r = state.lastSubmission;
+  const cfg = window.SMART_ASSESS_CONFIG;
+  if(!r || !r.id || r.applicantInitialsOnly || receiptDoneSent === r.id || !cfg || !cfg.api || !cfg.csrf) return;
+  receiptDoneSent = r.id;
+  try{
+    fetch(cfg.api+'?action=receipt_done', { method:'POST', credentials:'same-origin', keepalive:true,
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'receipt_done', csrf:cfg.csrf, reference:r.id}) }).catch(function(){});
+  }catch(e){}
+}
+document.addEventListener('click', function(e){
+  // Only a person's click counts: saving the receipt clicks a download link from code.
+  if(!e.isTrusted || !state.lastSubmission || (state.view!=='confirmation' && state.view!=='track')) return;
+  const el = e.target && e.target.closest ? e.target.closest('a[href],button,[data-nav],[data-action]') : null;
+  if(!el || el.hasAttribute('download')) return;
+  const action = el.getAttribute('data-action');
+  if(action && RECEIPT_KEEP_ACTIONS.indexOf(action) !== -1) return;
+  receiptDone();
+}, true);
+
 /* ======================= Terms and Conditions =======================
    Shown before either application form opens (guests included). Continue
    stays disabled until the box is ticked; it records the acceptance on the
@@ -2057,7 +2089,7 @@ window.SMART_ASSESS_TRACK = { prepare: function(){ return trackPrepare(); } };
    submission without a valid acceptance. TERMS_VERSION must match
    SA_TERMS_VERSION in web/terms-acceptance.php. Keep this text consistent with
    the public web/terms.php and web/privacy-policy.php pages. */
-const TERMS_VERSION = '2026-11-11';
+const TERMS_VERSION = '2026-11-12';
 const TERMS_AGREE_TEXT = 'I have read, understood, and agree to the Terms and Conditions of SMART ASSESS.';
 function termsList(items){ return '<ul>'+items.map(function(i){ return '<li>'+i+'</li>'; }).join('')+'</ul>'; }
 function renderTermsContent(){
@@ -2072,10 +2104,10 @@ function renderTermsContent(){
     + sec(5,'Submitting Documents','<p>Depending on your request, you may need to upload documents such as:</p>'+termsList(['Certified True Copy of Tax Declaration or Title','Vicinity Map','Tax Clearance','Notarial Deed of Sale or Donation','Certification of No Improvement','A valid ID, and an authorization letter if you are applying on behalf of the property owner'])+'<p>All documents you submit must be genuine, complete, and clearly readable.</p><p>Uploaded files must be smaller than 5 MiB each. Government-issued IDs and authorization letters must be in JPG or PNG format. Other supporting documents may be submitted in JPG, PNG, WEBP, or PDF format.</p>')
     + sec(6,'Accuracy of Information','<p>You must give true, correct, and up-to-date information. False, misleading, incomplete, or fraudulent information or documents may cause your request to be delayed or rejected, and may be dealt with under applicable laws and regulations.</p>')
     + sec(7,'Processing and Verification','<p>Authorized personnel of the '+MAO+' will review and verify what you submit. Submitting a request does not mean it is approved or completed. Every request remains subject to the Office’s requirements, verification, evaluation, and approval procedures.</p>')
-    + sec(8,'Request Status and Notifications','<p>After submitting, you will receive a reference number. Use it on the Track Request page to check your request’s status. Keep it safe, because anyone with your reference number can view your request’s status, the applicant’s name, and the service requested.</p><p>Status changes appear in request tracking and do not automatically send an SMS or email. Staff may choose to message you about your request by SMS, or by email if you provide an address. Please make sure your contact number is valid and active.</p>')
+    + sec(8,'Request Status and Notifications','<p>After submitting, you will receive a reference number. Use it on the Track Request page to check your request’s status. Keep it safe, because anyone with your reference number can view your request’s status, the service requested, and the applicant’s initials. The browser used to submit the request can show the applicant’s full name for up to 15 minutes after submission. This ends sooner if the applicant leaves the receipt page, for example by going to the home page or starting another request; saving the receipt, copying the reference number or viewing the request’s status does not end it. After that, that browser also shows only the initials. The receipt already shown on screen, and any receipt image the applicant saved, remain usable.</p><p>Status changes appear in request tracking and do not automatically send an SMS or email. Staff may choose to message you about your request by SMS, or by email if you provide an address. Please make sure your contact number is valid and active.</p>')
     + sec(9,'Saved Applications and Your Responsibility','<p>Your application is saved automatically while you fill it in, so you can continue later. You may receive a recovery code or resume link to open your saved application on another device.</p>'
         + termsList(['Keep your recovery code, resume link, and reference number private. Anyone who has them can open your saved application or view your request’s status.','Do not use another person’s reference number, recovery code, or resume link without their permission.','Saved applications that are not submitted are deleted automatically 7 days after your last change.','If you believe someone has accessed your application without permission, report it to the '+MAO+' right away.']))
-    + sec(10,'Who Can Access Your Information','<p>Only authorized users can access submitted information, according to their roles:</p>'+termsList(['<strong>Client</strong> – submits and monitors their own requests;','<strong>Staff</strong> – processes and manages assigned requests;','<strong>Head</strong> – reviews transactions and reports within their responsibilities; and','<strong>Administrator</strong> – manages system accounts and system functions, and can access request information.']))
+    + sec(10,'Who Can Access Your Information','<p>Only authorized users can access submitted information, according to their roles:</p>'+termsList(['<strong>Client</strong> – submits and monitors their own requests;','<strong>Staff</strong> – processes and manages assigned requests, including your uploaded documents and the contact details used to send you messages;','<strong>Head</strong> – reviews transactions and reports within their responsibilities; and','<strong>Administrator</strong> – manages system accounts and system functions, and can access request information.'])+'<p>The Head and the Administrator do not receive your mobile number, email address, home address, client account name, or the names of your uploaded files, and cannot open your uploaded files.</p>')
     + sec(11,'Personal Information and Privacy','<p>SMART ASSESS collects personal and property-related information only as needed to provide its services. This information is used to:</p>'+termsList(['Process your request or transaction;','Verify your information and documents;','Identify you and the property involved;','Track the status of your request;','Contact you about your request; and','Keep the Office’s transaction records.'])+'<p>You may have rights over your personal information under the Data Privacy Act of 2012 (Republic Act No. 10173). Read the full <a href="/privacy-policy.php" target="_blank" rel="noopener">Privacy Policy</a> and <a href="/terms.php" target="_blank" rel="noopener">Terms of Service</a>. For questions or concerns about your personal information, you may contact the '+MAO+'.</p>')
     + sec(12,'Data Storage and Security','<p>Information you submit is stored by SMART ASSESS on a cloud server. Sign-in, role-based access, and restricted storage for uploaded files are used to protect it, but no system is completely secure.</p>')
     + sec(13,'Data Retention','<p>SMART ASSESS does not automatically delete submitted requests and their documents. They are kept as transaction records of the '+MAO+', subject to applicable records rules. You may ask the Office about the retention of your records.</p>')
@@ -2523,9 +2555,9 @@ function renderCardDraft(flow){
   if(!d || !draftHasContent(d)) return '';
   const name = flow==='docreq' ? 'Document Request' : 'Land Transfer';
   const when = d.savedAt ? receiptDate(d.savedAt) : '';
-  return '<div class="card-draft" role="region" aria-label="Unfinished '+name+'"><span class="card-draft-icon" aria-hidden="true">'+ic('file')+'</span>'
+  return '<div class="card-draft" role="region" aria-label="Unfinished '+name+'">'
     + '<div class="card-draft-text"><strong>You have an unfinished '+name+'</strong><span>Step '+(d.step||1)+' of 4'+(when?' · last saved '+esc(when):'')+'</span></div>'
-    + '<button type="button" class="btn btn-primary card-draft-btn" data-action="draft-resume" data-flow="'+flow+'">Continue Request '+ic('arrowRight')+'</button></div>';
+    + '<button type="button" class="btn btn-primary card-draft-btn" data-action="draft-resume" data-flow="'+flow+'">Continue Request</button></div>';
 }
 function draftApplyFields(flow, step, maxStep, fields, savedFiles){
   state.flow = flow; state.view = 'wizard';

@@ -32,7 +32,9 @@ $toPublicRequest = static function (array $request): array {
     return [
         'id' => (string) $request['reference_no'],
         'flow' => (string) $request['flow'],
-        'applicant' => trim((string) $request['first_name'] . ' ' . (string) $request['last_name']),
+        // Full name only for the session that submitted the request; initials otherwise.
+        'applicant' => (string) $request['applicant'],
+        'applicantInitialsOnly' => (bool) $request['applicant_initials_only'],
         'docType' => (string) ($request['document_type'] ?? $request['transfer_type'] ?? ''),
         'status' => (string) $request['status'],
         'requirementComplete' => (bool) $request['requirement_complete'],
@@ -51,9 +53,13 @@ $submittedReference = trim((string) ($_GET['submitted'] ?? ''));
 $trackingReference = trim((string) ($_GET['track'] ?? ''));
 if ($submittedReference !== '') {
     $request = sa_track_request($submittedReference);
-    if ($request !== null) {
+    if ($request !== null && !$request['applicant_initials_only']) {
         $page['view'] = 'confirmation';
         $page['lastSubmission'] = $toPublicRequest($request);
+    } elseif ($request !== null) {
+        // Another browser opened the receipt link: show request tracking (initials) instead.
+        $page['view'] = 'track';
+        $page['track'] = ['query' => (string) $request['reference_no'], 'result' => $toPublicRequest($request), 'searched' => true];
     }
 } elseif ($trackingReference !== '') {
     $request = sa_track_request($trackingReference);

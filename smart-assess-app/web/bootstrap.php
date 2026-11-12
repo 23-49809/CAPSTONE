@@ -310,7 +310,97 @@ function sa_track_request(string $ref): ?array
     );
     $logs->execute(['id' => $request['id']]);
     $request['history'] = $logs->fetchAll();
+    // Only the browser session that submitted the request sees the applicant's full
+    // name; anyone else who has the reference number sees initials. The separate
+    // name fields are removed so no tracking response can carry the full name.
+    $owned = sa_session_submitted((string) $request['reference_no']);
+    $request['applicant'] = $owned
+        ? trim((string) $request['first_name'] . ' ' . (string) $request['last_name'])
+        : sa_name_initials((string) $request['first_name'], (string) $request['last_name']);
+    $request['applicant_initials_only'] = !$owned;
+    unset($request['first_name'], $request['last_name']);
     return $request;
+}
+
+/** How many references one browser session remembers (oldest dropped first). */
+const SA_SESSION_SUBMITTED_LIMIT = 20;
+
+/*
+ * Shared computers: the full name is shown to the submitting browser only for a
+ * short time (default 15 minutes, enough to view and save the receipt), and the
+ * page ends it sooner when the applicant leaves the receipt ("receipt_done").
+ * After that the same browser, like any other, sees initials, so the next person
+ * using the computer cannot reopen the receipt from the browser history.
+ */
+const SA_RECEIPT_NAME_DEFAULT_SECONDS = 900;
+
+/** How long, in seconds, the submitting browser sees the full name (1 to 3600; invalid -> default). */
+function sa_receipt_name_seconds(): int
+{
+    $value = getenv('SMART_ASSESS_RECEIPT_NAME_SECONDS');
+    if ($value === false || !preg_match('/^\d{1,4}$/', trim($value))) {
+        return SA_RECEIPT_NAME_DEFAULT_SECONDS;
+    }
+    $seconds = (int) trim($value);
+    return $seconds >= 1 && $seconds <= 3600 ? $seconds : SA_RECEIPT_NAME_DEFAULT_SECONDS;
+}
+
+/** This session's still-valid submitted references: reference => time submitted. Expired ones are dropped. */
+function sa_session_submitted_references(): array
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return [];
+    }
+    $oldest = time() - sa_receipt_name_seconds();
+    $references = [];
+    foreach ((array) ($_SESSION['sa_submitted_refs'] ?? []) as $reference => $submittedAt) {
+        if (is_string($reference) && $reference !== '' && is_int($submittedAt) && $submittedAt >= $oldest) {
+            $references[$reference] = $submittedAt;
+        }
+    }
+    $_SESSION['sa_submitted_refs'] = $references;
+    return $references;
+}
+
+/** Records that this browser session submitted $reference (called only for a new submission). */
+function sa_remember_submitted_reference(string $reference): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE || $reference === '') {
+        return;
+    }
+    $references = sa_session_submitted_references();
+    unset($references[$reference]);
+    $references[$reference] = time();
+    $_SESSION['sa_submitted_refs'] = array_slice($references, -SA_SESSION_SUBMITTED_LIMIT, null, true);
+}
+
+/** The applicant has left the receipt: from now on this browser sees initials too. True when it was remembered. */
+function sa_forget_submitted_reference(string $reference): bool
+{
+    $references = sa_session_submitted_references();
+    if (!isset($references[$reference])) {
+        return false;
+    }
+    unset($references[$reference]);
+    $_SESSION['sa_submitted_refs'] = $references;
+    return true;
+}
+
+/** True when this browser session submitted $reference within the time window (stored reference, exact match). */
+function sa_session_submitted(string $reference): bool
+{
+    return $reference !== '' && isset(sa_session_submitted_references()[$reference]);
+}
+
+/** "Juan Dela Cruz" -> "J. D."; the first letter of the first and last name only. */
+function sa_name_initials(string $firstName, string $lastName): string
+{
+    $initial = static function (string $name): string {
+        $name = trim($name);
+        return $name === '' ? '' : mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8') . '.';
+    };
+    $initials = trim($initial($firstName) . ' ' . $initial($lastName));
+    return $initials === '' ? '—' : $initials;
 }
 
 /**
