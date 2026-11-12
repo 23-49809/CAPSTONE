@@ -2,10 +2,12 @@
 declare(strict_types=1);
 
 /*
- * Repeatable tests for SMS duplicate protection, using the real
+ * Repeatable fake-transport tests for staff notifications, using the real
  * sa_send_notification() from web/api.php:
  *  - an unconfirmed SMS blocks further SMS for that request, whatever the
  *    wording and however long ago;
+ *  - destinations and history records match the selected request/client;
+ *  - an unconfirmed email cannot be retried with different wording;
  *  - only a recognised refusal counts as "not sent" and may be retried;
  *  - the only way past a block is the audited, password-checked override.
  *
@@ -56,6 +58,7 @@ $_SERVER['REMOTE_ADDR'] = '192.0.2.1';
 
 // Fake IPROG: answers according to case.txt and records each send.
 file_put_contents($work . '/iprog/case.txt', 'accepted');
+file_put_contents($work . '/gmail/case.txt', 'accepted');
 file_put_contents($work . '/iprog/stub.php', <<<'STUB'
 <?php
 $case = trim((string) @file_get_contents(__DIR__ . '/case.txt'));
@@ -66,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         : '{"status":"success","message":"Account found.","data":{"load_balance":42}}';
     return;
 }
-file_put_contents(__DIR__ . '/hits.log', "1\n", FILE_APPEND);
+file_put_contents(__DIR__ . '/hits.log', json_encode(['phone' => $_POST['phone_number'] ?? '']) . "\n", FILE_APPEND);
 if ($case === 'timeout') {
     sleep(17);
 }
@@ -114,8 +117,14 @@ file_put_contents($iprogCopy, $iprogFor((string) $port));
 
 $fakeMailer = $work . '/fake-mailer.php';
 file_put_contents($fakeMailer, '<?php $real = require ' . var_export($app . '/gmail-mailer.php', true) . ';'
-    . ' return static function (array $d) use ($real): void { $real($d, static function (string $raw): void {'
-    . ' file_put_contents(' . var_export($work . '/mail.log', true) . ', "1\n", FILE_APPEND); }); };');
+    . ' return static function (array $d) use ($real): void {'
+    . ' if (!empty($d["check_only"])) return;'
+    . ' $capture = static function () use ($d): void { file_put_contents('
+    . var_export($work . '/mail.log', true)
+    . ', json_encode(["email" => $d["email"] ?? "", "reference" => $d["reference_no"] ?? ""]) . "\n", FILE_APPEND); };'
+    . ' if (trim((string) @file_get_contents(' . var_export($work . '/gmail/case.txt', true) . ')) === "unconfirmed") {'
+    . ' $capture(); throw new RuntimeException("[mailer] Gmail did not confirm the message (no reply from Google)."); }'
+    . ' $real($d, static function (string $raw) use ($capture): void { $capture(); }); };');
 $GLOBALS['SA_TEST_MAILER'] = $fakeMailer;
 
 require $app . '/web/bootstrap.php';
@@ -193,14 +202,22 @@ $results = [];
 $check = static function (string $name, bool $passed, mixed $detail = '') use (&$results): void {
     $results[] = [$passed, $name, $passed ? '' : json_encode($detail)];
 };
-$case = static fn (string $name) => file_put_contents($work . '/iprog/case.txt', $name);
+// The fake IPROG and the fake mailer each read their own case file.
+$case = static function (string $name) use ($work): void {
+    file_put_contents($work . '/iprog/case.txt', $name);
+    file_put_contents($work . '/gmail/case.txt', $name);
+};
 $hits = static fn (): int => is_file($work . '/iprog/hits.log') ? count(file($work . '/iprog/hits.log')) : 0;
 $mails = static fn (): int => is_file($work . '/mail.log') ? count(file($work . '/mail.log')) : 0;
-$newRequest = static function (string $email = 'juana.test@example.invalid') use ($pdo): string {
+$newRequest = static function (
+    string $email = 'juana.test@example.invalid',
+    string $phone = '+639171234567',
+    ?int $clientId = null
+) use ($pdo): string {
     static $n = 0;
     $reference = sprintf('DR-2026-DUP%05d', ++$n);
-    $pdo->prepare('INSERT INTO requests (reference_no, contact_number, email) VALUES (:r, :c, :e)')
-        ->execute(['r' => $reference, 'c' => '+639171234567', 'e' => $email]);
+    $pdo->prepare('INSERT INTO requests (client_id, reference_no, contact_number, email) VALUES (:client, :r, :c, :e)')
+        ->execute(['client' => $clientId, 'r' => $reference, 'c' => $phone, 'e' => $email]);
     return $reference;
 };
 /** Calls the real send; returns [http status, error code or '', data or error text]. */
@@ -213,9 +230,17 @@ $send = static function (string $reference, string $message, array $extra = ['se
     }
 };
 $rows = static function (string $reference) use ($pdo): array {
-    $stmt = $pdo->prepare('SELECT n.channel, n.type, n.delivery_status FROM notifications n JOIN requests r ON r.id = n.request_id WHERE r.reference_no = :r ORDER BY n.id');
+    $stmt = $pdo->prepare('SELECT n.request_id, n.client_id, n.channel, n.type, n.delivery_status FROM notifications n JOIN requests r ON r.id = n.request_id WHERE r.reference_no = :r ORDER BY n.id');
     $stmt->execute(['r' => $reference]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+};
+$sentSmsRecipients = static function () use ($work): array {
+    $file = $work . '/iprog/hits.log';
+    return is_file($file) ? array_map(static fn (string $line): array => json_decode($line, true), file($file, FILE_IGNORE_NEW_LINES)) : [];
+};
+$sentEmailRecipients = static function () use ($work): array {
+    $file = $work . '/mail.log';
+    return is_file($file) ? array_map(static fn (string $line): array => json_decode($line, true), file($file, FILE_IGNORE_NEW_LINES)) : [];
 };
 $age = static function (string $reference, string $interval) use ($pdo): void {
     $pdo->prepare("UPDATE notifications n JOIN requests r ON r.id = n.request_id SET n.created_at = NOW() - INTERVAL {$interval} WHERE r.reference_no = :r")->execute(['r' => $reference]);
@@ -224,6 +249,79 @@ $override = static fn (array $changes = []) => $changes + [
     'send_sms' => '1', 'override_unconfirmed' => true, 'override_reason' => 'Client confirmed nothing arrived by phone.',
     'override_acknowledged' => true, 'override_password' => $password,
 ];
+
+// ================= Recipient routing, request/client linkage and email outcomes =================
+$case('accepted');
+$clientOne = 4101;
+$clientTwo = 4102;
+$referenceOne = $newRequest('client.one@example.invalid', '+639171112222', $clientOne);
+$referenceTwo = $newRequest('client.two@example.invalid', '+639171113333', $clientTwo);
+$requestOneQuery = $pdo->prepare('SELECT id FROM requests WHERE reference_no = :r');
+$requestOneQuery->execute(['r' => $referenceOne]);
+$requestIdOne = (int) $requestOneQuery->fetchColumn();
+$smsBefore = $hits();
+$mailBefore = $mails();
+[$status, , $data] = $send($referenceOne, 'First client specific notification', [
+    'send_sms' => '1',
+    'send_email' => '1',
+    'email' => 'client.two@example.invalid',
+    'contact_number' => '+639171113333',
+]);
+$check('both channels send successfully for the selected request', $status === 200 && $data['channels'] === ['sms' => 'sent', 'email' => 'sent'], [$status, $data]);
+$requestRows = $rows($referenceOne);
+$check('both notification records link to the selected request and its client', count($requestRows) === 2
+    && array_reduce($requestRows, static fn (bool $ok, array $row): bool => $ok
+        && (int) $row['request_id'] === $requestIdOne
+        && (int) $row['client_id'] === $clientOne, true), $requestRows);
+$smsSent = $sentSmsRecipients();
+$emailSent = $sentEmailRecipients();
+$check('SMS and email use only the selected request registered contacts', $hits() === $smsBefore + 1 && $mails() === $mailBefore + 1
+    && end($smsSent)['phone'] === '639171112222'
+    && end($emailSent) === ['email' => 'client.one@example.invalid', 'reference' => $referenceOne],
+    [end($smsSent), end($emailSent)]);
+$statusLog = $pdo->prepare('SELECT actor, delivery_status FROM request_status_log WHERE request_id = :id ORDER BY id');
+$statusLog->execute(['id' => $requestIdOne]);
+$historyRows = $statusLog->fetchAll(PDO::FETCH_ASSOC);
+$check('per-channel delivery results are recorded in request history', count($historyRows) === 2
+    && $historyRows[0]['actor'] === 'staff' && $historyRows[0]['delivery_status'] === 'sent'
+    && $historyRows[1]['actor'] === 'email' && $historyRows[1]['delivery_status'] === 'sent', $historyRows);
+[$status, , $data] = $send($referenceOne, 'First client specific notification', ['send_email' => '1']);
+$check('repeat email to the same request is refused without another send', $status === 409
+    && $hits() === $smsBefore + 1 && $mails() === $mailBefore + 1, [$status, $data]);
+$otherIdQuery = $pdo->prepare('SELECT id FROM requests WHERE reference_no = :r');
+$otherIdQuery->execute(['r' => $referenceTwo]);
+$requestIdTwo = (int) $otherIdQuery->fetchColumn();
+$beforeOther = $hits();
+[$status, , $data] = $send($referenceTwo, 'Second client specific SMS');
+$otherRows = $rows($referenceTwo);
+$otherSmsSent = $sentSmsRecipients();
+$check('another client request uses its own contact and remains independently sendable', $status === 200
+    && $hits() === $beforeOther + 1 && end($otherSmsSent)['phone'] === '639171113333'
+    && count($otherRows) === 1 && (int) $otherRows[0]['request_id'] === $requestIdTwo
+    && (int) $otherRows[0]['client_id'] === $clientTwo, [$status, $otherRows, end($otherSmsSent)]);
+
+$emailPendingReference = $newRequest('pending.client@example.invalid', '+639171114444', 4103);
+$case('unconfirmed');
+$beforePendingEmail = $mails();
+[$status, , $data] = $send($emailPendingReference, 'Email outcome may be unclear', ['send_email' => '1']);
+$pendingEmailRows = $rows($emailPendingReference);
+$check('unconfirmed email is reported accurately and saved as pending', $status === 200
+    && $data['channels'] === ['email' => 'pending'] && $data['delivery_status'] === 'pending'
+    && str_contains($data['feedback'], 'outcome unconfirmed') && count($pendingEmailRows) === 1
+    && $pendingEmailRows[0]['delivery_status'] === 'pending', [$status, $data, $pendingEmailRows]);
+$case('accepted');
+$beforeSmsBlocked = $hits();
+[$status, $code] = $send($emailPendingReference, 'Different wording must not retry an uncertain email', ['send_sms' => '1', 'send_email' => '1']);
+$check('pending email blocks a retry with changed wording before either channel sends', $status === 409
+    && $code === 'email_unconfirmed' && $mails() === $beforePendingEmail + 1 && $hits() === $beforeSmsBlocked, [$status, $code]);
+$age($emailPendingReference, '400 DAY');
+[$status, $code] = $send($emailPendingReference, 'An old pending email must still block a retry', ['send_email' => '1']);
+$check('an old pending email still blocks a possible duplicate', $status === 409
+    && $code === 'email_unconfirmed' && $mails() === $beforePendingEmail + 1, [$status, $code]);
+$beforeSmsOnly = $hits();
+[$status, , $data] = $send($emailPendingReference, 'SMS remains available separately', ['send_sms' => '1']);
+$check('pending email does not prevent an explicit SMS-only send', $status === 200
+    && $data['channels'] === ['sms' => 'sent'] && $hits() === $beforeSmsOnly + 1 && $mails() === $beforePendingEmail + 1, [$status, $data]);
 
 // ================= Every unconfirmed outcome blocks, permanently =================
 foreach (['undocumented', 'http_500', 'not_json', 'body_error_unknown', 'http_400_unknown', 'accepted_then_failed', 'timeout'] as $outcome) {

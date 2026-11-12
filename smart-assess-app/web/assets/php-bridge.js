@@ -7,6 +7,8 @@
   var internalRowActions = Object.create(null);
   var isOwner = true;
   var ownerLookupSequence = 0;
+  var ownerLookupReference = '';
+  var ownerLookupForm = null;
 
   window.SMART_ASSESS_SET_FILE = function (key, file) {
     selectedFiles[key] = file;
@@ -347,6 +349,7 @@
     var phoneDisplay = form.querySelector('#notification-phone');
     var emailDisplay = form.querySelector('#notification-email');
     var emailBox = form.querySelector('input[name="send_email"]');
+    var smsBox = form.querySelector('input[name="send_sms"]');
     if (phoneDisplay) {
       phoneDisplay.textContent = phone || placeholder || 'No phone number on file';
       phoneDisplay.classList.toggle('is-empty', !phone);
@@ -359,6 +362,11 @@
       var emailUsable = !!email && !(channelStatus && !channelStatus.email.ready);
       emailBox.disabled = !emailUsable;
       emailBox.checked = emailUsable;
+    }
+    if (smsBox) {
+      var smsUsable = !!phone && !(channelStatus && !channelStatus.sms.ready);
+      smsBox.disabled = !smsUsable;
+      smsBox.checked = smsUsable;
     }
     applyChannelStatus(form);
   }
@@ -382,9 +390,18 @@
       if (line) line.classList.toggle('is-down', !status.ready || !!status.warning);
     });
   }
+  // A request opened from its details or a rejection draft arrives already
+  // selected, so ask the server for its recipient as if staff had chosen it.
+  function loadPreselectedRecipient(form) {
+    var select = form.querySelector('select[name="requestRef"]');
+    if (!select || !select.value || (ownerLookupForm === form && ownerLookupReference === select.value)) return;
+    if (form.getAttribute('data-recipient-ref') === select.value || form.getAttribute('data-recipient-failed') === select.value) return;
+    updateNotificationOwner(select);
+  }
   function loadChannelStatus() {
     var form = document.querySelector('form[data-form="send-notif"]');
     if (!form) return;
+    loadPreselectedRecipient(form);
     if (channelStatus) {
       applyChannelStatus(form);
       return;
@@ -409,6 +426,10 @@
     var reference = select.value;
     var sequence = ++ownerLookupSequence;
     if (!nameDisplay) return;
+    form.removeAttribute('data-recipient-ref');
+    form.removeAttribute('data-recipient-failed');
+    ownerLookupReference = reference;
+    ownerLookupForm = form;
     if (!reference) {
       nameDisplay.textContent = 'Select a reference number';
       nameDisplay.removeAttribute('title');
@@ -420,18 +441,25 @@
     setNotificationContact(form, '', '', 'Loading…');
     jsonRequest('lookup_request_owner', { reference: reference }).then(function (result) {
       if (sequence !== ownerLookupSequence || select.value !== reference) return;
+      ownerLookupReference = '';
+      form.setAttribute('data-recipient-ref', reference);
       var ownerName = result.data.ownerName || 'Owner name unavailable';
       var ownerType = result.data.ownerType;
-      nameDisplay.textContent = ownerName;
+      var recipientName = result.data.recipientName || '';
+      nameDisplay.textContent = recipientName && recipientName !== ownerName
+        ? ownerName + ' (contact on this request: ' + recipientName + ')'
+        : ownerName;
       nameDisplay.classList.toggle('is-empty', ownerName === 'Owner name unavailable');
       nameDisplay.title = ownerType && ownerName !== 'Owner name unavailable' ? ownerType + ': ' + ownerName : ownerName;
       setNotificationContact(form, result.data.contactNumber || '', result.data.email || '');
     }).catch(function () {
       if (sequence !== ownerLookupSequence || select.value !== reference) return;
+      ownerLookupReference = '';
+      form.setAttribute('data-recipient-failed', reference);
       nameDisplay.textContent = 'Owner name unavailable';
       nameDisplay.removeAttribute('title');
       setNotificationContact(form, '', '', 'Unavailable');
-      notice('Could not load the owner/client name. You can still continue with the notification.');
+      notice('Could not load this request\'s contact details, so nothing can be sent yet. Select the reference number again to retry.');
     });
   }
 
@@ -512,6 +540,13 @@
       event.stopImmediatePropagation();
       internalSuccess(actionName === 'start-processing' ? 'start_processing' : 'complete_processing', {
         id: internalAction.getAttribute('data-id')
+      });
+    } else if (actionName === 'ai-requeue' || actionName === 'ai-mark-reviewed') {
+      // AI document check (Staff only; the server checks the role).
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      internalSuccess(actionName === 'ai-requeue' ? 'ai_verification_requeue' : 'ai_verification_reviewed', {
+        reference: internalAction.getAttribute('data-ref')
       });
     } else if (actionName === 'ann-publish-now' || actionName === 'ann-unpublish' || actionName === 'ann-cancel') {
       event.preventDefault();
@@ -927,6 +962,13 @@
     if (type === 'send-notif') {
       // One send per click: the button stays locked until the server answers.
       if (form.getAttribute('data-sending') === '1') return;
+      // Staff must see who this goes to before it can be sent.
+      if (form.getAttribute('data-recipient-ref') !== data.requestRef) {
+        var refSelect = form.querySelector('select[name="requestRef"]');
+        if (form.getAttribute('data-recipient-failed') === data.requestRef && refSelect) updateNotificationOwner(refSelect);
+        notice('This request\'s contact details have not loaded yet. Nothing was sent. Check the recipient, then send again.');
+        return;
+      }
       var sendButton = form.querySelector('button[type="submit"]');
       var buttonText = sendButton ? sendButton.innerHTML : '';
       form.setAttribute('data-sending', '1');

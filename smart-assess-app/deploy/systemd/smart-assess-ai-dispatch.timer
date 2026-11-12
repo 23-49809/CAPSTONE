@@ -1,0 +1,19 @@
+# SMART ASSESS - runs the AI document check dispatcher once a minute.
+# NOT INSTALLED: see smart-assess-ai-dispatch.service for the install steps.
+#
+# OnUnitInactiveSec counts from the end of the previous run, so a long run is
+# never overlapped by the next one. The timer keeps firing after a failed run
+# (for example while the worker is down), so jobs are picked up as soon as the
+# worker is back.
+
+[Unit]
+Description=Run the SMART ASSESS AI document check dispatcher every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+AccuracySec=5s
+Unit=smart-assess-ai-dispatch.service
+
+[Install]
+WantedBy=timers.target

@@ -187,3 +187,12 @@ tables for writes.
 For code checks, run `php -l` on PHP files and `node --check` on
 `web/assets/php-bridge.js`. Browser and real-database workflow testing should
 be performed with non-production/test records before deployment.
+
+## AI document verification
+
+Staff-only, AI-assisted checking of uploaded documents (OCR with Tesseract and
+Poppler, analysis with a private Ollama model on a separate worker). Results
+are advice for Staff and never approve, reject or change a request. Setup,
+configuration, tests, privacy notes and the production checklist are in
+[docs/AI_DOCUMENT_VERIFICATION.md](docs/AI_DOCUMENT_VERIFICATION.md). It is not
+deployed. Deployments must include the entire `app/` directory, not only `web/`.

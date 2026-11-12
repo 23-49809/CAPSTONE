@@ -4,6 +4,8 @@ declare(strict_types=1);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 
+require_once dirname(__DIR__) . '/app/services/AiVerification.php';
+
 function sa_start_session(): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
@@ -28,7 +30,12 @@ function sa_start_session(): void
     session_start();
 }
 
-sa_start_session();
+// Web requests only: command-line scripts (the AI dispatcher, draft cleanup) need no
+// session, and starting one there would write session files or, under the
+// dispatcher's read-only systemd sandbox, log warnings on every run.
+if (PHP_SAPI !== 'cli') {
+    sa_start_session();
+}
 
 /** True when $table has $column (cached per request). Lets new code work
  *  before and after an additive migration has been applied. */
@@ -306,6 +313,76 @@ function sa_track_request(string $ref): ?array
     return $request;
 }
 
+/**
+ * Applicant contact details (phone, email, home address, client account name)
+ * and uploaded file names are for Staff, who process requests and contact
+ * applicants. Admin and Department Head get request records without them.
+ */
+function sa_can_view_applicant_contact(array $user): bool
+{
+    return (int) ($user['role_id'] ?? 0) === 2;
+}
+
+/** Email addresses and phone numbers in free text (such as an audit entry), masked. */
+function sa_redact_contact(?string $text): ?string
+{
+    if ($text === null) {
+        return null;
+    }
+    $text = (string) preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email hidden]', $text);
+    return (string) preg_replace('/(?<!\d)(?:\+?63|0)?[\s\-]?9\d{2}[\s\-]?\d{3}[\s\-]?\d{4}(?!\d)/', '[phone hidden]', $text);
+}
+
+/** Last 4 digits only: enough for staff to recognise the number in a result or history entry. */
+function sa_mask_phone(string $phone): string
+{
+    $digits = (string) preg_replace('/\D+/', '', $phone);
+    return strlen($digits) >= 4 ? '…' . substr($digits, -4) : 'no number on file';
+}
+
+/** First letter and domain only. */
+function sa_mask_email(string $email): string
+{
+    $at = strrpos($email, '@');
+    return $at === false || $at === 0 ? 'no email on file' : $email[0] . '•••' . substr($email, $at);
+}
+
+/**
+ * Staff notification history, newest first. The name and destination come from
+ * the request itself, because that is who a staff message goes to: a request
+ * need not have a client account, and an account holder may be someone else.
+ * Contact fields never change after submission, so the request's values are the
+ * ones used. Only masked values leave this function, and only for Staff.
+ */
+function sa_notification_history(PDO $pdo, bool $withDestination): array
+{
+    $smsCategory = sa_has_column('request_status_log', 'sms_category') ? 'l.sms_category' : 'NULL';
+    $deliveryStatus = sa_has_column('request_status_log', 'delivery_status') ? 'l.delivery_status' : 'NULL';
+    $hasSentBy = sa_has_column('request_status_log', 'sms_sent_by_id');
+    $query = $pdo->prepare(
+        'SELECT l.id, l.request_id, l.status, l.actor, l.sms_body AS message,
+                ' . $smsCategory . ' AS sms_category, ' . $deliveryStatus . ' AS delivery_status,
+                ' . ($hasSentBy ? 'u.name' : 'NULL') . ' AS sent_by_name, l.created_at, r.reference_no,
+                r.contact_number AS recipient_phone, r.email AS recipient_email,
+                COALESCE(
+                    NULLIF(TRIM(CONCAT_WS(\' \', NULLIF(r.first_name, \'\'), NULLIF(r.last_name, \'\'))), \'\'),
+                    NULLIF(TRIM(CONCAT_WS(\' \', NULLIF(c.first_name, \'\'), NULLIF(c.last_name, \'\'))), \'\')
+                ) AS client_name
+         FROM request_status_log l
+         LEFT JOIN requests r ON r.id = l.request_id
+         LEFT JOIN clients c ON c.id = r.client_id
+         ' . ($hasSentBy ? 'LEFT JOIN users u ON u.id = l.sms_sent_by_id' : '') . '
+         ORDER BY l.created_at DESC, l.id DESC LIMIT 200'
+    );
+    $query->execute();
+    return array_map(static function (array $row) use ($withDestination): array {
+        $row['destination'] = !$withDestination || (string) ($row['delivery_status'] ?? '') === '' ? ''
+            : ($row['actor'] === 'email' ? sa_mask_email((string) $row['recipient_email']) : sa_mask_phone((string) $row['recipient_phone']));
+        unset($row['recipient_phone'], $row['recipient_email']);
+        return $row;
+    }, $query->fetchAll());
+}
+
 function sa_internal_bootstrap(): array
 {
     $pdo = sa_db();
@@ -315,23 +392,26 @@ function sa_internal_bootstrap(): array
     }
     $roleId = (int) $user['role_id'];
     $data = ['csrf' => sa_csrf_token(), 'user' => $user];
+    // Contact columns are never selected for other roles, so no page or API
+    // response built from this data can contain them.
+    $withContact = sa_can_view_applicant_contact($user);
 
     $data['requests'] = $pdo->query(
-        'SELECT r.id, r.reference_no, r.flow, r.first_name, r.last_name, r.email, r.contact_number,
-                r.middle_name, r.address_line, r.province, r.city, r.zip_code,
+        'SELECT r.id, r.reference_no, r.flow, r.first_name, r.last_name,
+                ' . ($withContact ? 'r.email, r.contact_number, r.address_line, r.province, r.city, r.zip_code,' : '') . '
+                r.middle_name,
                 r.document_type, r.transfer_type, r.purpose, r.arp_number, r.property_address,
                 r.barangay, r.is_owner, r.status, r.requirement_complete, r.advisory, r.created_at,
                 r.processing_started_at, UNIX_TIMESTAMP(r.processing_started_at) AS processing_started_epoch,
                 r.processing_completed_at, UNIX_TIMESTAMP(r.processing_completed_at) AS processing_completed_epoch,
                 r.processing_duration_seconds,
-                r.processing_staff_id, r.processing_staff_name,
-                c.first_name AS client_first_name,
-                c.last_name AS client_last_name
-         FROM requests r LEFT JOIN clients c ON c.id = r.client_id
+                r.processing_staff_id, r.processing_staff_name
+                ' . ($withContact ? ', c.first_name AS client_first_name, c.last_name AS client_last_name' : '') . '
+         FROM requests r ' . ($withContact ? 'LEFT JOIN clients c ON c.id = r.client_id' : '') . '
          ORDER BY r.created_at DESC, r.id DESC LIMIT 500'
     )->fetchAll();
     $data['documents'] = $pdo->query(
-        'SELECT rd.id, rd.request_id, rd.doc_key, rd.label, rd.original_name, rd.mime_type,
+        'SELECT rd.id, rd.request_id, rd.doc_key, rd.label, ' . ($withContact ? 'rd.original_name, ' : '') . 'rd.mime_type,
                 rd.file_size, rd.file_status, dv.validation_status, dv.remarks, dv.validated_at
          FROM request_documents rd LEFT JOIN document_validation dv ON dv.request_document_id = rd.id
          JOIN (SELECT id FROM requests ORDER BY created_at DESC LIMIT 500) recent
@@ -354,10 +434,19 @@ function sa_internal_bootstrap(): array
              WHERE u.archived_at IS NOT NULL OR u.deleted_at IS NOT NULL
              ORDER BY COALESCE(u.deleted_at, u.archived_at) DESC"
         )->fetchAll();
-        $data['audit_logs'] = $pdo->query(
-            'SELECT id, actor_type, actor_name, action, target, created_at
+        // Older entries recorded a client's email as the target; never show it.
+        $data['audit_logs'] = array_map(static function (array $entry): array {
+            // A client's name is applicant information; Admin sees the account number instead.
+            if ($entry['actor_type'] === 'client') {
+                $entry['actor_name'] = 'Client account #' . (int) $entry['actor_id'];
+            }
+            $entry['action'] = sa_redact_contact($entry['action']);
+            $entry['target'] = sa_redact_contact($entry['target']);
+            return $entry;
+        }, $pdo->query(
+            'SELECT id, actor_type, actor_id, actor_name, action, target, created_at
              FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 200'
-        )->fetchAll();
+        )->fetchAll());
     }
 
     if ($roleId === 4) {
@@ -385,23 +474,21 @@ function sa_internal_bootstrap(): array
         ];
     }
 
-    $smsCategory = sa_has_column('request_status_log', 'sms_category') ? 'l.sms_category' : 'NULL';
-    $deliveryStatus = sa_has_column('request_status_log', 'delivery_status') ? 'l.delivery_status' : 'NULL';
-    $hasSentBy = sa_has_column('request_status_log', 'sms_sent_by_id');
-    $notificationsQuery = $pdo->prepare(
-        'SELECT l.id, l.request_id, l.status, l.actor, l.sms_body AS message,
-                ' . $smsCategory . ' AS sms_category, ' . $deliveryStatus . ' AS delivery_status,
-                ' . ($hasSentBy ? 'u.name' : 'NULL') . ' AS sent_by_name, l.created_at, r.reference_no,
-                NULLIF(TRIM(CONCAT_WS(
-                    \' \', NULLIF(c.first_name, \'\'), NULLIF(c.last_name, \'\')
-                )), \'\') AS client_name
-         FROM request_status_log l
-         LEFT JOIN requests r ON r.id = l.request_id
-         LEFT JOIN clients c ON c.id = r.client_id
-         ' . ($hasSentBy ? 'LEFT JOIN users u ON u.id = l.sms_sent_by_id' : '') . '
-         ORDER BY l.created_at DESC, l.id DESC LIMIT 200'
-    );
-    $notificationsQuery->execute();
-    $data['notifications'] = $notificationsQuery->fetchAll();
+    // Notification history is the Staff Notifications page; no other role has it.
+    if (!$withContact) {
+        $data['notifications'] = [];
+        return $data;
+    }
+    // Staff notification history (only Staff reach this point: see the early return above).
+    $data['notifications'] = sa_notification_history($pdo, $roleId === 2);
+
+    // AI document checks are applicant information: Staff (role 2) only, checked
+    // here explicitly so it holds whatever else this function returns per role.
+    if ($roleId === 2) {
+        $requestIds = array_map('intval', array_column($data['requests'], 'id'));
+        $data['ai_verifications'] = AiVerification::staffViews($pdo, $requestIds);
+        // Whether each request may be checked by AI (Privacy Policy effective date).
+        $data['ai_eligibility'] = AiVerification::eligibility($pdo, $requestIds);
+    }
     return $data;
 }

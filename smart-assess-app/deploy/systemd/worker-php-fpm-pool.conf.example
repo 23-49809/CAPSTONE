@@ -1,0 +1,42 @@
+; SMART ASSESS AI worker - example php-fpm pool for the SEPARATE worker server.
+; NOT INSTALLED. Install as e.g. /etc/php/8.3/fpm/pool.d/smart-assess-worker.conf
+; (root:root 0640, because it holds the shared secret), served by nginx over
+; HTTPS on the private address only. Only worker/ and app/services/ are deployed
+; on the worker; there is no database and there are no uploads.
+
+[smart-assess-worker]
+user = sa-worker
+group = sa-worker
+listen = /run/php/smart-assess-worker.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+; One job runs at a time (the worker locks); a second child answers the health
+; check while a job runs, so the dispatcher does not mistake "busy" for "down".
+pm = static
+pm.max_children = 2
+
+; Time limits: the job budget is at most SMART_ASSESS_WORKER_MAX_JOB_SECONDS (900).
+; PHP and nginx must allow longer: nginx "fastcgi_read_timeout 1000s;" and
+; "client_max_body_size 80m;" in the worker's server block.
+request_terminate_timeout = 1000s
+php_admin_value[max_execution_time] = 960
+php_admin_value[memory_limit] = 512M
+php_admin_value[post_max_size] = 80M
+php_admin_value[upload_max_filesize] = 1M
+php_admin_value[display_errors] = Off
+php_admin_value[log_errors] = On
+
+clear_env = yes
+env[PATH] = /usr/bin:/bin
+env[SMART_ASSESS_WORKER_SECRET] = <shared secret, the same as SMART_ASSESS_AI_WORKER_SECRET>
+env[SMART_ASSESS_WORKER_STATE_DIR] = /var/lib/smart-assess-worker
+env[SMART_ASSESS_WORKER_OLLAMA_URL] = http://127.0.0.1:11434
+; Exactly as "ollama list" shows it (e.g. gemma2:9b); the health check needs the exact name.
+env[SMART_ASSESS_WORKER_OLLAMA_MODEL] = <model chosen from the evaluation>
+env[SMART_ASSESS_WORKER_OLLAMA_TIMEOUT] = 180
+env[SMART_ASSESS_WORKER_MAX_JOB_SECONDS] = 900
+env[SMART_ASSESS_WORKER_OCR_PROCESS_TIMEOUT] = 30
+env[SMART_ASSESS_WORKER_OCR_TOTAL_TIMEOUT] = 90
+env[SMART_ASSESS_WORKER_OCR_LANGUAGES] = eng
