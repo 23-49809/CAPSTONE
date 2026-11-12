@@ -1,6 +1,9 @@
 name: Deploy SMART ASSESS-MABINI
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -12,6 +15,7 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy to Sydney production
     runs-on: [self-hosted, linux, x64]
     environment: production
     timeout-minutes: 30
