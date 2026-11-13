@@ -2924,6 +2924,18 @@ try {
     $data = sa_normalize_bridge_request($data);
     $action = (string) ($data['action'] ?? '');
     sa_verify_csrf(isset($data['csrf']) ? (string) $data['csrf'] : null);
+    // During a deployment only these POST actions run; every other one (including
+    // any added later) is refused. They read data, or change only the caller's own
+    // session: draft_load's only write is its anti-abuse rate record, and signing
+    // out stays possible on shared computers. GET requests are never blocked.
+    // Authentication, CSRF and validation still apply to everything that runs.
+    if (sa_maintenance_active() && !in_array($action, [
+        'draft_load', 'draft_file', 'lookup_request_owner', 'notification_status',
+        'generate_ai_message', 'client_logout', 'internal_logout',
+    ], true)) {
+        header('Retry-After: 60');
+        sa_json_response(['ok' => false, 'code' => 'maintenance', 'error' => SA_MAINTENANCE_MESSAGE], 503);
+    }
     if ($action === 'draft_file') {
         sa_draft_file($data);
     }

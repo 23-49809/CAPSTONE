@@ -119,6 +119,47 @@ function sa_verify_csrf(?string $token): void
     }
 }
 
+/*
+ * Deployment maintenance gate. While the deploy script copies files it creates
+ * this flag next to the served pages (outside the application folder). Requests
+ * that change data are then refused with HTTP 503 (see api.php), so nothing is
+ * saved against a half-updated application; pages and read-only requests keep
+ * working.
+ *
+ * Fail closed: the flag blocks for as long as it exists, whatever its age. Only
+ * a verified deployment, a verified rollback, or the recovery tool
+ * (smart-assess-maintenance.sh clear, which checks consistency first) removes
+ * it. A deployment killed mid-copy (kill -9, power loss) therefore leaves
+ * changes paused instead of accepting them against mixed files. A flag older
+ * than SA_MAINTENANCE_STALE_AFTER is logged so an administrator can recover.
+ */
+const SA_MAINTENANCE_FLAG = '.smart-assess-maintenance';
+const SA_MAINTENANCE_STALE_AFTER = 900;   // seconds; a deployment holds the gate for well under a minute
+const SA_MAINTENANCE_MESSAGE = 'SMART ASSESS is being updated. Please try again in a minute. Nothing you entered has been lost.';
+
+function sa_maintenance_flag_path(): string
+{
+    return dirname(__DIR__, 2) . '/' . SA_MAINTENANCE_FLAG;
+}
+
+function sa_maintenance_active(): bool
+{
+    static $staleLogged = false;
+    $path = sa_maintenance_flag_path();
+    clearstatcache(true, $path);
+    $modified = @filemtime($path);
+    if ($modified === false) {
+        return file_exists($path);   // exists but unreadable time: still blocks
+    }
+    $age = time() - $modified;
+    if (!$staleLogged && ($age > SA_MAINTENANCE_STALE_AFTER || $age < -60)) {
+        $staleLogged = true;
+        error_log('[SMART_ASSESS] The deployment maintenance flag is ' . $age . ' s old: a deployment may have been interrupted. '
+            . 'Changes stay paused until it is recovered: run "smart-assess-maintenance.sh status", then redeploy or "smart-assess-maintenance.sh clear".');
+    }
+    return true;
+}
+
 function sa_e(mixed $value): string
 {
     return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
