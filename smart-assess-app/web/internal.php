@@ -261,25 +261,34 @@ $page['adminProcessingStats'] = [
 $page['timeLogs'] = [];
 $page['notifs'] = array_map(static function (array $notification): array {
     $clientName = trim((string) ($notification['client_name'] ?? ''));
+    $actor = (string) ($notification['actor'] ?? '');
+    $isEmail = in_array($actor, ['email', 'auto_email'], true);
+    $automatic = in_array($actor, ['auto_sms', 'auto_email'], true);
     return [
         'id' => (string) ($notification['id'] ?? ''),
         'requestRef' => (string) ($notification['reference_no'] ?? ''),
         'clientName' => $clientName !== '' ? $clientName : 'Client information unavailable',
         'category' => trim((string) ($notification['sms_category'] ?? '')) ?: 'Request Status Update',
         'message' => (string) ($notification['message'] ?? ''),
-        'sentBy' => trim((string) ($notification['sent_by_name'] ?? '')) ?: (string) ($notification['actor'] ?? 'system'),
-        // Staff messages: actor 'email' marks an email; everything else is SMS or a status entry.
-        'channel' => ($notification['actor'] ?? '') === 'email' ? 'Email' : 'SMS',
+        'sentBy' => $automatic ? 'Automatic confirmation'
+            : (trim((string) ($notification['sent_by_name'] ?? '')) ?: ($actor !== '' ? $actor : 'system')),
+        // Actors 'email' (staff) and 'auto_email' (submission confirmation) mark an email;
+        // everything else is SMS or a status entry.
+        'channel' => $isEmail ? 'Email' : 'SMS',
         // Masked destination; empty for status entries, which go nowhere.
         'destination' => (string) ($notification['destination'] ?? ''),
         // NULL = saved before IPROG sending existed (no SMS status).
         'deliveryStatus' => match ((string) ($notification['delivery_status'] ?? '')) {
             // IPROG accepting an SMS is not proof it was delivered.
-            'sent' => ($notification['actor'] ?? '') === 'email' ? 'Sent' : 'Accepted',
+            'sent' => $isEmail ? 'Sent' : 'Accepted',
             'failed' => 'Failed',
             'pending' => 'Pending',
             default => 'Recorded',
         },
+        // IPROG's message ID and the status it reported once after accepting (SMS only;
+        // empty before database update 20261113). Neither is proof of delivery.
+        'providerId' => (string) ($notification['provider_message_id'] ?? ''),
+        'providerStatus' => (string) ($notification['provider_status'] ?? ''),
         'sentAt' => (string) ($notification['created_at'] ?? ''),
     ];
 }, $page['notifications'] ?? []);

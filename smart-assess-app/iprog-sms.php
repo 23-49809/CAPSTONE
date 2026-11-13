@@ -37,7 +37,14 @@ final class IprogSmsService
     /** Reasons IPROG refuses a send for. Whole words, so "content" or "SMART ASSESS" never match. */
     private const KNOWN_REFUSAL = '/invalid token|unauthori[sz]ed|\\b(?:smart(?!\\s+assess)|tnt)\\b|shared sender|sender name|insufficient|not enough|no (?:sms )?credits?|invalid (?:phone|mobile|number|recipient)/i';
 
-    private function __construct(private readonly string $apiToken)
+    /** IPROG delivery routes accepted by its sms_provider field (its documentation does not name them). */
+    public const ROUTES = [0, 1, 2];
+
+    /**
+     * @param int|null $route IPROG sms_provider value sent with every message; null sends none,
+     *                        so IPROG uses its own default (route 0).
+     */
+    private function __construct(private readonly string $apiToken, private readonly ?int $route = null)
     {
         if ($this->apiToken === '') {
             throw new RuntimeException('IPROG_API_TOKEN is not configured.');
@@ -51,7 +58,31 @@ final class IprogSmsService
             throw new RuntimeException('IPROG_API_TOKEN is not configured.');
         }
 
-        return new self(trim($token));
+        return new self(trim($token), self::routeFromEnvironment());
+    }
+
+    /**
+     * SMART_ASSESS_SMS_PROVIDER: IPROG route for every SMS (0, 1 or 2). Unset or empty: none is
+     * sent and IPROG uses its default. Any other value is ignored (logged), never guessed.
+     */
+    public static function routeFromEnvironment(): ?int
+    {
+        $value = getenv('SMART_ASSESS_SMS_PROVIDER');
+        if ($value === false || trim($value) === '') {
+            return null;
+        }
+        $value = trim($value);
+        if (!preg_match('/^\d$/', $value) || !in_array((int) $value, self::ROUTES, true)) {
+            error_log('[IPROG_SMS] SMART_ASSESS_SMS_PROVIDER must be 0, 1 or 2; it is ignored and IPROG uses its default route.');
+            return null;
+        }
+        return (int) $value;
+    }
+
+    /** The configured IPROG route, or null when IPROG's default is used. */
+    public function route(): ?int
+    {
+        return $this->route;
     }
 
     public static function normalizePhoneNumber(string $phoneNumber): string
@@ -164,7 +195,7 @@ final class IprogSmsService
                 'api_token' => $this->apiToken,
                 'phone_number' => $normalizedPhoneNumber,
                 'message' => $message,
-            ], '', '&', PHP_QUERY_RFC3986),
+            ] + ($this->route === null ? [] : ['sms_provider' => (string) $this->route]), '', '&', PHP_QUERY_RFC3986),
             CURLOPT_HTTPHEADER => [
                 'Accept: application/json',
                 'Content-Type: application/x-www-form-urlencoded',
