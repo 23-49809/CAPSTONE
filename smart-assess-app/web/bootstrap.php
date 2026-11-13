@@ -54,6 +54,32 @@ function sa_has_column(string $table, string $column): bool
     return $cache[$key];
 }
 
+/**
+ * True once database update 20261113_notification_delivery_tracking.sql has run:
+ * notifications then record IPROG's message ID and status, link to their history
+ * row, and carry the send state of automatic submission confirmations. Before
+ * that, everything works as it did and no confirmation is queued.
+ */
+function sa_notification_tracking_available(): bool
+{
+    foreach (['provider_message_id', 'provider_status', 'status_log_id', 'send_state'] as $column) {
+        if (!sa_has_column('notifications', $column)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/** A provider value safe to store: printable ASCII only, at most $max characters, null when empty. */
+function sa_provider_value(mixed $value, int $max): ?string
+{
+    if (!is_scalar($value)) {
+        return null;
+    }
+    $clean = substr((string) preg_replace('/[^\x21-\x7E]/', '', (string) $value), 0, $max);
+    return $clean === '' ? null : $clean;
+}
+
 /** True when $table.$column accepts NULL (cached per request). */
 function sa_column_nullable(string $table, string $column): bool
 {
@@ -490,9 +516,11 @@ function sa_notification_history(PDO $pdo, bool $withDestination): array
     $smsCategory = sa_has_column('request_status_log', 'sms_category') ? 'l.sms_category' : 'NULL';
     $deliveryStatus = sa_has_column('request_status_log', 'delivery_status') ? 'l.delivery_status' : 'NULL';
     $hasSentBy = sa_has_column('request_status_log', 'sms_sent_by_id');
+    $tracking = sa_notification_tracking_available();
     $query = $pdo->prepare(
         'SELECT l.id, l.request_id, l.status, l.actor, l.sms_body AS message,
                 ' . $smsCategory . ' AS sms_category, ' . $deliveryStatus . ' AS delivery_status,
+                ' . ($tracking ? 'n.provider_message_id, n.provider_status' : 'NULL AS provider_message_id, NULL AS provider_status') . ',
                 ' . ($hasSentBy ? 'u.name' : 'NULL') . ' AS sent_by_name, l.created_at, r.reference_no,
                 r.contact_number AS recipient_phone, r.email AS recipient_email,
                 COALESCE(
@@ -503,12 +531,17 @@ function sa_notification_history(PDO $pdo, bool $withDestination): array
          LEFT JOIN requests r ON r.id = l.request_id
          LEFT JOIN clients c ON c.id = r.client_id
          ' . ($hasSentBy ? 'LEFT JOIN users u ON u.id = l.sms_sent_by_id' : '') . '
+         ' . ($tracking ? 'LEFT JOIN notifications n ON n.status_log_id = l.id' : '') . '
          ORDER BY l.created_at DESC, l.id DESC LIMIT 200'
     );
     $query->execute();
     return array_map(static function (array $row) use ($withDestination): array {
+        $isEmail = in_array($row['actor'], ['email', 'auto_email'], true);
         $row['destination'] = !$withDestination || (string) ($row['delivery_status'] ?? '') === '' ? ''
-            : ($row['actor'] === 'email' ? sa_mask_email((string) $row['recipient_email']) : sa_mask_phone((string) $row['recipient_phone']));
+            : ($isEmail ? sa_mask_email((string) $row['recipient_email']) : sa_mask_phone((string) $row['recipient_phone']));
+        if (!$withDestination) {
+            $row['provider_message_id'] = $row['provider_status'] = null;   // Staff only, like the destination
+        }
         unset($row['recipient_phone'], $row['recipient_email']);
         return $row;
     }, $query->fetchAll());

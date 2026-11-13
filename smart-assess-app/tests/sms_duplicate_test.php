@@ -460,7 +460,8 @@ $before = $hits();
 [$status] = $send($reference, 'A new, different message');
 $check('accepted: a genuinely new message may be sent', $status === 200 && $hits() === $before + 1);
 $page = (string) file_get_contents($app . '/web/internal.php');
-$check('history: an SMS IPROG accepted shows as Accepted, an email as Sent', str_contains($page, "'sent' => (\$notification['actor'] ?? '') === 'email' ? 'Sent' : 'Accepted'"));
+$check('history: an SMS IPROG accepted shows as Accepted, an email as Sent', str_contains($page, "\$isEmail = in_array(\$actor, ['email', 'auto_email'], true);")
+    && str_contains($page, "'sent' => \$isEmail ? 'Sent' : 'Accepted'"));
 $staffPage = (string) file_get_contents(dirname($app) . '/smart-assess-internal.html');
 $check('history: the Accepted label says it does not confirm delivery', str_contains($staffPage, "Accepted: 'Accepted by IPROG for sending. This does not confirm it reached the phone.'"));
 
@@ -480,7 +481,10 @@ $pdo->prepare("INSERT INTO notifications (request_id, type, message, channel, de
 [$status] = $send($reference, 'After an old automatic SMS');
 $check('an old automatic SMS (not a staff send) does not block', $status === 200);
 foreach (['sa_submit_request', 'sa_update_request_status', 'sa_start_request_processing', 'sa_complete_request_processing'] as $function) {
-    $check("no automatic SMS/email in {$function}", !preg_match('/sa_sms_deliver|sa_email_deliver|sa_send_notification|gmail-mailer|IprogSmsService/', $extractFrom($api, $function)));
+    // Submissions only queue their confirmation (sent afterwards by bin/send-submission-confirmations.php);
+    // status changes and processing never send anything. Nothing here sends inline.
+    $check($function === 'sa_submit_request' ? 'sa_submit_request sends nothing inline (it only queues the confirmation)' : "no automatic SMS/email in {$function}",
+        !preg_match('/sa_sms_deliver|sa_email_deliver|sa_send_notification|gmail-mailer|IprogSmsService/', $extractFrom($api, $function)));
 }
 $GLOBALS['SA_TEST_USER'] = null;
 $before = $hits();

@@ -2808,14 +2808,15 @@ function renderNotifications(acct){
       Sent: 'Accepted by Gmail for sending.',
       Accepted: 'Accepted by IPROG for sending. This does not confirm it reached the phone.',
       Failed: isEmail ? 'Gmail did not accept this email. It was not sent.' : 'IPROG did not accept this SMS. It was not sent.',
-      Pending: isEmail ? 'Outcome unconfirmed.' : 'Outcome unconfirmed. It may have reached the client, so further SMS for this request are blocked.'
+      Pending: n.sentBy==='Automatic confirmation' ? 'Being sent, or outcome unconfirmed. Automatic confirmations never block staff messages.'
+        : isEmail ? 'Outcome unconfirmed.' : 'Outcome unconfirmed. It may have reached the client, so further SMS for this request are blocked.'
     })[status] || 'Status update shown in request tracking. No SMS or email was sent.';
     var pillText = status==='Recorded' ? 'Tracking only' : (isEmail?'Email':'SMS')+' · '+status;
     return '<div class="sent-item" role="button" tabindex="0" aria-expanded="false" data-action="toggle-sent-item">'
       + '<div class="si-main"><div class="si-title">'+esc(notifCategoryName(n.category)||'Notification')+'</div>'
         + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')'+(n.destination?' &middot; '+esc(n.destination):'')+'</div>'
         + '<div class="si-msg">'+esc(n.message)+'</div>'
-        + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div></div>'
+        + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div>'+notifProviderHtml(n, 'si-extra')+'</div>'
       + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(pillText)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
       + '<span class="si-chev" aria-hidden="true">'+ic('chevRight','16px')+'</span></div>';
   }).join('');
@@ -3162,9 +3163,17 @@ function reqNotifHistoryHtml(r){
     + sent.map(function(n){
         var tone = {Sent:'sent', Accepted:'sent', Failed:'failed', Pending:'pending'}[n.deliveryStatus] || 'recorded';
         return '<tr><th scope="row">'+esc(fmtDateTime(n.sentAt))+'</th><td><span class="si-pill si-'+tone+'">'+esc(n.channel+' · '+n.deliveryStatus)+'</span> '+esc(n.destination||'')
-          + '<div class="cell-sub">'+esc(n.message)+'</div><div class="cell-sub">Sent by '+esc(n.sentBy||'system')+'</div></td></tr>';
+          + '<div class="cell-sub">'+esc(n.message)+'</div><div class="cell-sub">Sent by '+esc(n.sentBy||'system')+'</div>'+notifProviderHtml(n, 'cell-sub')+'</td></tr>';
       }).join('')
     + '</tbody></table></div></section>';
+}
+
+/* IPROG's message ID (to look the SMS up with IPROG) and the status it reported
+   once after accepting it. Neither proves the SMS reached the phone. */
+function notifProviderHtml(n, cls){
+  if(!n.providerId) return '';
+  return '<div class="'+cls+'">IPROG message ID '+esc(n.providerId)
+    + (n.providerStatus ? ' &middot; IPROG status: '+esc(n.providerStatus)+' (not proof of delivery)' : '')+'</div>';
 }
 
 

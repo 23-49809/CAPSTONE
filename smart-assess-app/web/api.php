@@ -802,6 +802,22 @@ function sa_submit_request(array $data): array
                 error_log('[SMART_ASSESS_AI] Could not queue the AI check for request ID ' . $requestId . '.');
             }
         }
+        // Automatic confirmation (SMS, and email when given): queued with the request,
+        // sent after the response. If queueing fails, the submission still succeeds.
+        $confirmations = 0;
+        try {
+            $pdo->exec('SAVEPOINT sa_confirmation');
+            $confirmations = sa_confirmation_queue($pdo, $requestId, isset($client['id']) ? (int) $client['id'] : null,
+                $reference, (string) $values['contact_number'], $values['email'] !== null ? (string) $values['email'] : null);
+        } catch (Throwable) {
+            try {
+                $pdo->exec('ROLLBACK TO SAVEPOINT sa_confirmation');
+            } catch (Throwable) {
+                // No savepoint was made, so nothing was queued.
+            }
+            $confirmations = 0;
+            error_log('[SMART_ASSESS_CONFIRM] Could not queue the confirmation for request ID ' . $requestId . '; the request was saved.');
+        }
         $pdo->commit();
         // Saved draft files for documents this request does not need are not kept.
         foreach ($unusedDraftFiles as $path) {
@@ -810,8 +826,11 @@ function sa_submit_request(array $data): array
             }
         }
 
-        // No automatic email or SMS: the client sees the new request in
-        // request tracking; staff contact clients from the Notifications page.
+        // The only automatic messages: the confirmation of this submission. Status
+        // changes never send one; staff send everything else from the Notifications page.
+        if ($confirmations > 0) {
+            sa_confirmation_kick($requestId);
+        }
 
         // This browser session submitted it, so its receipt and tracking show the
         // full applicant name (the duplicate return above records nothing).
@@ -1169,16 +1188,20 @@ function sa_sms_load_service(): bool
  * configured, invalid/unsupported number, or IPROG refused it) or 'pending'
  * (outcome unknown: timeout, server error, unrecognised reply). The log line
  * holds only $context and the outcome, never the token, number or message.
+ * $provider receives IPROG's message ID and the status it reported once
+ * shortly after accepting (either may be null), so delivery can be looked up later.
  */
-function sa_sms_deliver(string $phoneNumber, string $message, string $context, ?string &$staffReason = null): string
+function sa_sms_deliver(string $phoneNumber, string $message, string $context, ?string &$staffReason = null, ?array &$provider = null): string
 {
     $reason = null;
+    $provider = ['message_id' => null, 'status' => null];
     try {
         if (!sa_sms_load_service()) {
             throw new RuntimeException('SMS service file missing.');
         }
         $service = IprogSmsService::fromEnvironment();
         $sent = $service->send($phoneNumber, $message);
+        $provider['message_id'] = $sent['message_id'];
         // Accepted only means queued. Look once at what IPROG did with it; this
         // never sends again, and a problem here cannot undo the accepted send.
         $staffReason = 'It is queued at IPROG, which does not confirm it reached the phone.';
@@ -1188,6 +1211,7 @@ function sa_sms_deliver(string $phoneNumber, string $message, string $context, ?
         } catch (Throwable) {
             $providerStatus = null;
         }
+        $provider['status'] = $providerStatus;
         if ($providerStatus !== null && preg_match('/^(failed|fail|rejected|undelivered|error|cancell?ed)$/', $providerStatus)) {
             // It was accepted, so "failed" here is not proof it can be sent again safely.
             $staffReason = 'IPROG accepted it, then reported it as ' . $providerStatus . '.';
@@ -1354,6 +1378,90 @@ function sa_email_deliver(array $details, string $context, ?string &$staffReason
         $staffReason = str_starts_with($message, '[mailer] ') ? $reason : 'The email service failed on the server.';
         return str_contains($message, 'did not confirm') ? 'pending' : 'failed';
     }
+}
+
+/**
+ * Automatic confirmation SMS. Plain text, one SMS part (at most 160 basic
+ * characters with the longest reference), and no web link: Globe blocks SMS
+ * that contain links.
+ */
+const SA_CONFIRMATION_SMS = 'SMART ASSESS: We received your request %s. Keep this reference number to track it on the SMART ASSESS website. - Mabini Assessor\'s Office';
+
+/** Category shown in the Staff notification history for automatic confirmations. */
+const SA_CONFIRMATION_CATEGORY = 'Submission Confirmation';
+
+/**
+ * Queues the automatic confirmation of a new submission: one SMS to the
+ * request's mobile number and, when an email address was given, one email.
+ * Called inside the submission's transaction, so a confirmation exists only
+ * for a request that was really saved. Nothing is sent here: the sender runs
+ * after the response (sa_confirmation_kick()), so the client never waits for
+ * IPROG or Gmail. A channel that is not set up is skipped. Returns the number
+ * of confirmations queued (0 before database update 20261113 has run, or when
+ * SMART_ASSESS_SUBMISSION_CONFIRMATION is 0).
+ */
+function sa_confirmation_queue(PDO $pdo, int $requestId, ?int $clientId, string $reference, string $phone, ?string $email): int
+{
+    $setting = strtolower(trim((string) getenv('SMART_ASSESS_SUBMISSION_CONFIRMATION')));
+    if (in_array($setting, ['0', 'false', 'off', 'no'], true) || !sa_notification_tracking_available()) {
+        return 0;
+    }
+    $channels = [];
+    if (sa_sms_enabled() && sa_sms_load_service()) {
+        try {
+            IprogSmsService::fromEnvironment();
+            IprogSmsService::normalizePhoneNumber($phone);
+            $channels['sms'] = sprintf(SA_CONFIRMATION_SMS, $reference);
+        } catch (Throwable) {
+            // No valid mobile number or no SMS setup: no confirmation SMS.
+        }
+    }
+    if ($email !== null && filter_var($email, FILTER_VALIDATE_EMAIL) && sa_email_configured()) {
+        $channels['email'] = 'Confirmation email: we received your request ' . $reference . '.';
+    }
+    $hasCategory = sa_has_column('request_status_log', 'sms_category');
+    $hasDelivery = sa_has_column('request_status_log', 'delivery_status');
+    foreach ($channels as $channel => $message) {
+        $pdo->prepare(
+            'INSERT INTO request_status_log (request_id, status, actor, sms_body' . ($hasDelivery ? ', delivery_status' : '') . ($hasCategory ? ', sms_category' : '') . ")
+             VALUES (:request, 'Received', :actor, :body" . ($hasDelivery ? ", 'pending'" : '') . ($hasCategory ? ', :category' : '') . ')'
+        )->execute(['request' => $requestId, 'actor' => $channel === 'email' ? 'auto_email' : 'auto_sms', 'body' => $message]
+            + ($hasCategory ? ['category' => SA_CONFIRMATION_CATEGORY] : []));
+        $logId = (int) $pdo->lastInsertId();
+        $pdo->prepare(
+            "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status, send_state, status_log_id)
+             VALUES (:client, :request, 'submission_confirmation', :message, :channel, 'pending', 'queued', :log)"
+        )->execute(['client' => $clientId, 'request' => $requestId, 'message' => $message, 'channel' => $channel, 'log' => $logId]);
+    }
+    return count($channels);
+}
+
+/**
+ * Starts the confirmation sender (bin/send-submission-confirmations.php) in the
+ * background for one request and returns at once. If it cannot start, the
+ * confirmations stay queued and the next sender run (any later submission)
+ * sends them. Never throws.
+ */
+function sa_confirmation_kick(int $requestId): void
+{
+    $app = dirname(__DIR__);
+    $script = $app . '/bin/send-submission-confirmations.php';
+    $php = (string) (getenv('SMART_ASSESS_PHP_CLI') ?: '/usr/bin/php');
+    if (!function_exists('proc_open') || !is_file($script) || !is_executable($php)) {
+        error_log('[SMART_ASSESS_CONFIRM] Could not start the confirmation sender for request ID ' . $requestId . '; it stays queued.');
+        return;
+    }
+    $command = escapeshellarg($php) . ' -d display_errors=0 -d log_errors=1 -d error_log=' . escapeshellarg($app . '/logs/confirmations.log')
+        . ' ' . escapeshellarg($script) . ' --request=' . $requestId . ' </dev/null >/dev/null 2>&1 &';
+    try {
+        $process = @proc_open(['/bin/sh', '-c', $command], [['file', '/dev/null', 'r'], ['file', '/dev/null', 'w'], ['file', '/dev/null', 'w']], $pipes);
+        if (is_resource($process)) {
+            proc_close($process);   // returns as soon as the shell has put the sender in the background
+            return;
+        }
+    } catch (Throwable) {
+    }
+    error_log('[SMART_ASSESS_CONFIRM] Could not start the confirmation sender for request ID ' . $requestId . '; it stays queued.');
 }
 
 /**
@@ -1629,6 +1737,11 @@ function sa_send_notification(array $data): array
                 }
                 $pdo->prepare("INSERT INTO request_status_log ($columns) VALUES ($values)")->execute($params);
                 $logId = (int) $pdo->lastInsertId();
+                if (sa_notification_tracking_available()) {
+                    // Links the history row to this attempt so IPROG's message ID can be shown with it.
+                    $pdo->prepare('UPDATE notifications SET status_log_id = :log WHERE id = :id')
+                        ->execute(['log' => $logId, 'id' => $notificationId]);
+                }
                 $pdo->commit();
             } catch (Throwable $exception) {
                 if ($pdo->inTransaction()) {
@@ -1646,8 +1759,9 @@ function sa_send_notification(array $data): array
             // One attempt only, outside any transaction.
             $context = 'request ID ' . (int) $requestId . '; staff_message ' . $channel;
             $reason = null;
+            $provider = null;
             $outcome = $channel === 'sms'
-                ? sa_sms_deliver((string) $request['contact_number'], $message, $context, $reason)
+                ? sa_sms_deliver((string) $request['contact_number'], $message, $context, $reason, $provider)
                 : sa_email_deliver([
                     'email' => (string) $request['email'],
                     'first_name' => (string) $request['first_name'],
@@ -1666,6 +1780,10 @@ function sa_send_notification(array $data): array
                 }
                 $pdo->prepare('UPDATE notifications SET delivery_status = :status WHERE id = :id')
                     ->execute(['status' => $outcome, 'id' => $notificationId]);
+                if (is_array($provider) && sa_notification_tracking_available()) {
+                    $pdo->prepare('UPDATE notifications SET provider_message_id = :mid, provider_status = :pst WHERE id = :id')
+                        ->execute(['mid' => sa_provider_value($provider['message_id'] ?? null, 64), 'pst' => sa_provider_value($provider['status'] ?? null, 30), 'id' => $notificationId]);
+                }
                 $pdo->commit();
             } catch (Throwable) {
                 if ($pdo->inTransaction()) {

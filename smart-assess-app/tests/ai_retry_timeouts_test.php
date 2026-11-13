@@ -822,8 +822,8 @@ $check('privacy: only requests submitted on or after the policy\'s effective dat
 $check('privacy: review markers stay in PHP comments and never reach visitors', !str_contains($rendered, 'CONFIRM') && !str_contains($rendered, 'BEFORE PUBLICATION')
     && substr_count((string) file_get_contents($app . '/web/privacy-policy.php'), 'CONFIRM') >= 3);
 $check('privacy: no new retention period was invented', !preg_match('/\b(\d+)\s+(days|months|years)\b[^.]*(document check|AI)/i', $text));
-$check('Terms version is 2026-11-12 on the server and in the client form', str_contains((string) file_get_contents($app . '/web/terms-acceptance.php'), "SA_TERMS_VERSION = '2026-11-12'")
-    && str_contains((string) file_get_contents(dirname($app) . '/smart-assess.html'), "TERMS_VERSION = '2026-11-12'"));
+$check('Terms version is 2026-11-13 on the server and in the client form', str_contains((string) file_get_contents($app . '/web/terms-acceptance.php'), "SA_TERMS_VERSION = '2026-11-13'")
+    && str_contains((string) file_get_contents(dirname($app) . '/smart-assess.html'), "TERMS_VERSION = '2026-11-13'"));
 
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {

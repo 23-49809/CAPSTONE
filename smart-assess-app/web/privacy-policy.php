@@ -37,7 +37,7 @@ $saAiEffectiveText = $saAiEffectiveFrom === null ? null
 sa_legal_header(
     'Privacy Policy',
     "How SMART ASSESS, the online service of the Municipal Assessor's Office of Mabini, Batangas, collects, uses, stores and shares personal information, including its use of the Gmail API and its automatic document check.",
-    'November 12, 2026'
+    'November 13, 2026'
 );
 ?>
 <nav class="legal-toc" aria-labelledby="toc-title">
@@ -121,14 +121,14 @@ sa_legal_header(
   <tbody>
     <?php /* CONFIRM item 3: both servers are in ap-southeast-2 (Sydney). */ ?>
     <tr><td>Amazon Web Services</td><td>Hosts the website, its stored information and the automatic document check on servers in the Asia Pacific (Sydney) region, in Australia, outside the Philippines</td><td>Everything stored in SMART ASSESS, and the documents and details sent for the automatic document check</td></tr>
-    <tr><td>IPROG SMS</td><td>Delivers SMS messages that staff send</td><td>Your mobile number and the message text</td></tr>
-    <tr><td>Google (Gmail API)</td><td>Delivers email messages that staff send</td><td>Your name, email address, reference number and the message text</td></tr>
+    <tr><td>IPROG SMS</td><td>Delivers SMS messages: the confirmation of each submission and messages that staff send</td><td>Your mobile number and the message text</td></tr>
+    <tr><td>Google (Gmail API)</td><td>Delivers email messages: the confirmation of each submission (when you give an email address) and messages that staff send</td><td>Your name, email address, reference number and the message text</td></tr>
   </tbody>
 </table></div>
 <p>These providers handle information under their own terms and privacy policies.</p>
 
 <h2 id="notifications">6. SMS and email notifications</h2>
-<p>Submitting a request or changing its status does not send you an SMS or email. Status changes appear in request tracking. An SMS or email is sent only when a staff member chooses to send a message about your request from the Notifications page, to the number or address on that request.</p>
+<p>When you submit a request, SMART ASSESS automatically sends you one confirmation with your reference number: by SMS to the mobile number you entered and, if you gave one, by email to that address. Changing a request's status does not send an SMS or email; status changes appear in request tracking. Any other SMS or email is sent only when a staff member chooses to send a message about your request from the Notifications page, to the number or address on that request.</p>
 <p>The message text and its delivery status are kept with your request. A provider accepting a message does not guarantee that it reaches you.</p>
 
 <h2 id="google">7. Google user data and the Gmail API</h2>

@@ -39,7 +39,7 @@ $dbPort = getenv('DB_PORT') ?: '3306';
 $dbUser = getenv('DB_USER') ?: 'root';
 $dbPass = (string) getenv('SMART_ASSESS_DB_PASS');
 $project = dirname(__DIR__, 2);
-$termsVersion = '2026-11-12';   // the current Terms version (browser and PHP)
+$termsVersion = '2026-11-13';   // the current Terms version (browser and PHP)
 
 $results = [];
 $check = static function (string $name, bool $passed, mixed $detail = '') use (&$results): void {
