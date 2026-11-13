@@ -34,7 +34,7 @@ $dbPort = getenv('DB_PORT') ?: '3306';
 $dbUser = getenv('DB_USER') ?: 'root';
 $dbPass = (string) getenv('SMART_ASSESS_DB_PASS');
 $project = dirname(__DIR__, 2);
-$previousVersion = '2026-11-06';
+$previousVersion = '2026-11-11';
 $newWording = 'Uploaded files must be smaller than 5 MiB each. Government-issued IDs and authorization letters must be in JPG or PNG format. '
     . 'Other supporting documents may be submitted in JPG, PNG, WEBP, or PDF format.';
 
@@ -155,7 +155,7 @@ $http = static function (string $path, mixed $post = null, array $headers = []) 
 };
 [$status, $page] = $http('/terms.php');
 $check('the public Terms page shows the new wording and date', $status === 200 && str_contains(html_entity_decode($page), $newWording)
-    && str_contains($page, 'November 11, 2026'), $status);
+    && str_contains($page, 'November 12, 2026'), $status);
 preg_match('/SMART_ASSESS_CONFIG=(\{.*?\});/', $http('/index.php')[1], $m);
 $csrf = (string) (json_decode($m[1] ?? '{}', true)['csrf'] ?? '');
 $json = static fn (string $action, array $data) => $http('/api.php?action=' . $action, (string) json_encode(['action' => $action, 'csrf' => $csrf] + $data), ['Content-Type: application/json']);

@@ -694,7 +694,7 @@ goes live (no later than the day AI checking is turned on), confirm:
 
 The policy makes no new retention promise: AI results are kept with the request
 like other request records (nothing deletes them automatically). The Terms
-version stays `2026-11-11` (the file-format rule); the Privacy Policy is not
+version is `2026-11-12` (the file-format rule and the tracking-name wording); the Privacy Policy is not
 part of the Terms acceptance, so this change does not ask clients to accept again.
 
 ### Deployment sequence

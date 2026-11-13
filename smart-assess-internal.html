@@ -448,7 +448,7 @@
   .sidebar .side-link .icon{ width:22px; height:22px; }
   .sidebar .side-link:hover{ background:rgba(255,255,255,.08); color:#fff; }
   .sidebar .side-link.active{ background:rgba(255,255,255,.15); color:#fff; box-shadow:inset 4px 0 0 var(--gold); }
-  .sidebar .side-link > span:not(.icon){ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sidebar .side-link > span:not(.icon){ white-space:normal; line-height:1.25; overflow-wrap:break-word; }
   .sidebar-foot{ border-top:1px solid rgba(255,255,255,.2); padding-top:14px; }
   /* The office photo, blended into the green as a luminosity layer. */
   .sidebar-art{ position:absolute !important; z-index:0 !important; left:0; right:0; bottom:80px; height:330px; pointer-events:none;
@@ -520,7 +520,7 @@
   .main-content .app-header .hd-avatar .avatar-circle{ width:44px; height:44px; flex:0 0 44px; font-size:15px; background:var(--navy); color:var(--surface); }
   .main-content .app-header .hd-avatar .hd-name{ color:var(--ink); font-size:14.5px; }
   .main-content .app-header .hd-avatar .hd-role{ color:var(--ink-faint); font-size:12px; }
-  @media (min-width:641px){ .main-content .app-header .hd-avatar .hd-avatar-copy{ max-width:220px; margin-left:12px; opacity:1; } }
+  @media (min-width:641px){ .main-content .app-header .hd-avatar .hd-avatar-copy{ max-width:220px; margin-left:12px; opacity:1; padding-right:3px; } }
   @media (max-width:640px){ .main-content{ --main-pad-x:14px; padding:16px var(--main-pad-x) 44px; } }
 
   .sr-only{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
@@ -534,7 +534,8 @@
   /* All internal pages: 1px divider above every page heading. It bleeds through
      .main-content's side padding so it spans the content column edge to
      edge; the heading sits 18px below it. */
-  .main-content .page-head{ padding-top:18px; margin-bottom:28px; }
+  .main-content .page-head{ padding-top:30px; margin-bottom:28px; }
+  .main-content .page-head .btn{ box-shadow:none; }
   .main-content .page-head::before{ content:""; position:absolute; left:calc(-1 * var(--main-pad-x)); right:calc(-1 * var(--main-pad-x)); top:0; height:1px; background:#2b2f2d; pointer-events:none; }
   /* One heading style for every internal page (taken from "Staff Dashboard"). */
   .main-content .page-head > div{ margin:0; padding:0; }
@@ -578,12 +579,12 @@
   .dash-table tbody tr.dash-row:hover{ background:var(--row-hover); }
   .dash-table tbody tr.dash-row:hover td:first-child{ color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
   .dash-table tbody tr.dash-row:focus-visible{ outline:2px solid var(--brand-600); outline-offset:-2px; }
-  .dash-table tbody td:first-child{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; font-variant-numeric:tabular-nums; }
+  .dash-table tbody td:first-child{ white-space:normal; overflow-wrap:anywhere; font-weight:600; font-variant-numeric:tabular-nums; }
   .dash-table td.dash-date{ font-size:13.5px; color:var(--ink-soft); }
   .dash-table td.dash-date span{ white-space:nowrap; }
   .dash-table td.dash-status .badge{ white-space:normal; line-height:1.3; border-radius:6px; font-weight:600; font-size:12px; padding:3px 8px; }
   .dash-table td .cell-sub{ font-size:11.5px; }
-  .dash-table .col-id{ width:24%; } .dash-table .col-status{ width:24%; } .dash-table .col-date{ width:26%; }
+  .dash-table .col-id{ width:31%; } .dash-table .col-status{ width:19%; } .dash-table .col-date{ width:24%; }
   .dash-table .empty-state{ padding:28px 12px; }
 
   .dash-ann-list{ flex:1; min-height:0; overflow-y:auto; }
@@ -1708,7 +1709,7 @@ function renderLogin(){
     + '<form data-form="login">'
       + '<div class="field"><label for="li-user">Username</label><input id="li-user" name="username" type="text" placeholder="e.g. jessica.staff" autocomplete="username" required></div>'
       + '<div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">'+ic('eye','19px')+'</button></div></div>'
-      + '<button type="submit" class="btn btn-primary btn-block">'+ic('check','18px')+' Sign In</button>'
+      + '<button type="submit" class="btn btn-primary btn-block">Sign In</button>'
     + '</form>'
     + '<div class="login-note">Sign-in is restricted to authorized Assessor’s Office personnel.</div>'
   + '</div></div>';

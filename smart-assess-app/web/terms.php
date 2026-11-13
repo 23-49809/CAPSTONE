@@ -6,7 +6,7 @@ require_once __DIR__ . '/legal-layout.php';
 sa_legal_header(
     'Terms of Service',
     "The terms for using SMART ASSESS, the online document request and land transfer service of the Municipal Assessor's Office of Mabini, Batangas.",
-    'November 11, 2026'
+    'November 12, 2026'
 );
 ?>
 <nav class="legal-toc" aria-labelledby="toc-title">
@@ -59,7 +59,7 @@ sa_legal_header(
 <p>Submitting a request does not mean it is approved or completed. Every request remains subject to the Office's requirements, verification, evaluation and approval procedures. A rejected request may include a reason, and the Office may tell you what is needed.</p>
 
 <h2 id="tracking">5. Tracking your request</h2>
-<p>You receive a reference number after submitting. Use it on the Track Request page to check your request's status. Anyone with your reference number can see the applicant's name, the service requested and the status, so keep it private.</p>
+<p>You receive a reference number after submitting. Use it on the Track Request page to check your request's status. Anyone with your reference number can see the service requested, the status and the applicant's initials, so keep it private. The browser used to submit the request can show the applicant's full name for up to 15 minutes after submission. This ends sooner if the applicant leaves the receipt page, for example by going to the home page or starting another request; saving the receipt, copying the reference number or viewing the request's status does not end it. After that, that browser also shows only the initials. The receipt already shown on screen, and any receipt image the applicant saved, remain usable.</p>
 
 <h2 id="notifications">6. Notifications</h2>
 <p>Status changes appear in request tracking and do not automatically send an SMS or email. Staff may choose to message you about your request by SMS, or by email if you gave an address.</p>
