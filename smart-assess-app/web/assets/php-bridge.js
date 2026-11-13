@@ -198,17 +198,22 @@
             window.SMART_ASSESS_TERMS_RECOVER(result.code, submitPublicRequest);
             return;
           }
-          throw new Error(result.error || 'The request could not be submitted.');
+          var failure = new Error(result.error || 'The request could not be submitted.');
+          failure.code = result.code || '';
+          throw failure;
         }
         if (typeof window.SMART_ASSESS_DRAFT_DONE === 'function') window.SMART_ASSESS_DRAFT_DONE();
         window.location.assign('/index.php?submitted=' + encodeURIComponent(result.request.reference_no));
       });
     }).catch(function (error) {
       submitting = false;
+      // Close the "Are you sure?" popup so the message is not hidden behind it.
+      var cancel = document.querySelector('[data-action="cancel-submit"]');
+      if (cancel) cancel.click();
       // A network failure leaves the draft intact, so nothing is lost.
       notice(error && /Failed to fetch|NetworkError|Load failed/i.test(String(error.message))
         ? 'Could not reach the server. Your application is still saved; check your connection and press Submit again.'
-        : error.message);
+        : error.message, error && error.code === 'maintenance' ? 'pending' : undefined);
     });
   }
 
