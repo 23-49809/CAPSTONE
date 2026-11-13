@@ -55,7 +55,9 @@ $apiSource = (string) file_get_contents("$project/smart-assess-app/web/api.php")
 preg_match('/\$result = match \(\$action\) \{(.*?)default => throw/s', $apiSource, $m);
 preg_match_all("/^\s+'([a-z_]+)' =>/m", $m[1] ?? '', $mm);
 $postActions = array_values(array_unique(array_merge($mm[1] ?? [], ['draft_file'])));
-$check('the API has the expected number of POST actions (37 in the dispatcher + draft_file = 38)', count($postActions) === 38, $postActions);
+// 38 in the dispatcher + draft_file = 39. receipt_done (PR #16) only changes the caller's own session, but it
+// is not in the allowed list, so it is refused during a deployment like every other action not listed.
+$check('the API has the expected number of POST actions (38 in the dispatcher + draft_file = 39)', count($postActions) === 39, $postActions);
 $check('every action the gate allows exists in the API', array_diff($allowed, $postActions) === [], array_diff($allowed, $postActions));
 $gateAt = strpos($apiSource, 'if (sa_maintenance_active()');
 $csrfAt = strpos($apiSource, "sa_verify_csrf(isset(\$data['csrf'])");
