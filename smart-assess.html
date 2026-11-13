@@ -752,6 +752,9 @@
   .draft-state.saving::before{ background:var(--warn); animation:draftPulse 1s ease-in-out infinite; }
   .draft-state.offline::before, .draft-state.error::before{ background:var(--danger); }
   .draft-state.local::before{ background:var(--info); }
+  .draft-state.paused::before{ background:var(--warn); }
+  /* Messages from web/assets/php-bridge.js (notice()); the internal portal styles the same class. */
+  .login-error{ font-size:15px; line-height:1.45; color:var(--danger); background:var(--danger-bg); border-radius:var(--radius-sm); padding:12px 16px; }
   @keyframes draftPulse{ 50%{ opacity:.35; } }
   .draft-panel{ margin:0 0 14px; padding:16px 18px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); font-size:15px; color:var(--ink-soft); }
   .draft-panel strong{ color:var(--ink); }
@@ -2289,7 +2292,7 @@ function draftApi(action, payload, asBlob){
   }).then(function(res){
     if(asBlob && res.ok) return res.blob();
     return res.json().catch(function(){ return {}; }).then(function(json){
-      if(!res.ok || !json.ok){ const err = new Error(json.error || ('HTTP ' + res.status)); err.status = res.status; throw err; }
+      if(!res.ok || !json.ok){ const err = new Error(json.error || ('HTTP ' + res.status)); err.status = res.status; err.code = json.code || ''; throw err; }
       return json.data;
     });
   }, function(){ const err = new Error('offline'); err.status = 0; throw err; });
@@ -2328,6 +2331,8 @@ function flushDraft(){
         draft.code = ''; draft.files = {}; draft.notice = 'Your earlier saved copy had expired, so this application is now saved as a new one.';
         draft.again = true; return;
       }
+      // A short update in progress: keep the changes here and keep retrying.
+      if(err.status===503 && err.code==='maintenance'){ setDraftStatus('paused'); draftRetryLater(); return; }
       if(err.status===503){ setDraftStatus('local'); return; }
       setDraftStatus(err.status===0 ? 'offline' : 'error');
       draftRetryLater();
@@ -2375,6 +2380,7 @@ function draftStatusText(){
   if(draft.status==='saving') return Object.keys(draft.uploads).length ? 'Saving… uploading document' : 'Saving…';
   if(draft.status==='offline') return 'You’re offline. Changes are kept on this device and will be saved when you reconnect.';
   if(draft.status==='error') return failed ? failed+' document'+(failed>1?'s':'')+' not saved yet. Retrying…' : 'Couldn’t save to the server. Retrying…';
+  if(draft.status==='paused') return 'SMART ASSESS is being updated. Your changes are kept on this device and will be saved in a moment.';
   if(draft.status==='local') return 'Draft saved on this device';
   if(draft.status==='saved'){ const t = draft.savedAt ? receiptDate(draft.savedAt).split(' - ')[1] : ''; return 'Draft saved'+(t?' · '+t:''); }
   return 'Your progress is saved automatically';
