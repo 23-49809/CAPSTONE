@@ -41,6 +41,17 @@ final class DocumentAnalysis
     private const KEY_PATTERN = '/^[A-Za-z][A-Za-z0-9_]{0,39}$/';
     /** IDs carry little text; other documents should carry a page of it. */
     private const ID_KEYS = ['ownerId', 'requesterId'];
+    /**
+     * Words by which the model's own wording (a finding's explanation or a document note)
+     * would judge whether something is genuine or decide the request. The model may do
+     * neither, so such wording is withheld and Staff are asked to review (see
+     * withholdVerdicts()). English and Tagalog. Quoted document text ("evidence") and
+     * the names of missing details are not checked: they quote or name, they do not judge.
+     */
+    private const VERDICT_PATTERN = '/\b(?:genuine\w*|authentic\w*|inauthentic\w*|forg(?:e|ed|ery|eries|ing)|fake\w*|counterfeit\w*|falsif\w*|tamper\w*'
+        . '|legitimate\w*|illegitimate\w*|approv\w*|disapprov\w*|reject\w*|deny|denie[sd]|denial|tunay|peke|huwad|aprub\w*|tanggihan|tinanggihan)\b/iu';
+    public const WITHHELD_EXPLANATION = 'The AI model\'s wording for this finding was withheld because it judged whether a document, signature or seal is genuine, or whether the request should be approved or rejected. The AI cannot judge either. Open the original document and decide yourself.';
+    public const WITHHELD_NOTE = 'The AI model\'s note was withheld because it judged genuineness or a decision, which the AI cannot do.';
 
     /**
      * JSON schema given to Ollama (structured output), with the job's own
@@ -138,11 +149,51 @@ final class DocumentAnalysis
                 'model'
             );
         }
-        return [
+        return self::withholdVerdicts([
             'documents' => array_values($documents),
             'findings' => $findings,
             'manual_review_recommended' => $object['manual_review_recommended'],
-        ];
+        ]);
+    }
+
+    /**
+     * True when model-written text judges genuineness or decides the request
+     * (VERDICT_PATTERN). Such text is never shown to Staff as the model wrote it.
+     */
+    public static function judgesGenuinenessOrDecision(string $text): bool
+    {
+        return preg_match(self::VERDICT_PATTERN, $text) === 1;
+    }
+
+    /**
+     * The AI may only point out possible problems: it cannot authenticate documents,
+     * signatures or seals, and cannot approve or reject. Validated model output whose
+     * own wording does either keeps its structure (category, field, documents), but
+     * the wording is replaced with a neutral notice and Staff review is required, so
+     * such an answer can never make a result look "passed" or settled.
+     */
+    private static function withholdVerdicts(array $output): array
+    {
+        $withheld = false;
+        foreach ($output['findings'] as &$finding) {
+            if (self::judgesGenuinenessOrDecision($finding['explanation'])) {
+                $finding['explanation'] = self::WITHHELD_EXPLANATION;
+                $finding['evidence'] = '';
+                $withheld = true;
+            }
+        }
+        unset($finding);
+        foreach ($output['documents'] as &$document) {
+            if (self::judgesGenuinenessOrDecision($document['note'])) {
+                $document['note'] = self::WITHHELD_NOTE;
+                $withheld = true;
+            }
+        }
+        unset($document);
+        if ($withheld) {
+            $output['manual_review_recommended'] = true;
+        }
+        return $output;
     }
 
     /**

@@ -73,3 +73,8 @@ AmbientCapabilities=
 SystemCallArchitectures=native
 UMask=0077
 ReadOnlyPaths=/var/www/smart-assess
+# It needs only its own settings (read by systemd before the sandbox starts), the
+# database, the request's uploads and the worker. It never sends SMS or email, so the
+# website's settings file (Gmail and IPROG credentials), the Gmail token folder, the
+# backups and the worker's own secret file are hidden from it ("-": if present).
+InaccessiblePaths=-/etc/smart-assess/apache.env -/etc/smart-assess/gmail -/var/backups -/etc/smart-assess-ai-worker -/var/lib/smart-assess-ai-worker -/opt/actions-runner -/etc/mysql/debian.cnf

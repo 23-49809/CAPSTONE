@@ -144,6 +144,36 @@ $check('a worker result with an extra field is rejected', $rejects(static fn () 
 $check('a worker result for a document that was not sent is rejected', $rejects(static fn () => DocumentAnalysis::validateWorkerResult($worker(['other' => 'good'], 'skipped'), ['ownerId'])));
 $check('a worker result carrying model output after a failed model is rejected', $rejects(static fn () => DocumentAnalysis::validateWorkerResult($worker(['ownerId' => 'good'], 'invalid_output', $goodOutput), ['ownerId'])));
 
+// ================= The model cannot authenticate or decide (Step 6) =================
+$verdictFinding = static fn (string $category, string $explanation, string $evidence = ''): array => ['category' => $category, 'field' => 'other',
+    'document_keys' => ['ownerId'], 'explanation' => $explanation, 'evidence' => $evidence];
+foreach ([
+    'genuineness of a signature' => 'The signature on the ID appears genuine.',
+    'a seal judged authentic' => 'The notary seal looks authentic.',
+    'a forgery claim' => 'The seal looks forged.',
+    'a fake claim' => 'This ID is fake.',
+    'an approval' => 'All documents are complete; the request can be approved.',
+    'a rejection' => 'Recommend rejecting this request.',
+    'a Tagalog verdict' => 'Mukhang peke ang ID.',
+] as $label => $text) {
+    $out = DocumentAnalysis::validateModelOutput(array_replace($goodOutput, ['findings' => [$verdictFinding('cannot_verify', $text, 'SAMPLE QUOTE')]]), $keys);
+    $check('model wording withheld: ' . $label, $out['findings'][0]['explanation'] === DocumentAnalysis::WITHHELD_EXPLANATION
+        && $out['findings'][0]['evidence'] === '' && $out['manual_review_recommended'] === true && !str_contains((string) json_encode($out), $text), $out);
+}
+$noted = DocumentAnalysis::validateModelOutput(array_replace($goodOutput, ['documents' => [array_replace($goodOutput['documents'][0], ['note' => 'Authentic government ID; approve.']),
+    $goodOutput['documents'][1]]]), $keys);
+$check('a document note that judges genuineness or decides is withheld and requires review', $noted['documents'][0]['note'] === DocumentAnalysis::WITHHELD_NOTE
+    && $noted['manual_review_recommended'] === true, $noted);
+$verdictOnly = DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']),
+    $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', array_replace($goodOutput, ['findings' => [$verdictFinding('cannot_verify', 'Signature and seal are genuine. Approve.')]])), $keys), $labels);
+$check('a model answer that only "authenticates" or "approves" can never give PASSED', $verdictOnly['outcome'] === 'needs_review'
+    && !str_contains((string) json_encode($verdictOnly), 'Signature and seal are genuine'), $verdictOnly);
+$plain = DocumentAnalysis::validateModelOutput(array_replace($goodOutput, ['findings' => [$verdictFinding('possible_inconsistency',
+    'The surname on the Valid ID differs from the form.', 'APPROVED BY THE REGISTRY')]]), $keys);
+$check('ordinary wording is kept, including "Valid ID" and quoted document text', $plain['findings'][0]['explanation'] === 'The surname on the Valid ID differs from the form.'
+    && $plain['findings'][0]['evidence'] === 'APPROVED BY THE REGISTRY' && $plain['manual_review_recommended'] === false, $plain);
+$check('a correct answer without verdict wording is unchanged', DocumentAnalysis::validateModelOutput($goodOutput, $keys)['documents'][0]['note'] === 'Looks like a government ID.');
+
 // ================= Rule checks, readability and prompts =================
 $idText = 'REPUBLIC OF THE PHILIPPINES DRIVER LICENSE DELA CRUZ, JUAN SANTOS Address Mabini Batangas Date of Birth 1980';
 $check('readability: a readable ID is good', DocumentAnalysis::readability('ownerId', $idText, true) === 'good');

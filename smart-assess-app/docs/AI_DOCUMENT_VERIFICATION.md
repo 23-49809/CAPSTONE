@@ -432,6 +432,69 @@ password, because PHP's built-in server drops empty environment variables.
   from the client form, so the check recomputes requirements on the server with
   `DocumentRequirements`.
 
+### Staff decide (reviewed in Step 6, 14 Nov 2026)
+
+* **The AI cannot authenticate or decide.** Besides the schema (no field can
+  approve, reject or change anything), the application withholds model-written
+  wording that judges genuineness or decides the request: a finding's
+  explanation or a document note containing words such as genuine, authentic,
+  forged, fake, legitimate, approve, reject, deny (and Tagalog tunay, peke,
+  huwad, aprub-, tanggihan). The finding keeps its category and documents, its
+  text is replaced with a notice that the AI cannot judge this, and the result
+  becomes at least **Needs review**: such an answer can never produce
+  **Passed** (`DocumentAnalysis::withholdVerdicts()`). Quoted document text
+  ("evidence") and names of missing details are not filtered; they quote, they
+  do not judge. The filter is deliberately broad: a harmless sentence that
+  happens to use one of these words is also withheld and sent to review.
+* **Originals before "reviewed".** Every time a Staff member opens or previews
+  an uploaded original (`web/request-file.php`), one audit entry is written per
+  Staff member and document (`Request document opened`, target
+  `<reference> document #<id>`; no file content or applicant details). The AI
+  result can be marked **reviewed** only by a Staff member who has opened every
+  uploaded original of that request; otherwise the action answers 409 and says
+  how many are still unopened (`AiVerification::markReviewed()`). Approving,
+  rejecting or releasing a request is a separate Staff action that never reads
+  or depends on the AI result; the system does not (yet) require the originals
+  to be opened before that decision.
+* **Nothing else is written or sent.** The dispatcher and the AI classes write
+  only `ai_verification_jobs`; Staff AI actions add audit entries. No AI path
+  changes a request, its status history or notifications, or calls the SMS or
+  email senders (the workflow test checks every other table byte for byte and
+  records any send attempt).
+* **Queueing never breaks a submission.** The job insert at submission runs
+  behind a savepoint (`sa_ai_queue`): if it fails, only the insert is undone and
+  the request is saved without an AI job. If the database rolled the whole
+  transaction back (a deadlock), the submission fails with an error instead of
+  returning a reference that was never saved.
+* **Access.** Staff (role 2) only, checked on the server for every AI action,
+  every page and the direct `internal_bootstrap` API. Admin, Department Head,
+  signed-in clients and visitors get 401/403 and no AI data; role fields sent by
+  a client are ignored; AI actions require POST and the CSRF token. Request
+  tracking never shows AI results.
+* **Dispatcher sandbox.** `deploy/systemd/smart-assess-ai-dispatch.service`
+  (not installed) hides the website's settings file, the Gmail token folder,
+  backups, the worker's secret and state, the GitHub runner and MySQL's
+  maintenance credentials from the dispatcher, which needs none of them.
+
+### Production worker as installed (Steps 4 and 5, 13–14 Nov 2026)
+
+The production worker differs from the separate-server plan below: it runs on
+the web server itself (Free plan, no second server), reachable only on
+loopback.
+
+| Part | As installed |
+|---|---|
+| Worker URL for the dispatcher | `http://127.0.0.1:8095` (plain HTTP is accepted only on loopback; no CA file) |
+| HTTP front | lighttpd, 127.0.0.1:8095 only, unit `smart-assess-ai-worker.service`, account `sa-ai-worker` |
+| PHP | PHP-FPM 8.5 pool, unit `smart-assess-ai-worker-fpm.service`, private socket, no database drivers loaded |
+| Network | nft table `inet sa_ai_worker_egress` (unit `smart-assess-ai-worker-egress.service`): the worker account may reach only Ollama on 127.0.0.1:11434; MySQL, DNS, metadata and the internet are rejected |
+| Limits | slice `smart-assess-ai-worker.slice` (1 CPU, 1 GiB) inside `smart-assess-ai.slice` (4.5 GiB with Ollama) |
+| Secret | `/etc/smart-assess-ai-worker/worker.env`, root 0600 |
+| Code | a copy of `worker/` and `app/services/` in `/opt/smart-assess-ai-worker`, refreshed by hand when a release changes them |
+
+AI checking stays off until the dispatcher, its settings file and the website's
+`SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` are set up, each with separate approval.
+
 ## Production deployment (not done; needs explicit approval)
 
 Nothing below has been applied. Every step needs approval, a backup first and

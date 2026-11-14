@@ -72,6 +72,16 @@ $name = trim((string) preg_replace('/[^A-Za-z0-9._ -]+/', '_', $name), ' ._');
 $name = ($name !== '' ? substr($name, 0, 80) : 'document') . '.' . $types[$mime];
 $disposition = isset($_GET['download']) ? 'attachment' : 'inline';
 
+// Staff must inspect the originals themselves: each opening is recorded, and the AI
+// check can only be marked reviewed once this Staff member has opened every original
+// (AiVerification::markReviewed). The entry names the reference and document ID only.
+// A failed record never blocks the file: it only means "Mark as reviewed" stays refused.
+try {
+    AiVerification::recordOriginalOpened(sa_db(), (int) $user['id'], (string) $user['name'], $reference, (int) $documentId);
+} catch (Throwable) {
+    error_log('[SMART_ASSESS] Could not record that a staff member opened a request document.');
+}
+
 header('Content-Type: ' . $mime);
 header('Content-Length: ' . (string) filesize($path));
 header('Content-Disposition: ' . $disposition . '; filename="' . $name . '"');

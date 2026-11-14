@@ -9,8 +9,10 @@ require_once __DIR__ . '/DocumentRequirements.php';
  * ai_verification_jobs, building a job from a request's private uploads,
  * storing validated results and the Staff-only view of them.
  *
- * It only ever writes ai_verification_jobs. It never changes a request's
- * status, never approves or rejects, and never sends messages.
+ * The AI processing (queue, claim, results) only ever writes ai_verification_jobs.
+ * The one other write is a Staff action: recordOriginalOpened() adds an audit entry
+ * when a Staff member opens an original. It never changes a request's status, never
+ * approves or rejects, and never sends messages.
  */
 final class AiVerification
 {
@@ -610,15 +612,81 @@ final class AiVerification
         return $status;
     }
 
-    /** Staff confirmed they looked at the result. Only for finished jobs. */
-    public static function markReviewed(PDO $pdo, int $requestId, int $staffId): bool
+    /**
+     * Audit entry written each time a Staff member opens or previews an uploaded original
+     * (web/request-file.php). The AI result can only be marked reviewed by a Staff member
+     * who has opened every uploaded original of the request (see markReviewed()), because
+     * the AI can be wrong and only the originals decide. The entry names the reference and
+     * the document ID, never the file's content or the applicant.
+     */
+    public const ORIGINAL_OPENED_ACTION = 'Request document opened';
+
+    public static function originalOpenedTarget(string $reference, int $documentId): string
     {
+        return $reference . ' document #' . $documentId;
+    }
+
+    /**
+     * Records that Staff member $staffId opened document $documentId of request $reference:
+     * once per Staff member and document, so previews never crowd other entries out of the
+     * audit log.
+     */
+    public static function recordOriginalOpened(PDO $pdo, int $staffId, string $staffName, string $reference, int $documentId): void
+    {
+        $target = self::originalOpenedTarget($reference, $documentId);
+        $pdo->prepare(
+            "INSERT INTO audit_log (actor_type, actor_id, actor_name, action, target)
+             SELECT 'staff', :id, :name, :action, :target FROM DUAL
+             WHERE NOT EXISTS (SELECT 1 FROM audit_log WHERE actor_type = 'staff' AND actor_id = :id2 AND action = :action2 AND target = :target2)"
+        )->execute(['id' => $staffId, 'name' => $staffName, 'action' => self::ORIGINAL_OPENED_ACTION, 'target' => $target,
+            'id2' => $staffId, 'action2' => self::ORIGINAL_OPENED_ACTION, 'target2' => $target]);
+    }
+
+    /**
+     * IDs of the request's uploaded originals that Staff member $staffId has not opened yet
+     * (only documents with a stored file count; a document the client did not upload has
+     * nothing to open).
+     *
+     * @return list<int>
+     */
+    public static function unopenedOriginals(PDO $pdo, int $requestId, int $staffId): array
+    {
+        $stmt = $pdo->prepare(
+            "SELECT rd.id FROM request_documents rd JOIN requests r ON r.id = rd.request_id
+             WHERE rd.request_id = :request AND rd.file_status <> 'missing' AND rd.stored_path IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.actor_type = 'staff' AND a.actor_id = :staff AND a.action = :action
+                                 AND a.target = CONCAT(r.reference_no, ' document #', rd.id))
+             ORDER BY rd.id"
+        );
+        $stmt->execute(['request' => $requestId, 'staff' => $staffId, 'action' => self::ORIGINAL_OPENED_ACTION]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    public const REVIEWED = 'reviewed';
+    public const REVIEW_NOT_FINISHED = 'not_finished';
+    public const REVIEW_ORIGINALS_NOT_OPENED = 'originals_not_opened';
+
+    /**
+     * Staff confirmed they looked at the result. Only for finished jobs, and only by a
+     * Staff member who has opened every uploaded original of the request.
+     * Returns REVIEWED, REVIEW_NOT_FINISHED or REVIEW_ORIGINALS_NOT_OPENED.
+     */
+    public static function markReviewed(PDO $pdo, int $requestId, int $staffId): string
+    {
+        $finished = $pdo->prepare("SELECT COUNT(*) FROM ai_verification_jobs WHERE request_id = :id AND status IN ('completed', 'needs_manual_review')");
+        $finished->execute(['id' => $requestId]);
+        if ((int) $finished->fetchColumn() !== 1) {
+            return self::REVIEW_NOT_FINISHED;
+        }
+        if (self::unopenedOriginals($pdo, $requestId, $staffId) !== []) {
+            return self::REVIEW_ORIGINALS_NOT_OPENED;
+        }
         $stmt = $pdo->prepare(
             "UPDATE ai_verification_jobs SET staff_review_status = 'reviewed', reviewed_by = :staff, reviewed_at = NOW()
              WHERE request_id = :id AND status IN ('completed', 'needs_manual_review')"
         );
         $stmt->execute(['staff' => $staffId, 'id' => $requestId]);
-        return $stmt->rowCount() === 1;
+        return $stmt->rowCount() === 1 ? self::REVIEWED : self::REVIEW_NOT_FINISHED;
     }
 
     /**

@@ -3275,7 +3275,7 @@ function reqAiHtml(r){
   var finished = ai.status==='completed' || ai.status==='needs_manual_review';
   html += '<div class="ai-actions">'
     + (ai.status!=='processing' ? runBtn(ai.status==='pending' ? 'Queued, run again' : 'Run check again') : '')
-    + (finished && !ai.reviewed ? '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button>' : '')
+    + (finished && !ai.reviewed ? '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button><span class="cell-sub">Open every original document first; the server checks that you have.</span>' : '')
     + (ai.reviewed ? '<span class="cell-sub">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>' : '')
     + '</div>' + blocked + disclaimer + '</section>';
   return html;

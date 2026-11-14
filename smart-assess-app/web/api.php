@@ -794,11 +794,25 @@ function sa_submit_request(array $data): array
         // private AI worker, so the client never waits for it. Only when the
         // Privacy Policy that describes it is in effect for this submission
         // (SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT); otherwise nothing is queued.
-        // If queueing fails, the submission still succeeds.
+        // If queueing fails, the submission still succeeds: the queue insert runs behind
+        // a savepoint, so a failed insert is undone without touching the request.
         if (AiVerification::available($pdo)) {
             try {
+                $pdo->exec('SAVEPOINT sa_ai_queue');
                 AiVerification::enqueueIfEligible($pdo, $requestId);
             } catch (Throwable) {
+                try {
+                    $pdo->exec('ROLLBACK TO SAVEPOINT sa_ai_queue');
+                } catch (Throwable) {
+                    // No savepoint: either it was never made, or the database rolled the whole
+                    // transaction back (a deadlock). Then the request itself is gone, and the
+                    // submission must fail instead of returning a reference that was never saved.
+                    $saved = $pdo->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
+                    $saved->execute(['id' => $requestId]);
+                    if ((int) $saved->fetchColumn() !== 1) {
+                        throw new RuntimeException('The submission transaction was rolled back while queueing the AI check.');
+                    }
+                }
                 error_log('[SMART_ASSESS_AI] Could not queue the AI check for request ID ' . $requestId . '.');
             }
         }
@@ -1884,7 +1898,11 @@ function sa_ai_verification_requeue(array $data): array
     return ['queued' => true];
 }
 
-/** Staff: record that they have looked at a finished AI check. */
+/**
+ * Staff: record that they have looked at a finished AI check. Only after this Staff
+ * member has opened every uploaded original of the request (request-file.php records
+ * each opening), because the AI can be wrong and the originals decide.
+ */
 function sa_ai_verification_reviewed(array $data): array
 {
     $user = sa_internal_or_fail(['STAFF']);
@@ -1893,7 +1911,13 @@ function sa_ai_verification_reviewed(array $data): array
         throw new SaHttpException(503, 'AI document checking is not set up on this server yet.');
     }
     $request = sa_ai_request($pdo, $data);
-    if (!AiVerification::markReviewed($pdo, (int) $request['id'], (int) $user['id'])) {
+    $outcome = AiVerification::markReviewed($pdo, (int) $request['id'], (int) $user['id']);
+    if ($outcome === AiVerification::REVIEW_ORIGINALS_NOT_OPENED) {
+        $unopened = count(AiVerification::unopenedOriginals($pdo, (int) $request['id'], (int) $user['id']));
+        throw new SaHttpException(409, 'Open every original document of this request before marking the AI check as reviewed ('
+            . $unopened . ' not opened by you yet). The AI can be wrong; the original documents decide.');
+    }
+    if ($outcome !== AiVerification::REVIEWED) {
         throw new SaHttpException(409, 'There is no finished AI check for this request to mark as reviewed.');
     }
     sa_audit('staff', (int) $user['id'], (string) $user['name'], 'AI document check reviewed', (string) $request['reference_no']);
