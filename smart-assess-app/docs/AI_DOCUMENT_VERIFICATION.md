@@ -76,6 +76,8 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `deploy/systemd/smart-assess-ai-dispatch-egress.service`, `deploy/nftables/ai-dispatch-egress.nft` | The dispatcher's egress filter: only 127.0.0.1:8095 (not installed). |
 | `deploy/sbin/smart-assess-ai-dispatch-permissions.sh`, `deploy/systemd/smart-assess-ai-dispatch-permissions.service` | Read access for the dispatcher's group `sa-ai-read`, re-applied before every run (not installed). |
 | `bin/ai-worker-compat-check.php` | Release-order check: is a worker copy compatible with the deployed application? |
+| `deploy/sbin/smart-assess-ai-worker-refresh.sh` | Refreshes the worker copy only when the release-order check passes; health check and rollback (not installed). |
+| `deploy/sbin/smart-assess-ai-egress-guard.sh`, `deploy/systemd/smart-assess-ai-egress-guard.service`, `.timer`, `deploy/systemd/nftables.service.d/50-smart-assess-ai-egress.conf` | Keep both AI egress filters loaded or stop what they protect (not installed). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -446,7 +448,7 @@ password, because PHP's built-in server drops empty environment variables.
   from the client form, so the check recomputes requirements on the server with
   `DocumentRequirements`.
 
-### Staff decide (reviewed in Steps 6–10, 14 Nov 2026)
+### Staff decide (reviewed in Steps 6–12, 14 Nov 2026)
 
 * **Nothing the model writes in its own words reaches Staff.** The model's
   answer must match the schema exactly (no field can approve, reject or change
@@ -531,12 +533,17 @@ password, because PHP's built-in server drops empty environment variables.
   a last check after the commit confirms the request exists before success is
   returned (`sa_submission_still_saved()`). The workflow test forces a real
   InnoDB deadlock in each queue to prove it. If the commit itself fails (for
-  example the connection dropped), its outcome is uncertain, so a fresh
-  connection checks whether the request was saved (`sa_commit_submission()`):
-  saved means success and the files stay; not saved means the usual clean-up;
-  if even that check fails, the submission is reported as failed but no uploaded
-  file is deleted (a saved request never loses its documents). A failing
-  rollback (lost connection) is logged and never skips the clean-up.
+  example the connection dropped), its outcome is uncertain: the database may
+  even finish the commit a moment later. A fresh connection looks for the request
+  several times over about 3.5 seconds (`sa_commit_submission()`): found means
+  success; otherwise the submission is reported as failed but **no file is
+  deleted** (not the request's copies, not the draft's own files), so a saved
+  request never loses its documents and a draft is never damaged. Only a failure
+  before the commit (a definite rollback) removes the request's copies. Files a
+  submission takes from a saved draft are **copied** into the request (a new file
+  gets the folder's default access entries) and the draft's own files are removed
+  only after the commit. A failing rollback (lost connection) is logged and never
+  skips the clean-up.
   `tests/submission_commit_recovery_test.php` covers these outcomes; the
   workflow test kills a submission's database connection mid-transaction.
 * **Access.** Staff (role 2) only, checked on the server for every AI action,
@@ -559,7 +566,15 @@ password, because PHP's built-in server drops empty environment variables.
     replaces the code files (copied through a temporary folder and renamed, with
     `ubuntu:www-data 0640`), which removes such entries; uploads get a default
     entry for new files. Inside the sandbox `/var/www` is an empty read-only
-    folder with only those paths mounted in. Needs the `acl` package.
+    folder with only those paths mounted in. Needs the `acl` package. The script
+    refuses any path with a symbolic link in any component, an unexpected owner
+    or a world-writable folder, grants files only by a physical walk that never
+    follows links (`setfacl -R -P`), checks every path again afterwards, and its
+    unit mounts drafts, logs and every folder it never changes read only and has
+    only `CAP_FOWNER` and `CAP_DAC_READ_SEARCH`. If a stored file is still not
+    readable when a job runs (for example it arrived during a run), the job is
+    retried later without using an attempt (`stored_file_unreadable`), never
+    reported as "could not be prepared".
   * **Hidden:** all of `/etc/smart-assess` (the website settings, the website's
     database login in `database.env`, Gmail; the dispatcher's own settings file is
     read by systemd before the sandbox starts), backups, the worker's secret and
@@ -572,6 +587,13 @@ password, because PHP's built-in server drops empty environment variables.
     D-Bus are hidden, so names cannot be resolved by any route. MySQL is reached
     through its local socket (`DB_HOST=localhost`). `IPAddressDeny=any` /
     `IPAddressAllow=localhost` stay as a second layer.
+  * **A flushed firewall fails closed** (for the worker filter installed in Step 5
+    too). The dispatcher's filter unit has no `RemainAfterExit`, so every run
+    loads and verifies the filter first. `smart-assess-ai-egress-guard` (a timer,
+    every 30 s, and a drop-in that runs it right after `nftables.service` starts,
+    reloads or stops: its `/etc/nftables.conf` begins with `flush ruleset`)
+    reloads both filters; if one cannot be restored it stops the services it
+    protects. Remaining window: up to about 30 s after a manual `nft flush ruleset`.
   * **Database:** its own MySQL account (`deploy/mysql/ai-dispatch-db-user.sql.example`)
     reads only nine columns of `requests` (no contact details), eight of
     `request_documents`, and reads and updates `ai_verification_jobs`; the
@@ -595,7 +617,14 @@ and would fail every job as an invalid worker result. Therefore:
    It must print "compatible" (exit 0). Exit 1 means "NOT COMPATIBLE: deploy the
    application first"; exit 2 means the files could not be read. Do not continue
    on anything but exit 0.
-3. Refresh the worker copy, then run the same check with `--worker=/opt/smart-assess-ai-worker`.
+3. Refresh the worker copy with `deploy/sbin/smart-assess-ai-worker-refresh.sh`
+   (installed as `/usr/local/sbin/smart-assess-ai-worker-refresh.sh`): it stages the
+   copy, runs the check and **refuses** (exit 1, nothing changed) unless it passes,
+   then swaps it in, restarts the worker's PHP pool, checks `/v1/health` and rolls
+   back if the worker is not healthy. `--check-only` stages and checks only.
+4. Enforced at run time too: the dispatcher runs the same check against
+   `/opt/smart-assess-ai-worker` before every run (`ExecStartPre`), so a mismatched
+   worker stops the dispatcher before any job is sent.
 
 The check reads source files only. A new application with the worker installed
 in Step 4 (version 1) is compatible: model quotes are then simply dropped.

@@ -65,6 +65,9 @@ SupplementaryGroups=sa-ai-read
 # root:root 0600: systemd reads it before switching to sa-ai-dispatch.
 EnvironmentFile=/etc/smart-assess/ai-dispatch.env
 WorkingDirectory=/var/www/smart-assess
+# Release order, enforced before every run: the installed worker must answer in a version this
+# application accepts (bin/ai-worker-compat-check.php; exit 1 = deploy the application first).
+ExecStartPre=/usr/bin/php -n /var/www/smart-assess/bin/ai-worker-compat-check.php --app=/var/www/smart-assess --worker=/opt/smart-assess-ai-worker
 # Up to 20 jobs, starting new ones for at most 30 minutes. Errors go to the journal.
 ExecStart=/usr/bin/php -d memory_limit=512M -d display_errors=0 -d log_errors=1 -d error_log= /var/www/smart-assess/bin/ai-verification-dispatch.php --limit=20 --max-seconds=1800
 # 1800 s of starting jobs + one job's lease (worker timeout 900 s + 120 s) + margin.
@@ -82,7 +85,7 @@ IOSchedulingClass=idle
 # Only what it needs of the application, read only: everything else under /var/www is
 # absent from its view, whatever the file permissions say.
 TemporaryFileSystem=/var/www:ro
-BindReadOnlyPaths=/var/www/smart-assess/bin/ai-verification-dispatch.php /var/www/smart-assess/web/bootstrap.php /var/www/smart-assess/app/services /var/www/smart-assess/private_uploads/requests
+BindReadOnlyPaths=/var/www/smart-assess/bin/ai-verification-dispatch.php /var/www/smart-assess/bin/ai-worker-compat-check.php /var/www/smart-assess/web/bootstrap.php /var/www/smart-assess/app/services /var/www/smart-assess/private_uploads/requests
 
 # Network: the egress filter (above) allows only 127.0.0.1:8095; this is a second layer.
 IPAddressDeny=any

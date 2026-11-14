@@ -61,9 +61,9 @@ $check('no privileges or capabilities can be gained', $one('NoNewPrivileges') ==
 $check('the whole file system is read-only for it, home folders hidden, nothing writable', $one('ProtectSystem') === 'strict' && $one('ProtectHome') === 'yes'
     && !isset($service['ReadWritePaths']) && !isset($service['ReadOnlyPaths']));
 $check('only its code and the request uploads exist in its view of /var/www (Step 10, R2)', $one('TemporaryFileSystem') === '/var/www:ro'
-    && $words('BindReadOnlyPaths') === ['/var/www/smart-assess/bin/ai-verification-dispatch.php', '/var/www/smart-assess/web/bootstrap.php',
+    && $words('BindReadOnlyPaths') === ['/var/www/smart-assess/bin/ai-verification-dispatch.php', '/var/www/smart-assess/bin/ai-worker-compat-check.php', '/var/www/smart-assess/web/bootstrap.php',
         '/var/www/smart-assess/app/services', '/var/www/smart-assess/private_uploads/requests'] && !isset($service['BindPaths']), $words('BindReadOnlyPaths'));
-$check('the permissions unit is required and runs before every dispatcher run (outside its read-only sandbox)', !isset($service['ExecStartPre'])
+$check('the permissions unit is required and runs before every dispatcher run (outside its read-only sandbox)', !str_contains(implode(' ', $service['ExecStartPre'] ?? []), 'permissions')
     && (bool) preg_match('/^Requires=.*smart-assess-ai-dispatch-permissions\.service/m', $unitText) && (bool) preg_match('/^After=.*smart-assess-ai-dispatch-permissions\.service/m', $unitText));
 $permUnit = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-dispatch-permissions.service');
 $check('the permissions unit is a oneshot WITHOUT RemainAfterExit (so it runs again on every start), offline, writing only the application folder',
@@ -100,20 +100,63 @@ $check('egress: exactly one thing is allowed, TCP to 127.0.0.1:8095 (the worker)
 $check('egress: everything else is rejected (TCP reset, then any other protocol)', str_contains($dispatchChain, 'meta l4proto tcp counter name rejected reject with tcp reset')
     && (bool) preg_match('/counter name rejected reject with icmpx admin-prohibited\s*$/', trim($dispatchChain)));
 $egressUnit = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-dispatch-egress.service');
-$check('egress unit: loads the table, removes only its own table on stop, and is enabled at boot', str_contains($egressUnit, 'ExecStart=/usr/sbin/nft -f /usr/local/share/smart-assess/ai-dispatch-egress.nft')
-    && str_contains($egressUnit, 'ExecStop=/usr/sbin/nft destroy table inet sa_ai_dispatch_egress') && str_contains($egressUnit, 'WantedBy=multi-user.target'));
+$check('egress unit (Step 12, F2): reloads and verifies the table on every dispatcher run (no RemainAfterExit), enabled at boot',
+    str_contains($egressUnit, 'ExecStart=/usr/sbin/nft -f /usr/local/share/smart-assess/ai-dispatch-egress.nft')
+    && str_contains($egressUnit, 'ExecStartPost=/usr/sbin/nft list table inet sa_ai_dispatch_egress') && !preg_match('/^RemainAfterExit=/m', $egressUnit)
+    && str_contains($egressUnit, 'WantedBy=multi-user.target'));
+$check('the egress rules replace their own table in one transaction (so a reload never opens a gap)', (bool) preg_match('/table inet sa_ai_dispatch_egress\s+delete table inet sa_ai_dispatch_egress\s+table inet sa_ai_dispatch_egress \{/', (string) preg_replace('/#.*$/m', '', $nft)));
 
-// ---- The permissions script (Step 10, R2) ----
+// ---- The egress guard: a flushed firewall fails closed, for the worker and the dispatcher (Step 12, F2) ----
+$guard = (string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-egress-guard.sh');
+$guardCode = (string) preg_replace('/^\s*#.*$/m', '', $guard);
+$check('guard: covers the live worker filter and the dispatcher filter, each with the services it protects',
+    str_contains($guardCode, 'guard sa_ai_worker_egress /etc/smart-assess-ai-worker-runtime/worker-egress.nft') && str_contains($guardCode, 'smart-assess-ai-worker.service smart-assess-ai-worker-fpm.service')
+    && str_contains($guardCode, 'guard sa_ai_dispatch_egress /usr/local/share/smart-assess/ai-dispatch-egress.nft') && str_contains($guardCode, 'smart-assess-ai-dispatch.timer smart-assess-ai-dispatch.service'));
+$check('guard: reloads, verifies, and stops the protected services when a filter cannot be restored', str_contains($guardCode, 'nft -f "$file"')
+    && str_contains($guardCode, 'nft list table inet "$table"') && str_contains($guardCode, 'systemctl stop "$@"') && str_contains($guardCode, 'exit "$status"'));
+$guardUnit = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-egress-guard.service');
+$guardTimer = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-egress-guard.timer');
+$check('guard unit: a root oneshot limited to CAP_NET_ADMIN; its timer runs every 30 s and soon after boot', str_contains($guardUnit, 'CapabilityBoundingSet=CAP_NET_ADMIN')
+    && str_contains($guardUnit, 'Type=oneshot') && str_contains($guardTimer, 'OnUnitActiveSec=30s') && str_contains($guardTimer, 'OnBootSec=20s') && str_contains($guardTimer, 'WantedBy=timers.target'));
+$dropIn = (string) file_get_contents($app . '/deploy/systemd/nftables.service.d/50-smart-assess-ai-egress.conf');
+$check('nftables.service drop-in: the guard runs straight after its start, reload and stop (its config flushes everything)',
+    str_contains($dropIn, 'ExecStartPost=-/usr/local/sbin/smart-assess-ai-egress-guard.sh') && str_contains($dropIn, 'ExecReload=-/usr/local/sbin/smart-assess-ai-egress-guard.sh')
+    && str_contains($dropIn, 'ExecStopPost=-/usr/local/sbin/smart-assess-ai-egress-guard.sh'));
+$check('nftables.service drop-in: a guard failure never fails the host firewall unit ("-" on every line)',
+    preg_match_all('/^Exec\w+=(?!-)/m', $dropIn) === 0 && preg_match_all('/^Exec\w+=-/m', $dropIn) === 3);
+
+// ---- Release order, enforced (Step 12, F3) ----
+$check('dispatcher: the compatibility check runs before every run (installed worker vs deployed application)',
+    $one('ExecStartPre') === '/usr/bin/php -n /var/www/smart-assess/bin/ai-worker-compat-check.php --app=/var/www/smart-assess --worker=/opt/smart-assess-ai-worker');
+$refresh = (string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-worker-refresh.sh');
+$refreshCode = (string) preg_replace('/^\s*#.*$/m', '', $refresh);
+$check('worker refresh: stages a copy, runs the compatibility check and REFUSES (exit 1, nothing changed) unless it passes',
+    str_contains($refreshCode, 'ai-worker-compat-check.php" --app="$APP" --worker="$STAGE"') && (bool) preg_match('/if ! .*ai-worker-compat-check\.php.*\n\s*rm -rf -- "\$STAGE"\n.*REFUSED.*\n\s*exit 1/', $refreshCode)
+    && strpos($refreshCode, 'ai-worker-compat-check.php') < strpos($refreshCode, 'mv -- "$STAGE" "$LIVE"'));
+$check('worker refresh: health-checks the new copy and rolls back to the previous one when unhealthy', str_contains($refreshCode, 'v1/health')
+    && str_contains($refreshCode, 'mv -- "$PREV" "$LIVE"') && str_contains($refreshCode, '--check-only'));
+
+// ---- The permissions script (Steps 10 and 12: R2, F4, F5) ----
 $perm = (string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-dispatch-permissions.sh');
 $permCode = (string) preg_replace('/^\s*#.*$/m', '', $perm);
-$check('permissions: fails closed (set -euo pipefail; stops without setfacl, the group or any expected path)', str_contains($permCode, 'set -euo pipefail')
-    && str_contains($permCode, 'command -v setfacl') && str_contains($permCode, 'getent group "$GROUP"') && str_contains($permCode, '[[ -e "$path" && ! -L "$path" ]]'));
+$check('permissions: fails closed (set -euo pipefail; stops without setfacl, the group or a safe path)', str_contains($permCode, 'set -euo pipefail')
+    && str_contains($permCode, 'command -v setfacl') && str_contains($permCode, 'getent group "$GROUP"') && str_contains($permCode, '[[ -e "$part" && ! -L "$part" ]]'));
+$check('permissions (F5): every component of every path is checked (no symbolic link, safe owner, not world-writable), before AND after',
+    str_contains($permCode, 'IFS=/ read -ra parts') && str_contains($permCode, 'root|ubuntu|www-data') && str_contains($permCode, '& 02')
+    && substr_count($permCode, "\ncheck_all\n") === 2);
+$check('permissions (F5): files are granted only by a physical walk that never follows symbolic links (-R -P), and paths end option parsing (--)',
+    !preg_match('/setfacl -R (?!-P)/', $permCode) && preg_match_all('/setfacl -R -P /', $permCode) === 2 && preg_match_all('/^\s*setfacl -[^\n]* -- /m', $permCode) === preg_match_all('/^\s*setfacl -/m', $permCode) && preg_match_all('/^\s*setfacl -/m', $permCode) === 5);
 $check('permissions: grants only to group sa-ai-read and never changes owners, groups or modes', str_contains($permCode, 'GROUP=sa-ai-read')
-    && !preg_match('/\b(chown|chgrp|chmod|usermod|useradd)\b/', $permCode) && !str_contains($permCode, 'www-data'));
+    && !preg_match('/\b(chown|chgrp|chmod|usermod|useradd)\b/', $permCode) && !preg_match('/setfacl[^\n]*www-data/', $permCode));
 preg_match_all('/setfacl[^\n]*/', $permCode, $setfacl);
 $granted = implode("\n", $setfacl[0]);
-$check('permissions: read only, never write (no "w" in any entry)', !preg_match('/g:\$GROUP:[rx]*w/', $granted), $granted);
-$check('permissions: no recursive grant on the application tree', !preg_match('/setfacl\s+(-[a-zA-Z]*R|--recursive)/', $permCode));
+$check('permissions: read only, never write (no "w" in any entry)', !preg_match('/g:\$GROUP:[rxX]*w/', $granted), $granted);
+$check('permissions: recursion only inside app/services and private_uploads/requests', !preg_match('/setfacl -R[^\n]*"\$APP"\s*$/m', $permCode)
+    && preg_match_all('/setfacl -R -P -m "g:\$GROUP:rX" -- "\$APP\/(app\/services|private_uploads\/requests)"/', $permCode) === 2);
+$permUnitText = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-dispatch-permissions.service');
+$check('permissions unit (F4): no CAP_DAC_OVERRIDE, only CAP_FOWNER and CAP_DAC_READ_SEARCH', str_contains($permUnitText, 'CapabilityBoundingSet=CAP_FOWNER CAP_DAC_READ_SEARCH')
+    && !str_contains($permUnitText, 'CAP_DAC_OVERRIDE'));
+$check('permissions unit (F5): drafts, logs and every folder it never changes are mounted read only', (bool) preg_match('/^ReadOnlyPaths=.*private_uploads\/drafts.*\/logs.*\/vendor/m', $permUnitText));
 foreach (['drafts', 'logs', 'vendor', '/etc/', 'gmail', 'database.env', 'apache.env'] as $never) {
     $check('permissions: nothing for ' . $never, !str_contains($permCode, $never));
 }

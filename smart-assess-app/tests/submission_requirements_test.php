@@ -268,11 +268,29 @@ $before = $requestCount();
 [$status, , $body] = $submit('docreq', true, [], ['draft_token' => $code]);
 $check('submitting a draft holding an old PDF ID is refused with a request to upload it again; the draft keeps its file', $status === 422
     && str_contains($body, 'again') && $requestCount() === $before && is_file($oldPdfId), [$status, $body]);
-$plant('ownerId', $fixtures . '/id.png', 'image/png');
+$ownerDraft = $plant('ownerId', $fixtures . '/id.png', 'image/png');
 $extra = $plant('requesterId', $fixtures . '/id.png', 'image/png');   // not needed by an owner's request
+// Step 12 (F7): a failure after the draft's files were copied into the request leaves the draft intact.
+$requestFiles = static fn (): array => glob($work . '/smart-assess-app/private_uploads/requests/*') ?: [];
+$filesBefore = $requestFiles();
+$before = $requestCount();
+$pdo->exec("CREATE TRIGGER sa_test_fail_documents BEFORE INSERT ON request_documents FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'test: documents unavailable'");
+[$status, , $body] = $submit('docreq', true, [], ['draft_token' => $code]);
+$pdo->exec('DROP TRIGGER sa_test_fail_documents');
+$check('a draft submission that fails after its files were copied: refused, nothing saved, no copy left, the draft keeps every file',
+    $status >= 500 && $requestCount() === $before && $requestFiles() === $filesBefore && is_file($ownerDraft) && is_file($extra), [$status, substr($body, 0, 200)]);
 [$status, $ref, $body] = $submit('docreq', true, [], ['draft_token' => $code]);
 $check('a draft submission uses only required documents; an unneeded saved file is not attached and is deleted', $status === 200
     && array_column($documentsOf($ref), 'doc_key') === ['ownerId'] && !is_file($extra), [$status, $documentsOf($ref), $body]);
+// Step 12 (F1): the request holds its own COPY (a new file, so it gets the folder's default access
+// entries); the draft's file is removed only after the commit.
+$stored = (string) $pdo->query('SELECT d.stored_path FROM request_documents d JOIN requests r ON r.id = d.request_id WHERE r.reference_no = ' . $pdo->quote($ref) . " AND d.doc_key = 'ownerId'")->fetchColumn();
+$check('the request\'s file is a copy in the request folder and the draft\'s own file is gone after the commit', $stored !== ''
+    && is_file($work . '/smart-assess-app/' . $stored) && !is_file($ownerDraft)
+    && hash_file('sha256', $work . '/smart-assess-app/' . $stored) === hash_file('sha256', $fixtures . '/id.png'), [$stored, is_file($ownerDraft)]);
+$api = (string) file_get_contents($project . '/smart-assess-app/web/api.php');
+$check('source: draft files are copied into a request, never renamed', str_contains($api, "@copy((string) \$draftFile['path'], \$destination)")
+    && !preg_match('/rename\(\(string\) \$draftFile/', $api));
 
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {

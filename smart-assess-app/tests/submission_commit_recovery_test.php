@@ -82,6 +82,18 @@ final class CommittedThenLostPDO extends PDO
         throw new PDOException('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away');   // ... but the answer was lost
     }
 }
+/** The commit is reported as failed, but the server finishes it a moment later (in doubt). */
+final class LateCommitPDO extends PDO
+{
+    public function commit(): bool
+    {
+        throw new PDOException('SQLSTATE[HY000]: General error: 2013 Lost connection to MySQL server during query');
+    }
+    public function finishOnServer(): void
+    {
+        parent::commit();
+    }
+}
 final class FailedCommitPDO extends PDO
 {
     public function commit(): bool
@@ -113,21 +125,38 @@ $check('commit happened but its answer was lost: a fresh connection finds it, so
 
 $pdo = new FailedCommitPDO($dsn, $user, $pass, $options);
 $id = $begin($pdo, 'DR-2026-NOTSAVED');
-$outcome = sa_commit_submission($pdo, $id, $fresh);
-$check('commit failed: a fresh connection finds nothing, so it is "not_saved" (the usual clean-up)', $outcome === 'not_saved' && !$saved($id), $outcome);
+$started = microtime(true);
+$outcome = sa_commit_submission($pdo, $id, $fresh, [0, 0.2, 0.2]);
+$check('commit failed: looked for several times, never found, so "not_found" (the caller still keeps every file)', $outcome === 'not_found' && !$saved($id)
+    && microtime(true) - $started >= 0.35, $outcome);
+
+$pdo = new LateCommitPDO($dsn, $user, $pass, $options);
+$id = $begin($pdo, 'DR-2026-INDOUBT');
+$looks = 0;
+$outcome = sa_commit_submission($pdo, $id, static function () use (&$looks, $pdo, $fresh): PDO {
+    if (++$looks === 2) {
+        $pdo->finishOnServer();   // the server completes the commit only after the first look
+    }
+    return $fresh();
+}, [0, 0.1, 0.1]);
+$check('in doubt: the commit completes on the server after the first look; a later look finds it, so "committed"', $outcome === 'committed' && $saved($id) && $looks === 2, [$outcome, $looks]);
 
 $pdo = new FailedCommitPDO($dsn, $user, $pass, $options);
 $id = $begin($pdo, 'DR-2026-UNKNOWN');
-$outcome = sa_commit_submission($pdo, $id, static fn (): PDO => throw new PDOException('SQLSTATE[HY000] [2002] Connection refused'));
+$outcome = sa_commit_submission($pdo, $id, static fn (): PDO => throw new PDOException('SQLSTATE[HY000] [2002] Connection refused'), [0, 0.1]);
 $check('commit failed and no fresh connection is possible: "unknown"', $outcome === 'unknown', $outcome);
 
 $pdo = new CommittedThenLostPDO($dsn, $user, $pass, $options);
 $id = $begin($pdo, 'DR-2026-DEFAULT');
 $outcome = sa_commit_submission($pdo, $id);   // the real default: sa_db_connect() with the environment's settings
 $check('by default the fresh connection is sa_db_connect() (same settings, a new connection)', $outcome === 'committed' && $saved($id), $outcome);
+$defaults = (new ReflectionFunction('sa_commit_submission'))->getParameters()[3]->getDefaultValue();
+$check('by default an uncertain commit is looked for at least 3 times over at least 3 seconds (a late commit is found)',
+    is_array($defaults) && count($defaults) >= 3 && array_sum($defaults) >= 3, $defaults);
 $log = (string) @file_get_contents($work . '/php-errors.log');
-$check('each uncertain commit is logged by request ID only (no names or references)', substr_count($log, 'The commit of a submission (request ID') === 4
-    && str_contains($log, 'its uploaded files are kept') && !preg_match('/DR-2026-/', $log), $log);
+$check('each uncertain commit is logged by request ID only (no names or references)', substr_count($log, 'The commit of a submission (request ID') === 5
+    && str_contains($log, 'not found after its commit failed; its files are kept') && str_contains($log, 'not checked (no connection); its files are kept')
+    && !preg_match('/DR-2026-/', $log), $log);
 
 // ---- sa_submit_request() uses it as intended ----
 $submit = $extract($api, 'sa_submit_request');
@@ -136,10 +165,13 @@ $check('the submission saves only through sa_commit_submission()', str_contains(
     && preg_match_all('/\$pdo->commit\(\)/', $submit) === 1
     && str_contains($submit, "\$pdo->commit();\n                return ['reference_no' => (string) \$draft['submitted_reference'], 'status' => 'Received', 'duplicate' => true];"),
     'direct commits: ' . preg_match_all('/\$pdo->commit\(\)/', $submit));
-$check('an "unknown" commit keeps every uploaded file', str_contains($submit, "\$keepFiles = \$committed === 'unknown';")
+$check('any uncertain commit (not found or unknown) keeps every uploaded file and the draft\'s files', str_contains($submit, '$keepFiles = true;')
     && (bool) preg_match('/if \(\$keepFiles\) \{[^}]*throw \$exception;/s', $submit));
 $check('a failing rollBack() is caught, so the clean-up always runs', (bool) preg_match('/try \{\s*if \(\$pdo->inTransaction\(\)\) \{\s*\$pdo->rollBack\(\);\s*\}\s*\} catch \(Throwable\)/s', $submit));
 $check('the clean-up after a failed submission cannot itself fail on a missing file', str_contains($submit, '@unlink($path);'));
+$check('a definitely failed submission removes only its own copies; the draft\'s files are removed only after a commit (F7)',
+    !str_contains($submit, '$movedDraftFiles') && str_contains($submit, "foreach (array_merge(\$draftOriginals, \$unusedDraftFiles) as \$path)")
+    && strpos($submit, 'array_merge($draftOriginals') > strpos($submit, '$committed = sa_commit_submission('));
 
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {

@@ -4,7 +4,10 @@
 #   sudo install -o root -g root -m 0644 smart-assess-ai-dispatch-egress.service /etc/systemd/system/
 #   sudo systemctl daemon-reload && sudo systemctl enable --now smart-assess-ai-dispatch-egress.service
 # smart-assess-ai-dispatch.service requires it: if the filter is not loaded, the dispatcher does
-# not run. Stopping it removes only its own table.
+# not run. Between runs smart-assess-ai-egress-guard also keeps it loaded.
+# Upgrading a server where an earlier version of this unit (with RemainAfterExit=yes) is active: run
+# "sudo systemctl stop smart-assess-ai-dispatch-egress.service" once after daemon-reload, or it stays
+# "active (exited)" and the dispatcher's runs do not reload the filter until the next reboot.
 
 [Unit]
 Description=SMART ASSESS AI dispatcher egress filter (nftables, account sa-ai-dispatch only)
@@ -12,9 +15,10 @@ Before=smart-assess-ai-dispatch.service
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
+# No RemainAfterExit: the dispatcher Requires= this unit, so every dispatcher run loads the filter again
+# (and checks it is there) before it starts; a flush between runs can never leave a run unfiltered.
 ExecStart=/usr/sbin/nft -f /usr/local/share/smart-assess/ai-dispatch-egress.nft
-ExecStop=/usr/sbin/nft destroy table inet sa_ai_dispatch_egress
+ExecStartPost=/usr/sbin/nft list table inet sa_ai_dispatch_egress
 
 [Install]
 WantedBy=multi-user.target

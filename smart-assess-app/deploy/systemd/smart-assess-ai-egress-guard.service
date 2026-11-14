@@ -1,0 +1,24 @@
+# SMART ASSESS - reloads the AI egress filters, or stops what they protect (see
+# ../sbin/smart-assess-ai-egress-guard.sh). Started by smart-assess-ai-egress-guard.timer every 30 s
+# and by the nftables.service drop-in. NOT INSTALLED. Install (with approval):
+#   sudo install -o root -g root -m 0755 ../sbin/smart-assess-ai-egress-guard.sh /usr/local/sbin/
+#   sudo install -o root -g root -m 0644 smart-assess-ai-egress-guard.service smart-assess-ai-egress-guard.timer /etc/systemd/system/
+#   sudo install -d /etc/systemd/system/nftables.service.d
+#   sudo install -o root -g root -m 0644 nftables.service.d/50-smart-assess-ai-egress.conf /etc/systemd/system/nftables.service.d/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now smart-assess-ai-egress-guard.timer
+
+[Unit]
+Description=SMART ASSESS AI egress filter guard (reload, or stop what the filters protect)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/smart-assess-ai-egress-guard.sh
+# Root with only what it needs: load nftables rules and stop units.
+CapabilityBoundingSet=CAP_NET_ADMIN
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK

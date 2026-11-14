@@ -1402,6 +1402,22 @@ $confirmationRows = (int) $pdo->query("SELECT COUNT(*) FROM notifications n JOIN
 $check('after the deadlocks, a normal submission is saved with its AI job and its SMS confirmation queued (confirmations unchanged)', $status === 200 && $refAfter !== ''
     && $hasJob($refAfter) && $confirmationRows === 1, [$status, $refAfter, $confirmationRows]);
 $check('queueing a confirmation sends nothing by itself', (string) @file_get_contents($sendAttempts) === $sentBefore);
+// ================= Step 12 (F1): a stored file the dispatcher cannot read yet is retried, never a finding =================
+[, $refUnreadable] = $submit('docreq', 'Santos', ['ownerId' => 'id-santos.png']);
+$unreadablePath = $work . '/smart-assess-app/' . (string) $pdo->query("SELECT d.stored_path FROM request_documents d JOIN requests r ON r.id = d.request_id
+    WHERE r.reference_no = " . $pdo->quote($refUnreadable))->fetchColumn();
+chmod($unreadablePath, 0000);   // like a file that arrived during a run, before its read access was restored
+clearstatcache();
+$output = $dispatch();
+$waiting = $job($refUnreadable);
+$check('an unreadable stored original: the job waits for a retry (no attempt used), with no "could not be prepared" finding', $waiting['status'] === 'pending'
+    && $waiting['error_code'] === 'stored_file_unreadable' && (int) $waiting['attempts'] === 0 && $waiting['findings_json'] === null, [$waiting['status'], $waiting['error_code'], $waiting['attempts'], $output]);
+chmod($unreadablePath, 0640);
+$makeDue();
+$dispatch();
+$done = $job($refUnreadable);
+$check('once readable, the same job completes normally', $done['status'] === 'completed' && !str_contains((string) $done['findings_json'], 'could not be prepared'), [$done['status'], $done['findings_json']]);
+
 // ================= Step 10 (R5): the database connection lost in the middle of a submission =================
 // The submission waits inside its transaction (a test trigger), then this test kills its database
 // connection, exactly like a crashed or restarted MySQL connection. Expected: no PHP fatal error,

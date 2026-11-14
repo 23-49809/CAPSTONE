@@ -542,7 +542,16 @@ function sa_submission_still_saved(PDO $pdo, int $requestId, string $step): void
  * saved request is never treated as failed (and its files deleted), and an unsaved one is
  * never reported as saved. 'unknown' means even that check failed: the caller keeps the files.
  */
-function sa_commit_submission(PDO $pdo, int $requestId, ?Closure $freshConnection = null): string
+/**
+ * Commits a submission. If commit() itself fails (for example the connection dropped), the
+ * outcome is uncertain: the server may still finish the commit a moment later. A fresh
+ * connection then looks for the request several times ($retryDelays, in seconds before each
+ * look). 'committed' when found; 'not_found' when every look missed it; 'unknown' when no
+ * look could run. Only 'committed' counts as saved; the caller keeps every file otherwise.
+ *
+ * @param list<float|int> $retryDelays
+ */
+function sa_commit_submission(PDO $pdo, int $requestId, ?Closure $freshConnection = null, array $retryDelays = [0, 0.5, 1, 2]): string
 {
     try {
         $pdo->commit();
@@ -550,15 +559,30 @@ function sa_commit_submission(PDO $pdo, int $requestId, ?Closure $freshConnectio
     } catch (Throwable) {
         error_log('[SMART_ASSESS] The commit of a submission (request ID ' . $requestId . ') failed; checking on a new connection whether it was saved.');
     }
-    try {
-        $fresh = $freshConnection !== null ? $freshConnection() : sa_db_connect();
-        $stmt = $fresh->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
-        $stmt->execute(['id' => $requestId]);
-        return (int) $stmt->fetchColumn() === 1 ? 'committed' : 'not_saved';
-    } catch (Throwable) {
-        error_log('[SMART_ASSESS] Could not find out whether request ID ' . $requestId . ' was saved; its uploaded files are kept.');
-        return 'unknown';
+    $looked = false;
+    foreach ($retryDelays as $delay) {
+        if ($delay > 0) {
+            usleep((int) round($delay * 1_000_000));
+        }
+        try {
+            // A new connection for every look: the earlier one may be the next to drop.
+            $fresh = $freshConnection !== null ? $freshConnection() : sa_db_connect();
+            $stmt = $fresh->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
+            $stmt->execute(['id' => $requestId]);
+            $looked = true;
+            if ((int) $stmt->fetchColumn() === 1) {
+                return 'committed';
+            }
+        } catch (Throwable) {
+            // no look this time; try again after the next delay
+        }
     }
+    if ($looked) {
+        error_log('[SMART_ASSESS] Request ID ' . $requestId . ' was not found after its commit failed; its files are kept.');
+        return 'not_found';
+    }
+    error_log('[SMART_ASSESS] Whether request ID ' . $requestId . ' was saved was not checked (no connection); its files are kept.');
+    return 'unknown';
 }
 
 function sa_submit_request(array $data): array
@@ -649,7 +673,7 @@ function sa_submit_request(array $data): array
 
     $pdo = sa_db();
     $storedFiles = [];
-    $movedDraftFiles = [];
+    $draftOriginals = [];   // draft files copied into this request: removed only after the commit is confirmed
     $keepFiles = false;   // set when a commit's outcome is unknown: then no file is removed
     $requestId = 0;
     $unusedDraftFiles = [];
@@ -770,15 +794,21 @@ function sa_submit_request(array $data): array
                     'file_status' => 'ok',
                 ]);
             } elseif (isset($draftFiles[$key])) {
-                // Saved with the draft earlier; move it into the request folder.
+                // Saved with the draft earlier: COPIED into the request folder, not renamed. A new file
+                // gets the folder's default access entries (the AI dispatcher's read group, when that
+                // is installed), and the draft keeps its own file until this request is committed, so
+                // a failed or uncertain submission never takes the draft's documents away.
                 $draftFile = $draftFiles[$key];
                 $extension = strtolower(pathinfo((string) $draftFile['path'], PATHINFO_EXTENSION));
                 $storedName = $requestId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
                 $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
-                if (!rename((string) $draftFile['path'], $destination)) {
+                if (!@copy((string) $draftFile['path'], $destination) || filesize($destination) !== filesize((string) $draftFile['path'])) {
+                    @unlink($destination);
                     throw new RuntimeException('Unable to store a saved draft file.');
                 }
-                $movedDraftFiles[$destination] = (string) $draftFile['path'];
+                chmod($destination, 0640);
+                $storedFiles[] = $destination;   // the copy: removed if the submission is not saved
+                $draftOriginals[] = (string) $draftFile['path'];
                 $documentInsert->execute([
                     'request_id' => $requestId,
                     'doc_key' => $key,
@@ -879,10 +909,12 @@ function sa_submit_request(array $data): array
         }
         $committed = sa_commit_submission($pdo, $requestId);
         if ($committed !== 'committed') {
-            // Not saved: clean up as for any failure. Unknown: keep every file (a saved request
-            // must never lose its documents); the client is told it failed and can check tracking.
-            $keepFiles = $committed === 'unknown';
-            throw new RuntimeException('The submission could not be saved (commit ' . $committed . ').');
+            // The commit's outcome is uncertain (not found after several looks, or no look possible):
+            // keep every file, the request's copies and the draft's own, because the request may still
+            // turn out saved and must never lose its documents. The client is told it failed and can
+            // check tracking; an orphaned copy costs only disk space.
+            $keepFiles = true;
+            throw new RuntimeException('The submission could not be confirmed as saved (commit ' . $committed . ').');
         }
         // Last check before success is reported: the request really is saved. A transaction the
         // database dropped earlier (a deadlock) would otherwise "commit" nothing silently.
@@ -893,10 +925,11 @@ function sa_submit_request(array $data): array
         } catch (PDOException) {
             error_log('[SMART_ASSESS] Could not re-check a committed submission (request ID ' . $requestId . '); it was committed.');
         }
-        // Saved draft files for documents this request does not need are not kept.
-        foreach ($unusedDraftFiles as $path) {
-            if (is_file($path)) {
-                @unlink($path);
+        // Committed: the draft's own copies of the files it handed over, and saved draft files for
+        // documents this request does not need, are no longer kept.
+        foreach (array_merge($draftOriginals, $unusedDraftFiles) as $path) {
+            if (is_file($path) && !@unlink($path)) {
+                error_log('[SMART_ASSESS] Could not remove a draft file after request ID ' . $requestId . ' was saved.');
             }
         }
 
@@ -924,11 +957,8 @@ function sa_submit_request(array $data): array
             error_log('[SMART_ASSESS] Kept the uploaded files of request ID ' . $requestId . ': it is not known whether it was saved.');
             throw $exception;
         }
-        foreach ($movedDraftFiles as $moved => $original) {
-            if (is_file($moved)) {
-                @rename($moved, $original);   // give the draft its files back
-            }
-        }
+        // Definitely not saved (the failure came before the commit): remove this request's copies and
+        // uploads. The draft's own files were never touched, so the draft is unchanged.
         foreach ($storedFiles as $path) {
             if (is_file($path)) {
                 @unlink($path);

@@ -54,7 +54,9 @@ final class AiVerification
     public const RETRY_CONFIGURATION = 'configuration';
     public const RETRY_COUNTED = 'counted';
     public const RETRY_PERMANENT = 'permanent';
-    private const TRANSIENT = ['worker_unavailable', 'worker_busy'];
+    /** stored_file_unreadable: a stored original exists but this process may not read it yet (its read access is
+     *  restored at the next dispatcher run); retried without using an attempt, never reported as a finding. */
+    private const TRANSIENT = ['worker_unavailable', 'worker_busy', 'stored_file_unreadable'];
     private const CRASH = ['worker_crashed', 'model_unavailable'];
     private const CONFIGURATION = ['worker_auth_failed', 'worker_not_configured', 'worker_cleanup_failed', 'worker_tls_failed',
         'worker_body_too_large', 'worker_proxy_error'];
@@ -453,6 +455,11 @@ final class AiVerification
             $uploaded[$key] = ['mime' => (string) $row['mime_type'], 'size' => (int) $row['file_size']];
             $path = (string) $row['stored_path'];
             $real = preg_match(self::UPLOAD_PATH, $path) && $uploadRoot !== false ? realpath($appRoot . '/' . $path) : false;
+            if ($real !== false && str_starts_with($real, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($real) && !is_readable($real)) {
+                // Present but not readable by this process (for example a file that arrived during this
+                // dispatcher run, before its read access was restored): try the job again later.
+                throw new RuntimeException('stored_file_unreadable');
+            }
             $bytes = $real !== false && str_starts_with($real, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($real)
                 && filesize($real) < AiDocumentWorkerLimits::MAX_DOCUMENT_BYTES ? @file_get_contents($real) : false;
             if (!is_string($bytes) || $bytes === '' || count($documents) >= AiDocumentWorkerLimits::MAX_DOCUMENTS) {
@@ -513,6 +520,8 @@ final class AiVerification
             'error' => $code, 'retry' => self::retryClass($code)];
         try {
             $built = self::buildJob($pdo, $job, $appRoot);
+        } catch (RuntimeException $exception) {
+            return $failed($exception->getMessage() === 'stored_file_unreadable' ? 'stored_file_unreadable' : 'job_build_failed');
         } catch (Throwable) {
             return $failed('job_build_failed');
         }
@@ -824,6 +833,7 @@ final class AiVerification
             'worker_outage_too_long' => 'The AI worker was unavailable for about three days, so automatic retries stopped. Run the check again when the worker is back, or inspect the documents manually.',
             'model_output_invalid' => 'The AI model did not give a valid answer, so only the automatic rule checks are shown.',
             'job_build_failed' => 'The request\'s documents could not be prepared for checking.',
+            'stored_file_unreadable' => 'A stored document could not be read by the AI check yet. The check is retried automatically.',
             'lease_expired', 'too_many_attempts' => 'The check did not finish after several attempts.',
             default => 'The automatic check could not be completed.',
         };
