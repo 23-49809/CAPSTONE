@@ -1,0 +1,20 @@
+# SMART ASSESS - the AI dispatcher's only connection: a Unix socket forwarded to the AI worker (127.0.0.1:8095).
+# NOT INSTALLED. Install (with approval) with smart-assess-ai-worker-link.service:
+#   sudo install -o root -g root -m 0644 smart-assess-ai-worker-link.socket smart-assess-ai-worker-link.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now smart-assess-ai-worker-link.socket
+# the AI dispatcher runs with PrivateNetwork=yes (no network at all, so flushing or breaking the host firewall can never
+# open anything to it). This socket file is its only way out: group sa-ai-dispatch only, and the forwarder behind it
+# can connect to 127.0.0.1:8095 and nowhere else.
+[Unit]
+Description=SMART ASSESS link for the AI dispatcher (Unix socket to 127.0.0.1:8095)
+
+[Socket]
+ListenStream=/run/smart-assess-ai-link/worker.sock
+SocketUser=root
+SocketGroup=sa-ai-dispatch
+SocketMode=0660
+DirectoryMode=0755
+Accept=no
+
+[Install]
+WantedBy=sockets.target

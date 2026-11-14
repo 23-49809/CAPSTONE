@@ -51,8 +51,8 @@
 [Unit]
 Description=SMART ASSESS AI document check dispatcher
 Documentation=file:///var/www/smart-assess/docs/AI_DOCUMENT_VERIFICATION.md
-Requires=smart-assess-ai-dispatch-egress.service smart-assess-ai-dispatch-permissions.service
-After=network-online.target mysql.service smart-assess-ai-worker.service smart-assess-ai-dispatch-egress.service smart-assess-ai-dispatch-permissions.service
+Requires=smart-assess-ai-dispatch-egress.service smart-assess-ai-dispatch-permissions.service smart-assess-ai-worker-link.socket
+After=network-online.target mysql.service smart-assess-ai-worker.service smart-assess-ai-dispatch-egress.service smart-assess-ai-dispatch-permissions.service smart-assess-ai-worker-link.socket
 Wants=network-online.target
 
 [Service]
@@ -88,9 +88,15 @@ TemporaryFileSystem=/var/www:ro
 BindReadOnlyPaths=/var/www/smart-assess/bin/ai-verification-dispatch.php /var/www/smart-assess/bin/ai-worker-compat-check.php /var/www/smart-assess/web/bootstrap.php /var/www/smart-assess/app/services /var/www/smart-assess/private_uploads/requests
 
 # Network: the egress filter (above) allows only 127.0.0.1:8095; this is a second layer.
+# No network at all (Step 13): a private network namespace with only an empty loopback, set up when the
+# process starts, so flushing, reloading or breaking the host firewall can never open anything to a running
+# dispatcher. Its only connections are socket files: MySQL (/run/mysqld, DB_HOST=localhost) and the AI
+# worker through smart-assess-ai-worker-link.socket. The nftables filter and IPAddressDeny stay as extra layers.
+PrivateNetwork=yes
+Environment=SMART_ASSESS_AI_WORKER_SOCKET=/run/smart-assess-ai-link/worker.sock
 IPAddressDeny=any
 IPAddressAllow=localhost
-RestrictAddressFamilies=AF_UNIX AF_INET
+RestrictAddressFamilies=AF_UNIX
 
 # Hardening: writes nothing to disk.
 NoNewPrivileges=yes

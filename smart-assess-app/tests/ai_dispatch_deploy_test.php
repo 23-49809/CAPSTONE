@@ -56,7 +56,11 @@ $check('the unit says how to create the account (non-login) and the read group',
 $check('network, second layer: everything denied except loopback (IPAddressDeny=any, IPAddressAllow=localhost)', $one('IPAddressDeny') === 'any' && $one('IPAddressAllow') === 'localhost');
 $check('network, first layer: the egress filter unit is required and started first (Step 10, R1)', in_array('smart-assess-ai-dispatch-egress.service', preg_split('/\s+/', (string) (preg_match('/^Requires=(.*)$/m', $unitText, $m) ? $m[1] : '')), true)
     && (bool) preg_match('/^After=.*smart-assess-ai-dispatch-egress\.service/m', $unitText));
-$check('no IPv6, raw or netlink sockets: only AF_UNIX and AF_INET', $words('RestrictAddressFamilies') === ['AF_UNIX', 'AF_INET']);
+$check('Step 13: only Unix sockets (no IP, IPv6, raw or netlink sockets at all)', $words('RestrictAddressFamilies') === ['AF_UNIX']);
+$check('Step 13: no network at all (PrivateNetwork=yes): a flushed or broken host firewall cannot open anything to it', $one('PrivateNetwork') === 'yes');
+$check('Step 13: it reaches the worker only through the link socket, set in the unit itself',
+    $one('Environment') === 'SMART_ASSESS_AI_WORKER_SOCKET=/run/smart-assess-ai-link/worker.sock'
+    && (bool) preg_match('/^Requires=.*\bsmart-assess-ai-worker-link\.socket\b/m', $unitText) && (bool) preg_match('/^After=.*\bsmart-assess-ai-worker-link\.socket\b/m', $unitText));
 $check('no privileges or capabilities can be gained', $one('NoNewPrivileges') === 'yes' && $one('CapabilityBoundingSet') === '' && $one('AmbientCapabilities') === '');
 $check('the whole file system is read-only for it, home folders hidden, nothing writable', $one('ProtectSystem') === 'strict' && $one('ProtectHome') === 'yes'
     && !isset($service['ReadWritePaths']) && !isset($service['ReadOnlyPaths']));
@@ -227,6 +231,38 @@ $check('requests: only the columns the check needs, no contact details or addres
     && !preg_match('/contact_number|email|address_line|province|city|zip_code|client_id|middle_name|property_address/', $requestGrant), $requestGrant);
 $check('ai_verification_jobs: read and update only (it never inserts or deletes)', (bool) preg_grep('/^GRANT SELECT, UPDATE ON smart_assess_sydney\.ai_verification_jobs TO/', $grants));
 $check('no grant on any other table', preg_grep('/ON smart_assess_sydney\.(?!requests |request_documents |ai_verification_jobs )/', $grants) === []);
+
+$permLines = preg_grep('/^\s*setfacl /', explode("\n", (string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-dispatch-permissions.sh')));
+$check('Step 13: every setfacl line is physical (-P): a symbolic link swapped in after the check is never followed',
+    count($permLines) === 5 && count(preg_grep('/^\s*setfacl (-R )?-P /', $permLines)) === 5, array_values($permLines));
+
+// ---- Step 13: the two links and the worker pool's isolation ----
+$unitValue = static function (string $text, string $key): array {
+    preg_match_all('/^' . preg_quote($key, '/') . '=(.*)$/m', $text, $m);
+    return array_map('trim', $m[1]);
+};
+foreach ([['smart-assess-ai-worker-link', '/run/smart-assess-ai-link/worker.sock', 'sa-ai-dispatch', '127.0.0.1:8095'],
+          ['smart-assess-ai-ollama-link', '/run/smart-assess-ai-ollama/ollama.sock', 'sa-ai-worker', '127.0.0.1:11434']] as [$link, $path, $group, $target]) {
+    $sock = (string) @file_get_contents($app . '/deploy/systemd/' . $link . '.socket');
+    $svc = (string) @file_get_contents($app . '/deploy/systemd/' . $link . '.service');
+    $check("Step 13: {$link}.socket: {$path}, root:{$group} 0660, one forwarder (Accept=no)", $unitValue($sock, 'ListenStream') === [$path]
+        && $unitValue($sock, 'SocketUser') === ['root'] && $unitValue($sock, 'SocketGroup') === [$group] && $unitValue($sock, 'SocketMode') === ['0660']
+        && $unitValue($sock, 'Accept') === ['no']);
+    $check("Step 13: {$link}.service forwards only to {$target} (systemd-socket-proxyd)", $unitValue($svc, 'ExecStart') === ['/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=120s ' . $target]
+        && $unitValue($svc, 'Requires') === [$link . '.socket']);
+    $check("Step 13: {$link}.service: no privileges, may reach only 127.0.0.1", $unitValue($svc, 'DynamicUser') === ['yes'] && $unitValue($svc, 'CapabilityBoundingSet') === ['']
+        && $unitValue($svc, 'NoNewPrivileges') === ['yes'] && $unitValue($svc, 'IPAddressDeny') === ['any'] && $unitValue($svc, 'IPAddressAllow') === ['127.0.0.1/32']
+        && $unitValue($svc, 'ProtectSystem') === ['strict'] && $unitValue($svc, 'SystemCallFilter') === ['@system-service']);
+}
+$fpmDropIn = (string) @file_get_contents($app . '/deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf');
+$check('Step 13: the worker pool (it parses the documents) gets no network and only Unix sockets', $unitValue($fpmDropIn, 'PrivateNetwork') === ['yes']
+    && $unitValue($fpmDropIn, 'RestrictAddressFamilies') === ['', 'AF_UNIX'] && $unitValue($fpmDropIn, 'Requires') === ['smart-assess-ai-ollama-link.socket']
+    && $unitValue($fpmDropIn, 'After') === ['smart-assess-ai-ollama-link.socket'], $fpmDropIn);
+$pool = (string) file_get_contents($app . '/deploy/systemd/worker-php-fpm-pool.conf.example');
+$check('Step 13: the pool passes the Ollama socket to PHP (clear_env)', str_contains($pool, 'env[SMART_ASSESS_WORKER_OLLAMA_SOCKET] = /run/smart-assess-ai-ollama/ollama.sock'));
+$check('Step 13: the dispatcher cannot use the Ollama link and the worker cannot use the dispatcher link (different groups)',
+    !str_contains((string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-ollama-link.socket'), 'sa-ai-dispatch')
+    && !preg_match('/^SupplementaryGroups=.*sa-ai-worker/m', $unitText));
 
 // ---- systemd's own check, where available ----
 $analyze = trim((string) shell_exec('command -v systemd-analyze 2>/dev/null'));

@@ -20,7 +20,8 @@
 # symbolic link while this runs as root):
 #   - every folder on every path, from / down, must be a real folder (no symbolic link), owned
 #     by root, ubuntu or www-data, and not writable by "other"; every target file a regular file;
-#   - files are granted with a physical walk (setfacl -R -P), which never follows a symbolic link;
+#   - every setfacl runs with -P (physical): it never follows a symbolic link, neither while walking (-R)
+#     nor as an argument swapped in after the check (Step 13: without -P an argument link is followed);
 #   - every path is checked again after the change; any difference is an error;
 #   - its unit mounts the drafts, logs and every other folder it does not change read only, so even
 #     a swap that won a race could not change access anywhere else.
@@ -56,15 +57,15 @@ check_all
 
 # Pass-through only: folders on the way to what is read.
 for dir in "$APP" "$APP/bin" "$APP/web" "$APP/app" "$APP/private_uploads"; do
-    setfacl -m "g:$GROUP:x" -- "$dir"
+    setfacl -P -m "g:$GROUP:x" -- "$dir"
 done
 # The dispatcher's code (read only).
-setfacl -m "g:$GROUP:r" -- "${FILES[@]}"
+setfacl -P -m "g:$GROUP:r" -- "${FILES[@]}"
 setfacl -R -P -m "g:$GROUP:rX" -- "$APP/app/services"
 # The request uploads (read only), and the same for files uploaded later. -R -P: symbolic links
 # inside are skipped, never followed; X gives the folder pass-through but no file execute.
 setfacl -R -P -m "g:$GROUP:rX" -- "$APP/private_uploads/requests"
-setfacl -m "d:g:$GROUP:r" -- "$APP/private_uploads/requests"
+setfacl -P -m "d:g:$GROUP:r" -- "$APP/private_uploads/requests"
 
 # Nothing moved while this ran.
 check_all

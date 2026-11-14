@@ -78,6 +78,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `bin/ai-worker-compat-check.php` | Release-order check: is a worker copy compatible with the deployed application? |
 | `deploy/sbin/smart-assess-ai-worker-refresh.sh` | Refreshes the worker copy only when the release-order check passes; health check and rollback (not installed). |
 | `deploy/sbin/smart-assess-ai-egress-guard.sh`, `deploy/systemd/smart-assess-ai-egress-guard.service`, `.timer`, `deploy/systemd/nftables.service.d/50-smart-assess-ai-egress.conf` | Keep both AI egress filters loaded or stop what they protect (not installed). |
+| `deploy/systemd/smart-assess-ai-worker-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-ollama-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf` | Step 13: the dispatcher and the worker pool run without network; these socket links are their only connections (not installed). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -587,13 +588,38 @@ password, because PHP's built-in server drops empty environment variables.
     D-Bus are hidden, so names cannot be resolved by any route. MySQL is reached
     through its local socket (`DB_HOST=localhost`). `IPAddressDeny=any` /
     `IPAddressAllow=localhost` stay as a second layer.
-  * **A flushed firewall fails closed** (for the worker filter installed in Step 5
-    too). The dispatcher's filter unit has no `RemainAfterExit`, so every run
-    loads and verifies the filter first. `smart-assess-ai-egress-guard` (a timer,
-    every 30 s, and a drop-in that runs it right after `nftables.service` starts,
-    reloads or stops: its `/etc/nftables.conf` begins with `flush ruleset`)
-    reloads both filters; if one cannot be restored it stops the services it
-    protects. Remaining window: up to about 30 s after a manual `nft flush ruleset`.
+  * **No network at all (Step 13).** A firewall filter by user exists only while the
+    ruleset holds it: `nft flush ruleset`, or `nftables.service` (its
+    `/etc/nftables.conf` begins with `flush ruleset`), removes it, and until it is
+    reloaded (the guard: up to about 30 s) a process that is already running could
+    reach every service on 127.0.0.1. Measured on Ubuntu 26.04 with the Step 12 design:
+    MySQL, MySQL X, Apache, SSH, Ollama and the DNS stub (which resolves external names)
+    were all reachable during the gap; the internet stayed blocked (`IPAddressDeny`).
+    So the dispatcher and the worker's PHP-FPM pool (which parses the documents) now run
+    with `PrivateNetwork=yes` and only Unix sockets (`RestrictAddressFamilies=AF_UNIX`):
+    systemd gives each its own network namespace with only an empty loopback when the
+    process starts, which no firewall change can alter. Each has one way out, a socket
+    file served by systemd's minimal forwarder (`systemd-socket-proxyd`), which can only
+    connect to one fixed address:
+    * dispatcher -> `/run/smart-assess-ai-link/worker.sock` (group `sa-ai-dispatch`)
+      -> the worker on 127.0.0.1:8095 (`smart-assess-ai-worker-link.socket`);
+    * worker pool -> `/run/smart-assess-ai-ollama/ollama.sock` (group `sa-ai-worker`)
+      -> Ollama on 127.0.0.1:11434 (`smart-assess-ai-ollama-link.socket`), set with
+      `SMART_ASSESS_WORKER_OLLAMA_SOCKET` (worker.env and the pool's `env[]` line) and the
+      drop-in `smart-assess-ai-worker-fpm.service.d/50-private-network.conf`.
+    MySQL is reached through its socket file (`DB_HOST=localhost`). Verified in the VM
+    with processes already running: after a flush, in the full 30 s gap, with the guard
+    broken, with an invalid filter file, with the nftables hook failing, and right after
+    a reboot, each reached only its own socket. If a link is stopped or its forwarder is
+    broken, the worker reports "not ready" and the dispatcher "unreachable"; no other
+    route exists. The nftables filters, the guard (timer every 30 s and the
+    `nftables.service` drop-in, which keeps them loaded or stops the worker) and
+    `IPAddressDeny` remain as extra layers.
+  * **Remaining gap:** lighttpd (the worker's HTTP front, user `sa-ai-worker`) stays in the
+    host network: it must listen on 127.0.0.1:8095. It only passes requests to the pool
+    and never reads document content, but if it were compromised, during a flush it could
+    reach services on 127.0.0.1 (never the internet: `IPAddressDeny=any`) until the guard
+    reloads the filter.
   * **Database:** its own MySQL account (`deploy/mysql/ai-dispatch-db-user.sql.example`)
     reads only nine columns of `requests` (no contact details), eight of
     `request_documents`, and reads and updates `ai_verification_jobs`; the

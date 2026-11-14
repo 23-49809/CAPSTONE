@@ -521,6 +521,57 @@ $started = microtime(true);
 $check('Ollama: a slow answer times out', $ollamaError(static fn () => $ollama->chatJson('s', 'u', [])) === 'ollama_timeout' && microtime(true) - $started < 7);
 $check('Ollama: the model digest is read', $ollama->modelDigest() === 'sha256abc');
 proc_terminate($server);
+
+// ---- Step 13: Ollama and worker reached through a Unix socket (callers with PrivateNetwork=yes) ----
+$socketPath = '/tmp/sa-link-' . bin2hex(random_bytes(4)) . '.sock';
+file_put_contents($work . '/unix-server.php', <<<'PHP'
+<?php
+[$_, $path, $log] = $argv;
+@unlink($path);
+$server = stream_socket_server('unix://' . $path, $no, $err);
+if ($server === false) { exit(1); }
+while ($client = @stream_socket_accept($server, 30)) {
+    $request = '';
+    while (!str_contains($request, "\r\n\r\n") && ($chunk = fread($client, 8192)) !== false && $chunk !== '') { $request .= $chunk; }
+    [$head, $body] = explode("\r\n\r\n", $request, 2) + [1 => ''];
+    if (preg_match('/Content-Length: (\d+)/i', $head, $m)) { while (strlen($body) < (int) $m[1] && ($chunk = fread($client, 8192)) !== false && $chunk !== '') { $body .= $chunk; } }
+    $line = strtok($head, "\r\n");
+    file_put_contents($log, $line . "\n", FILE_APPEND);
+    $answer = str_contains($line, '/v1/health') ? '{"ok":true}'
+        : (str_contains($line, '/api/tags') ? '{"models":[{"name":"fake-model:1","digest":"sha256:unixsock"}]}'
+        : json_encode(['message' => ['role' => 'assistant', 'content' => json_encode(['documents' => [], 'findings' => [], 'manual_review_recommended' => true])]]));
+    fwrite($client, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " . strlen($answer) . "\r\nConnection: close\r\n\r\n" . $answer);
+    fclose($client);
+}
+PHP);
+$unixLog = $work . '/unix-requests.log';
+$unixServer = proc_open([PHP_BINARY, $work . '/unix-server.php', $socketPath, $unixLog], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $unixPipes);
+for ($i = 0; $i < 50 && !file_exists($socketPath); $i++) { usleep(100000); }
+// Port 1: nothing listens there, so an answer can only have come through the socket.
+$viaSocket = new OllamaClient('http://127.0.0.1:1', 'fake-model:1', 5, 262_144, 8192, 1500, $socketPath);
+try { $socketChat = $viaSocket->chatJson('s', 'u', []); } catch (RuntimeException $exception) { $socketChat = $exception->getMessage(); }
+$check('Step 13: Ollama through a Unix socket (nothing on the TCP port): chat, model status and digest work',
+    is_array($socketChat) && ($socketChat['manual_review_recommended'] ?? null) === true && $viaSocket->modelStatus() === 'ready' && $viaSocket->modelDigest() === 'sha256:unixsock', $socketChat);
+$check('Step 13: without the socket the same client finds nothing (no hidden TCP fallback needed)',
+    (new OllamaClient('http://127.0.0.1:1', 'fake-model:1', 5))->modelStatus() === 'unreachable');
+$check('Step 13: the worker client through a Unix socket: health is ready', (new AiWorkerClient('http://127.0.0.1:1', $signer, 600, 1_048_576, null, $socketPath))->health() === AiWorkerClient::HEALTH_READY);
+putenv('SMART_ASSESS_AI_WORKER_URL=http://127.0.0.1:1'); putenv('SMART_ASSESS_AI_WORKER_SECRET=' . $secret); putenv('SMART_ASSESS_AI_WORKER_SOCKET=' . $socketPath);
+$check('Step 13: the dispatcher\'s setting SMART_ASSESS_AI_WORKER_SOCKET is used', AiWorkerClient::fromEnvironment()->health() === AiWorkerClient::HEALTH_READY);
+putenv('SMART_ASSESS_AI_WORKER_SOCKET'); putenv('SMART_ASSESS_AI_WORKER_URL'); putenv('SMART_ASSESS_AI_WORKER_SECRET');
+$requests = (string) @file_get_contents($unixLog);
+$check('Step 13: the socket server saw the requests', substr_count($requests, 'POST /api/chat') === 1 && substr_count($requests, 'GET /v1/health') === 2 && substr_count($requests, 'GET /api/tags') === 2, $requests);
+proc_terminate($unixServer);
+@unlink($socketPath);
+$check('Step 13: a socket path must be absolute, plain and short', $rejects(static fn () => new OllamaClient('http://127.0.0.1:11434', 'm', 180, 262_144, 8192, 1500, 'run/ollama.sock'))
+    && $rejects(static fn () => new OllamaClient('http://127.0.0.1:11434', 'm', 180, 262_144, 8192, 1500, '/run/../etc/x.sock'))
+    && $rejects(static fn () => new OllamaClient('http://127.0.0.1:11434', 'm', 180, 262_144, 8192, 1500, '/run/' . str_repeat('a', 120)))
+    && $rejects(static fn () => new AiWorkerClient('http://127.0.0.1:8095', $signer, 600, 1_048_576, null, '/run/a b.sock'))
+    && $rejects(static fn () => new AiWorkerClient('http://127.0.0.1:8095', $signer, 600, 1_048_576, null, '')));
+$check('Step 13: a socket is only accepted with a loopback http:// address (never for HTTPS or a remote host)',
+    $rejects(static fn () => new AiWorkerClient('https://10.0.1.20:8443', $signer, 600, 1_048_576, null, '/run/x.sock'))
+    && $rejects(static fn () => new OllamaClient('https://ollama.example', 'm', 180, 262_144, 8192, 1500, '/run/x.sock')));
+$workerSource = (string) file_get_contents(dirname(__DIR__) . '/worker/index.php');
+$check('Step 13: the worker passes SMART_ASSESS_WORKER_OLLAMA_SOCKET to its Ollama client', substr_count($workerSource, "getenv('SMART_ASSESS_WORKER_OLLAMA_SOCKET')") >= 1);
 $check('Ollama: nothing listening means unavailable', $ollamaError(static fn () => (new OllamaClient('http://127.0.0.1:' . $port, 'm', 5))->chatJson('s', 'u', [])) === 'ollama_unavailable');
 $check('Ollama: a non-local endpoint must use HTTPS', $rejects(static fn () => new OllamaClient('http://10.0.0.5:11434', 'm')));
 $check('Ollama: endpoints with credentials or paths are refused', $rejects(static fn () => new OllamaClient('https://u:p@host', 'm')) && $rejects(static fn () => new OllamaClient('https://host/api', 'm')));

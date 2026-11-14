@@ -1,0 +1,40 @@
+# SMART ASSESS - forwarder behind smart-assess-ai-worker-link.socket: /run/smart-assess-ai-link/worker.sock -> 127.0.0.1:8095, nothing else.
+# systemd's own minimal forwarder (it does not read or change the traffic); started on the first connection.
+# NOT INSTALLED (see smart-assess-ai-worker-link.socket).
+[Unit]
+Description=SMART ASSESS link forwarder for the AI dispatcher (127.0.0.1:8095)
+Requires=smart-assess-ai-worker-link.socket
+After=smart-assess-ai-worker-link.socket
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=120s 127.0.0.1:8095
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+# It may connect to its one target and nothing else, even with the host firewall flushed.
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1/32
+RestrictAddressFamilies=AF_UNIX AF_INET
+MemoryMax=64M
+TasksMax=8

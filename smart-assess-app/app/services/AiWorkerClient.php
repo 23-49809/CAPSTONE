@@ -43,7 +43,8 @@ final class AiWorkerClient
         private readonly WorkerSignature $signature,
         private readonly int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
         private readonly int $maxResponseBytes = 1_048_576,
-        private readonly ?string $caFile = null
+        private readonly ?string $caFile = null,
+        private readonly ?string $unixSocket = null
     ) {
         $baseUrl = rtrim(trim($baseUrl), '/');
         $parts = parse_url($baseUrl);
@@ -65,6 +66,15 @@ final class AiWorkerClient
         if ($caFile !== null && ($caFile === '' || $caFile[0] !== '/' || !is_file($caFile) || !is_readable($caFile))) {
             throw new InvalidArgumentException('The AI worker CA file must be an absolute path to a readable file.');
         }
+        // Optional Unix socket (Step 13): the HTTP request goes to this socket file instead of a TCP port.
+        // Used when the caller runs without network access (systemd PrivateNetwork=yes), so it can reach
+        // only this one service, whatever happens to the host firewall. Loopback http:// URLs only (the
+        // URL then only names the Host header); an absolute path short enough for a socket address.
+        if ($unixSocket !== null && ($unixSocket === '' || $unixSocket[0] !== '/' || strlen($unixSocket) > 100
+            || str_contains($unixSocket, "\0") || !preg_match('#^/[A-Za-z0-9._/-]+$#', $unixSocket) || str_contains($unixSocket, '/../')
+            || $scheme !== 'http' || !in_array($host, ['127.0.0.1', 'localhost', '::1'], true))) {
+            throw new InvalidArgumentException('The AI worker socket must be an absolute path, used with a loopback http:// URL.');
+        }
         $this->url = $baseUrl;
     }
 
@@ -76,9 +86,11 @@ final class AiWorkerClient
         }
         $timeout = getenv('SMART_ASSESS_AI_WORKER_TIMEOUT');
         $caFile = getenv('SMART_ASSESS_AI_WORKER_CA_FILE');
+        $socket = getenv('SMART_ASSESS_AI_WORKER_SOCKET');
         return new self($url, WorkerSignature::fromEnvironment('SMART_ASSESS_AI_WORKER_SECRET'),
             is_string($timeout) && ctype_digit(trim($timeout)) ? (int) trim($timeout) : self::DEFAULT_TIMEOUT_SECONDS, 1_048_576,
-            is_string($caFile) && trim($caFile) !== '' ? trim($caFile) : null);
+            is_string($caFile) && trim($caFile) !== '' ? trim($caFile) : null,
+            is_string($socket) && trim($socket) !== '' ? trim($socket) : null);
     }
 
     /**
@@ -88,7 +100,8 @@ final class AiWorkerClient
      */
     private function caOption(): array
     {
-        return $this->caFile !== null ? [CURLOPT_CAINFO => $this->caFile] : [];
+        return ($this->caFile !== null ? [CURLOPT_CAINFO => $this->caFile] : [])
+            + ($this->unixSocket !== null ? [CURLOPT_UNIX_SOCKET_PATH => $this->unixSocket] : []);
     }
 
     public function timeoutSeconds(): int
