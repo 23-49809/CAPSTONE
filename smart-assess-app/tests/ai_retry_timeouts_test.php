@@ -744,15 +744,16 @@ $deploy = $app . '/deploy/systemd';
 $service = $unit($deploy . '/smart-assess-ai-dispatch.service');
 $timer = $unit($deploy . '/smart-assess-ai-dispatch.timer');
 $serviceText = (string) file_get_contents($deploy . '/smart-assess-ai-dispatch.service');
-$check('service: oneshot, runs as its own account sa-ai-dispatch (Step 8: never www-data), www-data only as a read group', ($service['Type'][0] ?? '') === 'oneshot'
-    && ($service['User'][0] ?? '') === 'sa-ai-dispatch' && ($service['Group'][0] ?? '') === 'sa-ai-dispatch' && ($service['SupplementaryGroups'] ?? []) === ['www-data']);
+$check('service: oneshot, runs as its own account sa-ai-dispatch with only its own read group sa-ai-read (never www-data)', ($service['Type'][0] ?? '') === 'oneshot'
+    && ($service['User'][0] ?? '') === 'sa-ai-dispatch' && ($service['Group'][0] ?? '') === 'sa-ai-dispatch' && ($service['SupplementaryGroups'] ?? []) === ['sa-ai-read']);
 $check('service: its own KEY=VALUE environment file, not apache.env', ($service['EnvironmentFile'] ?? []) === ['/etc/smart-assess/ai-dispatch.env']);
 $check('service: runs the dispatcher of /var/www/smart-assess with --limit and --max-seconds', str_contains($service['ExecStart'][0] ?? '', '/var/www/smart-assess/bin/ai-verification-dispatch.php --limit=20 --max-seconds=1800'));
 $maxSeconds = preg_match('/--max-seconds=(\d+)/', $service['ExecStart'][0] ?? '', $m) ? (int) $m[1] : 0;
 $check('service: TimeoutStartSec covers the run plus one leased job', (int) ($service['TimeoutStartSec'][0] ?? 0) >= $maxSeconds + $default->leaseSeconds());
 $check('service: resource limits (MemoryMax, CPUQuota, TasksMax, Nice)', isset($service['MemoryMax'], $service['CPUQuota'], $service['TasksMax'], $service['Nice']));
 $check('service: hardened and read-only (NoNewPrivileges, ProtectSystem=strict, empty CapabilityBoundingSet)', ($service['NoNewPrivileges'][0] ?? '') === 'yes'
-    && ($service['ProtectSystem'][0] ?? '') === 'strict' && ($service['CapabilityBoundingSet'][0] ?? 'x') === '' && ($service['ReadOnlyPaths'][0] ?? '') === '/var/www/smart-assess');
+    && ($service['ProtectSystem'][0] ?? '') === 'strict' && ($service['CapabilityBoundingSet'][0] ?? 'x') === ''
+    && ($service['TemporaryFileSystem'][0] ?? '') === '/var/www:ro' && str_contains($service['BindReadOnlyPaths'][0] ?? '', '/var/www/smart-assess/private_uploads/requests'));   // Step 10: only what it needs
 $check('service: no [Install] section, so only the timer can be enabled', !str_contains($serviceText, '[Install]'));
 $check('timer: one minute after the previous run ends (never overlapping), and after boot', ($timer['OnUnitInactiveSec'][0] ?? '') === '1min'
     && isset($timer['OnBootSec']) && ($timer['Unit'][0] ?? '') === 'smart-assess-ai-dispatch.service' && ($timer['WantedBy'][0] ?? '') === 'timers.target');

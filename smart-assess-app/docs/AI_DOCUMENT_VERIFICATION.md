@@ -73,6 +73,9 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `deploy/systemd/smart-assess-ai-dispatch.service`, `.timer` | Dispatcher service and one-minute timer for the web server (not installed). |
 | `deploy/systemd/ai-dispatch.env.example` | The dispatcher's own environment file (KEY=VALUE, root 0600). |
 | `deploy/mysql/ai-dispatch-db-user.sql.example` | The dispatcher's least-privilege MySQL account (not applied). |
+| `deploy/systemd/smart-assess-ai-dispatch-egress.service`, `deploy/nftables/ai-dispatch-egress.nft` | The dispatcher's egress filter: only 127.0.0.1:8095 (not installed). |
+| `deploy/sbin/smart-assess-ai-dispatch-permissions.sh`, `deploy/systemd/smart-assess-ai-dispatch-permissions.service` | Read access for the dispatcher's group `sa-ai-read`, re-applied before every run (not installed). |
+| `bin/ai-worker-compat-check.php` | Release-order check: is a worker copy compatible with the deployed application? |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -443,7 +446,7 @@ password, because PHP's built-in server drops empty environment variables.
   from the client form, so the check recomputes requirements on the server with
   `DocumentRequirements`.
 
-### Staff decide (reviewed in Steps 6–8, 14 Nov 2026)
+### Staff decide (reviewed in Steps 6–10, 14 Nov 2026)
 
 * **Nothing the model writes in its own words reaches Staff.** The model's
   answer must match the schema exactly (no field can approve, reject or change
@@ -465,10 +468,14 @@ password, because PHP's built-in server drops empty environment variables.
   (`DocumentAnalysis::keepQuotedEvidence()`). Such workers answer with result
   version 2. For a version 1 answer (the copy installed in `/opt` before this
   change) the application cannot check quotes, so it drops all model evidence.
-  Staff see a kept quote labelled as text read from the document by OCR, which
-  may contain reading errors. A real quote can still contain words such as
-  "APPROVED" if the document says so; it is shown as the document's text, not
-  as the AI's judgement.
+  A quote is also dropped (by the worker and again by the application, for any
+  worker version) when it is shorter than 12 characters or 3 words, or belongs to
+  a "cannot verify" finding (`DocumentAnalysis::evidenceAllowed()`), so a single
+  cherry-picked word such as "GENUINE" or "APPROVED" can never stand next to a
+  finding. Staff see a kept quote labelled as text read from the document by OCR,
+  which may contain reading errors. A longer real quote can still contain such
+  words if the document says them ("APPROVED BY THE REGISTRAR"); it is shown as
+  the document's text, not as the AI's judgement.
 * **Missing details only from a fixed list.** The model may name missing details
   only as codes from `DocumentAnalysis::MISSING_FIELD_LABELS` (for example
   `date_of_birth`, `arp_number`); Staff see the application's labels. Any other
@@ -480,7 +487,13 @@ password, because PHP's built-in server drops empty environment variables.
   "cannot be checked" from text (that needs Staff, so it is **Needs review**).
   The Passed text says it does not verify that any document, signature or seal
   is genuine. A model answer that is merely valid JSON cannot produce it: only
-  the absence of every concern can.
+  the absence of every concern can. "Needs review" names each reason that applies
+  (counts of inconsistencies, reading problems, possibly missing details and
+  points the AI cannot check, the AI's manual-review suggestion, or a model that
+  did not review the documents). In the Staff panel every model judgement (the
+  findings, the "looks like this document?" column, the outcome banner) is
+  labelled "AI suggestion (unverified)". Limitation: a model that wrongly says a
+  document is the right type, with every server check clean, still gives Passed.
 * **Originals before "reviewed".** Each time a Staff member opens, previews or
   downloads an original (`web/request-file.php`), one row per Staff member and
   document is kept in `request_document_views` (migration
@@ -491,8 +504,13 @@ password, because PHP's built-in server drops empty environment variables.
   application can serve**; originals missing from storage or of an unsupported
   type are listed as "Cannot be opened" on the Staff page and in the 409 answer,
   and never block the review (`AiVerification::originalFile()` is the one check
-  used by the file page, the gate and the Staff page). Until the migration has
-  run, "Mark as reviewed" answers that the opening record is not set up.
+  used by the file page, the gate and the Staff page). The Staff page checks a
+  file's type only for requests whose AI check is finished and not yet reviewed
+  (where the review depends on it); for the others its "can be opened" hint
+  checks the stored path, the uploads folder, presence and readability (the type
+  was checked at upload). Opening a file and the review gate always check fully.
+  Until the migration has run, "Mark as reviewed" answers that the opening record
+  is not set up.
 * **Limitation: opened is not inspected.** A row shows that the file was sent to
   that Staff member's browser, not that they looked at it, read it or
   understood it. The gate makes skipping the originals deliberate; it cannot
@@ -512,29 +530,75 @@ password, because PHP's built-in server drops empty environment variables.
   so the submission fails with an error and its uploaded files are removed, and
   a last check after the commit confirms the request exists before success is
   returned (`sa_submission_still_saved()`). The workflow test forces a real
-  InnoDB deadlock in each queue to prove it.
+  InnoDB deadlock in each queue to prove it. If the commit itself fails (for
+  example the connection dropped), its outcome is uncertain, so a fresh
+  connection checks whether the request was saved (`sa_commit_submission()`):
+  saved means success and the files stay; not saved means the usual clean-up;
+  if even that check fails, the submission is reported as failed but no uploaded
+  file is deleted (a saved request never loses its documents). A failing
+  rollback (lost connection) is logged and never skips the clean-up.
+  `tests/submission_commit_recovery_test.php` covers these outcomes; the
+  workflow test kills a submission's database connection mid-transaction.
 * **Access.** Staff (role 2) only, checked on the server for every AI action,
   every page and the direct `internal_bootstrap` API. Admin, Department Head,
   signed-in clients and visitors get 401/403 and no AI data; role fields sent by
   a client are ignored; AI actions require POST and the CSRF token. Request
   tracking never shows AI results.
 * **Dispatcher account and sandbox** (`deploy/systemd/smart-assess-ai-dispatch.service`,
-  not installed). It runs as its own non-login account `sa-ai-dispatch`, not
-  www-data, so Apache processes cannot read its environment (which holds the
-  worker secret). It reads the application code and the request uploads through
-  the www-data group, read only (production: application folder
-  `ubuntu:www-data 0750`, uploads `www-data:www-data 0750/0640`; that group
-  cannot read `apache.env` or the Gmail folder). The website settings file, the
-  Gmail folder, draft uploads, backups, the worker's secret and state, the GitHub
-  runner and MySQL's maintenance credentials are hidden. Network: loopback only
-  (`IPAddressDeny=any`, `IPAddressAllow=localhost`), enough for the worker at
-  127.0.0.1:8095 and MySQL over its local socket. It uses its own MySQL account
-  (`deploy/mysql/ai-dispatch-db-user.sql.example`) that can read only nine
-  columns of `requests` (no contact details), eight of `request_documents`, and
-  read and update `ai_verification_jobs`; the workflow test runs the dispatcher
-  with exactly these grants and shows 13 forbidden actions are refused.
-  `tests/ai_dispatch_deploy_test.php` checks the unit and settings files;
-  `systemd-analyze verify` must still be run on the server before installing.
+  not installed; tested in an isolated Ubuntu 26.04 VM).
+  * Its own non-login account `sa-ai-dispatch`, not www-data, so Apache
+    processes cannot read its environment (worker secret, its database password).
+  * **Files.** It is not in the www-data group. Its own group `sa-ai-read` gets read
+    access (POSIX ACLs; owners, groups and modes are unchanged) to exactly
+    `bin/ai-verification-dispatch.php`, `web/bootstrap.php`, `app/services/*.php`
+    and `private_uploads/requests` (plus pass-through on the folders above them).
+    `deploy/sbin/smart-assess-ai-dispatch-permissions.sh` sets this; the unit
+    `smart-assess-ai-dispatch-permissions.service` (a root oneshot outside the
+    dispatcher's read-only sandbox, required by the dispatcher) runs it again
+    before every dispatcher run, because each deployment
+    replaces the code files (copied through a temporary folder and renamed, with
+    `ubuntu:www-data 0640`), which removes such entries; uploads get a default
+    entry for new files. Inside the sandbox `/var/www` is an empty read-only
+    folder with only those paths mounted in. Needs the `acl` package.
+  * **Hidden:** all of `/etc/smart-assess` (the website settings, the website's
+    database login in `database.env`, Gmail; the dispatcher's own settings file is
+    read by systemd before the sandbox starts), backups, the worker's secret and
+    state, the GitHub runner, MySQL's data and maintenance login.
+  * **Network:** the egress filter (`deploy/nftables/ai-dispatch-egress.nft`,
+    unit `smart-assess-ai-dispatch-egress.service`, required by the dispatcher)
+    allows the `sa-ai-dispatch` account only TCP to 127.0.0.1:8095. DNS
+    (127.0.0.53/54), MySQL over TCP (3306) and X (33060), Ollama (11434), Apache,
+    other addresses and IPv6 are rejected, and the resolver's local sockets and
+    D-Bus are hidden, so names cannot be resolved by any route. MySQL is reached
+    through its local socket (`DB_HOST=localhost`). `IPAddressDeny=any` /
+    `IPAddressAllow=localhost` stay as a second layer.
+  * **Database:** its own MySQL account (`deploy/mysql/ai-dispatch-db-user.sql.example`)
+    reads only nine columns of `requests` (no contact details), eight of
+    `request_documents`, and reads and updates `ai_verification_jobs`; the
+    workflow test runs the dispatcher with exactly these grants and shows 13
+    forbidden actions are refused.
+  * `tests/ai_dispatch_deploy_test.php` checks the unit, the filter, the
+    permissions script and the release-order check; `systemd-analyze verify`
+    must still be run on the server before installing.
+
+### Release order (application first, then the worker)
+
+Worker answers carry a result version. A refreshed worker answers version 2 (it
+checks the model's quotes against the OCR text); the application accepts
+version 1 and 2 from this branch on, but release 6482fcd0 accepts version 1 only
+and would fail every job as an invalid worker result. Therefore:
+
+1. Deploy the application release that contains this change.
+2. Before refreshing `/opt/smart-assess-ai-worker` (or installing or starting the
+   dispatcher), stage the new worker copy and run, on the server:
+   `php /var/www/smart-assess/bin/ai-worker-compat-check.php --app=/var/www/smart-assess --worker=<staged copy>`
+   It must print "compatible" (exit 0). Exit 1 means "NOT COMPATIBLE: deploy the
+   application first"; exit 2 means the files could not be read. Do not continue
+   on anything but exit 0.
+3. Refresh the worker copy, then run the same check with `--worker=/opt/smart-assess-ai-worker`.
+
+The check reads source files only. A new application with the worker installed
+in Step 4 (version 1) is compatible: model quotes are then simply dropped.
 
 ### Production worker as installed (Steps 4 and 5, 13–14 Nov 2026)
 

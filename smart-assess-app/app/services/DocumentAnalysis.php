@@ -64,6 +64,13 @@ final class DocumentAnalysis
         'party_names' => 'Names of the parties', 'authorized_person' => 'Name of the authorized person', 'authorized_purpose' => 'What the letter authorizes',
         'tax_period' => 'Tax period covered', 'receipt_number' => 'Receipt number',
     ];
+    /**
+     * A model "evidence" quote is shown only when it is an exact OCR quote (worker, version 2) of at
+     * least this many characters and words, and never on a "cannot verify" finding: a single
+     * cherry-picked word such as "GENUINE" or "APPROVED" could otherwise read like a verdict.
+     */
+    public const MIN_EVIDENCE_CHARACTERS = 12;
+    public const MIN_EVIDENCE_WORDS = 3;
     /** Worker result versions: 2 = model evidence was checked against the OCR text by the worker. */
     public const WORKER_RESULT_VERSIONS = [1, 2];
     public const WORKER_RESULT_VERSION = 2;
@@ -220,10 +227,18 @@ final class DocumentAnalysis
                     break;
                 }
             }
-            $finding['evidence'] = $quoted ? $evidence : '';
+            $finding['evidence'] = $quoted && self::evidenceAllowed((string) $finding['category'], $evidence) ? $evidence : '';
         }
         unset($finding);
         return $output;
+    }
+
+    /** Whether a model finding may show $evidence at all (length, words, category); see MIN_EVIDENCE_*. */
+    public static function evidenceAllowed(string $category, string $evidence): bool
+    {
+        $evidence = trim((string) preg_replace('/\s+/u', ' ', self::normalizeText($evidence)));
+        $words = preg_match_all('/[\p{L}\p{N}]+/u', $evidence);
+        return $category !== 'cannot_verify' && mb_strlen($evidence) >= self::MIN_EVIDENCE_CHARACTERS && $words >= self::MIN_EVIDENCE_WORDS;
     }
 
     /** Staff-facing wording of a model finding: built only from validated codes, always "unverified". */
@@ -404,6 +419,9 @@ final class DocumentAnalysis
             foreach ($model['output']['findings'] as $finding) {
                 // Worded here from validated codes only; the model's own text is never used.
                 $finding['explanation'] = self::modelFindingText($finding['category'], $finding['field'], $finding['document_keys'], $label);
+                if (!self::evidenceAllowed($finding['category'], $finding['evidence'])) {
+                    $finding['evidence'] = '';   // too short to give context, or on a "cannot verify" finding
+                }
                 $findings[] = $finding['category'] === 'missing_information' ? self::reliableOr($finding, $readability) : $finding;
             }
         }
@@ -445,7 +463,7 @@ final class DocumentAnalysis
 
         return [
             'outcome' => $outcome,
-            'reason' => self::reason($outcome, $findings, $manualReview),
+            'reason' => self::reason($outcome, $findings, $manualReview, $modelReviewed),
             'findings' => $findings,
             'documents' => $documents,
             'manual_review' => $outcome !== self::OUTCOME_PASSED,
@@ -658,17 +676,35 @@ PROMPT;
         return $finding;
     }
 
-    private static function reason(string $outcome, array $findings, bool $manualReview): string
+    private static function reason(string $outcome, array $findings, bool $manualReview, bool $modelReviewed = true): string
     {
         $count = static fn (string $category): int => count(array_filter($findings, static fn (array $f): bool => $f['category'] === $category));
         $confirmed = count(array_filter($findings, static fn (array $f): bool => $f['category'] === 'missing_information' && $f['source'] === 'requirements'));
         $notApproval = ' This is not an approval: Staff must inspect the original documents and make the decision.';
+        if ($outcome === self::OUTCOME_NEEDS_REVIEW) {
+            // Every reason that applies is named, so the explanation never reads "0, 0 and 0".
+            $parts = [];
+            foreach ([
+                'possible_inconsistency' => '%d possible inconsistency(ies)',
+                'ocr_uncertainty' => '%d reading problem(s)',
+                'missing_information' => '%d possibly missing detail(s) (not confirmed)',
+                'cannot_verify' => '%d point(s) the AI cannot check from text (Staff must judge them from the original)',
+            ] as $category => $format) {
+                if ($count($category) > 0) {
+                    $parts[] = sprintf($format, $count($category));
+                }
+            }
+            if ($manualReview) {
+                $parts[] = 'the AI suggests a manual review';
+            }
+            if (!$modelReviewed) {
+                $parts[] = 'the AI model did not review the documents, so only the automatic checks ran';
+            }
+            return 'Needs review: ' . ($parts === [] ? 'a closer look by Staff is needed' : implode('; ', $parts)) . '.' . $notApproval;
+        }
         return match ($outcome) {
             self::OUTCOME_MISSING => 'Missing information: ' . $confirmed . ' required document(s) not uploaded.'
                 . (count($findings) > $confirmed ? ' Other concerns were also found.' : '') . $notApproval,
-            self::OUTCOME_NEEDS_REVIEW => 'Needs review: ' . $count('possible_inconsistency') . ' possible inconsistency(ies), '
-                . $count('ocr_uncertainty') . ' reading problem(s) and ' . $count('missing_information') . ' possibly missing detail(s) (not confirmed)'
-                . ($manualReview ? '; the AI also recommends manual review' : '') . '.' . $notApproval,
             default => 'Passed: the required documents are present, their text was read clearly and the automatic checks found no concern. This does not verify that any document, signature or seal is genuine.' . $notApproval,
         };
     }

@@ -1,0 +1,20 @@
+# SMART ASSESS - egress filter for the AI dispatcher (account sa-ai-dispatch only): the AI worker
+# at 127.0.0.1:8095 and nothing else. NOT INSTALLED. Install (with approval):
+#   sudo install -o root -g root -m 0644 ../nftables/ai-dispatch-egress.nft /usr/local/share/smart-assess/ai-dispatch-egress.nft
+#   sudo install -o root -g root -m 0644 smart-assess-ai-dispatch-egress.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now smart-assess-ai-dispatch-egress.service
+# smart-assess-ai-dispatch.service requires it: if the filter is not loaded, the dispatcher does
+# not run. Stopping it removes only its own table.
+
+[Unit]
+Description=SMART ASSESS AI dispatcher egress filter (nftables, account sa-ai-dispatch only)
+Before=smart-assess-ai-dispatch.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /usr/local/share/smart-assess/ai-dispatch-egress.nft
+ExecStop=/usr/sbin/nft destroy table inet sa_ai_dispatch_egress
+
+[Install]
+WantedBy=multi-user.target

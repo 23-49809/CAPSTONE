@@ -50,29 +50,99 @@ $one = static fn (string $key): ?string => isset($service[$key]) && count($servi
 $words = static fn (string $key): array => preg_split('/\s+/', trim(implode(' ', $service[$key] ?? [])), -1, PREG_SPLIT_NO_EMPTY);
 
 $check('the dispatcher runs as its own account sa-ai-dispatch, not www-data or root', $one('User') === 'sa-ai-dispatch' && $one('Group') === 'sa-ai-dispatch');
-$check('its only extra group is www-data (read-only access to the code and request uploads)', $words('SupplementaryGroups') === ['www-data']);
-$check('the unit says how to create the account as a non-login system account', (bool) preg_match('/useradd --system .*--shell \/usr\/sbin\/nologin sa-ai-dispatch/', $unitText));
-$check('network: everything denied except loopback (IPAddressDeny=any, IPAddressAllow=localhost)', $one('IPAddressDeny') === 'any' && $one('IPAddressAllow') === 'localhost');
-$check('no raw or netlink sockets: only AF_UNIX, AF_INET, AF_INET6', $words('RestrictAddressFamilies') === ['AF_UNIX', 'AF_INET', 'AF_INET6']);
+$check('its only extra group is its own read group sa-ai-read, never www-data (Step 10, R2)', $words('SupplementaryGroups') === ['sa-ai-read']);
+$check('the unit says how to create the account (non-login) and the read group', (bool) preg_match('/useradd --system .*--shell \/usr\/sbin\/nologin sa-ai-dispatch/', $unitText)
+    && str_contains($unitText, 'groupadd --system sa-ai-read') && str_contains($unitText, 'usermod -a -G sa-ai-read sa-ai-dispatch'));
+$check('network, second layer: everything denied except loopback (IPAddressDeny=any, IPAddressAllow=localhost)', $one('IPAddressDeny') === 'any' && $one('IPAddressAllow') === 'localhost');
+$check('network, first layer: the egress filter unit is required and started first (Step 10, R1)', in_array('smart-assess-ai-dispatch-egress.service', preg_split('/\s+/', (string) (preg_match('/^Requires=(.*)$/m', $unitText, $m) ? $m[1] : '')), true)
+    && (bool) preg_match('/^After=.*smart-assess-ai-dispatch-egress\.service/m', $unitText));
+$check('no IPv6, raw or netlink sockets: only AF_UNIX and AF_INET', $words('RestrictAddressFamilies') === ['AF_UNIX', 'AF_INET']);
 $check('no privileges or capabilities can be gained', $one('NoNewPrivileges') === 'yes' && $one('CapabilityBoundingSet') === '' && $one('AmbientCapabilities') === '');
 $check('the whole file system is read-only for it, home folders hidden, nothing writable', $one('ProtectSystem') === 'strict' && $one('ProtectHome') === 'yes'
-    && !isset($service['ReadWritePaths']) && $one('ReadOnlyPaths') === '/var/www/smart-assess');
-$check('other processes are invisible to it', $one('ProtectProc') === 'invisible' && $one('ProcSubset') === 'pid');
+    && !isset($service['ReadWritePaths']) && !isset($service['ReadOnlyPaths']));
+$check('only its code and the request uploads exist in its view of /var/www (Step 10, R2)', $one('TemporaryFileSystem') === '/var/www:ro'
+    && $words('BindReadOnlyPaths') === ['/var/www/smart-assess/bin/ai-verification-dispatch.php', '/var/www/smart-assess/web/bootstrap.php',
+        '/var/www/smart-assess/app/services', '/var/www/smart-assess/private_uploads/requests'] && !isset($service['BindPaths']), $words('BindReadOnlyPaths'));
+$check('the permissions unit is required and runs before every dispatcher run (outside its read-only sandbox)', !isset($service['ExecStartPre'])
+    && (bool) preg_match('/^Requires=.*smart-assess-ai-dispatch-permissions\.service/m', $unitText) && (bool) preg_match('/^After=.*smart-assess-ai-dispatch-permissions\.service/m', $unitText));
+$permUnit = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-dispatch-permissions.service');
+$check('the permissions unit is a oneshot WITHOUT RemainAfterExit (so it runs again on every start), offline, writing only the application folder',
+    str_contains($permUnit, 'Type=oneshot') && !preg_match('/^RemainAfterExit=/m', $permUnit) && str_contains($permUnit, 'ExecStart=/usr/local/sbin/smart-assess-ai-dispatch-permissions.sh')
+    && str_contains($permUnit, 'PrivateNetwork=yes') && str_contains($permUnit, 'ReadWritePaths=/var/www/smart-assess') && str_contains($permUnit, 'ProtectSystem=strict'));
+$check('other processes are invisible to it, and system calls are filtered', $one('ProtectProc') === 'invisible' && $one('ProcSubset') === 'pid'
+    && $one('SystemCallFilter') === '@system-service');
 $hidden = array_map(static fn (string $path): string => ltrim($path, '-'), $words('InaccessiblePaths'));
 foreach ([
-    '/etc/smart-assess/apache.env' => 'the website settings (Gmail and IPROG credentials)',
-    '/etc/smart-assess/gmail' => 'the Gmail token folder',
-    '/var/www/smart-assess/private_uploads/drafts' => 'draft uploads',
+    '/etc/smart-assess' => 'ALL of /etc/smart-assess: website settings, the website\'s database login (database.env), Gmail (Step 10, D1)',
+    '/run/systemd/resolve' => 'the resolver\'s local sockets (no DNS through NSS, Step 10, R1)',
+    '/run/dbus' => 'D-Bus (no DNS through resolved\'s bus API)',
     '/var/backups' => 'database backups',
     '/etc/smart-assess-ai-worker' => 'the worker\'s secret file',
     '/var/lib/smart-assess-ai-worker' => 'the worker\'s state',
     '/opt/actions-runner' => 'the GitHub runner',
     '/etc/mysql/debian.cnf' => 'MySQL maintenance credentials',
+    '/var/lib/mysql' => 'MySQL data files',
 ] as $path => $what) {
     $check('hidden from the dispatcher: ' . $what . ' (' . $path . ')', in_array($path, $hidden, true));
 }
+$check('no single file of /etc/smart-assess is listed instead of the whole folder', preg_grep('#^/etc/smart-assess/#', $hidden) === [], $hidden);
 $check('the request uploads it needs are not hidden', !preg_grep('#^/var/www/smart-assess(/private_uploads(/requests)?)?$#', $hidden));
 $check('its settings file is read by systemd as root before the sandbox starts', $one('EnvironmentFile') === '/etc/smart-assess/ai-dispatch.env');
+
+// ---- The egress filter (Step 10, R1) ----
+$nft = (string) file_get_contents($app . '/deploy/nftables/ai-dispatch-egress.nft');
+$rules = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) preg_replace('/#.*$/m', '', $nft))), static fn (string $l): bool => $l !== ''));
+$check('egress: only packets of the sa-ai-dispatch account are filtered; everything else keeps the default', in_array('meta skuid "sa-ai-dispatch" jump dispatch', $rules, true)
+    && in_array('type filter hook output priority filter; policy accept;', $rules, true));
+$dispatchChain = (string) (preg_match('/chain dispatch \{(.*?)\}/s', $nft, $m) ? $m[1] : '');
+$accepts = array_values(preg_grep('/\baccept\b/', array_map('trim', explode("\n", $dispatchChain))));
+$check('egress: exactly one thing is allowed, TCP to 127.0.0.1:8095 (the worker)', $accepts === ['oifname "lo" ip daddr 127.0.0.1 tcp dport 8095 counter name allowed_worker accept'], $accepts);
+$check('egress: everything else is rejected (TCP reset, then any other protocol)', str_contains($dispatchChain, 'meta l4proto tcp counter name rejected reject with tcp reset')
+    && (bool) preg_match('/counter name rejected reject with icmpx admin-prohibited\s*$/', trim($dispatchChain)));
+$egressUnit = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-dispatch-egress.service');
+$check('egress unit: loads the table, removes only its own table on stop, and is enabled at boot', str_contains($egressUnit, 'ExecStart=/usr/sbin/nft -f /usr/local/share/smart-assess/ai-dispatch-egress.nft')
+    && str_contains($egressUnit, 'ExecStop=/usr/sbin/nft destroy table inet sa_ai_dispatch_egress') && str_contains($egressUnit, 'WantedBy=multi-user.target'));
+
+// ---- The permissions script (Step 10, R2) ----
+$perm = (string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-dispatch-permissions.sh');
+$permCode = (string) preg_replace('/^\s*#.*$/m', '', $perm);
+$check('permissions: fails closed (set -euo pipefail; stops without setfacl, the group or any expected path)', str_contains($permCode, 'set -euo pipefail')
+    && str_contains($permCode, 'command -v setfacl') && str_contains($permCode, 'getent group "$GROUP"') && str_contains($permCode, '[[ -e "$path" && ! -L "$path" ]]'));
+$check('permissions: grants only to group sa-ai-read and never changes owners, groups or modes', str_contains($permCode, 'GROUP=sa-ai-read')
+    && !preg_match('/\b(chown|chgrp|chmod|usermod|useradd)\b/', $permCode) && !str_contains($permCode, 'www-data'));
+preg_match_all('/setfacl[^\n]*/', $permCode, $setfacl);
+$granted = implode("\n", $setfacl[0]);
+$check('permissions: read only, never write (no "w" in any entry)', !preg_match('/g:\$GROUP:[rx]*w/', $granted), $granted);
+$check('permissions: no recursive grant on the application tree', !preg_match('/setfacl\s+(-[a-zA-Z]*R|--recursive)/', $permCode));
+foreach (['drafts', 'logs', 'vendor', '/etc/', 'gmail', 'database.env', 'apache.env'] as $never) {
+    $check('permissions: nothing for ' . $never, !str_contains($permCode, $never));
+}
+
+// ---- Release order: the compatibility check (Step 10, D2) ----
+$fixture = sys_get_temp_dir() . '/sa-compat-' . bin2hex(random_bytes(4));
+foreach (['old-app', 'old-worker'] as $tree) {
+    mkdir($fixture . '/' . $tree . '/app/services', 0700, true);
+}
+// The exact lines that decide the versions in release 6482fcd0.
+file_put_contents($fixture . '/old-app/app/services/DocumentAnalysis.php', "<?php\n        if (\$object['version'] !== 1) {\n");
+file_put_contents($fixture . '/old-app/app/services/AiVerification.php', "<?php\n            'payload' => [\n                'version' => 1,\n");
+file_put_contents($fixture . '/old-worker/app/services/AiDocumentWorker.php', "<?php\n        if (!is_array(\$job) || \$job['version'] !== 1) {}\n            return [\n                'version' => 1,\n                'documents' => \$checks,\n");
+$compat = static function (string $appDir, string $workerDir) use ($app): array {
+    exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($app . '/bin/ai-worker-compat-check.php') . ' --app=' . escapeshellarg($appDir) . ' --worker=' . escapeshellarg($workerDir) . ' 2>&1', $out, $code);
+    return [$code, implode("\n", $out)];
+};
+[$code, $out] = $compat($app, $app);
+$check('release order: this application with this worker is compatible (exit 0)', $code === 0 && str_contains($out, 'compatible'), $out);
+[$code, $out] = $compat($app, $fixture . '/old-worker');
+$check('release order: this application with the worker installed now (6482fcd0) is compatible', $code === 0, $out);
+[$code, $out] = $compat($fixture . '/old-app', $app);
+$check('release order: the live application (6482fcd0) with this worker is REFUSED (exit 1), naming the order', $code === 1
+    && str_contains($out, 'Deploy the application release first, then refresh the worker'), $out);
+[$code, $out] = $compat($fixture . '/missing', $app);
+$check('release order: unreadable trees are an error (exit 2), never "compatible"', $code === 2, $out);
+exec('rm -rf ' . escapeshellarg($fixture));
+$docs = (string) file_get_contents($app . '/docs/AI_DOCUMENT_VERIFICATION.md');
+$check('the docs state the release order and the check to run', str_contains($docs, '### Release order') && str_contains($docs, 'bin/ai-worker-compat-check.php'));
 
 // ---- The settings example ----
 $env = [];

@@ -626,17 +626,30 @@ final class AiVerification
      *
      * @return null|array{path:string, mime:string}
      */
-    public static function originalFile(string $appRoot, ?string $storedPath, ?string $fileStatus): ?array
+    public static function originalFile(string $appRoot, ?string $storedPath, ?string $fileStatus, bool $checkType = true): ?array
     {
+        // $checkType false: only the Staff page's "can be opened" hint for a document no review
+        // depends on (see sa_internal_bootstrap). Every file was type-checked when it was uploaded;
+        // request-file.php and the review gate always check the type again (the default).
         if ($fileStatus === 'missing' || $storedPath === null || !preg_match(self::ORIGINAL_PATH_PATTERN, $storedPath)) {
             return null;
         }
-        $base = realpath($appRoot . '/private_uploads/requests');
+        // One type detector and one resolved upload folder per process: building a finfo object
+        // loads the whole magic database, which made a Staff page with many files slow. The
+        // checks themselves are unchanged (every file is still resolved, confined and typed).
+        static $finfo = null;
+        static $bases = [];
+        $bases[$appRoot] ??= realpath($appRoot . '/private_uploads/requests');
+        $base = $bases[$appRoot];
         $path = realpath($appRoot . '/' . $storedPath);
         if ($base === false || $path === false || !str_starts_with($path, $base . DIRECTORY_SEPARATOR) || !is_file($path) || !is_readable($path)) {
             return null;
         }
-        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
+        if (!$checkType) {
+            return ['path' => $path, 'mime' => ''];
+        }
+        $finfo ??= new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($path);
         return is_string($mime) && isset(self::ORIGINAL_MIME_TYPES[$mime]) ? ['path' => $path, 'mime' => $mime] : null;
     }
 

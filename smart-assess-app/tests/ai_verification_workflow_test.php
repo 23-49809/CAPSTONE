@@ -129,7 +129,7 @@ $pdo = new PDO(sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $dbHos
 // The application stores and compares times in Philippine time (sa_db() sets +08:00); so does this test.
 $pdo->exec("SET time_zone = '+08:00'");
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['request_document_views', 'deadlock_probe', 'deadlock_filler', 'ai_verification_jobs', 'terms_acceptances', 'roles', 'users', 'clients', 'requests', 'request_documents', 'document_validation', 'request_status_log',
+foreach (['request_document_views', 'deadlock_probe', 'deadlock_filler', 'deadlock_conn', 'ai_verification_jobs', 'terms_acceptances', 'roles', 'users', 'clients', 'requests', 'request_documents', 'document_validation', 'request_status_log',
     'audit_log', 'announcements', 'settings', 'user_sessions', 'notifications', 'document_types', 'transfer_types'] as $table) {
     $pdo->exec("DROP TABLE IF EXISTS {$table}");
 }
@@ -399,8 +399,8 @@ $submit = static function (string $flow, string $lastName, array $uploads, array
     return [$status, (string) (json_decode($response, true)['data']['reference_no'] ?? ''), $response];
 };
 // Starts a submission without waiting for it (for the deadlock tests); the answer is written to $out.
-$submitAsync = static function (string $flow, array $uploads, string $out) use ($client, $files, $payloadFor) {
-    return $client->startSubmit($payloadFor($flow, 'Santos', $uploads), array_map(static fn (string $name): array => [$name, $files[$name]], $uploads), $out);
+$submitAsync = static function (string $flow, array $uploads, string $out, array $extra = []) use ($client, $files, $payloadFor) {
+    return $client->startSubmit($payloadFor($flow, 'Santos', $uploads, $extra), array_map(static fn (string $name): array => [$name, $files[$name]], $uploads), $out);
 };
 $requestRow = static function (string $reference) use ($pdo): array {
     $stmt = $pdo->prepare('SELECT id, status, advisory, processing_started_at, processing_completed_at, processing_staff_id, requirement_complete FROM requests WHERE reference_no = ?');
@@ -1234,6 +1234,28 @@ $check('Staff open the original that can be served', $fileStatus($staff8, (int) 
 [$status, $body] = $staff8->api('ai_verification_reviewed', ['reference' => $refFiles]);
 $check('then the review is recorded: unavailable originals do not lock Staff out', $status === 200 && $job($refFiles)['staff_review_status'] === 'reviewed'
     && (int) (json_decode($body, true)['data']['unavailable_originals'] ?? -1) === 2, [$status, $body]);
+// Step 10 (R6): once no review depends on it, the page's hint no longer reads each file's type (the
+// file was type-checked at upload); opening it still checks fully, and the gate is unaffected.
+[, $html] = $staff8->request('GET', '/internal.php?view=land-transfer-requests');
+$hintFlags = [];
+foreach (array_merge($pageData($html)['docRequests'] ?? [], $pageData($html)['landRequests'] ?? []) as $record) {
+    if ($record['id'] === $refFiles) {
+        foreach ($record['files'] ?? [] as $f) {
+            if (($f['status'] ?? '') !== 'missing') {
+                $hintFlags[$f['key']] = $f['available'] ?? null;
+            }
+        }
+    }
+}
+$check('after the review, the cheaper hint still flags the missing file but no longer reads file types; opening the bad file still answers 415',
+    $hintFlags === ['ctcTdOrTitle' => true, 'notarialDeed' => false, 'ownerId' => true]
+    && $fileStatus($staff8, (int) $docRows['ctcTdOrTitle']['id'], $refFiles) === 415, $hintFlags);
+// Step 10 (R4): every model judgement in the Staff panel is labelled as an unverified AI suggestion.
+$panel = (string) file_get_contents($work . '/smart-assess-internal.html');
+$check('Staff panel: the type column, its values, the model\'s findings and the outcome banner say "AI suggestion (unverified)"',
+    str_contains($panel, 'Looks like this document? (AI suggestion, unverified)') && str_contains($panel, "yes:'AI suggestion (unverified): yes'")
+    && str_contains($panel, "model:'AI suggestion (unverified)'") && str_contains($panel, 'Automatic checks and AI suggestions (unverified), not a decision')
+    && !str_contains($panel, "model:'AI model'"));
 
 // ================= Step 8: simultaneous openings keep one row =================
 $concurrentDoc = (int) $docRows['ownerId']['id'];
@@ -1380,6 +1402,55 @@ $confirmationRows = (int) $pdo->query("SELECT COUNT(*) FROM notifications n JOIN
 $check('after the deadlocks, a normal submission is saved with its AI job and its SMS confirmation queued (confirmations unchanged)', $status === 200 && $refAfter !== ''
     && $hasJob($refAfter) && $confirmationRows === 1, [$status, $refAfter, $confirmationRows]);
 $check('queueing a confirmation sends nothing by itself', (string) @file_get_contents($sendAttempts) === $sentBefore);
+// ================= Step 10 (R5): the database connection lost in the middle of a submission =================
+// The submission waits inside its transaction (a test trigger), then this test kills its database
+// connection, exactly like a crashed or restarted MySQL connection. Expected: no PHP fatal error,
+// the rollback failure is caught, nothing is saved, every uploaded file is removed, the client is
+// told it failed.
+// A named lock is not transactional: IS_USED_LOCK() tells this test which connection holds it.
+$pdo->exec("CREATE TRIGGER sa_test_wait BEFORE INSERT ON notifications FOR EACH ROW BEGIN
+    IF (SELECT n FROM deadlock_probe WHERE id = 0) = 1 THEN
+        DO GET_LOCK('sa_test_lost_connection', 0);
+        SELECT n INTO @sa_wait FROM deadlock_probe WHERE id = 1 FOR UPDATE;
+    END IF;
+END");
+$before = $counts();
+$filesBefore = $storedFiles();
+$logBefore = strlen((string) @file_get_contents($work . '/app.log'));
+$holder = new PDO($dsn, $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$holder->beginTransaction();
+$holder->query('SELECT n FROM deadlock_probe WHERE id = 1 FOR UPDATE')->fetchAll();
+$pdo->exec('UPDATE deadlock_probe SET n = 1 WHERE id = 0');
+$out = $work . '/lost-connection.json';
+// Its own (synthetic) number: an earlier confirmation to the shared test number is still queued,
+// and the application rightly does not queue a second one to the same number.
+$process = $submitAsync('docreq', ['ownerId' => 'id-santos.png'], $out, ['contact_number' => '+639170002222']);
+$victim = null;
+for ($i = 0; $i < 300 && $victim === null; $i++) {   // the submission's connection, waiting inside the trigger
+    $victim = $pdo->query("SELECT IS_USED_LOCK('sa_test_lost_connection')")->fetchColumn() ?: null;
+    if ($victim === null) {
+        usleep(50000);
+    }
+}
+if ($victim !== null) {
+    usleep(200000);   // it is now waiting for the row lock inside its transaction
+    $pdo->exec('KILL CONNECTION ' . (int) $victim);
+}
+$holder->rollBack();
+$pdo->exec('UPDATE deadlock_probe SET n = 0 WHERE id = 0');
+proc_close($process);
+$pdo->exec('DROP TRIGGER sa_test_wait');
+$answer = (array) json_decode((string) @file_get_contents($out), true);
+$log = substr((string) @file_get_contents($work . '/app.log'), $logBefore);
+$check('lost connection mid-submission: the connection really was killed while the submission waited', $victim !== null, $victim);
+$check('lost connection mid-submission: the client is told it failed (no 200, no reference number)', ($answer['status'] ?? 0) !== 200
+    && !str_contains((string) ($answer['body'] ?? ''), 'reference_no'), $answer);
+$check('lost connection mid-submission: nothing saved and no uploaded file left behind', $counts() === $before && $storedFiles() === $filesBefore,
+    [$before, $counts(), $filesBefore, $storedFiles()]);
+$check('lost connection mid-submission: the failed rollback was caught (logged), no PHP fatal error', str_contains($log, 'Rolling back a failed submission failed')
+    && !str_contains($log, 'PHP Fatal'), substr($log, -500));
+[$status, $refAfterLoss] = $submit('docreq', 'Santos', ['ownerId' => 'id-santos.png']);
+$check('after the lost connection, the next submission is saved normally', $status === 200 && $refAfterLoss !== '' && $hasJob($refAfterLoss), [$status, $refAfterLoss]);
 $pdo->exec('DROP TABLE deadlock_probe');
 $pdo->exec('DROP TABLE deadlock_filler');
 

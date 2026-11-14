@@ -102,7 +102,16 @@ function sa_db(): PDO
     if ($pdo instanceof PDO) {
         return $pdo;
     }
+    $pdo = sa_db_connect();
+    return $pdo;
+}
 
+/**
+ * A new database connection with the same settings as sa_db(). Used on its own only to
+ * find out, after a failed commit, whether the submission was saved (sa_commit_submission()).
+ */
+function sa_db_connect(): PDO
+{
     $host = getenv('DB_HOST') !== false && getenv('DB_HOST') !== '' ? getenv('DB_HOST') : '127.0.0.1';
     $port = getenv('DB_PORT') !== false && getenv('DB_PORT') !== '' ? getenv('DB_PORT') : '3307';
     $name = getenv('DB_NAME') !== false && getenv('DB_NAME') !== '' ? getenv('DB_NAME') : 'smart_assess';
@@ -590,9 +599,21 @@ function sa_internal_bootstrap(): array
                  JOIN (SELECT id FROM requests ORDER BY created_at DESC LIMIT 500) recent ON recent.id = rd.request_id')->fetchAll() as $row) {
             $paths[(int) $row['id']] = $row['stored_path'] === null ? null : (string) $row['stored_path'];
         }
+        // The full check (including the file's type) only where a review depends on it: requests
+        // whose AI check is finished and not yet reviewed. For the rest a cheaper check (stored path,
+        // inside the uploads folder, present and readable) is enough for this hint; every file was
+        // type-checked at upload, and opening one (request-file.php) always checks fully.
+        $reviewPending = [];
+        if (AiVerification::available($pdo)) {
+            foreach ($pdo->query("SELECT request_id FROM ai_verification_jobs WHERE status IN ('completed', 'needs_manual_review')
+                     AND staff_review_status = 'not_reviewed'")->fetchAll(PDO::FETCH_COLUMN) as $pendingId) {
+                $reviewPending[(int) $pendingId] = true;
+            }
+        }
         $appRoot = dirname(__DIR__);
         foreach ($data['documents'] as &$document) {
-            $document['file_available'] = AiVerification::originalFile($appRoot, $paths[(int) $document['id']] ?? null, (string) $document['file_status']) !== null;
+            $document['file_available'] = AiVerification::originalFile($appRoot, $paths[(int) $document['id']] ?? null, (string) $document['file_status'],
+                isset($reviewPending[(int) $document['request_id']])) !== null;
         }
         unset($document);
     }

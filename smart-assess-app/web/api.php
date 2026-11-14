@@ -534,6 +534,33 @@ function sa_submission_still_saved(PDO $pdo, int $requestId, string $step): void
     }
 }
 
+/**
+ * Commits a submission and says what happened: 'committed' (the request is saved), 'not_saved'
+ * (it is not) or 'unknown'. A commit that throws (for example a dropped connection) has an
+ * uncertain outcome: the database may have committed just before the connection was lost.
+ * A fresh connection ($freshConnection, by default sa_db_connect()) then finds out, so a
+ * saved request is never treated as failed (and its files deleted), and an unsaved one is
+ * never reported as saved. 'unknown' means even that check failed: the caller keeps the files.
+ */
+function sa_commit_submission(PDO $pdo, int $requestId, ?Closure $freshConnection = null): string
+{
+    try {
+        $pdo->commit();
+        return 'committed';
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS] The commit of a submission (request ID ' . $requestId . ') failed; checking on a new connection whether it was saved.');
+    }
+    try {
+        $fresh = $freshConnection !== null ? $freshConnection() : sa_db_connect();
+        $stmt = $fresh->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
+        $stmt->execute(['id' => $requestId]);
+        return (int) $stmt->fetchColumn() === 1 ? 'committed' : 'not_saved';
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS] Could not find out whether request ID ' . $requestId . ' was saved; its uploaded files are kept.');
+        return 'unknown';
+    }
+}
+
 function sa_submit_request(array $data): array
 {
     $flow = (string) ($data['flow'] ?? '');
@@ -623,6 +650,8 @@ function sa_submit_request(array $data): array
     $pdo = sa_db();
     $storedFiles = [];
     $movedDraftFiles = [];
+    $keepFiles = false;   // set when a commit's outcome is unknown: then no file is removed
+    $requestId = 0;
     $unusedDraftFiles = [];
     $draftCode = isset($data['draft_token']) && sa_drafts_enabled() ? sa_draft_normalize_code($data['draft_token']) : null;
     try {
@@ -848,7 +877,13 @@ function sa_submit_request(array $data): array
             $confirmations = 0;
             error_log('[SMART_ASSESS_CONFIRM] Could not queue the confirmation for request ID ' . $requestId . '; the request was saved.');
         }
-        $pdo->commit();
+        $committed = sa_commit_submission($pdo, $requestId);
+        if ($committed !== 'committed') {
+            // Not saved: clean up as for any failure. Unknown: keep every file (a saved request
+            // must never lose its documents); the client is told it failed and can check tracking.
+            $keepFiles = $committed === 'unknown';
+            throw new RuntimeException('The submission could not be saved (commit ' . $committed . ').');
+        }
         // Last check before success is reported: the request really is saved. A transaction the
         // database dropped earlier (a deadlock) would otherwise "commit" nothing silently.
         // Only a confirmed "not found" fails it: if this check itself cannot run (a dropped
@@ -876,8 +911,18 @@ function sa_submit_request(array $data): array
         sa_remember_submitted_reference($reference);
         return ['reference_no' => $reference, 'status' => 'Received'];
     } catch (Throwable $exception) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
+        // A lost connection makes rollBack() itself fail; the database then discards the
+        // uncommitted transaction on its own. Either way the clean-up below must still run.
+        try {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+        } catch (Throwable) {
+            error_log('[SMART_ASSESS] Rolling back a failed submission failed (the connection was probably lost); the database discards it.');
+        }
+        if ($keepFiles) {
+            error_log('[SMART_ASSESS] Kept the uploaded files of request ID ' . $requestId . ': it is not known whether it was saved.');
+            throw $exception;
         }
         foreach ($movedDraftFiles as $moved => $original) {
             if (is_file($moved)) {
@@ -886,7 +931,7 @@ function sa_submit_request(array $data): array
         }
         foreach ($storedFiles as $path) {
             if (is_file($path)) {
-                unlink($path);
+                @unlink($path);
             }
         }
         throw $exception;

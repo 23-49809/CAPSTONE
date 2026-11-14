@@ -217,12 +217,47 @@ foreach ([
     $check('evidence removed: ' . $label, $evidenceFor($evidence) === '', $evidenceFor($evidence));
 }
 $check('evidence: a hidden character is stripped, and only the real text it hid is shown', $evidenceFor("DELA\u{200B}CRUZ, JUAN") === 'DELA CRUZ, JUAN'
-    && $evidenceFor("DELA\u{200B} CRUZ") === 'DELA CRUZ' && !str_contains($evidenceFor("DELA\u{200B} CRUZ"), "\u{200B}"));
+    && $evidenceFor("LICENSE DELA\u{200B} CRUZ") === 'LICENSE DELA CRUZ' && !str_contains($evidenceFor("LICENSE DELA\u{200B} CRUZ"), "\u{200B}"));
 $check('evidence: a finding naming no document may quote any document', $evidenceFor('ARP No. 018-00045', []) === 'ARP No. 018-00045');
-$withEvidence = array_replace($goodOutput, ['findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'DELA CRUZ']]]);
+$withEvidence = array_replace($goodOutput, ['findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'DRIVER LICENSE DELA CRUZ']]]);
 $check('a version 1 worker (did not check quotes): all model evidence is dropped by the application', $classifyV($withEvidence, 1)['findings'][0]['evidence'] === '');
 $check('a version 2 worker (checked quotes): the checked evidence is shown', array_column(array_filter($classifyV($withEvidence, 2)['findings'],
-    static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['DELA CRUZ']);
+    static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['DRIVER LICENSE DELA CRUZ']);
+// Step 10 (R3): short, cherry-picked quotes and quotes on "cannot verify" findings are never shown.
+$cherryTexts = ['ownerId' => ['text' => 'CERTIFIED TRUE COPY. THIS IS A GENUINE COPY OF THE ORIGINAL. APPROVED BY THE REGISTRAR.']];
+$quoteOn = static fn (string $category, string $evidence): string => DocumentAnalysis::keepQuotedEvidence(['documents' => [], 'manual_review_recommended' => false,
+    'findings' => [['category' => $category, 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => $evidence]]], $cherryTexts)['findings'][0]['evidence'];
+foreach (['GENUINE', 'APPROVED', 'GENUINE COPY'] as $short) {
+    $check('worker: a real but too short quote is dropped: ' . $short, $quoteOn('possible_inconsistency', $short) === '', $quoteOn('possible_inconsistency', $short));
+}
+$check('worker: a real quote of 12+ characters and 3+ words is kept', $quoteOn('possible_inconsistency', 'APPROVED BY THE REGISTRAR') === 'APPROVED BY THE REGISTRAR');
+$check('worker: no quote at all on a "cannot verify" finding, even a long real one', $quoteOn('cannot_verify', 'THIS IS A GENUINE COPY OF THE ORIGINAL') === '');
+foreach ([1, 2] as $version) {
+    $shown = $classifyV(array_replace($goodOutput, ['findings' => [
+        ['category' => 'possible_inconsistency', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'GENUINE'],
+        ['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'THIS IS A GENUINE COPY'],
+    ]]), $version)['findings'];
+    $check("application (worker version {$version}): short quotes and quotes on cannot-verify findings are dropped whatever the worker sent",
+        array_column(array_filter($shown, static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['', ''], $shown);
+}
+$check('evidenceAllowed: the rule in one place', !DocumentAnalysis::evidenceAllowed('possible_inconsistency', 'GENUINE')
+    && !DocumentAnalysis::evidenceAllowed('possible_inconsistency', 'ABCDEFGHIJKLMN') && DocumentAnalysis::evidenceAllowed('possible_inconsistency', 'ARP No. 018-00045')
+    && !DocumentAnalysis::evidenceAllowed('cannot_verify', 'ARP No. 018-00045'));
+
+// Step 10 (D3): "Needs review" always names its reasons, never "0, 0 and 0".
+$cvOnly = $classifyV(array_replace($goodOutput, ['findings' => [['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => '']]]));
+$check('reason names a cannot-verify point', $cvOnly['outcome'] === 'needs_review' && str_contains($cvOnly['reason'], '1 point(s) the AI cannot check from text')
+    && !str_contains($cvOnly['reason'], '0 possible'), $cvOnly['reason']);
+$mrOnly = $classifyV(array_replace($goodOutput, ['manual_review_recommended' => true]));
+$check('reason names the AI\'s manual-review suggestion', $mrOnly['outcome'] === 'needs_review' && str_contains($mrOnly['reason'], 'the AI suggests a manual review')
+    && !str_contains($mrOnly['reason'], '0 '), $mrOnly['reason']);
+$skipped = DocumentAnalysis::classify($requirements($both), $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'skipped'), $keys), $labels);
+$check('reason says the model did not review the documents', $skipped['outcome'] === 'needs_review' && str_contains($skipped['reason'], 'did not review the documents'), $skipped['reason']);
+$mixed = $classifyV(array_replace($goodOutput, ['findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => '']]]),
+    2, ['ownerId' => 'good', 'ctcTdOrTitle' => 'partial']);
+$check('reason counts only what applies, with the not-an-approval sentence', str_contains($mixed['reason'], '1 possible inconsistency(ies); 1 reading problem(s)')
+    && !str_contains($mixed['reason'], '0 ') && str_contains($mixed['reason'], 'This is not an approval'), $mixed['reason']);
+
 $check('an unknown worker result version is rejected', $rejects(static fn () => $validated(['version' => 3] + $worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $goodOutput), $keys)));
 
 // ================= Rule checks, readability and prompts =================

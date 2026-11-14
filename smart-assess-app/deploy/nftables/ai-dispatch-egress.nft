@@ -1,0 +1,23 @@
+#!/usr/sbin/nft -f
+# SMART ASSESS AI dispatcher egress filter. NOT INSTALLED (see smart-assess-ai-dispatch-egress.service).
+# Only packets owned by a socket of the sa-ai-dispatch account enter the "dispatch" chain; every
+# other packet on this host, including kernel-generated packets that belong to no socket, keeps the
+# default (accept), so nothing else changes. The dispatcher may open TCP connections to the AI
+# worker at 127.0.0.1:8095 and nothing else: not DNS (127.0.0.53/54), not MySQL over TCP (3306) or
+# the X protocol (33060), not Ollama (11434), not Apache, not the internet, over IPv4 or IPv6.
+# MySQL is reached through its local socket (AF_UNIX), which this filter does not see.
+table inet sa_ai_dispatch_egress
+delete table inet sa_ai_dispatch_egress
+table inet sa_ai_dispatch_egress {
+    counter allowed_worker { }
+    counter rejected { }
+    chain output {
+        type filter hook output priority filter; policy accept;
+        meta skuid "sa-ai-dispatch" jump dispatch
+    }
+    chain dispatch {
+        oifname "lo" ip daddr 127.0.0.1 tcp dport 8095 counter name allowed_worker accept
+        meta l4proto tcp counter name rejected reject with tcp reset
+        counter name rejected reject with icmpx admin-prohibited
+    }
+}
