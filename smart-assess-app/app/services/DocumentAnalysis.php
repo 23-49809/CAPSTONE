@@ -36,11 +36,58 @@ final class DocumentAnalysis
     private const MAX_EXPLANATION = 400;
     private const MAX_EVIDENCE = 160;
     private const MAX_NOTE = 300;
+    /*
+     * Shorter limits sent to the MODEL only (its JSON schema; Ollama enforces maxLength while it
+     * generates). Its "note" and "explanation" are validated but never shown (findings are worded
+     * by the server), so long free text only costs generation time: about 4 tokens/s on the
+     * production CPU. Step 12 benchmark (9 synthetic jobs): 15% fewer output tokens, about 9% less
+     * time, no loss of document-type answers, evidence or manual-review flags. The validator keeps
+     * MAX_NOTE / MAX_EXPLANATION, so answers from any worker version stay accepted.
+     */
+    private const MODEL_MAX_NOTE = 60;
+    private const MODEL_MAX_EXPLANATION = 100;
     private const MAX_FIELD_NAME = 80;
     private const MAX_MISSING_FIELDS = 10;
     private const KEY_PATTERN = '/^[A-Za-z][A-Za-z0-9_]{0,39}$/';
     /** IDs carry little text; other documents should carry a page of it. */
     private const ID_KEYS = ['ownerId', 'requesterId'];
+    /*
+     * Nothing the model writes in its own words reaches Staff. Its "explanation" and
+     * "note" texts are still requested and validated (so the answer format stays the
+     * same for every worker version) but are discarded: every finding Staff see is
+     * worded by this class from validated codes (category, field, document labels),
+     * and always marked as an unverified suggestion. So no phrasing, language,
+     * spelling trick or hidden character can make the AI say that a signature, seal
+     * or document is genuine, or that a request should be approved, rejected or
+     * released. The only text from a document shown with a finding is "evidence", and
+     * only when the worker confirmed it is an exact quote of the OCR text
+     * (keepQuotedEvidence(), worker result version 2).
+     */
+
+    /** Details the model may report as missing: code => label shown to Staff. Anything else is dropped. */
+    public const MISSING_FIELD_LABELS = [
+        'full_name' => 'Full name', 'date_of_birth' => 'Date of birth', 'address' => 'Address', 'id_number' => 'ID number',
+        'date_of_issue' => 'Date of issue', 'expiry_date' => 'Expiry date', 'photo' => 'Photo', 'signature' => 'Signature',
+        'issuing_office' => 'Issuing office', 'arp_number' => 'ARP or Tax Declaration number', 'title_number' => 'Title number (TCT/OCT)',
+        'lot_number' => 'Lot number', 'owner_name' => 'Owner\'s name', 'property_location' => 'Property location', 'land_area' => 'Land area',
+        'assessed_value' => 'Assessed value', 'document_date' => 'Date of the document', 'notarial_details' => 'Notarial details',
+        'party_names' => 'Names of the parties', 'authorized_person' => 'Name of the authorized person', 'authorized_purpose' => 'What the letter authorizes',
+        'tax_period' => 'Tax period covered', 'receipt_number' => 'Receipt number',
+    ];
+    /**
+     * A model "evidence" quote is shown only when it is an exact OCR quote (worker, version 2) of at
+     * least this many characters and words, and never on a "cannot verify" finding: a single
+     * cherry-picked word such as "GENUINE" or "APPROVED" could otherwise read like a verdict.
+     */
+    public const MIN_EVIDENCE_CHARACTERS = 12;
+    public const MIN_EVIDENCE_WORDS = 3;
+    /** Worker result versions: 2 = model evidence was checked against the OCR text by the worker. */
+    public const WORKER_RESULT_VERSIONS = [1, 2];
+    public const WORKER_RESULT_VERSION = 2;
+    private const FIELD_NOUNS = [
+        'name' => 'a name', 'property_identifier' => 'a property number (ARP, TCT, OCT or lot number)', 'date' => 'a date',
+        'document_type' => 'the type of document', 'required_field' => 'a required detail', 'other' => 'a detail',
+    ];
 
     /**
      * JSON schema given to Ollama (structured output), with the job's own
@@ -65,8 +112,8 @@ final class DocumentAnalysis
                     'properties' => [
                         'key' => $key,
                         'expected_type_match' => ['type' => 'string', 'enum' => self::TYPE_MATCH],
-                        'missing_fields' => ['type' => 'array', 'maxItems' => self::MAX_MISSING_FIELDS, 'items' => $string(self::MAX_FIELD_NAME)],
-                        'note' => $string(self::MAX_NOTE),
+                        'missing_fields' => ['type' => 'array', 'maxItems' => self::MAX_MISSING_FIELDS, 'items' => ['type' => 'string', 'enum' => array_keys(self::MISSING_FIELD_LABELS)]],
+                        'note' => $string(self::MODEL_MAX_NOTE),
                     ],
                 ]],
                 'findings' => ['type' => 'array', 'maxItems' => self::MAX_FINDINGS, 'items' => [
@@ -77,7 +124,7 @@ final class DocumentAnalysis
                         'category' => ['type' => 'string', 'enum' => self::CATEGORIES],
                         'field' => ['type' => 'string', 'enum' => ['name', 'property_identifier', 'date', 'document_type', 'required_field', 'other']],
                         'document_keys' => ['type' => 'array', 'items' => $key],
-                        'explanation' => $string(self::MAX_EXPLANATION),
+                        'explanation' => $string(self::MODEL_MAX_EXPLANATION),
                         'evidence' => $string(self::MAX_EVIDENCE),
                     ],
                 ]],
@@ -113,11 +160,19 @@ final class DocumentAnalysis
             if (!is_array($missing) || !array_is_list($missing) || count($missing) > self::MAX_MISSING_FIELDS) {
                 throw new UnexpectedValueException('missing_fields must be a short list');
             }
+            self::text($document['note'], self::MAX_NOTE, 'note');   // validated, never shown (see above)
+            $fields = [];
+            foreach ($missing as $field) {
+                $code = self::missingFieldCode(self::text($field, self::MAX_FIELD_NAME, 'missing field', false));
+                if ($code !== null && !in_array($code, $fields, true)) {
+                    $fields[] = $code;   // unknown or invented names are dropped
+                }
+            }
             $documents[$key] = [
                 'key' => $key,
                 'expected_type_match' => self::enum($document['expected_type_match'], self::TYPE_MATCH, 'expected_type_match'),
-                'missing_fields' => array_map(static fn (mixed $field): string => self::text($field, self::MAX_FIELD_NAME, 'missing field', false), $missing),
-                'note' => self::text($document['note'], self::MAX_NOTE, 'note'),
+                'missing_fields' => $fields,
+                'note' => '',
             ];
         }
         if (count($documents) !== count($documentKeys)) {
@@ -129,20 +184,84 @@ final class DocumentAnalysis
         $findings = [];
         foreach ($object['findings'] as $finding) {
             $finding = self::exactObject($finding, ['category', 'field', 'document_keys', 'explanation', 'evidence'], 'finding');
-            $findings[] = self::finding(
-                self::enum($finding['category'], self::CATEGORIES, 'category'),
-                self::enum($finding['field'], ['name', 'property_identifier', 'date', 'document_type', 'required_field', 'other'], 'field'),
-                self::keyList($finding['document_keys'], $documentKeys),
-                self::text($finding['explanation'], self::MAX_EXPLANATION, 'explanation', false),
-                self::text($finding['evidence'], self::MAX_EVIDENCE, 'evidence'),
-                'model'
-            );
+            $category = self::enum($finding['category'], self::CATEGORIES, 'category');
+            $field = self::enum($finding['field'], array_keys(self::FIELD_NOUNS), 'field');
+            self::text($finding['explanation'], self::MAX_EXPLANATION, 'explanation', false);   // validated, never shown
+            $findings[] = self::finding($category, $field, self::keyList($finding['document_keys'], $documentKeys),
+                '', self::text($finding['evidence'], self::MAX_EVIDENCE, 'evidence'), 'model');   // worded in classify()
         }
         return [
             'documents' => array_values($documents),
             'findings' => $findings,
             'manual_review_recommended' => $object['manual_review_recommended'],
         ];
+    }
+
+    /** The allowed code for a missing-field name the model gave (a code, or its label), or null. */
+    public static function missingFieldCode(string $name): ?string
+    {
+        $code = trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower($name)), '_');
+        if (isset(self::MISSING_FIELD_LABELS[$code])) {
+            return $code;
+        }
+        foreach (self::MISSING_FIELD_LABELS as $known => $label) {
+            if ($code === trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower($label)), '_')) {
+                return $known;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Worker side, where the OCR text is known: keeps a model finding's "evidence" only if
+     * it is an exact quote of the text read from one of the finding's documents (or any
+     * document, when it names none), compared after the same whitespace normalisation the
+     * text had. Anything else (invented, paraphrased or altered) becomes "". Works on the
+     * raw, already validated model output and keeps its shape.
+     *
+     * @param array<string, array{text:string}> $texts document key => normalized OCR text
+     */
+    public static function keepQuotedEvidence(array $output, array $texts): array
+    {
+        // Whitespace (spaces, line breaks) and invisible/control characters are not meaningful
+        // in OCR text, so both sides are compared with them reduced to single spaces; the
+        // evidence kept is then a string that does occur in the text, character for character.
+        $flat = static fn (string $text): string => trim((string) preg_replace('/\s+/u', ' ', self::normalizeText($text)));
+        foreach ($output['findings'] as &$finding) {
+            $evidence = $flat((string) ($finding['evidence'] ?? ''));
+            $keys = $finding['document_keys'] !== [] ? $finding['document_keys'] : array_keys($texts);
+            $quoted = false;
+            foreach ($keys as $key) {
+                if ($evidence !== '' && isset($texts[$key]) && str_contains($flat($texts[$key]['text']), $evidence)) {
+                    $quoted = true;
+                    break;
+                }
+            }
+            $finding['evidence'] = $quoted && self::evidenceAllowed((string) $finding['category'], $evidence) ? $evidence : '';
+        }
+        unset($finding);
+        return $output;
+    }
+
+    /** Whether a model finding may show $evidence at all (length, words, category); see MIN_EVIDENCE_*. */
+    public static function evidenceAllowed(string $category, string $evidence): bool
+    {
+        $evidence = trim((string) preg_replace('/\s+/u', ' ', self::normalizeText($evidence)));
+        $words = preg_match_all('/[\p{L}\p{N}]+/u', $evidence);
+        return $category !== 'cannot_verify' && mb_strlen($evidence) >= self::MIN_EVIDENCE_CHARACTERS && $words >= self::MIN_EVIDENCE_WORDS;
+    }
+
+    /** Staff-facing wording of a model finding: built only from validated codes, always "unverified". */
+    private static function modelFindingText(string $category, string $field, array $keys, Closure $label): string
+    {
+        $documents = $keys === [] ? 'the documents' : implode(', ', array_map($label, $keys));
+        $noun = self::FIELD_NOUNS[$field] ?? 'a detail';
+        return match ($category) {
+            'possible_inconsistency' => 'AI suggestion (unverified): ' . $noun . ' in ' . $documents . ' may not match the form or the other documents. Compare the originals yourself.',
+            'missing_information' => 'AI suggestion (unverified): ' . $noun . ' may be missing from ' . $documents . '. Check the original.',
+            'ocr_uncertainty' => 'AI suggestion (unverified): the text of ' . $documents . ' may be unclear or incomplete about ' . $noun . '. Check the original.',
+            default => 'Cannot be checked by the AI: ' . $noun . ' in ' . $documents . ' (for example a signature, seal or notarization) can only be judged by Staff from the original document.',
+        };
     }
 
     /**
@@ -154,7 +273,7 @@ final class DocumentAnalysis
     public static function validateWorkerResult(mixed $result, array $documentKeys): array
     {
         $object = self::exactObject($result, ['version', 'documents', 'rule_findings', 'model', 'ocr_engine'], 'worker result');
-        if ($object['version'] !== 1) {
+        if (!in_array($object['version'], self::WORKER_RESULT_VERSIONS, true)) {
             throw new UnexpectedValueException('unsupported result version');
         }
         if (!is_array($object['documents']) || !array_is_list($object['documents']) || count($object['documents']) !== count($documentKeys)) {
@@ -218,6 +337,14 @@ final class DocumentAnalysis
         $output = null;
         if ($status === 'ok') {
             $output = self::validateModelOutput($model['output'], $documentKeys);
+            if ($object['version'] < 2) {
+                // A worker before version 2 did not check the model's quotes against the OCR
+                // text, and this application cannot (it never receives the text): drop them.
+                foreach ($output['findings'] as &$finding) {
+                    $finding['evidence'] = '';
+                }
+                unset($finding);
+            }
         } elseif ($model['output'] !== null) {
             throw new UnexpectedValueException('model output is only allowed when the model succeeded');
         }
@@ -225,7 +352,7 @@ final class DocumentAnalysis
             throw new UnexpectedValueException('ocr_engine is not valid');
         }
         return [
-            'version' => 1,
+            'version' => $object['version'],
             'documents' => array_values($documents),
             'rule_findings' => $ruleFindings,
             'model' => ['status' => $status, 'name' => $model['name'], 'digest' => $model['digest'], 'output' => $output],
@@ -265,6 +392,10 @@ final class DocumentAnalysis
             } elseif (in_array($document['readability'], ['poor', 'unreadable'], true)) {
                 $findings[] = self::finding('ocr_uncertainty', 'other', [$document['key']],
                     'Little or no text could be read from ' . $label($document['key']) . '. It may be blurry, handwritten, rotated or in a language OCR does not support. Inspect it manually.', '', 'ocr');
+            } elseif ($document['readability'] === 'partial') {
+                // "Passed" needs every document read clearly: the checks cannot vouch for text they only partly read.
+                $findings[] = self::finding('ocr_uncertainty', 'other', [$document['key']],
+                    'Only part of the text of ' . $label($document['key']) . ' could be read, so the automatic checks may have missed something. Inspect it manually.', '', 'ocr');
             }
         }
         foreach ($worker['rule_findings'] as $finding) {
@@ -281,29 +412,40 @@ final class DocumentAnalysis
                 $key = $document['key'];
                 if ($document['expected_type_match'] === 'no') {
                     $findings[] = self::finding('possible_inconsistency', 'document_type', [$key],
-                        'The text does not look like the expected document (' . $label($key) . ').' . ($document['note'] !== '' ? ' ' . $document['note'] : ''), '', 'model');
+                        'AI suggestion (unverified): the text does not look like the expected document (' . $label($key) . '). Check the original.', '', 'model');
                 } elseif ($document['expected_type_match'] === 'unclear') {
                     $findings[] = self::finding('ocr_uncertainty', 'document_type', [$key],
-                        'It is unclear from the text whether this is the expected document (' . $label($key) . ').', '', 'model');
+                        'AI suggestion (unverified): it is unclear from the text whether this is the expected document (' . $label($key) . ').', '', 'model');
                 }
                 if ($document['missing_fields'] !== []) {
                     $findings[] = self::reliableOr(
                         self::finding('missing_information', 'required_field', [$key],
-                            'Details that seem to be absent from ' . $label($key) . ': ' . implode(', ', $document['missing_fields']) . '.', '', 'model'),
+                            'AI suggestion (unverified): details that may be absent from ' . $label($key) . ': '
+                            . implode(', ', array_map(static fn (string $code): string => self::MISSING_FIELD_LABELS[$code] ?? $code, $document['missing_fields'])) . '.', '', 'model'),
                         $readability
                     );
                 }
             }
             foreach ($model['output']['findings'] as $finding) {
+                // Worded here from validated codes only; the model's own text is never used.
+                $finding['explanation'] = self::modelFindingText($finding['category'], $finding['field'], $finding['document_keys'], $label);
+                if (!self::evidenceAllowed($finding['category'], $finding['evidence'])) {
+                    $finding['evidence'] = '';   // too short to give context, or on a "cannot verify" finding
+                }
                 $findings[] = $finding['category'] === 'missing_information' ? self::reliableOr($finding, $readability) : $finding;
             }
         }
 
         $categories = array_column($findings, 'category');
         $confirmedMissing = array_filter($findings, static fn (array $f): bool => $f['category'] === 'missing_information' && $f['source'] === 'requirements');
+        // "Passed" is never the model's to give: it needs the server's own checks to be clean AND the
+        // model to have actually reviewed every document. A model that did not (skipped, or any
+        // status other than ok while documents were sent) leaves the result for Staff to review.
+        $modelReviewed = $worker['documents'] === [] || ($model['status'] === 'ok' && is_array($model['output']));
         if ($confirmedMissing !== []) {
             $outcome = self::OUTCOME_MISSING;
-        } elseif (array_intersect($categories, ['missing_information', 'possible_inconsistency', 'ocr_uncertainty']) !== [] || $manualReview) {
+        } elseif (array_intersect($categories, ['missing_information', 'possible_inconsistency', 'ocr_uncertainty', 'cannot_verify']) !== [] || $manualReview || !$modelReviewed) {
+            // cannot_verify included: "only Staff can judge this from the original" needs a person, so it is never "Passed".
             $outcome = self::OUTCOME_NEEDS_REVIEW;
         } else {
             $outcome = self::OUTCOME_PASSED;
@@ -325,13 +467,13 @@ final class DocumentAnalysis
                 'readability' => $check['readability'] ?? null,
                 'pages' => $check['pages'] ?? 0,
                 'expected_type_match' => $modelDocuments[$item['key']]['expected_type_match'] ?? null,
-                'note' => $modelDocuments[$item['key']]['note'] ?? '',
+                'note' => '',   // the model's own note is never shown
             ];
         }
 
         return [
             'outcome' => $outcome,
-            'reason' => self::reason($outcome, $findings, $manualReview),
+            'reason' => self::reason($outcome, $findings, $manualReview, $modelReviewed),
             'findings' => $findings,
             'documents' => $documents,
             'manual_review' => $outcome !== self::OUTCOME_PASSED,
@@ -471,8 +613,8 @@ Strict rules:
    - possible_inconsistency: names, property numbers (ARP, TCT, OCT, lot numbers), dates or other details differ between documents or from the form, or a document does not look like its expected type.
    - ocr_uncertainty: the text is garbled, partial or too short to judge.
    - cannot_verify: something that cannot be checked from text alone.
-5. For each document give: expected_type_match "yes" if the text looks like the expected document type, "no" if it clearly looks like something else, "unclear" if you cannot tell; missing_fields (short names, only when the text is clearly readable); and a short neutral note.
-6. "evidence" is at most a short quote from the text, or an empty string. Keep explanations short, plain and factual.
+5. For each document give: expected_type_match "yes" if the text looks like the expected document type, "no" if it clearly looks like something else, "unclear" if you cannot tell; missing_fields (only codes from the allowed list in the schema, only when the text is clearly readable); and a short neutral note.
+6. "evidence" is an exact, short quote copied from the document text, or an empty string; anything that is not an exact quote is discarded. Keep explanations short, plain and factual.
 7. Set manual_review_recommended to true if anything needs a person to look at it.
 8. Reply with JSON only, matching the required schema exactly.
 PROMPT;
@@ -544,18 +686,36 @@ PROMPT;
         return $finding;
     }
 
-    private static function reason(string $outcome, array $findings, bool $manualReview): string
+    private static function reason(string $outcome, array $findings, bool $manualReview, bool $modelReviewed = true): string
     {
         $count = static fn (string $category): int => count(array_filter($findings, static fn (array $f): bool => $f['category'] === $category));
         $confirmed = count(array_filter($findings, static fn (array $f): bool => $f['category'] === 'missing_information' && $f['source'] === 'requirements'));
         $notApproval = ' This is not an approval: Staff must inspect the original documents and make the decision.';
+        if ($outcome === self::OUTCOME_NEEDS_REVIEW) {
+            // Every reason that applies is named, so the explanation never reads "0, 0 and 0".
+            $parts = [];
+            foreach ([
+                'possible_inconsistency' => '%d possible inconsistency(ies)',
+                'ocr_uncertainty' => '%d reading problem(s)',
+                'missing_information' => '%d possibly missing detail(s) (not confirmed)',
+                'cannot_verify' => '%d point(s) the AI cannot check from text (Staff must judge them from the original)',
+            ] as $category => $format) {
+                if ($count($category) > 0) {
+                    $parts[] = sprintf($format, $count($category));
+                }
+            }
+            if ($manualReview) {
+                $parts[] = 'the AI suggests a manual review';
+            }
+            if (!$modelReviewed) {
+                $parts[] = 'the AI model did not review the documents, so only the automatic checks ran';
+            }
+            return 'Needs review: ' . ($parts === [] ? 'a closer look by Staff is needed' : implode('; ', $parts)) . '.' . $notApproval;
+        }
         return match ($outcome) {
             self::OUTCOME_MISSING => 'Missing information: ' . $confirmed . ' required document(s) not uploaded.'
                 . (count($findings) > $confirmed ? ' Other concerns were also found.' : '') . $notApproval,
-            self::OUTCOME_NEEDS_REVIEW => 'Needs review: ' . $count('possible_inconsistency') . ' possible inconsistency(ies), '
-                . $count('ocr_uncertainty') . ' reading problem(s) and ' . $count('missing_information') . ' possibly missing detail(s) (not confirmed)'
-                . ($manualReview ? '; the AI also recommends manual review' : '') . '.' . $notApproval,
-            default => 'Passed: the required documents are present, the text was readable and no inconsistencies were detected.' . $notApproval,
+            default => 'Passed: the required documents are present, their text was read clearly and the automatic checks found no concern. This does not verify that any document, signature or seal is genuine.' . $notApproval,
         };
     }
 

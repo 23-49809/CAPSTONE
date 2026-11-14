@@ -17,7 +17,8 @@ final class OllamaClient
         private readonly int $timeoutSeconds = 180,
         private readonly int $maxResponseBytes = 262_144,
         private readonly int $contextTokens = 8192,
-        private readonly int $maxOutputTokens = 1500
+        private readonly int $maxOutputTokens = 1500,
+        private readonly ?string $unixSocket = null
     ) {
         $endpoint = rtrim(trim($endpoint), '/');
         $parts = parse_url($endpoint);
@@ -38,6 +39,16 @@ final class OllamaClient
             || $contextTokens < 2048 || $contextTokens > 131_072 || $maxOutputTokens < 256 || $maxOutputTokens > 8192) {
             throw new InvalidArgumentException('An Ollama limit is out of range.');
         }
+        // Optional Unix socket (Step 13): the HTTP request goes to this socket file instead of a TCP port.
+        // Used when the caller runs without network access (systemd PrivateNetwork=yes), so it can reach
+        // only this one service, whatever happens to the host firewall. Loopback http:// URLs only (the
+        // URL then only names the Host header); an absolute path short enough for a socket address.
+        if ($unixSocket !== null && ($unixSocket === '' || $unixSocket[0] !== '/' || strlen($unixSocket) > 100
+            || str_contains($unixSocket, "\0") || !preg_match('#^/[A-Za-z0-9._/-]+$#', $unixSocket) || str_contains($unixSocket, '/../')
+            || $scheme !== 'http' || !in_array($host, ['127.0.0.1', 'localhost', '::1'], true))) {
+            throw new InvalidArgumentException('The Ollama socket must be an absolute path, used with a loopback http:// endpoint.');
+        }
+
         $this->endpoint = $endpoint;
     }
 
@@ -160,6 +171,9 @@ final class OllamaClient
         ];
         if ($body !== null) {
             $options[CURLOPT_POSTFIELDS] = $body;
+        }
+        if ($this->unixSocket !== null) {
+            $options[CURLOPT_UNIX_SOCKET_PATH] = $this->unixSocket;
         }
         curl_setopt_array($curl, $options);
         $ok = curl_exec($curl);

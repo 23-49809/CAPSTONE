@@ -52,7 +52,9 @@ try {
         $number('SMART_ASSESS_WORKER_OLLAMA_TIMEOUT', 180),
         $number('SMART_ASSESS_WORKER_OLLAMA_MAX_RESPONSE_BYTES', 262_144),
         $number('SMART_ASSESS_WORKER_OLLAMA_CONTEXT_TOKENS', 8192),
-        $number('SMART_ASSESS_WORKER_OLLAMA_MAX_OUTPUT_TOKENS', 1500)
+        $number('SMART_ASSESS_WORKER_OLLAMA_MAX_OUTPUT_TOKENS', 1500),
+        // Step 13: with PrivateNetwork=yes the worker reaches Ollama only through this socket.
+        trim((string) getenv('SMART_ASSESS_WORKER_OLLAMA_SOCKET')) !== '' ? trim((string) getenv('SMART_ASSESS_WORKER_OLLAMA_SOCKET')) : null
     );
     $maxInput = $number('SMART_ASSESS_WORKER_MAX_INPUT_CHARS', 16_000);
     $maxBody = $number('SMART_ASSESS_WORKER_MAX_BODY_BYTES', 75 * 1024 * 1024);

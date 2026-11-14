@@ -1,0 +1,11 @@
+# SMART ASSESS - runs smart-assess-ai-egress-guard.service every 30 seconds and soon after boot.
+[Unit]
+Description=SMART ASSESS AI egress filter guard, every 30 seconds
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=30s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

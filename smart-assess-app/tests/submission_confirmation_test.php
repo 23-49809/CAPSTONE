@@ -322,7 +322,7 @@ $check('a refused staff SMS returns no IPROG message ID', $outcome === 'failed' 
 // ---- 8. Source checks: wiring that a fake database cannot show ----
 $submitFn = $extractFrom($api, 'sa_submit_request');
 $queueAt = strpos($submitFn, 'sa_confirmation_queue(');
-$commitAt = strrpos($submitFn, '$pdo->commit();');
+$commitAt = strrpos($submitFn, 'sa_commit_submission($pdo, $requestId)');   // Step 10: the submission commits through sa_commit_submission()
 $kickAt = strpos($submitFn, 'sa_confirmation_kick(');
 $check('sa_submit_request queues confirmations inside its transaction (before commit), behind a savepoint', $queueAt !== false && $commitAt !== false && $queueAt < $commitAt
     && str_contains($submitFn, "SAVEPOINT sa_confirmation") && str_contains($submitFn, "ROLLBACK TO SAVEPOINT sa_confirmation"));

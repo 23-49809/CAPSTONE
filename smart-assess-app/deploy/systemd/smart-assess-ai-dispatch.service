@@ -1,22 +1,47 @@
 # SMART ASSESS - AI document check dispatcher (Sydney web server).
 #
-# Sends queued AI document checks to the private AI worker and stores the
-# validated results. It never changes a request's status. Started every minute
-# by smart-assess-ai-dispatch.timer; a new run starts only after the previous
-# one has finished, so runs never overlap.
+# Sends queued AI document checks to the local AI worker (http://127.0.0.1:8095,
+# installed in Steps 4-5) and stores the validated results. It never changes a
+# request's status and never sends SMS or email. Started every minute by
+# smart-assess-ai-dispatch.timer; a new run starts only after the previous one has
+# finished, so runs never overlap.
 #
-# NOT INSTALLED. To install (only with approval, after the migration):
-#   sudo install -o root -g root -m 0644 smart-assess-ai-dispatch.service smart-assess-ai-dispatch.timer /etc/systemd/system/
-#   sudo install -o root -g root -m 0600 /dev/null /etc/smart-assess/ai-dispatch.env   # then fill it in (see ai-dispatch.env.example)
-#   sudo systemd-analyze verify /etc/systemd/system/smart-assess-ai-dispatch.service
-#   sudo systemctl daemon-reload
-#   sudo systemctl start smart-assess-ai-dispatch.service      # one manual run first; check: journalctl -u smart-assess-ai-dispatch
-#   sudo systemctl enable --now smart-assess-ai-dispatch.timer
+# NOT INSTALLED. To install (only with approval, after the 20261111 and 20261114
+# migrations, and only after the application release containing this file is deployed:
+# see "Release order" in docs/AI_DOCUMENT_VERIFICATION.md):
+#   1. Its own non-login system account and its own read-only group (never www-data):
+#        sudo useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin sa-ai-dispatch
+#        sudo groupadd --system sa-ai-read && sudo usermod -a -G sa-ai-read sa-ai-dispatch
+#        sudo apt-get install acl          # setfacl, used by the permissions script
+#   2. Its own least-privilege MySQL account: deploy/mysql/ai-dispatch-db-user.sql.example
+#   3. Files (all root-owned):
+#        sudo install -m 0755 ../sbin/smart-assess-ai-dispatch-permissions.sh /usr/local/sbin/
+#        sudo install -m 0644 smart-assess-ai-dispatch-permissions.service /etc/systemd/system/
+#        the egress filter: see smart-assess-ai-dispatch-egress.service (enable it first)
+#        sudo install -o root -g root -m 0644 smart-assess-ai-dispatch.service smart-assess-ai-dispatch.timer /etc/systemd/system/
+#        sudo install -o root -g root -m 0600 /dev/null /etc/smart-assess/ai-dispatch.env   # then fill it in (ai-dispatch.env.example)
+#        sudo systemd-analyze verify /etc/systemd/system/smart-assess-ai-dispatch.service
+#        sudo systemctl daemon-reload
+#        sudo systemctl start smart-assess-ai-dispatch.service      # one manual run first; journalctl -u smart-assess-ai-dispatch
+#        sudo systemctl enable --now smart-assess-ai-dispatch.timer
 # To stop AI checking (submissions keep working; jobs stay queued):
 #   sudo systemctl disable --now smart-assess-ai-dispatch.timer
 #
-# Paths assume the application root /var/www/smart-assess (the smart-assess-app
-# folder of the repository). Confirm it in the readiness report before installing.
+# What it can read (production layout checked 14 Nov 2026: application folder
+# ubuntu:www-data 0750, uploads www-data:www-data 0750/0640, /etc/smart-assess
+# root:www-data 0750 with database.env root:www-data 0640):
+#   - It is NOT in the www-data group. It reads only through sa-ai-read, which the
+#     permissions script grants on exactly (smart-assess-ai-dispatch-permissions.service,
+#     required by this unit and run again before every run, so deployments cannot remove it): bin/ai-verification-dispatch.php,
+#     web/bootstrap.php, app/services/*.php and private_uploads/requests.
+#   - Inside its sandbox /var/www is an empty read-only folder with only those paths
+#     mounted in, read only (TemporaryFileSystem + BindReadOnlyPaths).
+#   - /etc/smart-assess is hidden entirely: the website's settings, its database login
+#     (database.env), Gmail, and this service's own settings file, which systemd reads as
+#     root before the sandbox starts.
+# Network: the egress filter allows only TCP to 127.0.0.1:8095; DNS, MySQL over TCP,
+# Ollama and every other address are rejected, and the resolver's local sockets are
+# hidden. MySQL is reached through its local socket (DB_HOST=localhost).
 #
 # Exit codes (see bin/ai-verification-dispatch.php): 0 done or nothing to do;
 # 2 not configured; 3 the worker refused the shared secret; 75 the worker is not
@@ -26,17 +51,23 @@
 [Unit]
 Description=SMART ASSESS AI document check dispatcher
 Documentation=file:///var/www/smart-assess/docs/AI_DOCUMENT_VERIFICATION.md
-After=network-online.target mysql.service
+Requires=smart-assess-ai-dispatch-egress.service smart-assess-ai-dispatch-permissions.service smart-assess-ai-worker-link.socket
+After=network-online.target mysql.service smart-assess-ai-worker.service smart-assess-ai-dispatch-egress.service smart-assess-ai-dispatch-permissions.service smart-assess-ai-worker-link.socket
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=www-data
-Group=www-data
+User=sa-ai-dispatch
+Group=sa-ai-dispatch
+# Read-only access to its code and the request uploads only (see above). Not www-data.
+SupplementaryGroups=sa-ai-read
 # Database and worker settings for the dispatcher only (KEY=VALUE lines).
-# root:root 0600: systemd reads it before switching to www-data.
+# root:root 0600: systemd reads it before switching to sa-ai-dispatch.
 EnvironmentFile=/etc/smart-assess/ai-dispatch.env
 WorkingDirectory=/var/www/smart-assess
+# Release order, enforced before every run: the installed worker must answer in a version this
+# application accepts (bin/ai-worker-compat-check.php; exit 1 = deploy the application first).
+ExecStartPre=/usr/bin/php -n /var/www/smart-assess/bin/ai-worker-compat-check.php --app=/var/www/smart-assess --worker=/opt/smart-assess-ai-worker
 # Up to 20 jobs, starting new ones for at most 30 minutes. Errors go to the journal.
 ExecStart=/usr/bin/php -d memory_limit=512M -d display_errors=0 -d log_errors=1 -d error_log= /var/www/smart-assess/bin/ai-verification-dispatch.php --limit=20 --max-seconds=1800
 # 1800 s of starting jobs + one job's lease (worker timeout 900 s + 120 s) + margin.
@@ -51,25 +82,48 @@ TasksMax=16
 Nice=10
 IOSchedulingClass=idle
 
-# Hardening: reads the application and uploads, writes nothing to disk.
+# Only what it needs of the application, read only: everything else under /var/www is
+# absent from its view, whatever the file permissions say.
+TemporaryFileSystem=/var/www:ro
+BindReadOnlyPaths=/var/www/smart-assess/bin/ai-verification-dispatch.php /var/www/smart-assess/bin/ai-worker-compat-check.php /var/www/smart-assess/web/bootstrap.php /var/www/smart-assess/app/services /var/www/smart-assess/private_uploads/requests
+
+# Network: the egress filter (above) allows only 127.0.0.1:8095; this is a second layer.
+# No network at all (Step 13): a private network namespace with only an empty loopback, set up when the
+# process starts, so flushing, reloading or breaking the host firewall can never open anything to a running
+# dispatcher. Its only connections are socket files: MySQL (/run/mysqld, DB_HOST=localhost) and the AI
+# worker through smart-assess-ai-worker-link.socket. The nftables filter and IPAddressDeny stay as extra layers.
+PrivateNetwork=yes
+Environment=SMART_ASSESS_AI_WORKER_SOCKET=/run/smart-assess-ai-link/worker.sock
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_UNIX
+
+# Hardening: writes nothing to disk.
 NoNewPrivileges=yes
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes
 ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
+RemoveIPC=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
 SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
 UMask=0077
-ReadOnlyPaths=/var/www/smart-assess
+# Hidden: all of /etc/smart-assess (website settings, the website's database login, Gmail),
+# the resolver's local sockets and D-Bus (no DNS by another route), backups, the worker's
+# secret and state, the GitHub runner, MySQL's data and maintenance login ("-": if present).
+InaccessiblePaths=-/etc/smart-assess -/run/systemd/resolve -/run/dbus -/var/backups -/etc/smart-assess-ai-worker -/var/lib/smart-assess-ai-worker -/opt/actions-runner -/etc/mysql/debian.cnf -/var/lib/mysql

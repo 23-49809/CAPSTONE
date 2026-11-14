@@ -9,8 +9,10 @@ require_once __DIR__ . '/DocumentRequirements.php';
  * ai_verification_jobs, building a job from a request's private uploads,
  * storing validated results and the Staff-only view of them.
  *
- * It only ever writes ai_verification_jobs. It never changes a request's
- * status, never approves or rejects, and never sends messages.
+ * The AI processing (queue, claim, results) only ever writes ai_verification_jobs.
+ * The one other write is a Staff action: recordOriginalOpened() records in
+ * request_document_views that a Staff member opened an original. It never changes a request's status, never
+ * approves or rejects, and never sends messages.
  */
 final class AiVerification
 {
@@ -52,7 +54,9 @@ final class AiVerification
     public const RETRY_CONFIGURATION = 'configuration';
     public const RETRY_COUNTED = 'counted';
     public const RETRY_PERMANENT = 'permanent';
-    private const TRANSIENT = ['worker_unavailable', 'worker_busy'];
+    /** stored_file_unreadable: a stored original exists but this process may not read it yet (its read access is
+     *  restored at the next dispatcher run); retried without using an attempt, never reported as a finding. */
+    private const TRANSIENT = ['worker_unavailable', 'worker_busy', 'stored_file_unreadable'];
     private const CRASH = ['worker_crashed', 'model_unavailable'];
     private const CONFIGURATION = ['worker_auth_failed', 'worker_not_configured', 'worker_cleanup_failed', 'worker_tls_failed',
         'worker_body_too_large', 'worker_proxy_error'];
@@ -451,6 +455,11 @@ final class AiVerification
             $uploaded[$key] = ['mime' => (string) $row['mime_type'], 'size' => (int) $row['file_size']];
             $path = (string) $row['stored_path'];
             $real = preg_match(self::UPLOAD_PATH, $path) && $uploadRoot !== false ? realpath($appRoot . '/' . $path) : false;
+            if ($real !== false && str_starts_with($real, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($real) && !is_readable($real)) {
+                // Present but not readable by this process (for example a file that arrived during this
+                // dispatcher run, before its read access was restored): try the job again later.
+                throw new RuntimeException('stored_file_unreadable');
+            }
             $bytes = $real !== false && str_starts_with($real, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($real)
                 && filesize($real) < AiDocumentWorkerLimits::MAX_DOCUMENT_BYTES ? @file_get_contents($real) : false;
             if (!is_string($bytes) || $bytes === '' || count($documents) >= AiDocumentWorkerLimits::MAX_DOCUMENTS) {
@@ -511,6 +520,8 @@ final class AiVerification
             'error' => $code, 'retry' => self::retryClass($code)];
         try {
             $built = self::buildJob($pdo, $job, $appRoot);
+        } catch (RuntimeException $exception) {
+            return $failed($exception->getMessage() === 'stored_file_unreadable' ? 'stored_file_unreadable' : 'job_build_failed');
         } catch (Throwable) {
             return $failed('job_build_failed');
         }
@@ -610,15 +621,138 @@ final class AiVerification
         return $status;
     }
 
-    /** Staff confirmed they looked at the result. Only for finished jobs. */
-    public static function markReviewed(PDO $pdo, int $requestId, int $staffId): bool
+    /** Stored-path rule for request uploads; shared with web/request-file.php. */
+    public const ORIGINAL_PATH_PATTERN = '~^private_uploads/requests/[A-Za-z0-9_]+\.(?:pdf|jpg|jpeg|png|webp)$~';
+    /** File types an original may be served as (detected from the file itself). */
+    public const ORIGINAL_MIME_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf'];
+
+    /**
+     * The original of an uploaded document as web/request-file.php would serve it:
+     * ['path' => real path, 'mime' => detected type], or null when it cannot be served
+     * (not uploaded, a stored path outside the rule, missing from storage, or a file
+     * type that is not allowed). request-file.php uses exactly this, so the review gate
+     * below counts precisely the files Staff are able to open.
+     *
+     * @return null|array{path:string, mime:string}
+     */
+    public static function originalFile(string $appRoot, ?string $storedPath, ?string $fileStatus, bool $checkType = true): ?array
     {
+        // $checkType false: only the Staff page's "can be opened" hint for a document no review
+        // depends on (see sa_internal_bootstrap). Every file was type-checked when it was uploaded;
+        // request-file.php and the review gate always check the type again (the default).
+        if ($fileStatus === 'missing' || $storedPath === null || !preg_match(self::ORIGINAL_PATH_PATTERN, $storedPath)) {
+            return null;
+        }
+        // One type detector and one resolved upload folder per process: building a finfo object
+        // loads the whole magic database, which made a Staff page with many files slow. The
+        // checks themselves are unchanged (every file is still resolved, confined and typed).
+        static $finfo = null;
+        static $bases = [];
+        $bases[$appRoot] ??= realpath($appRoot . '/private_uploads/requests');
+        $base = $bases[$appRoot];
+        $path = realpath($appRoot . '/' . $storedPath);
+        if ($base === false || $path === false || !str_starts_with($path, $base . DIRECTORY_SEPARATOR) || !is_file($path) || !is_readable($path)) {
+            return null;
+        }
+        if (!$checkType) {
+            return ['path' => $path, 'mime' => ''];
+        }
+        $finfo ??= new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($path);
+        return is_string($mime) && isset(self::ORIGINAL_MIME_TYPES[$mime]) ? ['path' => $path, 'mime' => $mime] : null;
+    }
+
+    /** True when the opening record (migration 20261114_request_document_views) has been set up. */
+    public static function documentViewsAvailable(PDO $pdo): bool
+    {
+        static $known = [];
+        $key = spl_object_id($pdo);
+        if (!isset($known[$key])) {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'request_document_views'");
+            $stmt->execute();
+            $known[$key] = (int) $stmt->fetchColumn() === 1;
+        }
+        return $known[$key];
+    }
+
+    /**
+     * Records that Staff member $staffId was sent original $documentId (request-file.php).
+     * One row per Staff member and document in request_document_views (never the audit
+     * log); a repeated opening only updates it, atomically, so simultaneous previews
+     * cannot create a second row. It records that the file was sent, not that it was
+     * inspected or understood.
+     */
+    public static function recordOriginalOpened(PDO $pdo, int $staffId, int $documentId): void
+    {
+        if (!self::documentViewsAvailable($pdo)) {
+            return;
+        }
+        $pdo->prepare(
+            'INSERT INTO request_document_views (user_id, request_document_id) VALUES (:user, :document)
+             ON DUPLICATE KEY UPDATE last_opened_at = NOW(), open_count = LEAST(open_count + 1, 4294967295)'
+        )->execute(['user' => $staffId, 'document' => $documentId]);
+    }
+
+    /**
+     * The request's originals, for Staff member $staffId: 'unopened' = documents the
+     * application can serve that this Staff member has not opened yet; 'unavailable' =
+     * uploaded documents that cannot be served (missing from storage, unsupported type),
+     * which therefore cannot block a review. A document the client did not upload is in
+     * neither list.
+     *
+     * @return array{unopened: list<int>, unavailable: list<int>}
+     */
+    public static function originalsToOpen(PDO $pdo, int $requestId, int $staffId, string $appRoot): array
+    {
+        $stmt = $pdo->prepare(
+            "SELECT rd.id, rd.stored_path, rd.file_status, EXISTS (SELECT 1 FROM request_document_views v
+                     WHERE v.user_id = :staff AND v.request_document_id = rd.id) AS opened
+             FROM request_documents rd
+             WHERE rd.request_id = :request AND rd.file_status <> 'missing' AND rd.stored_path IS NOT NULL
+             ORDER BY rd.id"
+        );
+        $stmt->execute(['request' => $requestId, 'staff' => $staffId]);
+        $result = ['unopened' => [], 'unavailable' => []];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (self::originalFile($appRoot, (string) $row['stored_path'], (string) $row['file_status']) === null) {
+                $result['unavailable'][] = (int) $row['id'];
+            } elseif ((int) $row['opened'] !== 1) {
+                $result['unopened'][] = (int) $row['id'];
+            }
+        }
+        return $result;
+    }
+
+    public const REVIEWED = 'reviewed';
+    public const REVIEW_NOT_FINISHED = 'not_finished';
+    public const REVIEW_ORIGINALS_NOT_OPENED = 'originals_not_opened';
+    public const REVIEW_TRACKING_NOT_SET_UP = 'tracking_not_set_up';
+
+    /**
+     * Staff confirmed they looked at the result. Only for finished jobs, and only by a
+     * Staff member who has opened every original of the request that can be served
+     * (originalsToOpen()); originals that cannot be served never block it. Returns
+     * REVIEWED, REVIEW_NOT_FINISHED, REVIEW_ORIGINALS_NOT_OPENED or REVIEW_TRACKING_NOT_SET_UP.
+     */
+    public static function markReviewed(PDO $pdo, int $requestId, int $staffId, string $appRoot): string
+    {
+        $finished = $pdo->prepare("SELECT COUNT(*) FROM ai_verification_jobs WHERE request_id = :id AND status IN ('completed', 'needs_manual_review')");
+        $finished->execute(['id' => $requestId]);
+        if ((int) $finished->fetchColumn() !== 1) {
+            return self::REVIEW_NOT_FINISHED;
+        }
+        if (!self::documentViewsAvailable($pdo)) {
+            return self::REVIEW_TRACKING_NOT_SET_UP;
+        }
+        if (self::originalsToOpen($pdo, $requestId, $staffId, $appRoot)['unopened'] !== []) {
+            return self::REVIEW_ORIGINALS_NOT_OPENED;
+        }
         $stmt = $pdo->prepare(
             "UPDATE ai_verification_jobs SET staff_review_status = 'reviewed', reviewed_by = :staff, reviewed_at = NOW()
              WHERE request_id = :id AND status IN ('completed', 'needs_manual_review')"
         );
         $stmt->execute(['staff' => $staffId, 'id' => $requestId]);
-        return $stmt->rowCount() === 1;
+        return $stmt->rowCount() === 1 ? self::REVIEWED : self::REVIEW_NOT_FINISHED;
     }
 
     /**
@@ -699,6 +833,7 @@ final class AiVerification
             'worker_outage_too_long' => 'The AI worker was unavailable for about three days, so automatic retries stopped. Run the check again when the worker is back, or inspect the documents manually.',
             'model_output_invalid' => 'The AI model did not give a valid answer, so only the automatic rule checks are shown.',
             'job_build_failed' => 'The request\'s documents could not be prepared for checking.',
+            'stored_file_unreadable' => 'A stored document could not be read by the AI check yet. The check is retried automatically.',
             'lease_expired', 'too_many_attempts' => 'The check did not finish after several attempts.',
             default => 'The automatic check could not be completed.',
         };

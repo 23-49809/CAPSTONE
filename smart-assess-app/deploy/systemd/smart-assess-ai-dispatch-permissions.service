@@ -1,0 +1,37 @@
+# SMART ASSESS - restores the AI dispatcher's read access (group sa-ai-read) before every
+# dispatcher run. NOT INSTALLED. Install (with approval) together with the dispatcher:
+#   sudo install -o root -g root -m 0755 ../sbin/smart-assess-ai-dispatch-permissions.sh /usr/local/sbin/
+#   sudo install -o root -g root -m 0644 smart-assess-ai-dispatch-permissions.service /etc/systemd/system/
+#
+# A oneshot WITHOUT RemainAfterExit: it is inactive after each run, so every start of
+# smart-assess-ai-dispatch.service (which Requires= it) runs it again. Deployments replace the
+# code files (renamed in with ubuntu:www-data 0640), which removes sa-ai-read's entries; this
+# puts them back before the dispatcher reads anything. It runs outside the dispatcher's
+# sandbox (that sandbox mounts /var/www read only, so it cannot set access entries itself).
+# It only adds sa-ai-read entries (see the script); it changes no owner, group or mode.
+
+[Unit]
+Description=SMART ASSESS AI dispatcher read access (sa-ai-read ACLs)
+Before=smart-assess-ai-dispatch.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/smart-assess-ai-dispatch-permissions.sh
+# Root, but only what setfacl needs: write access to the application folder's metadata, no network.
+# Every folder it never changes is mounted read only on top, so a path swapped for a symbolic link
+# while it runs could not change access there either (the script also refuses symbolic links).
+ProtectSystem=strict
+ReadWritePaths=/var/www/smart-assess
+ReadOnlyPaths=-/var/www/smart-assess/private_uploads/drafts -/var/www/smart-assess/logs -/var/www/smart-assess/web/uploads -/var/www/smart-assess/vendor -/var/www/smart-assess/database -/var/www/smart-assess/docs -/var/www/smart-assess/deploy -/var/www/smart-assess/tests -/var/www/smart-assess/worker -/var/www/smart-assess/ai_checker
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+# CAP_FOWNER to change access entries on files it does not own; CAP_DAC_READ_SEARCH to pass 0750 folders.
+CapabilityBoundingSet=CAP_FOWNER CAP_DAC_READ_SEARCH
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+InaccessiblePaths=-/etc/smart-assess -/etc/smart-assess-ai-worker -/var/backups

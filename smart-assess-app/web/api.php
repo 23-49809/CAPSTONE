@@ -517,6 +517,74 @@ function sa_validate_upload(array $file, string $key): array
     return [$original, $mime, $size, $allowed[$mime]];
 }
 
+/**
+ * Throws when request $requestId is no longer in the database: the submission's
+ * transaction was rolled back by the database (for example a deadlock while queueing the
+ * AI check or the confirmation), so the submission must fail instead of returning a
+ * reference that was never saved. Request IDs are never reused, so a missing ID cannot
+ * be mistaken for another request.
+ */
+function sa_submission_still_saved(PDO $pdo, int $requestId, string $step): void
+{
+    $saved = $pdo->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
+    $saved->execute(['id' => $requestId]);
+    if ((int) $saved->fetchColumn() !== 1) {
+        error_log('[SMART_ASSESS] A submission was rolled back by the database while ' . $step . '; the client was told it failed.');
+        throw new RuntimeException('The submission transaction was rolled back while ' . $step . '.');
+    }
+}
+
+/**
+ * Commits a submission and says what happened: 'committed' (the request is saved), 'not_saved'
+ * (it is not) or 'unknown'. A commit that throws (for example a dropped connection) has an
+ * uncertain outcome: the database may have committed just before the connection was lost.
+ * A fresh connection ($freshConnection, by default sa_db_connect()) then finds out, so a
+ * saved request is never treated as failed (and its files deleted), and an unsaved one is
+ * never reported as saved. 'unknown' means even that check failed: the caller keeps the files.
+ */
+/**
+ * Commits a submission. If commit() itself fails (for example the connection dropped), the
+ * outcome is uncertain: the server may still finish the commit a moment later. A fresh
+ * connection then looks for the request several times ($retryDelays, in seconds before each
+ * look). 'committed' when found; 'not_found' when every look missed it; 'unknown' when no
+ * look could run. Only 'committed' counts as saved; the caller keeps every file otherwise.
+ *
+ * @param list<float|int> $retryDelays
+ */
+function sa_commit_submission(PDO $pdo, int $requestId, ?Closure $freshConnection = null, array $retryDelays = [0, 0.5, 1, 2]): string
+{
+    try {
+        $pdo->commit();
+        return 'committed';
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS] The commit of a submission (request ID ' . $requestId . ') failed; checking on a new connection whether it was saved.');
+    }
+    $looked = false;
+    foreach ($retryDelays as $delay) {
+        if ($delay > 0) {
+            usleep((int) round($delay * 1_000_000));
+        }
+        try {
+            // A new connection for every look: the earlier one may be the next to drop.
+            $fresh = $freshConnection !== null ? $freshConnection() : sa_db_connect();
+            $stmt = $fresh->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
+            $stmt->execute(['id' => $requestId]);
+            $looked = true;
+            if ((int) $stmt->fetchColumn() === 1) {
+                return 'committed';
+            }
+        } catch (Throwable) {
+            // no look this time; try again after the next delay
+        }
+    }
+    if ($looked) {
+        error_log('[SMART_ASSESS] Request ID ' . $requestId . ' was not found after its commit failed; its files are kept.');
+        return 'not_found';
+    }
+    error_log('[SMART_ASSESS] Whether request ID ' . $requestId . ' was saved was not checked (no connection); its files are kept.');
+    return 'unknown';
+}
+
 function sa_submit_request(array $data): array
 {
     $flow = (string) ($data['flow'] ?? '');
@@ -605,7 +673,9 @@ function sa_submit_request(array $data): array
 
     $pdo = sa_db();
     $storedFiles = [];
-    $movedDraftFiles = [];
+    $draftOriginals = [];   // draft files copied into this request: removed only after the commit is confirmed
+    $keepFiles = false;   // set when a commit's outcome is unknown: then no file is removed
+    $requestId = 0;
     $unusedDraftFiles = [];
     $draftCode = isset($data['draft_token']) && sa_drafts_enabled() ? sa_draft_normalize_code($data['draft_token']) : null;
     try {
@@ -724,15 +794,21 @@ function sa_submit_request(array $data): array
                     'file_status' => 'ok',
                 ]);
             } elseif (isset($draftFiles[$key])) {
-                // Saved with the draft earlier; move it into the request folder.
+                // Saved with the draft earlier: COPIED into the request folder, not renamed. A new file
+                // gets the folder's default access entries (the AI dispatcher's read group, when that
+                // is installed), and the draft keeps its own file until this request is committed, so
+                // a failed or uncertain submission never takes the draft's documents away.
                 $draftFile = $draftFiles[$key];
                 $extension = strtolower(pathinfo((string) $draftFile['path'], PATHINFO_EXTENSION));
                 $storedName = $requestId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
                 $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
-                if (!rename((string) $draftFile['path'], $destination)) {
+                if (!@copy((string) $draftFile['path'], $destination) || filesize($destination) !== filesize((string) $draftFile['path'])) {
+                    @unlink($destination);
                     throw new RuntimeException('Unable to store a saved draft file.');
                 }
-                $movedDraftFiles[$destination] = (string) $draftFile['path'];
+                chmod($destination, 0640);
+                $storedFiles[] = $destination;   // the copy: removed if the submission is not saved
+                $draftOriginals[] = (string) $draftFile['path'];
                 $documentInsert->execute([
                     'request_id' => $requestId,
                     'doc_key' => $key,
@@ -794,11 +870,21 @@ function sa_submit_request(array $data): array
         // private AI worker, so the client never waits for it. Only when the
         // Privacy Policy that describes it is in effect for this submission
         // (SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT); otherwise nothing is queued.
-        // If queueing fails, the submission still succeeds.
+        // If queueing fails, the submission still succeeds: the queue insert runs behind
+        // a savepoint, so a failed insert is undone without touching the request.
         if (AiVerification::available($pdo)) {
             try {
+                $pdo->exec('SAVEPOINT sa_ai_queue');
                 AiVerification::enqueueIfEligible($pdo, $requestId);
             } catch (Throwable) {
+                try {
+                    $pdo->exec('ROLLBACK TO SAVEPOINT sa_ai_queue');
+                } catch (Throwable) {
+                    // No savepoint: either it was never made, or the database rolled the whole
+                    // transaction back (a deadlock). Then the request itself is gone, and the
+                    // submission must fail instead of returning a reference that was never saved.
+                    sa_submission_still_saved($pdo, $requestId, 'queueing the AI check');
+                }
                 error_log('[SMART_ASSESS_AI] Could not queue the AI check for request ID ' . $requestId . '.');
             }
         }
@@ -813,16 +899,37 @@ function sa_submit_request(array $data): array
             try {
                 $pdo->exec('ROLLBACK TO SAVEPOINT sa_confirmation');
             } catch (Throwable) {
-                // No savepoint was made, so nothing was queued.
+                // No savepoint: it was never made (nothing was queued), or the database rolled the
+                // whole transaction back (a deadlock), taking the request with it. Then the
+                // submission fails here instead of returning a reference that was never saved.
+                sa_submission_still_saved($pdo, $requestId, 'queueing the confirmation');
             }
             $confirmations = 0;
             error_log('[SMART_ASSESS_CONFIRM] Could not queue the confirmation for request ID ' . $requestId . '; the request was saved.');
         }
-        $pdo->commit();
-        // Saved draft files for documents this request does not need are not kept.
-        foreach ($unusedDraftFiles as $path) {
-            if (is_file($path)) {
-                @unlink($path);
+        $committed = sa_commit_submission($pdo, $requestId);
+        if ($committed !== 'committed') {
+            // The commit's outcome is uncertain (not found after several looks, or no look possible):
+            // keep every file, the request's copies and the draft's own, because the request may still
+            // turn out saved and must never lose its documents. The client is told it failed and can
+            // check tracking; an orphaned copy costs only disk space.
+            $keepFiles = true;
+            throw new RuntimeException('The submission could not be confirmed as saved (commit ' . $committed . ').');
+        }
+        // Last check before success is reported: the request really is saved. A transaction the
+        // database dropped earlier (a deadlock) would otherwise "commit" nothing silently.
+        // Only a confirmed "not found" fails it: if this check itself cannot run (a dropped
+        // connection), the commit above did succeed, so the saved request and its files are kept.
+        try {
+            sa_submission_still_saved($pdo, $requestId, 'saving the submission');
+        } catch (PDOException) {
+            error_log('[SMART_ASSESS] Could not re-check a committed submission (request ID ' . $requestId . '); it was committed.');
+        }
+        // Committed: the draft's own copies of the files it handed over, and saved draft files for
+        // documents this request does not need, are no longer kept.
+        foreach (array_merge($draftOriginals, $unusedDraftFiles) as $path) {
+            if (is_file($path) && !@unlink($path)) {
+                error_log('[SMART_ASSESS] Could not remove a draft file after request ID ' . $requestId . ' was saved.');
             }
         }
 
@@ -837,17 +944,24 @@ function sa_submit_request(array $data): array
         sa_remember_submitted_reference($reference);
         return ['reference_no' => $reference, 'status' => 'Received'];
     } catch (Throwable $exception) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-        foreach ($movedDraftFiles as $moved => $original) {
-            if (is_file($moved)) {
-                @rename($moved, $original);   // give the draft its files back
+        // A lost connection makes rollBack() itself fail; the database then discards the
+        // uncommitted transaction on its own. Either way the clean-up below must still run.
+        try {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
+        } catch (Throwable) {
+            error_log('[SMART_ASSESS] Rolling back a failed submission failed (the connection was probably lost); the database discards it.');
         }
+        if ($keepFiles) {
+            error_log('[SMART_ASSESS] Kept the uploaded files of request ID ' . $requestId . ': it is not known whether it was saved.');
+            throw $exception;
+        }
+        // Definitely not saved (the failure came before the commit): remove this request's copies and
+        // uploads. The draft's own files were never touched, so the draft is unchanged.
         foreach ($storedFiles as $path) {
             if (is_file($path)) {
-                unlink($path);
+                @unlink($path);
             }
         }
         throw $exception;
@@ -1884,7 +1998,11 @@ function sa_ai_verification_requeue(array $data): array
     return ['queued' => true];
 }
 
-/** Staff: record that they have looked at a finished AI check. */
+/**
+ * Staff: record that they have looked at a finished AI check. Only after this Staff
+ * member has opened every uploaded original of the request (request-file.php records
+ * each opening), because the AI can be wrong and the originals decide.
+ */
 function sa_ai_verification_reviewed(array $data): array
 {
     $user = sa_internal_or_fail(['STAFF']);
@@ -1893,11 +2011,23 @@ function sa_ai_verification_reviewed(array $data): array
         throw new SaHttpException(503, 'AI document checking is not set up on this server yet.');
     }
     $request = sa_ai_request($pdo, $data);
-    if (!AiVerification::markReviewed($pdo, (int) $request['id'], (int) $user['id'])) {
+    $appRoot = dirname(__DIR__);
+    $outcome = AiVerification::markReviewed($pdo, (int) $request['id'], (int) $user['id'], $appRoot);
+    if ($outcome === AiVerification::REVIEW_TRACKING_NOT_SET_UP) {
+        throw new SaHttpException(503, 'Recording which original documents Staff have opened is not set up on this server yet, so the AI check cannot be marked as reviewed.');
+    }
+    $originals = AiVerification::originalsToOpen($pdo, (int) $request['id'], (int) $user['id'], $appRoot);
+    $unavailable = count($originals['unavailable']);
+    $unavailableNote = $unavailable > 0 ? ' ' . $unavailable . ' original(s) cannot be opened (missing from storage or an unsupported file type) and do not block this; obtain them another way.' : '';
+    if ($outcome === AiVerification::REVIEW_ORIGINALS_NOT_OPENED) {
+        throw new SaHttpException(409, 'Open every original document of this request before marking the AI check as reviewed ('
+            . count($originals['unopened']) . ' not opened by you yet). The AI can be wrong; the original documents decide.' . $unavailableNote);
+    }
+    if ($outcome !== AiVerification::REVIEWED) {
         throw new SaHttpException(409, 'There is no finished AI check for this request to mark as reviewed.');
     }
     sa_audit('staff', (int) $user['id'], (string) $user['name'], 'AI document check reviewed', (string) $request['reference_no']);
-    return ['reviewed' => true];
+    return ['reviewed' => true, 'unavailable_originals' => $unavailable];
 }
 
 function sa_lookup_request_owner(array $data): array

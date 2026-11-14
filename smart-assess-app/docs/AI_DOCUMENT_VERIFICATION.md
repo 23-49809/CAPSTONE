@@ -58,6 +58,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | File | Purpose |
 |---|---|
 | `database/migrations/20261111_ai_document_verification.sql` | Creates `ai_verification_jobs` (one job per request). |
+| `database/migrations/20261114_request_document_views.sql` | Creates `request_document_views`: which Staff member opened which original (one row each). |
 | `app/services/DocumentAnalysis.php` | Schema, strict validation, prompts, rule checks, outcome rules. No I/O. |
 | `app/services/AiVerification.php` | Queue, job building, storing results, Staff view. |
 | `app/services/AiWorkerClient.php` | Signed request to the worker; verifies the signed answer. |
@@ -71,6 +72,13 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `bin/ai-model-evaluation.php` | Compares local models on synthetic documents. |
 | `deploy/systemd/smart-assess-ai-dispatch.service`, `.timer` | Dispatcher service and one-minute timer for the web server (not installed). |
 | `deploy/systemd/ai-dispatch.env.example` | The dispatcher's own environment file (KEY=VALUE, root 0600). |
+| `deploy/mysql/ai-dispatch-db-user.sql.example` | The dispatcher's least-privilege MySQL account (not applied). |
+| `deploy/systemd/smart-assess-ai-dispatch-egress.service`, `deploy/nftables/ai-dispatch-egress.nft` | The dispatcher's egress filter: only 127.0.0.1:8095 (not installed). |
+| `deploy/sbin/smart-assess-ai-dispatch-permissions.sh`, `deploy/systemd/smart-assess-ai-dispatch-permissions.service` | Read access for the dispatcher's group `sa-ai-read`, re-applied before every run (not installed). |
+| `bin/ai-worker-compat-check.php` | Release-order check: is a worker copy compatible with the deployed application? |
+| `deploy/sbin/smart-assess-ai-worker-refresh.sh` | Refreshes the worker copy only when the release-order check passes; health check and rollback (not installed). |
+| `deploy/sbin/smart-assess-ai-egress-guard.sh`, `deploy/systemd/smart-assess-ai-egress-guard.service`, `.timer`, `deploy/systemd/nftables.service.d/50-smart-assess-ai-egress.conf` | Keep both AI egress filters loaded or stop what they protect (not installed). |
+| `deploy/systemd/smart-assess-ai-worker-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-ollama-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf` | Step 13: the dispatcher and the worker pool run without network; these socket links are their only connections (not installed). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -378,10 +386,19 @@ when the model is wrong; the model adds cross-document and document-type checks.
 
 ```sh
 php tests/ai_document_analysis_test.php                     # no database
+php tests/ai_dispatch_deploy_test.php                       # no database: dispatcher unit, settings, grants
 SMART_ASSESS_TEST_DB=<name>_test DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=<user> \
-SMART_ASSESS_DB_PASS='<password>' php tests/ai_verification_workflow_test.php
+SMART_ASSESS_DB_PASS='<password>' \
+SMART_ASSESS_TEST_DB_ADMIN_USER=<scratch admin> SMART_ASSESS_TEST_DB_ADMIN_PASS='<password>' \
+php tests/ai_verification_workflow_test.php
 php tests/ocr_service_test.php
 ```
+
+The workflow test also forces real InnoDB deadlocks (it needs the TRIGGER privilege
+on the test database, and on a server with binary logging
+`log_bin_trust_function_creators=1`). With the optional scratch administrator it
+creates and drops the dispatcher's least-privilege MySQL account to test the shipped
+grants; without it, those checks are reported as SKIP.
 
 The workflow test runs a real submission, the dispatcher and the worker against
 fake OCR programs and a fake Ollama, and checks Staff/Admin/Head access. It uses
@@ -431,6 +448,231 @@ password, because PHP's built-in server drops empty environment variables.
   never verified; the required-document list stored with a submission comes
   from the client form, so the check recomputes requirements on the server with
   `DocumentRequirements`.
+
+### Staff decide (reviewed in Steps 6–12, 14 Nov 2026)
+
+* **Nothing the model writes in its own words reaches Staff.** The model's
+  answer must match the schema exactly (no field can approve, reject or change
+  anything). Its free-text fields (a finding's `explanation`, a document's
+  `note`) are still validated, then discarded. Every model finding Staff see is
+  worded by the application from validated codes only (category, field,
+  document labels) and starts with "AI suggestion (unverified):" or "Cannot be
+  checked by the AI:" (`DocumentAnalysis::classify()`). So no phrasing,
+  language, spelling trick, hidden character or look-alike letter can make the
+  AI say that a signature, seal or document is genuine, or that a request
+  should be approved, rejected or released. (Step 6 tried a word list instead;
+  the Step 7 review showed synonyms and obfuscation got past it, and it was
+  removed.)
+* **Evidence is an exact quote or nothing.** A model finding may carry a short
+  quote ("evidence"). The worker, the only place that has the OCR text, keeps it
+  only if it occurs in the text of the finding's document (compared with
+  whitespace and invisible characters reduced to single spaces); anything
+  invented, paraphrased or taken from another document is removed
+  (`DocumentAnalysis::keepQuotedEvidence()`). Such workers answer with result
+  version 2. For a version 1 answer (the copy installed in `/opt` before this
+  change) the application cannot check quotes, so it drops all model evidence.
+  A quote is also dropped (by the worker and again by the application, for any
+  worker version) when it is shorter than 12 characters or 3 words, or belongs to
+  a "cannot verify" finding (`DocumentAnalysis::evidenceAllowed()`), so a single
+  cherry-picked word such as "GENUINE" or "APPROVED" can never stand next to a
+  finding. Staff see a kept quote labelled as text read from the document by OCR,
+  which may contain reading errors. A longer real quote can still contain such
+  words if the document says them ("APPROVED BY THE REGISTRAR"); it is shown as
+  the document's text, not as the AI's judgement.
+* **Missing details only from a fixed list.** The model may name missing details
+  only as codes from `DocumentAnalysis::MISSING_FIELD_LABELS` (for example
+  `date_of_birth`, `arp_number`); Staff see the application's labels. Any other
+  name is dropped.
+* **"Passed" is never the model's to give.** It needs every server check to be
+  clean (every required document uploaded, every document read clearly — a
+  partly read document is a reading problem — and no rule finding) and the model
+  to have reviewed every document and reported nothing, including nothing that
+  "cannot be checked" from text (that needs Staff, so it is **Needs review**).
+  The Passed text says it does not verify that any document, signature or seal
+  is genuine. A model answer that is merely valid JSON cannot produce it: only
+  the absence of every concern can. "Needs review" names each reason that applies
+  (counts of inconsistencies, reading problems, possibly missing details and
+  points the AI cannot check, the AI's manual-review suggestion, or a model that
+  did not review the documents). In the Staff panel every model judgement (the
+  findings, the "looks like this document?" column, the outcome banner) is
+  labelled "AI suggestion (unverified)". Limitation: a model that wrongly says a
+  document is the right type, with every server check clean, still gives Passed.
+* **Originals before "reviewed".** Each time a Staff member opens, previews or
+  downloads an original (`web/request-file.php`), one row per Staff member and
+  document is kept in `request_document_views` (migration
+  `20261114_request_document_views.sql`; first and last opening, count; no
+  content, path or applicant details). Not in `audit_log`, so security events
+  are never crowded out of the Admin's audit view. The AI result can be marked
+  **reviewed** only by a Staff member who has opened every original **that the
+  application can serve**; originals missing from storage or of an unsupported
+  type are listed as "Cannot be opened" on the Staff page and in the 409 answer,
+  and never block the review (`AiVerification::originalFile()` is the one check
+  used by the file page, the gate and the Staff page). The Staff page checks a
+  file's type only for requests whose AI check is finished and not yet reviewed
+  (where the review depends on it); for the others its "can be opened" hint
+  checks the stored path, the uploads folder, presence and readability (the type
+  was checked at upload). Opening a file and the review gate always check fully.
+  Until the migration has run, "Mark as reviewed" answers that the opening record
+  is not set up.
+* **Limitation: opened is not inspected.** A row shows that the file was sent to
+  that Staff member's browser, not that they looked at it, read it or
+  understood it. The gate makes skipping the originals deliberate; it cannot
+  prove a careful review. Approving, rejecting or releasing a request is a
+  separate Staff action that never reads or depends on the AI result, and the
+  system does not require the originals to be opened before that decision.
+* **Nothing else is written or sent.** The dispatcher and the AI processing write
+  only `ai_verification_jobs`; Staff AI actions add audit entries and opening
+  rows. No AI path changes a request, its status history or notifications, or
+  calls the SMS or email senders (the workflow test checks every other table
+  byte for byte and records any send attempt).
+* **A submission never falsely succeeds.** The AI queue insert and the
+  confirmation queue each run behind a savepoint, so an ordinary failure undoes
+  only that insert and the request is saved without it. If the database rolled
+  the whole transaction back (a deadlock, or a lock timeout with
+  `innodb_rollback_on_timeout` on; production has it off), the request is gone,
+  so the submission fails with an error and its uploaded files are removed, and
+  a last check after the commit confirms the request exists before success is
+  returned (`sa_submission_still_saved()`). The workflow test forces a real
+  InnoDB deadlock in each queue to prove it. If the commit itself fails (for
+  example the connection dropped), its outcome is uncertain: the database may
+  even finish the commit a moment later. A fresh connection looks for the request
+  several times over about 3.5 seconds (`sa_commit_submission()`): found means
+  success; otherwise the submission is reported as failed but **no file is
+  deleted** (not the request's copies, not the draft's own files), so a saved
+  request never loses its documents and a draft is never damaged. Only a failure
+  before the commit (a definite rollback) removes the request's copies. Files a
+  submission takes from a saved draft are **copied** into the request (a new file
+  gets the folder's default access entries) and the draft's own files are removed
+  only after the commit. A failing rollback (lost connection) is logged and never
+  skips the clean-up.
+  `tests/submission_commit_recovery_test.php` covers these outcomes; the
+  workflow test kills a submission's database connection mid-transaction.
+* **Access.** Staff (role 2) only, checked on the server for every AI action,
+  every page and the direct `internal_bootstrap` API. Admin, Department Head,
+  signed-in clients and visitors get 401/403 and no AI data; role fields sent by
+  a client are ignored; AI actions require POST and the CSRF token. Request
+  tracking never shows AI results.
+* **Dispatcher account and sandbox** (`deploy/systemd/smart-assess-ai-dispatch.service`,
+  not installed; tested in an isolated Ubuntu 26.04 VM).
+  * Its own non-login account `sa-ai-dispatch`, not www-data, so Apache
+    processes cannot read its environment (worker secret, its database password).
+  * **Files.** It is not in the www-data group. Its own group `sa-ai-read` gets read
+    access (POSIX ACLs; owners, groups and modes are unchanged) to exactly
+    `bin/ai-verification-dispatch.php`, `web/bootstrap.php`, `app/services/*.php`
+    and `private_uploads/requests` (plus pass-through on the folders above them).
+    `deploy/sbin/smart-assess-ai-dispatch-permissions.sh` sets this; the unit
+    `smart-assess-ai-dispatch-permissions.service` (a root oneshot outside the
+    dispatcher's read-only sandbox, required by the dispatcher) runs it again
+    before every dispatcher run, because each deployment
+    replaces the code files (copied through a temporary folder and renamed, with
+    `ubuntu:www-data 0640`), which removes such entries; uploads get a default
+    entry for new files. Inside the sandbox `/var/www` is an empty read-only
+    folder with only those paths mounted in. Needs the `acl` package. The script
+    refuses any path with a symbolic link in any component, an unexpected owner
+    or a world-writable folder, grants files only by a physical walk that never
+    follows links (`setfacl -R -P`), checks every path again afterwards, and its
+    unit mounts drafts, logs and every folder it never changes read only and has
+    only `CAP_FOWNER` and `CAP_DAC_READ_SEARCH`. If a stored file is still not
+    readable when a job runs (for example it arrived during a run), the job is
+    retried later without using an attempt (`stored_file_unreadable`), never
+    reported as "could not be prepared".
+  * **Hidden:** all of `/etc/smart-assess` (the website settings, the website's
+    database login in `database.env`, Gmail; the dispatcher's own settings file is
+    read by systemd before the sandbox starts), backups, the worker's secret and
+    state, the GitHub runner, MySQL's data and maintenance login.
+  * **Network:** the egress filter (`deploy/nftables/ai-dispatch-egress.nft`,
+    unit `smart-assess-ai-dispatch-egress.service`, required by the dispatcher)
+    allows the `sa-ai-dispatch` account only TCP to 127.0.0.1:8095. DNS
+    (127.0.0.53/54), MySQL over TCP (3306) and X (33060), Ollama (11434), Apache,
+    other addresses and IPv6 are rejected, and the resolver's local sockets and
+    D-Bus are hidden, so names cannot be resolved by any route. MySQL is reached
+    through its local socket (`DB_HOST=localhost`). `IPAddressDeny=any` /
+    `IPAddressAllow=localhost` stay as a second layer.
+  * **No network at all (Step 13).** A firewall filter by user exists only while the
+    ruleset holds it: `nft flush ruleset`, or `nftables.service` (its
+    `/etc/nftables.conf` begins with `flush ruleset`), removes it, and until it is
+    reloaded (the guard: up to about 30 s) a process that is already running could
+    reach every service on 127.0.0.1. Measured on Ubuntu 26.04 with the Step 12 design:
+    MySQL, MySQL X, Apache, SSH, Ollama and the DNS stub (which resolves external names)
+    were all reachable during the gap; the internet stayed blocked (`IPAddressDeny`).
+    So the dispatcher and the worker's PHP-FPM pool (which parses the documents) now run
+    with `PrivateNetwork=yes` and only Unix sockets (`RestrictAddressFamilies=AF_UNIX`):
+    systemd gives each its own network namespace with only an empty loopback when the
+    process starts, which no firewall change can alter. Each has one way out, a socket
+    file served by systemd's minimal forwarder (`systemd-socket-proxyd`), which can only
+    connect to one fixed address:
+    * dispatcher -> `/run/smart-assess-ai-link/worker.sock` (group `sa-ai-dispatch`)
+      -> the worker on 127.0.0.1:8095 (`smart-assess-ai-worker-link.socket`);
+    * worker pool -> `/run/smart-assess-ai-ollama/ollama.sock` (group `sa-ai-worker`)
+      -> Ollama on 127.0.0.1:11434 (`smart-assess-ai-ollama-link.socket`), set with
+      `SMART_ASSESS_WORKER_OLLAMA_SOCKET` (worker.env and the pool's `env[]` line) and the
+      drop-in `smart-assess-ai-worker-fpm.service.d/50-private-network.conf`.
+    MySQL is reached through its socket file (`DB_HOST=localhost`). Verified in the VM
+    with processes already running: after a flush, in the full 30 s gap, with the guard
+    broken, with an invalid filter file, with the nftables hook failing, and right after
+    a reboot, each reached only its own socket. If a link is stopped or its forwarder is
+    broken, the worker reports "not ready" and the dispatcher "unreachable"; no other
+    route exists. The nftables filters, the guard (timer every 30 s and the
+    `nftables.service` drop-in, which keeps them loaded or stops the worker) and
+    `IPAddressDeny` remain as extra layers.
+  * **Remaining gap:** lighttpd (the worker's HTTP front, user `sa-ai-worker`) stays in the
+    host network: it must listen on 127.0.0.1:8095. It only passes requests to the pool
+    and never reads document content, but if it were compromised, during a flush it could
+    reach services on 127.0.0.1 (never the internet: `IPAddressDeny=any`) until the guard
+    reloads the filter.
+  * **Database:** its own MySQL account (`deploy/mysql/ai-dispatch-db-user.sql.example`)
+    reads only nine columns of `requests` (no contact details), eight of
+    `request_documents`, and reads and updates `ai_verification_jobs`; the
+    workflow test runs the dispatcher with exactly these grants and shows 13
+    forbidden actions are refused.
+  * `tests/ai_dispatch_deploy_test.php` checks the unit, the filter, the
+    permissions script and the release-order check; `systemd-analyze verify`
+    must still be run on the server before installing.
+
+### Release order (application first, then the worker)
+
+Worker answers carry a result version. A refreshed worker answers version 2 (it
+checks the model's quotes against the OCR text); the application accepts
+version 1 and 2 from this branch on, but release 6482fcd0 accepts version 1 only
+and would fail every job as an invalid worker result. Therefore:
+
+1. Deploy the application release that contains this change.
+2. Before refreshing `/opt/smart-assess-ai-worker` (or installing or starting the
+   dispatcher), stage the new worker copy and run, on the server:
+   `php /var/www/smart-assess/bin/ai-worker-compat-check.php --app=/var/www/smart-assess --worker=<staged copy>`
+   It must print "compatible" (exit 0). Exit 1 means "NOT COMPATIBLE: deploy the
+   application first"; exit 2 means the files could not be read. Do not continue
+   on anything but exit 0.
+3. Refresh the worker copy with `deploy/sbin/smart-assess-ai-worker-refresh.sh`
+   (installed as `/usr/local/sbin/smart-assess-ai-worker-refresh.sh`): it stages the
+   copy, runs the check and **refuses** (exit 1, nothing changed) unless it passes,
+   then swaps it in, restarts the worker's PHP pool, checks `/v1/health` and rolls
+   back if the worker is not healthy. `--check-only` stages and checks only.
+4. Enforced at run time too: the dispatcher runs the same check against
+   `/opt/smart-assess-ai-worker` before every run (`ExecStartPre`), so a mismatched
+   worker stops the dispatcher before any job is sent.
+
+The check reads source files only. A new application with the worker installed
+in Step 4 (version 1) is compatible: model quotes are then simply dropped.
+
+### Production worker as installed (Steps 4 and 5, 13–14 Nov 2026)
+
+The production worker differs from the separate-server plan below: it runs on
+the web server itself (Free plan, no second server), reachable only on
+loopback.
+
+| Part | As installed |
+|---|---|
+| Worker URL for the dispatcher | `http://127.0.0.1:8095` (plain HTTP is accepted only on loopback; no CA file; see `deploy/systemd/ai-dispatch.env.example`) |
+| HTTP front | lighttpd, 127.0.0.1:8095 only, unit `smart-assess-ai-worker.service`, account `sa-ai-worker` |
+| PHP | PHP-FPM 8.5 pool, unit `smart-assess-ai-worker-fpm.service`, private socket, no database drivers loaded |
+| Network | nft table `inet sa_ai_worker_egress` (unit `smart-assess-ai-worker-egress.service`): the worker account may reach only Ollama on 127.0.0.1:11434; MySQL, DNS, metadata and the internet are rejected |
+| Limits | slice `smart-assess-ai-worker.slice` (1 CPU, 1 GiB) inside `smart-assess-ai.slice` (4.5 GiB with Ollama) |
+| Secret | `/etc/smart-assess-ai-worker/worker.env`, root 0600 |
+| Code | a copy of `worker/` and `app/services/` in `/opt/smart-assess-ai-worker`, refreshed by hand when a release changes them. The copy installed in Step 4 answers result version 1, so until it is refreshed the application drops all model evidence |
+
+AI checking stays off until the dispatcher, its settings file and the website's
+`SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` are set up, each with separate approval.
 
 ## Production deployment (not done; needs explicit approval)
 
@@ -726,3 +968,34 @@ part of the Terms acceptance, so this change does not ask clients to accept agai
 - [ ] Dispatcher timer enabled; worker php-fpm, nginx and Ollama restart on failure.
 - [ ] Test with synthetic documents passed; Admin/Head checked.
 - [ ] Office informed: AI results are advice; Staff make every decision.
+
+## Performance (Step 12 benchmark, 14 Nov 2026)
+
+Measured locally with synthetic documents only (fictional names and numbers; clear, multi-page,
+low-quality, photographed and number-heavy scans), the real `AiDocumentWorker`, Tesseract 5.5 and
+llama3.2:3b (the same digest as production) on one CPU thread without a GPU. Production times are
+estimated from token counts at the rates measured on the server in Step 4/5 (about 35 prompt and
+4 generated tokens per second).
+
+* **The model is 95–98 % of a job.** OCR and the rule checks take 1–5 s per job; the model call
+  45–120 s locally, about 70–150 s estimated in production (a 4-document land transfer is the
+  slowest). Generation (output tokens) is the larger share at production speed.
+* **OCR settings stay as they are** (`-r 150 -scale-to 2000`, Tesseract defaults). Higher resolution
+  (200 or 300 dpi, 2500 px) recovered 8-pt text on clean scans but multiplied errors on 120–150 dpi
+  noisy scans (character error 42 % → 73–100 %); Sauvola thresholding fixed one noisy scan
+  (42 % → 8 %) but destroyed a dark one (8 % → 83 %). No setting was at least as accurate on every
+  document, and OCR is not where the time goes.
+* **Implemented:** the model is asked for a shorter `note` (60) and `explanation` (100 characters),
+  which are never shown. 9 jobs: output tokens −15 %, estimated time −9 %, document-type answers,
+  evidence quotes and manual-review flags unchanged, fewer repeated codes (48 → 19) and wrong
+  "missing" claims (47 % → 38 %). The validator's limits are unchanged.
+* **Measured, not changed:** duplicate jobs are already impossible (one job per request, leases, one
+  dispatcher at a time); a model retry never repeats OCR; OCR text is already whitespace-collapsed;
+  `num_predict` 1500 is never reached (answers end at 90–340 tokens). The model reloads after 5
+  idle minutes (Ollama's default `keep_alive`; about 7 s locally, likely longer on the server):
+  keeping it loaded longer holds about 2.9 GB of memory and needs a separate decision.
+* **Recommended production settings:** keep `SMART_ASSESS_WORKER_OLLAMA_TIMEOUT` 180, the worker's
+  job budget 900 and the dispatcher's lease; a 30 s budget always ends in `model_timeout`.
+* **Model quality on these synthetic documents is weak:** about 4 in 10 "missing field" claims name a
+  field that is in the text, and every "possible inconsistency" was a false positive. This is why
+  all model output is shown only as unverified suggestions and never decides anything.

@@ -75,6 +75,17 @@ foreach ($variants as $label => $output) {
 }
 $check('the model schema has no field that could approve, reject or change a request',
     !preg_match('/approv|reject|status|decision|action/i', (string) json_encode(DocumentAnalysis::modelSchema($keys))));
+$modelProps = DocumentAnalysis::modelSchema($keys)['properties'];
+$check('Step 12: the model is asked for short free text (note <= 60, explanation <= 100 characters), never shown anyway',
+    $modelProps['documents']['items']['properties']['note']['maxLength'] === 60
+    && $modelProps['findings']['items']['properties']['explanation']['maxLength'] === 100
+    && $modelProps['findings']['items']['properties']['evidence']['maxLength'] === 160);
+$longAnswer = ['documents' => [['key' => $keys[0], 'expected_type_match' => 'yes', 'missing_fields' => [], 'note' => str_repeat('n', 300)]],
+    'findings' => [['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => [$keys[0]], 'explanation' => str_repeat('e', 400), 'evidence' => '']],
+    'manual_review_recommended' => true];
+foreach (array_slice($keys, 1) as $k) { $longAnswer['documents'][] = ['key' => $k, 'expected_type_match' => 'yes', 'missing_fields' => [], 'note' => '']; }
+try { DocumentAnalysis::validateModelOutput($longAnswer, $keys); $acceptedLong = true; } catch (UnexpectedValueException) { $acceptedLong = false; }
+$check('Step 12: the validator still accepts the old limits (a 300-character note, a 400-character explanation)', $acceptedLong);
 $check('the model schema allows only this job\'s document keys', DocumentAnalysis::modelSchema($keys)['properties']['documents']['items']['properties']['key']['enum'] === $keys);
 
 // ================= Outcome rules =================
@@ -124,14 +135,15 @@ $conflict = array_replace($goodOutput, ['findings' => [['category' => 'possible_
     'explanation' => 'The owner name differs between the ID and the tax declaration.', 'evidence' => 'JUAN DELA CRUZ / PEDRO SANTOS']]]);
 $conflicting = DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']),
     $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $conflict), $keys), $labels);
-$check('conflicting names reported by the model: NEEDS REVIEW with the explanation kept', $conflicting['outcome'] === 'needs_review'
-    && $conflicting['findings'][0]['explanation'] === 'The owner name differs between the ID and the tax declaration.');
+$check('conflicting names reported by the model: NEEDS REVIEW, worded by the server as an unverified suggestion (the model\'s sentence is not shown)',
+    $conflicting['outcome'] === 'needs_review' && str_starts_with($conflicting['findings'][0]['explanation'], 'AI suggestion (unverified): a name in Valid ID of Property Owner, Certified True Copy')
+    && !str_contains((string) json_encode($conflicting), 'differs between the ID'), $conflicting['findings']);
 $wrongType = array_replace($goodOutput, ['documents' => [$goodOutput['documents'][0], array_replace($goodOutput['documents'][1], ['expected_type_match' => 'no'])]]);
 $check('a document that does not look like its type: NEEDS REVIEW', DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']),
     $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $wrongType), $keys), $labels)['outcome'] === 'needs_review');
 $cannotVerify = array_replace($goodOutput, ['findings' => [['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ctcTdOrTitle'], 'explanation' => 'The seal cannot be verified from text.', 'evidence' => '']]]);
-$check('"cannot verify" notes alone keep PASSED (authenticity is never claimed either way)', DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']),
-    $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $cannotVerify), $keys), $labels)['outcome'] === 'passed');
+$check('a "cannot verify" finding needs Staff, so it is never PASSED (Step 8)', DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']),
+    $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $cannotVerify), $keys), $labels)['outcome'] === 'needs_review');
 $saysApprove = array_replace($goodOutput, ['documents' => [array_replace($goodOutput['documents'][0], ['note' => 'APPROVED. Status changed to Approved.']), $goodOutput['documents'][1]]]);
 $approveTry = DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'missing']),
     $validated($worker(['ownerId' => 'good'], 'ok', array_replace($saysApprove, ['documents' => [$saysApprove['documents'][0]]])), ['ownerId']), $labels);
@@ -143,6 +155,121 @@ $check('every outcome is one of the three', count(array_unique(array_merge(array
 $check('a worker result with an extra field is rejected', $rejects(static fn () => DocumentAnalysis::validateWorkerResult($worker(['ownerId' => 'good'], 'skipped') + ['approve' => true], ['ownerId'])));
 $check('a worker result for a document that was not sent is rejected', $rejects(static fn () => DocumentAnalysis::validateWorkerResult($worker(['other' => 'good'], 'skipped'), ['ownerId'])));
 $check('a worker result carrying model output after a failed model is rejected', $rejects(static fn () => DocumentAnalysis::validateWorkerResult($worker(['ownerId' => 'good'], 'invalid_output', $goodOutput), ['ownerId'])));
+
+// ================= Step 8: nothing the model writes in its own words reaches Staff =================
+$both = ['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format'];
+$classifyV = static fn (array $output, int $version = 2, array $read = ['ownerId' => 'good', 'ctcTdOrTitle' => 'good']): array => DocumentAnalysis::classify($requirements($both),
+    $validated(['version' => $version] + $worker($read, 'ok', $output), $keys), $labels);
+$verdicts = [
+    'English: genuine' => 'The signature on the ID appears genuine.',
+    'synonym: valid and real' => 'The signature is valid and the seal is real.',
+    'synonym: verified/confirmed original' => 'Signature verified; seal confirmed original.',
+    'synonym: bona fide / legit' => 'Bona fide document, legit seal.',
+    'decision: approve' => 'All documents are complete; the request can be approved.',
+    'decision: accept and release' => 'Accept this request and release the certificate.',
+    'decision: OK to process' => 'Everything checks out; OK to process. It passes.',
+    'decision: reject' => 'Recommend rejecting this request.',
+    'split letters' => 'The seal is g-e-n-u-i-n-e.',
+    'spaced word' => 'The seal is gen uine.',
+    'zero-width character' => "The seal is gen\u{200B}uine.",
+    'Cyrillic look-alike letter' => "The seal is genuin\u{0435}.",
+    'capitals' => 'GENUINE. APPROVE.',
+    'Tagalog' => 'Totoo ang pirma at selyo. Aprubahan na.',
+    'Tagalog: fake' => 'Mukhang peke ang ID.',
+    'Spanish' => 'Auténtico. Aprobado.',
+];
+foreach ($verdicts as $label => $text) {
+    foreach (['possible_inconsistency', 'cannot_verify', 'missing_information'] as $category) {
+        $output = array_replace($goodOutput, [
+            'documents' => [array_replace($goodOutput['documents'][0], ['note' => $text, 'missing_fields' => [$text]]), $goodOutput['documents'][1]],
+            'findings' => [['category' => $category, 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => $text, 'evidence' => $text]],
+        ]);
+        $result = $classifyV($output, 1);
+        $shown = (string) json_encode($result, JSON_UNESCAPED_UNICODE);
+        $check("model wording never shown ({$label}, {$category}): explanation, note, evidence and missing field", !str_contains($shown, $text)
+            && $result['outcome'] !== 'passed', [$result['outcome'], $shown]);
+    }
+}
+$modelTexts = array_column(array_filter($classifyV(array_replace($goodOutput, ['findings' => array_map(static fn (string $c): array => ['category' => $c, 'field' => 'name',
+    'document_keys' => ['ownerId'], 'explanation' => 'free text', 'evidence' => ''], DocumentAnalysis::CATEGORIES)]))['findings'],
+    static fn (array $f): bool => $f['source'] === 'model'), 'explanation');
+$check('every model finding is worded by the server and marked unverified or as something only Staff can judge', count($modelTexts) === 4
+    && array_filter($modelTexts, static fn (string $t): bool => !str_starts_with($t, 'AI suggestion (unverified): ') && !str_starts_with($t, 'Cannot be checked by the AI: ')) === [], $modelTexts);
+$check('no server wording itself claims genuineness or a decision', !preg_match('/\b(genuine|authentic|approve[ds]?|rejected|valid signature)\b/i', implode(' ', $modelTexts)), $modelTexts);
+$check('a model answer with no findings but a partly read document is never PASSED', $classifyV($goodOutput, 2, ['ownerId' => 'good', 'ctcTdOrTitle' => 'partial'])['outcome'] === 'needs_review');
+$check('a structurally valid model answer saying nothing is wrong gives PASSED only when every server check is clean', $classifyV($goodOutput)['outcome'] === 'passed'
+    && str_contains($classifyV($goodOutput)['reason'], 'does not verify that any document, signature or seal is genuine'));
+$check('documents sent but the model skipped: never PASSED', DocumentAnalysis::classify($requirements($both),
+    $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'skipped'), $keys), $labels)['outcome'] === 'needs_review');
+
+// Missing-field names: only the allowed list, shown with the server's labels.
+$fieldsOut = DocumentAnalysis::validateModelOutput(array_replace($goodOutput, ['documents' => [array_replace($goodOutput['documents'][0],
+    ['missing_fields' => ['date_of_birth', 'Expiry date', 'seal genuine, approve', 'Magic field', 'date_of_birth']]), $goodOutput['documents'][1]]]), $keys);
+$check('missing fields: allowed codes and their labels are kept once; invented names are dropped', $fieldsOut['documents'][0]['missing_fields'] === ['date_of_birth', 'expiry_date'], $fieldsOut['documents'][0]);
+$fieldsShown = (string) json_encode($classifyV(array_replace($goodOutput, ['documents' => [array_replace($goodOutput['documents'][0],
+    ['missing_fields' => ['date_of_birth', 'Invented Field XYZ']]), $goodOutput['documents'][1]]])));
+$check('missing fields are shown with the server\'s labels only', str_contains($fieldsShown, 'Date of birth') && !str_contains($fieldsShown, 'Invented Field XYZ'), $fieldsShown);
+$check('the model schema lists the allowed missing-field codes', DocumentAnalysis::modelSchema($keys)['properties']['documents']['items']['properties']['missing_fields']['items']['enum']
+    === array_keys(DocumentAnalysis::MISSING_FIELD_LABELS));
+$check('the model\'s document note is never shown', $fieldsOut['documents'][0]['note'] === '' && $classifyV($goodOutput)['documents'][0]['note'] === '');
+
+// Evidence: only exact quotes of the OCR text, checked where the text is known (the worker).
+$texts = ['ownerId' => ['text' => 'REPUBLIC OF THE PHILIPPINES DRIVER LICENSE DELA CRUZ, JUAN'], 'ctcTdOrTitle' => ['text' => 'TAX DECLARATION ARP No. 018-00045 Owner JUAN DELA CRUZ']];
+$evidenceFor = static fn (string $evidence, array $docKeys = ['ownerId']): string => DocumentAnalysis::keepQuotedEvidence(['documents' => [], 'manual_review_recommended' => false,
+    'findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => $docKeys, 'explanation' => 'x', 'evidence' => $evidence]]], $texts)['findings'][0]['evidence'];
+$check('evidence: an exact quote of the document text is kept', $evidenceFor('DELA CRUZ, JUAN') === 'DELA CRUZ, JUAN');
+$check('evidence: extra spaces are normalised the same way as the text, then kept', $evidenceFor("DELA  CRUZ,\n JUAN") === 'DELA CRUZ, JUAN');
+foreach ([
+    'invented text' => 'Seal is genuine; approve',
+    'a paraphrase' => 'Juan Dela Cruz',
+    'a quote from a different document than the finding names' => 'ARP No. 018-00045',
+    'a hidden character that changes the words' => "gen\u{200B}uine DELA CRUZ",
+] as $label => $evidence) {
+    $check('evidence removed: ' . $label, $evidenceFor($evidence) === '', $evidenceFor($evidence));
+}
+$check('evidence: a hidden character is stripped, and only the real text it hid is shown', $evidenceFor("DELA\u{200B}CRUZ, JUAN") === 'DELA CRUZ, JUAN'
+    && $evidenceFor("LICENSE DELA\u{200B} CRUZ") === 'LICENSE DELA CRUZ' && !str_contains($evidenceFor("LICENSE DELA\u{200B} CRUZ"), "\u{200B}"));
+$check('evidence: a finding naming no document may quote any document', $evidenceFor('ARP No. 018-00045', []) === 'ARP No. 018-00045');
+$withEvidence = array_replace($goodOutput, ['findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'DRIVER LICENSE DELA CRUZ']]]);
+$check('a version 1 worker (did not check quotes): all model evidence is dropped by the application', $classifyV($withEvidence, 1)['findings'][0]['evidence'] === '');
+$check('a version 2 worker (checked quotes): the checked evidence is shown', array_column(array_filter($classifyV($withEvidence, 2)['findings'],
+    static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['DRIVER LICENSE DELA CRUZ']);
+// Step 10 (R3): short, cherry-picked quotes and quotes on "cannot verify" findings are never shown.
+$cherryTexts = ['ownerId' => ['text' => 'CERTIFIED TRUE COPY. THIS IS A GENUINE COPY OF THE ORIGINAL. APPROVED BY THE REGISTRAR.']];
+$quoteOn = static fn (string $category, string $evidence): string => DocumentAnalysis::keepQuotedEvidence(['documents' => [], 'manual_review_recommended' => false,
+    'findings' => [['category' => $category, 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => $evidence]]], $cherryTexts)['findings'][0]['evidence'];
+foreach (['GENUINE', 'APPROVED', 'GENUINE COPY'] as $short) {
+    $check('worker: a real but too short quote is dropped: ' . $short, $quoteOn('possible_inconsistency', $short) === '', $quoteOn('possible_inconsistency', $short));
+}
+$check('worker: a real quote of 12+ characters and 3+ words is kept', $quoteOn('possible_inconsistency', 'APPROVED BY THE REGISTRAR') === 'APPROVED BY THE REGISTRAR');
+$check('worker: no quote at all on a "cannot verify" finding, even a long real one', $quoteOn('cannot_verify', 'THIS IS A GENUINE COPY OF THE ORIGINAL') === '');
+foreach ([1, 2] as $version) {
+    $shown = $classifyV(array_replace($goodOutput, ['findings' => [
+        ['category' => 'possible_inconsistency', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'GENUINE'],
+        ['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'THIS IS A GENUINE COPY'],
+    ]]), $version)['findings'];
+    $check("application (worker version {$version}): short quotes and quotes on cannot-verify findings are dropped whatever the worker sent",
+        array_column(array_filter($shown, static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['', ''], $shown);
+}
+$check('evidenceAllowed: the rule in one place', !DocumentAnalysis::evidenceAllowed('possible_inconsistency', 'GENUINE')
+    && !DocumentAnalysis::evidenceAllowed('possible_inconsistency', 'ABCDEFGHIJKLMN') && DocumentAnalysis::evidenceAllowed('possible_inconsistency', 'ARP No. 018-00045')
+    && !DocumentAnalysis::evidenceAllowed('cannot_verify', 'ARP No. 018-00045'));
+
+// Step 10 (D3): "Needs review" always names its reasons, never "0, 0 and 0".
+$cvOnly = $classifyV(array_replace($goodOutput, ['findings' => [['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => '']]]));
+$check('reason names a cannot-verify point', $cvOnly['outcome'] === 'needs_review' && str_contains($cvOnly['reason'], '1 point(s) the AI cannot check from text')
+    && !str_contains($cvOnly['reason'], '0 possible'), $cvOnly['reason']);
+$mrOnly = $classifyV(array_replace($goodOutput, ['manual_review_recommended' => true]));
+$check('reason names the AI\'s manual-review suggestion', $mrOnly['outcome'] === 'needs_review' && str_contains($mrOnly['reason'], 'the AI suggests a manual review')
+    && !str_contains($mrOnly['reason'], '0 '), $mrOnly['reason']);
+$skipped = DocumentAnalysis::classify($requirements($both), $validated($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'skipped'), $keys), $labels);
+$check('reason says the model did not review the documents', $skipped['outcome'] === 'needs_review' && str_contains($skipped['reason'], 'did not review the documents'), $skipped['reason']);
+$mixed = $classifyV(array_replace($goodOutput, ['findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => '']]]),
+    2, ['ownerId' => 'good', 'ctcTdOrTitle' => 'partial']);
+$check('reason counts only what applies, with the not-an-approval sentence', str_contains($mixed['reason'], '1 possible inconsistency(ies); 1 reading problem(s)')
+    && !str_contains($mixed['reason'], '0 ') && str_contains($mixed['reason'], 'This is not an approval'), $mixed['reason']);
+
+$check('an unknown worker result version is rejected', $rejects(static fn () => $validated(['version' => 3] + $worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $goodOutput), $keys)));
 
 // ================= Rule checks, readability and prompts =================
 $idText = 'REPUBLIC OF THE PHILIPPINES DRIVER LICENSE DELA CRUZ, JUAN SANTOS Address Mabini Batangas Date of Birth 1980';
@@ -258,6 +385,13 @@ $check('worker: the model saw both documents\' text and the declared details', s
     && str_contains(end($prompts), '"applicant_name":"Juan Dela Cruz"'));
 $check('worker: the result holds no raw OCR text', !str_contains(json_encode($result), 'DRIVER LICENSE') && !str_contains(json_encode($result), 'Assessed Value'));
 $check('worker: job files are removed afterwards', glob($work . '/state/job-*') === []);
+$quoting = array_replace($goodOutput, ['findings' => [
+    ['category' => 'possible_inconsistency', 'field' => 'property_identifier', 'document_keys' => ['ctcTdOrTitle'], 'explanation' => 'x', 'evidence' => 'ARP No. 018-00045'],
+    ['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'SIGNATURE VERIFIED GENUINE'],
+]]);
+$quoted = $makeWorker($fakeModel($quoting))->run($twoDocs);
+$check('worker: result version 2, keeping only evidence that is an exact quote of the OCR text', $quoted['version'] === 2
+    && array_column($quoted['model']['output']['findings'], 'evidence') === ['ARP No. 018-00045', ''], $quoted['model']['output']['findings'] ?? null);
 
 $calls = 0;
 $result = $makeWorker($fakeModel(static function () use (&$calls): mixed { $calls++; return ['documents' => [], 'approve' => true]; }))->run($twoDocs);
@@ -387,6 +521,57 @@ $started = microtime(true);
 $check('Ollama: a slow answer times out', $ollamaError(static fn () => $ollama->chatJson('s', 'u', [])) === 'ollama_timeout' && microtime(true) - $started < 7);
 $check('Ollama: the model digest is read', $ollama->modelDigest() === 'sha256abc');
 proc_terminate($server);
+
+// ---- Step 13: Ollama and worker reached through a Unix socket (callers with PrivateNetwork=yes) ----
+$socketPath = '/tmp/sa-link-' . bin2hex(random_bytes(4)) . '.sock';
+file_put_contents($work . '/unix-server.php', <<<'PHP'
+<?php
+[$_, $path, $log] = $argv;
+@unlink($path);
+$server = stream_socket_server('unix://' . $path, $no, $err);
+if ($server === false) { exit(1); }
+while ($client = @stream_socket_accept($server, 30)) {
+    $request = '';
+    while (!str_contains($request, "\r\n\r\n") && ($chunk = fread($client, 8192)) !== false && $chunk !== '') { $request .= $chunk; }
+    [$head, $body] = explode("\r\n\r\n", $request, 2) + [1 => ''];
+    if (preg_match('/Content-Length: (\d+)/i', $head, $m)) { while (strlen($body) < (int) $m[1] && ($chunk = fread($client, 8192)) !== false && $chunk !== '') { $body .= $chunk; } }
+    $line = strtok($head, "\r\n");
+    file_put_contents($log, $line . "\n", FILE_APPEND);
+    $answer = str_contains($line, '/v1/health') ? '{"ok":true}'
+        : (str_contains($line, '/api/tags') ? '{"models":[{"name":"fake-model:1","digest":"sha256:unixsock"}]}'
+        : json_encode(['message' => ['role' => 'assistant', 'content' => json_encode(['documents' => [], 'findings' => [], 'manual_review_recommended' => true])]]));
+    fwrite($client, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " . strlen($answer) . "\r\nConnection: close\r\n\r\n" . $answer);
+    fclose($client);
+}
+PHP);
+$unixLog = $work . '/unix-requests.log';
+$unixServer = proc_open([PHP_BINARY, $work . '/unix-server.php', $socketPath, $unixLog], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $unixPipes);
+for ($i = 0; $i < 50 && !file_exists($socketPath); $i++) { usleep(100000); }
+// Port 1: nothing listens there, so an answer can only have come through the socket.
+$viaSocket = new OllamaClient('http://127.0.0.1:1', 'fake-model:1', 5, 262_144, 8192, 1500, $socketPath);
+try { $socketChat = $viaSocket->chatJson('s', 'u', []); } catch (RuntimeException $exception) { $socketChat = $exception->getMessage(); }
+$check('Step 13: Ollama through a Unix socket (nothing on the TCP port): chat, model status and digest work',
+    is_array($socketChat) && ($socketChat['manual_review_recommended'] ?? null) === true && $viaSocket->modelStatus() === 'ready' && $viaSocket->modelDigest() === 'sha256:unixsock', $socketChat);
+$check('Step 13: without the socket the same client finds nothing (no hidden TCP fallback needed)',
+    (new OllamaClient('http://127.0.0.1:1', 'fake-model:1', 5))->modelStatus() === 'unreachable');
+$check('Step 13: the worker client through a Unix socket: health is ready', (new AiWorkerClient('http://127.0.0.1:1', $signer, 600, 1_048_576, null, $socketPath))->health() === AiWorkerClient::HEALTH_READY);
+putenv('SMART_ASSESS_AI_WORKER_URL=http://127.0.0.1:1'); putenv('SMART_ASSESS_AI_WORKER_SECRET=' . $secret); putenv('SMART_ASSESS_AI_WORKER_SOCKET=' . $socketPath);
+$check('Step 13: the dispatcher\'s setting SMART_ASSESS_AI_WORKER_SOCKET is used', AiWorkerClient::fromEnvironment()->health() === AiWorkerClient::HEALTH_READY);
+putenv('SMART_ASSESS_AI_WORKER_SOCKET'); putenv('SMART_ASSESS_AI_WORKER_URL'); putenv('SMART_ASSESS_AI_WORKER_SECRET');
+$requests = (string) @file_get_contents($unixLog);
+$check('Step 13: the socket server saw the requests', substr_count($requests, 'POST /api/chat') === 1 && substr_count($requests, 'GET /v1/health') === 2 && substr_count($requests, 'GET /api/tags') === 2, $requests);
+proc_terminate($unixServer);
+@unlink($socketPath);
+$check('Step 13: a socket path must be absolute, plain and short', $rejects(static fn () => new OllamaClient('http://127.0.0.1:11434', 'm', 180, 262_144, 8192, 1500, 'run/ollama.sock'))
+    && $rejects(static fn () => new OllamaClient('http://127.0.0.1:11434', 'm', 180, 262_144, 8192, 1500, '/run/../etc/x.sock'))
+    && $rejects(static fn () => new OllamaClient('http://127.0.0.1:11434', 'm', 180, 262_144, 8192, 1500, '/run/' . str_repeat('a', 120)))
+    && $rejects(static fn () => new AiWorkerClient('http://127.0.0.1:8095', $signer, 600, 1_048_576, null, '/run/a b.sock'))
+    && $rejects(static fn () => new AiWorkerClient('http://127.0.0.1:8095', $signer, 600, 1_048_576, null, '')));
+$check('Step 13: a socket is only accepted with a loopback http:// address (never for HTTPS or a remote host)',
+    $rejects(static fn () => new AiWorkerClient('https://10.0.1.20:8443', $signer, 600, 1_048_576, null, '/run/x.sock'))
+    && $rejects(static fn () => new OllamaClient('https://ollama.example', 'm', 180, 262_144, 8192, 1500, '/run/x.sock')));
+$workerSource = (string) file_get_contents(dirname(__DIR__) . '/worker/index.php');
+$check('Step 13: the worker passes SMART_ASSESS_WORKER_OLLAMA_SOCKET to its Ollama client', substr_count($workerSource, "getenv('SMART_ASSESS_WORKER_OLLAMA_SOCKET')") >= 1);
 $check('Ollama: nothing listening means unavailable', $ollamaError(static fn () => (new OllamaClient('http://127.0.0.1:' . $port, 'm', 5))->chatJson('s', 'u', [])) === 'ollama_unavailable');
 $check('Ollama: a non-local endpoint must use HTTPS', $rejects(static fn () => new OllamaClient('http://10.0.0.5:11434', 'm')));
 $check('Ollama: endpoints with credentials or paths are refused', $rejects(static fn () => new OllamaClient('https://u:p@host', 'm')) && $rejects(static fn () => new OllamaClient('https://host/api', 'm')));

@@ -49,28 +49,38 @@ $stmt = sa_db()->prepare(
 $stmt->execute(['document_id' => $documentId, 'reference' => $reference]);
 $document = $stmt->fetch();
 $storedPath = (string) ($document['stored_path'] ?? '');
-if (!$document || $document['file_status'] === 'missing' ||
-    !preg_match('~^private_uploads/requests/[A-Za-z0-9_]+\.(?:pdf|jpg|jpeg|png|webp)$~', $storedPath)) {
+if (!$document || $document['file_status'] === 'missing' || !preg_match(AiVerification::ORIGINAL_PATH_PATTERN, $storedPath)) {
     $fail(404, 'This document was not uploaded or is no longer available.');
 }
-
-$base = realpath(dirname(__DIR__) . '/private_uploads/requests');
-$path = realpath(dirname(__DIR__) . '/' . $storedPath);
-if ($base === false || $path === false || !str_starts_with($path, $base . DIRECTORY_SEPARATOR) || !is_file($path)) {
-    $fail(404, 'This document is missing from storage.');
+// The same check the AI review gate uses (AiVerification::originalFile()), so the gate
+// counts exactly the files Staff can open here.
+$original = AiVerification::originalFile(dirname(__DIR__), $storedPath, (string) $document['file_status']);
+if ($original === null) {
+    $base = realpath(dirname(__DIR__) . '/private_uploads/requests');
+    $real = realpath(dirname(__DIR__) . '/' . $storedPath);
+    $fail($base !== false && $real !== false && str_starts_with($real, $base . DIRECTORY_SEPARATOR) && is_file($real) ? 415 : 404,
+        $real !== false && is_file($real) ? 'This file type cannot be displayed.' : 'This document is missing from storage.');
 }
-
-$types = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf'];
-$mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
-if (!is_string($mime) || !isset($types[$mime])) {
-    $fail(415, 'This file type cannot be displayed.');
-}
+$path = $original['path'];
+$mime = $original['mime'];
+$types = AiVerification::ORIGINAL_MIME_TYPES;
 
 // Download name: the client's original name, reduced to safe characters.
 $name = pathinfo((string) ($document['original_name'] ?? ''), PATHINFO_FILENAME);
 $name = trim((string) preg_replace('/[^A-Za-z0-9._ -]+/', '_', $name), ' ._');
 $name = ($name !== '' ? substr($name, 0, 80) : 'document') . '.' . $types[$mime];
 $disposition = isset($_GET['download']) ? 'attachment' : 'inline';
+
+// Staff must look at the originals themselves: each opening is recorded (one row per Staff
+// member and document, in request_document_views, never the audit log), and the AI check
+// can only be marked reviewed once this Staff member has opened every original that can be
+// served (AiVerification::markReviewed). A record shows the file was sent, not that it was
+// inspected. A failed record never blocks the file: "Mark as reviewed" then stays refused.
+try {
+    AiVerification::recordOriginalOpened(sa_db(), (int) $user['id'], (int) $documentId);
+} catch (Throwable) {
+    error_log('[SMART_ASSESS] Could not record that a staff member opened a request document.');
+}
 
 header('Content-Type: ' . $mime);
 header('Content-Length: ' . (string) filesize($path));

@@ -3229,7 +3229,7 @@ function reqAiHtml(r){
     missing_information:['Missing information','red','A required document or detail appears to be missing.']}[ai.outcome];
   var html = head;
   if(outcome && (ai.status==='completed' || ai.status==='needs_manual_review')){
-    html += '<div class="ai-outcome tone-'+outcome[1]+'"><span class="badge '+outcome[1]+'">'+esc(outcome[0])+'</span><strong>'+esc(outcome[2])+'</strong></div>'
+    html += '<div class="ai-outcome tone-'+outcome[1]+'"><span class="badge '+outcome[1]+'">'+esc(outcome[0])+'</span><strong>'+esc(outcome[2])+'</strong><span class="cell-sub">Automatic checks and AI suggestions (unverified), not a decision</span></div>'
       + '<p class="ai-note">'+esc(ai.reason)+'</p>'
       + (ai.outcome!=='passed' ? '<p class="ai-note"><strong>Manual review recommended.</strong></p>' : '');
   } else {
@@ -3243,25 +3243,26 @@ function reqAiHtml(r){
   if(ai.documents && ai.documents.length){
     var reqText = {missing:'Not uploaded', uploaded_valid_format:'Uploaded', uploaded_invalid_format:'Uploaded, unusual file type'};
     var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
-    var typeText = {yes:'Yes', no:'No', unclear:'Unclear'};
-    html += '<div class="rd-wrap"><table class="rd-table" aria-label="AI document checklist"><thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th><th scope="col">Text reading</th><th scope="col">Looks like this document</th><th scope="col">Original</th></tr></thead><tbody>'
+    // The model's judgement, never a verified fact: always labelled as an unverified AI suggestion.
+    var typeText = {yes:'AI suggestion (unverified): yes', no:'AI suggestion (unverified): no', unclear:'AI suggestion (unverified): unclear'};
+    html += '<div class="rd-wrap"><table class="rd-table" aria-label="AI document checklist"><thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th><th scope="col">Text reading</th><th scope="col">Looks like this document? (AI suggestion, unverified)</th><th scope="col">Original</th></tr></thead><tbody>'
       + ai.documents.map(function(d){
           var f = fileByKey[d.key];
-          var open = f && f.name ? '<a class="btn btn-outline btn-sm" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener">Open</a>' : '<span class="cell-sub">—</span>';
+          var open = f && f.name && f.available===false ? '<span class="badge red">Cannot be opened</span>' : f && f.name ? '<a class="btn btn-outline btn-sm" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener">Open</a>' : '<span class="cell-sub">—</span>';
           return '<tr><th scope="row" data-label="Document">'+esc(d.label)+'</th><td data-label="Uploaded">'+esc(reqText[d.requirement]||'—')+'</td>'
             + '<td data-label="Text reading">'+esc(d.ocr_status==='failed' ? 'Could not be read' : (readText[d.readability]||'—'))+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</td>'
-            + '<td data-label="Looks like this document">'+esc(typeText[d.expected_type_match]||'—')+(d.note ? '<div class="cell-sub">'+esc(d.note)+'</div>' : '')+'</td>'
+            + '<td data-label="Looks like this document? (AI suggestion, unverified)">'+esc(typeText[d.expected_type_match]||'—')+(d.note ? '<div class="cell-sub">'+esc(d.note)+'</div>' : '')+'</td>'
             + '<td data-label="Original">'+open+'</td></tr>';
         }).join('') + '</tbody></table></div>';
   }
   if(ai.findings && ai.findings.length){
     var catText = {missing_information:['Missing information','red'], possible_inconsistency:['Possible inconsistency','amber'], ocr_uncertainty:['Reading problem','amber'], cannot_verify:['Cannot be verified from text','slate']};
-    var srcText = {requirements:'Requirement check', ocr:'Text reading', rule:'Automatic comparison', model:'AI model'};
+    var srcText = {requirements:'Requirement check', ocr:'Text reading', rule:'Automatic comparison', model:'AI suggestion (unverified)'};
     html += '<h5 class="rd-caption" style="margin-top:14px">Findings</h5><ul class="ai-findings">'
       + ai.findings.map(function(f){
           var c = (f.category==='missing_information' && f.source!=='requirements') ? ['Possibly missing (not confirmed)','amber'] : (catText[f.category] || [f.category,'slate']);
           return '<li><div class="ai-f-head"><span class="badge '+c[1]+'">'+esc(c[0])+'</span>'+(f.documents && f.documents.length ? '<span>'+esc(f.documents.join(', '))+'</span>' : '')
-            + '<span class="cell-sub">'+esc(srcText[f.source]||f.source)+'</span></div><p>'+esc(f.explanation)+'</p>'+(f.evidence ? '<q>'+esc(f.evidence)+'</q>' : '')+'</li>';
+            + '<span class="cell-sub">'+esc(srcText[f.source]||f.source)+'</span></div><p>'+esc(f.explanation)+'</p>'+(f.evidence ? '<q><span class="cell-sub">Text read from the document (OCR, may contain reading errors):</span> '+esc(f.evidence)+'</q>' : '')+'</li>';
         }).join('') + '</ul>';
   } else if(ai.status==='completed'){
     html += '<p class="ai-note">No findings.</p>';
@@ -3275,7 +3276,7 @@ function reqAiHtml(r){
   var finished = ai.status==='completed' || ai.status==='needs_manual_review';
   html += '<div class="ai-actions">'
     + (ai.status!=='processing' ? runBtn(ai.status==='pending' ? 'Queued, run again' : 'Run check again') : '')
-    + (finished && !ai.reviewed ? '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button>' : '')
+    + (finished && !ai.reviewed ? '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button><span class="cell-sub">Open every original that can be opened first; the server checks that you have. Opening is recorded, not proof of inspection: look at each document yourself.</span>' : '')
     + (ai.reviewed ? '<span class="cell-sub">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>' : '')
     + '</div>' + blocked + disclaimer + '</section>';
   return html;
@@ -3291,6 +3292,11 @@ function reqSubmittedFilesHtml(r){
       var review = '<span class="badge '+(f.validation==='Valid'?'green':(f.validation==='Invalid'?'red':'slate'))+'">'+esc(f.validation==='Pending'?'Pending Review':f.validation)+'</span>';
       if(f.status==='missing' || !f.name){
         return '<tr class="rf-missing"><th scope="row" data-label="Document">'+esc(f.label)+'</th><td data-label="File" colspan="3"><span class="cell-sub">Not uploaded by the client.</span></td></tr>';
+      }
+      if(f.available===false){
+        // Uploaded, but the server cannot serve it (missing from storage or an unsupported type).
+        return '<tr class="rf-missing"><th scope="row" data-label="Document">'+esc(f.label)+'</th><td data-label="File"><span class="rf-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span></td>'
+          + '<td data-label="Review">'+review+'</td><td data-label="Actions"><span class="badge red">Cannot be opened</span><span class="cell-sub">Missing from storage or an unsupported file type. Obtain the original another way; it does not block marking the AI check as reviewed.</span></td></tr>';
       }
       var url = '/request-file.php?doc='+encodeURIComponent(f.docId)+'&ref='+encodeURIComponent(r.id);
       var isImage = /^image\/(jpeg|png|webp)$/.test(f.mime), isPdf = f.mime==='application/pdf';
