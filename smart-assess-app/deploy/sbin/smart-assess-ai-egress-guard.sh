@@ -10,6 +10,8 @@
 # atomic transaction, so a reload never opens a gap), then check the table is there. If it cannot be
 # restored, stop the services it protects, so nothing runs unfiltered, and exit non-zero.
 #   inet sa_ai_worker_egress   the local AI worker (Step 5), file /etc/smart-assess-ai-worker-runtime/worker-egress.nft
+#     (its HTTP socket unit is stopped first, so socket activation cannot start lighttpd again; stopping a
+#     unit that is not installed does nothing)
 #   inet sa_ai_dispatch_egress the AI dispatcher,           file /usr/local/share/smart-assess/ai-dispatch-egress.nft
 # Window: between a flush and the next run (at most about 30 s, or none when nftables.service did it).
 set -uo pipefail
@@ -24,7 +26,7 @@ guard() {
     fi
 }
 guard sa_ai_worker_egress /etc/smart-assess-ai-worker-runtime/worker-egress.nft \
-    smart-assess-ai-worker.service smart-assess-ai-worker-fpm.service
+    smart-assess-ai-worker-http.socket smart-assess-ai-worker.service smart-assess-ai-worker-fpm.service
 guard sa_ai_dispatch_egress /usr/local/share/smart-assess/ai-dispatch-egress.nft \
     smart-assess-ai-dispatch.timer smart-assess-ai-dispatch.service
 exit "$status"

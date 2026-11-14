@@ -79,6 +79,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `deploy/sbin/smart-assess-ai-worker-refresh.sh` | Refreshes the worker copy only when the release-order check passes; health check and rollback (not installed). |
 | `deploy/sbin/smart-assess-ai-egress-guard.sh`, `deploy/systemd/smart-assess-ai-egress-guard.service`, `.timer`, `deploy/systemd/nftables.service.d/50-smart-assess-ai-egress.conf` | Keep both AI egress filters loaded or stop what they protect (not installed). |
 | `deploy/systemd/smart-assess-ai-worker-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-ollama-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf` | Step 13: the dispatcher and the worker pool run without network; these socket links are their only connections (not installed). |
+| `deploy/systemd/smart-assess-ai-worker-http.socket`, `deploy/systemd/smart-assess-ai-worker.service.d/50-private-network.conf`, `deploy/systemd/worker-lighttpd.conf.example` | Step 15: lighttpd runs without network; systemd holds 127.0.0.1:8095 and hands it over (not installed). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -615,11 +616,26 @@ password, because PHP's built-in server drops empty environment variables.
     route exists. The nftables filters, the guard (timer every 30 s and the
     `nftables.service` drop-in, which keeps them loaded or stops the worker) and
     `IPAddressDeny` remain as extra layers.
-  * **Remaining gap:** lighttpd (the worker's HTTP front, user `sa-ai-worker`) stays in the
-    host network: it must listen on 127.0.0.1:8095. It only passes requests to the pool
-    and never reads document content, but if it were compromised, during a flush it could
-    reach services on 127.0.0.1 (never the internet: `IPAddressDeny=any`) until the guard
-    reloads the filter.
+  * **lighttpd without network (Step 15).** lighttpd (the worker's HTTP front, user
+    `sa-ai-worker`) parses every request. Measured in the VM with the Step 5 sandbox: an
+    already-running process could reach Ollama and world-connectable socket files (snapd,
+    local SSH, polkit, systemd's manager) even with the filter loaded, and after a flush also
+    MySQL, MySQL X, Apache, SSH and the DNS stub. Now systemd itself holds 127.0.0.1:8095
+    (`smart-assess-ai-worker-http.socket`) and hands the listening socket to lighttpd, which
+    runs with `PrivateNetwork=yes`, only Unix sockets, and an empty read-only `/run` except the
+    PHP-FPM socket folder (drop-in `smart-assess-ai-worker.service.d/50-private-network.conf`,
+    plus `server.systemd-socket-activation = "enable"` in its configuration,
+    `worker-lighttpd.conf.example`). Callers see no difference. Verified: with the process
+    already running, before and after a flush and after a reboot it reached only the PHP-FPM
+    socket; a missing activation line or an invalid configuration makes lighttpd fail, and after
+    3 failed starts systemd closes the address so callers are refused at once (recovery:
+    `systemctl reset-failed` both units, then start them); the guard stops the socket unit first.
+  * **Remaining (not changed):** the worker's PHP-FPM pool and the dispatcher have no network,
+    but still see most of `/run`, including world-connectable socket files (snapd, local SSH,
+    polkit, systemd's own sockets). These need authentication or give read-only answers, and
+    none is used by the AI check; the same empty-`/run` approach could be applied to both after
+    review (PHP-FPM needs its own socket folder, the Ollama link, systemd's notify socket and
+    the journal; the dispatcher needs the MySQL socket and its link).
   * **Database:** its own MySQL account (`deploy/mysql/ai-dispatch-db-user.sql.example`)
     reads only nine columns of `requests` (no contact details), eight of
     `request_documents`, and reads and updates `ai_verification_jobs`; the

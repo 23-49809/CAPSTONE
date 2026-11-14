@@ -264,6 +264,25 @@ $check('Step 13: the dispatcher cannot use the Ollama link and the worker cannot
     !str_contains((string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-ollama-link.socket'), 'sa-ai-dispatch')
     && !preg_match('/^SupplementaryGroups=.*sa-ai-worker/m', $unitText));
 
+// ---- Step 15: lighttpd (the worker's HTTP front) without network; systemd holds 127.0.0.1:8095 ----
+$httpSocket = (string) @file_get_contents($app . '/deploy/systemd/smart-assess-ai-worker-http.socket');
+$check('Step 15: systemd holds 127.0.0.1:8095 for lighttpd (socket activation)', $unitValue($httpSocket, 'ListenStream') === ['127.0.0.1:8095']
+    && $unitValue($httpSocket, 'Service') === ['smart-assess-ai-worker.service']);
+$lighttpdDropIn = (string) @file_get_contents($app . '/deploy/systemd/smart-assess-ai-worker.service.d/50-private-network.conf');
+$check('Step 15: lighttpd gets no network and only Unix sockets', $unitValue($lighttpdDropIn, 'PrivateNetwork') === ['yes']
+    && $unitValue($lighttpdDropIn, 'RestrictAddressFamilies') === ['', 'AF_UNIX'], $lighttpdDropIn);
+$check('Step 15: lighttpd sees nothing in /run but the PHP-FPM socket folder', $unitValue($lighttpdDropIn, 'TemporaryFileSystem') === ['/run:ro']
+    && $unitValue($lighttpdDropIn, 'BindReadOnlyPaths') === ['/run/smart-assess-ai-worker']);
+$check('Step 15: lighttpd requires its socket, and gives up after 3 failed starts (the socket then closes: callers are refused, not kept waiting)',
+    $unitValue($lighttpdDropIn, 'Requires') === ['smart-assess-ai-worker-http.socket'] && $unitValue($lighttpdDropIn, 'After') === ['smart-assess-ai-worker-http.socket']
+    && $unitValue($lighttpdDropIn, 'StartLimitBurst') === ['3'] && $unitValue($lighttpdDropIn, 'StartLimitIntervalSec') === ['120']);
+$lighttpdConf = (string) @file_get_contents($app . '/deploy/systemd/worker-lighttpd.conf.example');
+$check('Step 15: the lighttpd configuration takes the address from systemd, and it is the socket unit\'s address',
+    (bool) preg_match('/^server\.systemd-socket-activation = "enable"$/m', $lighttpdConf) && (bool) preg_match('/^server\.bind = "127\.0\.0\.1"$/m', $lighttpdConf)
+    && (bool) preg_match('/^server\.port = 8095$/m', $lighttpdConf) && (bool) preg_match('#"socket" => "/run/smart-assess-ai-worker/fpm\.sock"#', $lighttpdConf));
+$check('Step 15: the guard stops the HTTP socket before lighttpd (or socket activation would start it again)',
+    str_contains((string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-egress-guard.sh'), 'smart-assess-ai-worker-http.socket smart-assess-ai-worker.service smart-assess-ai-worker-fpm.service'));
+
 // ---- systemd's own check, where available ----
 $analyze = trim((string) shell_exec('command -v systemd-analyze 2>/dev/null'));
 if ($analyze === '') {
