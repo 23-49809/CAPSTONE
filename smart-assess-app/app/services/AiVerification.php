@@ -10,8 +10,8 @@ require_once __DIR__ . '/DocumentRequirements.php';
  * storing validated results and the Staff-only view of them.
  *
  * The AI processing (queue, claim, results) only ever writes ai_verification_jobs.
- * The one other write is a Staff action: recordOriginalOpened() adds an audit entry
- * when a Staff member opens an original. It never changes a request's status, never
+ * The one other write is a Staff action: recordOriginalOpened() records in
+ * request_document_views that a Staff member opened an original. It never changes a request's status, never
  * approves or rejects, and never sends messages.
  */
 final class AiVerification
@@ -612,73 +612,117 @@ final class AiVerification
         return $status;
     }
 
-    /**
-     * Audit entry written each time a Staff member opens or previews an uploaded original
-     * (web/request-file.php). The AI result can only be marked reviewed by a Staff member
-     * who has opened every uploaded original of the request (see markReviewed()), because
-     * the AI can be wrong and only the originals decide. The entry names the reference and
-     * the document ID, never the file's content or the applicant.
-     */
-    public const ORIGINAL_OPENED_ACTION = 'Request document opened';
-
-    public static function originalOpenedTarget(string $reference, int $documentId): string
-    {
-        return $reference . ' document #' . $documentId;
-    }
+    /** Stored-path rule for request uploads; shared with web/request-file.php. */
+    public const ORIGINAL_PATH_PATTERN = '~^private_uploads/requests/[A-Za-z0-9_]+\.(?:pdf|jpg|jpeg|png|webp)$~';
+    /** File types an original may be served as (detected from the file itself). */
+    public const ORIGINAL_MIME_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf'];
 
     /**
-     * Records that Staff member $staffId opened document $documentId of request $reference:
-     * once per Staff member and document, so previews never crowd other entries out of the
-     * audit log.
-     */
-    public static function recordOriginalOpened(PDO $pdo, int $staffId, string $staffName, string $reference, int $documentId): void
-    {
-        $target = self::originalOpenedTarget($reference, $documentId);
-        $pdo->prepare(
-            "INSERT INTO audit_log (actor_type, actor_id, actor_name, action, target)
-             SELECT 'staff', :id, :name, :action, :target FROM DUAL
-             WHERE NOT EXISTS (SELECT 1 FROM audit_log WHERE actor_type = 'staff' AND actor_id = :id2 AND action = :action2 AND target = :target2)"
-        )->execute(['id' => $staffId, 'name' => $staffName, 'action' => self::ORIGINAL_OPENED_ACTION, 'target' => $target,
-            'id2' => $staffId, 'action2' => self::ORIGINAL_OPENED_ACTION, 'target2' => $target]);
-    }
-
-    /**
-     * IDs of the request's uploaded originals that Staff member $staffId has not opened yet
-     * (only documents with a stored file count; a document the client did not upload has
-     * nothing to open).
+     * The original of an uploaded document as web/request-file.php would serve it:
+     * ['path' => real path, 'mime' => detected type], or null when it cannot be served
+     * (not uploaded, a stored path outside the rule, missing from storage, or a file
+     * type that is not allowed). request-file.php uses exactly this, so the review gate
+     * below counts precisely the files Staff are able to open.
      *
-     * @return list<int>
+     * @return null|array{path:string, mime:string}
      */
-    public static function unopenedOriginals(PDO $pdo, int $requestId, int $staffId): array
+    public static function originalFile(string $appRoot, ?string $storedPath, ?string $fileStatus): ?array
+    {
+        if ($fileStatus === 'missing' || $storedPath === null || !preg_match(self::ORIGINAL_PATH_PATTERN, $storedPath)) {
+            return null;
+        }
+        $base = realpath($appRoot . '/private_uploads/requests');
+        $path = realpath($appRoot . '/' . $storedPath);
+        if ($base === false || $path === false || !str_starts_with($path, $base . DIRECTORY_SEPARATOR) || !is_file($path) || !is_readable($path)) {
+            return null;
+        }
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
+        return is_string($mime) && isset(self::ORIGINAL_MIME_TYPES[$mime]) ? ['path' => $path, 'mime' => $mime] : null;
+    }
+
+    /** True when the opening record (migration 20261114_request_document_views) has been set up. */
+    public static function documentViewsAvailable(PDO $pdo): bool
+    {
+        static $known = [];
+        $key = spl_object_id($pdo);
+        if (!isset($known[$key])) {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'request_document_views'");
+            $stmt->execute();
+            $known[$key] = (int) $stmt->fetchColumn() === 1;
+        }
+        return $known[$key];
+    }
+
+    /**
+     * Records that Staff member $staffId was sent original $documentId (request-file.php).
+     * One row per Staff member and document in request_document_views (never the audit
+     * log); a repeated opening only updates it, atomically, so simultaneous previews
+     * cannot create a second row. It records that the file was sent, not that it was
+     * inspected or understood.
+     */
+    public static function recordOriginalOpened(PDO $pdo, int $staffId, int $documentId): void
+    {
+        if (!self::documentViewsAvailable($pdo)) {
+            return;
+        }
+        $pdo->prepare(
+            'INSERT INTO request_document_views (user_id, request_document_id) VALUES (:user, :document)
+             ON DUPLICATE KEY UPDATE last_opened_at = NOW(), open_count = LEAST(open_count + 1, 4294967295)'
+        )->execute(['user' => $staffId, 'document' => $documentId]);
+    }
+
+    /**
+     * The request's originals, for Staff member $staffId: 'unopened' = documents the
+     * application can serve that this Staff member has not opened yet; 'unavailable' =
+     * uploaded documents that cannot be served (missing from storage, unsupported type),
+     * which therefore cannot block a review. A document the client did not upload is in
+     * neither list.
+     *
+     * @return array{unopened: list<int>, unavailable: list<int>}
+     */
+    public static function originalsToOpen(PDO $pdo, int $requestId, int $staffId, string $appRoot): array
     {
         $stmt = $pdo->prepare(
-            "SELECT rd.id FROM request_documents rd JOIN requests r ON r.id = rd.request_id
+            "SELECT rd.id, rd.stored_path, rd.file_status, EXISTS (SELECT 1 FROM request_document_views v
+                     WHERE v.user_id = :staff AND v.request_document_id = rd.id) AS opened
+             FROM request_documents rd
              WHERE rd.request_id = :request AND rd.file_status <> 'missing' AND rd.stored_path IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.actor_type = 'staff' AND a.actor_id = :staff AND a.action = :action
-                                 AND a.target = CONCAT(r.reference_no, ' document #', rd.id))
              ORDER BY rd.id"
         );
-        $stmt->execute(['request' => $requestId, 'staff' => $staffId, 'action' => self::ORIGINAL_OPENED_ACTION]);
-        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        $stmt->execute(['request' => $requestId, 'staff' => $staffId]);
+        $result = ['unopened' => [], 'unavailable' => []];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (self::originalFile($appRoot, (string) $row['stored_path'], (string) $row['file_status']) === null) {
+                $result['unavailable'][] = (int) $row['id'];
+            } elseif ((int) $row['opened'] !== 1) {
+                $result['unopened'][] = (int) $row['id'];
+            }
+        }
+        return $result;
     }
 
     public const REVIEWED = 'reviewed';
     public const REVIEW_NOT_FINISHED = 'not_finished';
     public const REVIEW_ORIGINALS_NOT_OPENED = 'originals_not_opened';
+    public const REVIEW_TRACKING_NOT_SET_UP = 'tracking_not_set_up';
 
     /**
      * Staff confirmed they looked at the result. Only for finished jobs, and only by a
-     * Staff member who has opened every uploaded original of the request.
-     * Returns REVIEWED, REVIEW_NOT_FINISHED or REVIEW_ORIGINALS_NOT_OPENED.
+     * Staff member who has opened every original of the request that can be served
+     * (originalsToOpen()); originals that cannot be served never block it. Returns
+     * REVIEWED, REVIEW_NOT_FINISHED, REVIEW_ORIGINALS_NOT_OPENED or REVIEW_TRACKING_NOT_SET_UP.
      */
-    public static function markReviewed(PDO $pdo, int $requestId, int $staffId): string
+    public static function markReviewed(PDO $pdo, int $requestId, int $staffId, string $appRoot): string
     {
         $finished = $pdo->prepare("SELECT COUNT(*) FROM ai_verification_jobs WHERE request_id = :id AND status IN ('completed', 'needs_manual_review')");
         $finished->execute(['id' => $requestId]);
         if ((int) $finished->fetchColumn() !== 1) {
             return self::REVIEW_NOT_FINISHED;
         }
-        if (self::unopenedOriginals($pdo, $requestId, $staffId) !== []) {
+        if (!self::documentViewsAvailable($pdo)) {
+            return self::REVIEW_TRACKING_NOT_SET_UP;
+        }
+        if (self::originalsToOpen($pdo, $requestId, $staffId, $appRoot)['unopened'] !== []) {
             return self::REVIEW_ORIGINALS_NOT_OPENED;
         }
         $stmt = $pdo->prepare(

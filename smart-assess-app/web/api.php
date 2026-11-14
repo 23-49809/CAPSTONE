@@ -517,6 +517,23 @@ function sa_validate_upload(array $file, string $key): array
     return [$original, $mime, $size, $allowed[$mime]];
 }
 
+/**
+ * Throws when request $requestId is no longer in the database: the submission's
+ * transaction was rolled back by the database (for example a deadlock while queueing the
+ * AI check or the confirmation), so the submission must fail instead of returning a
+ * reference that was never saved. Request IDs are never reused, so a missing ID cannot
+ * be mistaken for another request.
+ */
+function sa_submission_still_saved(PDO $pdo, int $requestId, string $step): void
+{
+    $saved = $pdo->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
+    $saved->execute(['id' => $requestId]);
+    if ((int) $saved->fetchColumn() !== 1) {
+        error_log('[SMART_ASSESS] A submission was rolled back by the database while ' . $step . '; the client was told it failed.');
+        throw new RuntimeException('The submission transaction was rolled back while ' . $step . '.');
+    }
+}
+
 function sa_submit_request(array $data): array
 {
     $flow = (string) ($data['flow'] ?? '');
@@ -807,11 +824,7 @@ function sa_submit_request(array $data): array
                     // No savepoint: either it was never made, or the database rolled the whole
                     // transaction back (a deadlock). Then the request itself is gone, and the
                     // submission must fail instead of returning a reference that was never saved.
-                    $saved = $pdo->prepare('SELECT COUNT(*) FROM requests WHERE id = :id');
-                    $saved->execute(['id' => $requestId]);
-                    if ((int) $saved->fetchColumn() !== 1) {
-                        throw new RuntimeException('The submission transaction was rolled back while queueing the AI check.');
-                    }
+                    sa_submission_still_saved($pdo, $requestId, 'queueing the AI check');
                 }
                 error_log('[SMART_ASSESS_AI] Could not queue the AI check for request ID ' . $requestId . '.');
             }
@@ -827,12 +840,24 @@ function sa_submit_request(array $data): array
             try {
                 $pdo->exec('ROLLBACK TO SAVEPOINT sa_confirmation');
             } catch (Throwable) {
-                // No savepoint was made, so nothing was queued.
+                // No savepoint: it was never made (nothing was queued), or the database rolled the
+                // whole transaction back (a deadlock), taking the request with it. Then the
+                // submission fails here instead of returning a reference that was never saved.
+                sa_submission_still_saved($pdo, $requestId, 'queueing the confirmation');
             }
             $confirmations = 0;
             error_log('[SMART_ASSESS_CONFIRM] Could not queue the confirmation for request ID ' . $requestId . '; the request was saved.');
         }
         $pdo->commit();
+        // Last check before success is reported: the request really is saved. A transaction the
+        // database dropped earlier (a deadlock) would otherwise "commit" nothing silently.
+        // Only a confirmed "not found" fails it: if this check itself cannot run (a dropped
+        // connection), the commit above did succeed, so the saved request and its files are kept.
+        try {
+            sa_submission_still_saved($pdo, $requestId, 'saving the submission');
+        } catch (PDOException) {
+            error_log('[SMART_ASSESS] Could not re-check a committed submission (request ID ' . $requestId . '); it was committed.');
+        }
         // Saved draft files for documents this request does not need are not kept.
         foreach ($unusedDraftFiles as $path) {
             if (is_file($path)) {
@@ -1911,17 +1936,23 @@ function sa_ai_verification_reviewed(array $data): array
         throw new SaHttpException(503, 'AI document checking is not set up on this server yet.');
     }
     $request = sa_ai_request($pdo, $data);
-    $outcome = AiVerification::markReviewed($pdo, (int) $request['id'], (int) $user['id']);
+    $appRoot = dirname(__DIR__);
+    $outcome = AiVerification::markReviewed($pdo, (int) $request['id'], (int) $user['id'], $appRoot);
+    if ($outcome === AiVerification::REVIEW_TRACKING_NOT_SET_UP) {
+        throw new SaHttpException(503, 'Recording which original documents Staff have opened is not set up on this server yet, so the AI check cannot be marked as reviewed.');
+    }
+    $originals = AiVerification::originalsToOpen($pdo, (int) $request['id'], (int) $user['id'], $appRoot);
+    $unavailable = count($originals['unavailable']);
+    $unavailableNote = $unavailable > 0 ? ' ' . $unavailable . ' original(s) cannot be opened (missing from storage or an unsupported file type) and do not block this; obtain them another way.' : '';
     if ($outcome === AiVerification::REVIEW_ORIGINALS_NOT_OPENED) {
-        $unopened = count(AiVerification::unopenedOriginals($pdo, (int) $request['id'], (int) $user['id']));
         throw new SaHttpException(409, 'Open every original document of this request before marking the AI check as reviewed ('
-            . $unopened . ' not opened by you yet). The AI can be wrong; the original documents decide.');
+            . count($originals['unopened']) . ' not opened by you yet). The AI can be wrong; the original documents decide.' . $unavailableNote);
     }
     if ($outcome !== AiVerification::REVIEWED) {
         throw new SaHttpException(409, 'There is no finished AI check for this request to mark as reviewed.');
     }
     sa_audit('staff', (int) $user['id'], (string) $user['name'], 'AI document check reviewed', (string) $request['reference_no']);
-    return ['reviewed' => true];
+    return ['reviewed' => true, 'unavailable_originals' => $unavailable];
 }
 
 function sa_lookup_request_owner(array $data): array

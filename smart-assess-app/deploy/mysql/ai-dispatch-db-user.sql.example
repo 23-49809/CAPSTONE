@@ -1,0 +1,28 @@
+-- SMART ASSESS - least-privilege MySQL account for the AI dispatcher ONLY.
+-- NOT APPLIED. Run it only with approval, as the MySQL administrator, after the
+-- 20261111 AI migration, with a new random password in place of the placeholder:
+--   openssl rand -hex 24
+--
+-- The dispatcher (bin/ai-verification-dispatch.php) needs exactly this:
+--   * requests: the submission time and the declared details it compares with the
+--     documents (no contact details, no address, no client link);
+--   * request_documents: where each uploaded original is stored and its type;
+--   * ai_verification_jobs: read, claim and store results (it never inserts or deletes).
+-- It cannot read clients, users, notifications, audit_log, status history or any
+-- contact column, and cannot change any request. Its password goes only into
+-- /etc/smart-assess/ai-dispatch.env (root 0600), never into apache.env.
+-- tests/ai_verification_workflow_test.php runs the dispatcher with exactly these grants.
+--
+-- The website connects through the local socket (DB_HOST=localhost), so the
+-- account is 'localhost'. Keep DB_HOST=localhost in ai-dispatch.env.
+
+CREATE USER IF NOT EXISTS 'smart_assess_ai_dispatch'@'localhost' IDENTIFIED BY '<NEW RANDOM PASSWORD>';
+
+GRANT SELECT (id, created_at, flow, is_owner, first_name, last_name, arp_number, document_type, transfer_type)
+  ON smart_assess_sydney.requests TO 'smart_assess_ai_dispatch'@'localhost';
+GRANT SELECT (id, request_id, doc_key, label, stored_path, mime_type, file_size, file_status)
+  ON smart_assess_sydney.request_documents TO 'smart_assess_ai_dispatch'@'localhost';
+GRANT SELECT, UPDATE ON smart_assess_sydney.ai_verification_jobs TO 'smart_assess_ai_dispatch'@'localhost';
+
+-- Check: SHOW GRANTS FOR 'smart_assess_ai_dispatch'@'localhost';
+-- Remove:  DROP USER 'smart_assess_ai_dispatch'@'localhost';

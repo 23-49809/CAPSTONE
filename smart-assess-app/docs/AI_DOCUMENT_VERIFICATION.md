@@ -58,6 +58,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | File | Purpose |
 |---|---|
 | `database/migrations/20261111_ai_document_verification.sql` | Creates `ai_verification_jobs` (one job per request). |
+| `database/migrations/20261114_request_document_views.sql` | Creates `request_document_views`: which Staff member opened which original (one row each). |
 | `app/services/DocumentAnalysis.php` | Schema, strict validation, prompts, rule checks, outcome rules. No I/O. |
 | `app/services/AiVerification.php` | Queue, job building, storing results, Staff view. |
 | `app/services/AiWorkerClient.php` | Signed request to the worker; verifies the signed answer. |
@@ -71,6 +72,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `bin/ai-model-evaluation.php` | Compares local models on synthetic documents. |
 | `deploy/systemd/smart-assess-ai-dispatch.service`, `.timer` | Dispatcher service and one-minute timer for the web server (not installed). |
 | `deploy/systemd/ai-dispatch.env.example` | The dispatcher's own environment file (KEY=VALUE, root 0600). |
+| `deploy/mysql/ai-dispatch-db-user.sql.example` | The dispatcher's least-privilege MySQL account (not applied). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -378,10 +380,19 @@ when the model is wrong; the model adds cross-document and document-type checks.
 
 ```sh
 php tests/ai_document_analysis_test.php                     # no database
+php tests/ai_dispatch_deploy_test.php                       # no database: dispatcher unit, settings, grants
 SMART_ASSESS_TEST_DB=<name>_test DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=<user> \
-SMART_ASSESS_DB_PASS='<password>' php tests/ai_verification_workflow_test.php
+SMART_ASSESS_DB_PASS='<password>' \
+SMART_ASSESS_TEST_DB_ADMIN_USER=<scratch admin> SMART_ASSESS_TEST_DB_ADMIN_PASS='<password>' \
+php tests/ai_verification_workflow_test.php
 php tests/ocr_service_test.php
 ```
+
+The workflow test also forces real InnoDB deadlocks (it needs the TRIGGER privilege
+on the test database, and on a server with binary logging
+`log_bin_trust_function_creators=1`). With the optional scratch administrator it
+creates and drops the dispatcher's least-privilege MySQL account to test the shipped
+grants; without it, those checks are reported as SKIP.
 
 The workflow test runs a real submission, the dispatcher and the worker against
 fake OCR programs and a fake Ollama, and checks Staff/Admin/Head access. It uses
@@ -432,49 +443,98 @@ password, because PHP's built-in server drops empty environment variables.
   from the client form, so the check recomputes requirements on the server with
   `DocumentRequirements`.
 
-### Staff decide (reviewed in Step 6, 14 Nov 2026)
+### Staff decide (reviewed in Steps 6–8, 14 Nov 2026)
 
-* **The AI cannot authenticate or decide.** Besides the schema (no field can
-  approve, reject or change anything), the application withholds model-written
-  wording that judges genuineness or decides the request: a finding's
-  explanation or a document note containing words such as genuine, authentic,
-  forged, fake, legitimate, approve, reject, deny (and Tagalog tunay, peke,
-  huwad, aprub-, tanggihan). The finding keeps its category and documents, its
-  text is replaced with a notice that the AI cannot judge this, and the result
-  becomes at least **Needs review**: such an answer can never produce
-  **Passed** (`DocumentAnalysis::withholdVerdicts()`). Quoted document text
-  ("evidence") and names of missing details are not filtered; they quote, they
-  do not judge. The filter is deliberately broad: a harmless sentence that
-  happens to use one of these words is also withheld and sent to review.
-* **Originals before "reviewed".** Every time a Staff member opens or previews
-  an uploaded original (`web/request-file.php`), one audit entry is written per
-  Staff member and document (`Request document opened`, target
-  `<reference> document #<id>`; no file content or applicant details). The AI
-  result can be marked **reviewed** only by a Staff member who has opened every
-  uploaded original of that request; otherwise the action answers 409 and says
-  how many are still unopened (`AiVerification::markReviewed()`). Approving,
-  rejecting or releasing a request is a separate Staff action that never reads
-  or depends on the AI result; the system does not (yet) require the originals
-  to be opened before that decision.
-* **Nothing else is written or sent.** The dispatcher and the AI classes write
-  only `ai_verification_jobs`; Staff AI actions add audit entries. No AI path
-  changes a request, its status history or notifications, or calls the SMS or
-  email senders (the workflow test checks every other table byte for byte and
-  records any send attempt).
-* **Queueing never breaks a submission.** The job insert at submission runs
-  behind a savepoint (`sa_ai_queue`): if it fails, only the insert is undone and
-  the request is saved without an AI job. If the database rolled the whole
-  transaction back (a deadlock), the submission fails with an error instead of
-  returning a reference that was never saved.
+* **Nothing the model writes in its own words reaches Staff.** The model's
+  answer must match the schema exactly (no field can approve, reject or change
+  anything). Its free-text fields (a finding's `explanation`, a document's
+  `note`) are still validated, then discarded. Every model finding Staff see is
+  worded by the application from validated codes only (category, field,
+  document labels) and starts with "AI suggestion (unverified):" or "Cannot be
+  checked by the AI:" (`DocumentAnalysis::classify()`). So no phrasing,
+  language, spelling trick, hidden character or look-alike letter can make the
+  AI say that a signature, seal or document is genuine, or that a request
+  should be approved, rejected or released. (Step 6 tried a word list instead;
+  the Step 7 review showed synonyms and obfuscation got past it, and it was
+  removed.)
+* **Evidence is an exact quote or nothing.** A model finding may carry a short
+  quote ("evidence"). The worker, the only place that has the OCR text, keeps it
+  only if it occurs in the text of the finding's document (compared with
+  whitespace and invisible characters reduced to single spaces); anything
+  invented, paraphrased or taken from another document is removed
+  (`DocumentAnalysis::keepQuotedEvidence()`). Such workers answer with result
+  version 2. For a version 1 answer (the copy installed in `/opt` before this
+  change) the application cannot check quotes, so it drops all model evidence.
+  Staff see a kept quote labelled as text read from the document by OCR, which
+  may contain reading errors. A real quote can still contain words such as
+  "APPROVED" if the document says so; it is shown as the document's text, not
+  as the AI's judgement.
+* **Missing details only from a fixed list.** The model may name missing details
+  only as codes from `DocumentAnalysis::MISSING_FIELD_LABELS` (for example
+  `date_of_birth`, `arp_number`); Staff see the application's labels. Any other
+  name is dropped.
+* **"Passed" is never the model's to give.** It needs every server check to be
+  clean (every required document uploaded, every document read clearly — a
+  partly read document is a reading problem — and no rule finding) and the model
+  to have reviewed every document and reported nothing, including nothing that
+  "cannot be checked" from text (that needs Staff, so it is **Needs review**).
+  The Passed text says it does not verify that any document, signature or seal
+  is genuine. A model answer that is merely valid JSON cannot produce it: only
+  the absence of every concern can.
+* **Originals before "reviewed".** Each time a Staff member opens, previews or
+  downloads an original (`web/request-file.php`), one row per Staff member and
+  document is kept in `request_document_views` (migration
+  `20261114_request_document_views.sql`; first and last opening, count; no
+  content, path or applicant details). Not in `audit_log`, so security events
+  are never crowded out of the Admin's audit view. The AI result can be marked
+  **reviewed** only by a Staff member who has opened every original **that the
+  application can serve**; originals missing from storage or of an unsupported
+  type are listed as "Cannot be opened" on the Staff page and in the 409 answer,
+  and never block the review (`AiVerification::originalFile()` is the one check
+  used by the file page, the gate and the Staff page). Until the migration has
+  run, "Mark as reviewed" answers that the opening record is not set up.
+* **Limitation: opened is not inspected.** A row shows that the file was sent to
+  that Staff member's browser, not that they looked at it, read it or
+  understood it. The gate makes skipping the originals deliberate; it cannot
+  prove a careful review. Approving, rejecting or releasing a request is a
+  separate Staff action that never reads or depends on the AI result, and the
+  system does not require the originals to be opened before that decision.
+* **Nothing else is written or sent.** The dispatcher and the AI processing write
+  only `ai_verification_jobs`; Staff AI actions add audit entries and opening
+  rows. No AI path changes a request, its status history or notifications, or
+  calls the SMS or email senders (the workflow test checks every other table
+  byte for byte and records any send attempt).
+* **A submission never falsely succeeds.** The AI queue insert and the
+  confirmation queue each run behind a savepoint, so an ordinary failure undoes
+  only that insert and the request is saved without it. If the database rolled
+  the whole transaction back (a deadlock, or a lock timeout with
+  `innodb_rollback_on_timeout` on; production has it off), the request is gone,
+  so the submission fails with an error and its uploaded files are removed, and
+  a last check after the commit confirms the request exists before success is
+  returned (`sa_submission_still_saved()`). The workflow test forces a real
+  InnoDB deadlock in each queue to prove it.
 * **Access.** Staff (role 2) only, checked on the server for every AI action,
   every page and the direct `internal_bootstrap` API. Admin, Department Head,
   signed-in clients and visitors get 401/403 and no AI data; role fields sent by
   a client are ignored; AI actions require POST and the CSRF token. Request
   tracking never shows AI results.
-* **Dispatcher sandbox.** `deploy/systemd/smart-assess-ai-dispatch.service`
-  (not installed) hides the website's settings file, the Gmail token folder,
-  backups, the worker's secret and state, the GitHub runner and MySQL's
-  maintenance credentials from the dispatcher, which needs none of them.
+* **Dispatcher account and sandbox** (`deploy/systemd/smart-assess-ai-dispatch.service`,
+  not installed). It runs as its own non-login account `sa-ai-dispatch`, not
+  www-data, so Apache processes cannot read its environment (which holds the
+  worker secret). It reads the application code and the request uploads through
+  the www-data group, read only (production: application folder
+  `ubuntu:www-data 0750`, uploads `www-data:www-data 0750/0640`; that group
+  cannot read `apache.env` or the Gmail folder). The website settings file, the
+  Gmail folder, draft uploads, backups, the worker's secret and state, the GitHub
+  runner and MySQL's maintenance credentials are hidden. Network: loopback only
+  (`IPAddressDeny=any`, `IPAddressAllow=localhost`), enough for the worker at
+  127.0.0.1:8095 and MySQL over its local socket. It uses its own MySQL account
+  (`deploy/mysql/ai-dispatch-db-user.sql.example`) that can read only nine
+  columns of `requests` (no contact details), eight of `request_documents`, and
+  read and update `ai_verification_jobs`; the workflow test runs the dispatcher
+  with exactly these grants and shows 13 forbidden actions are refused.
+  `tests/ai_dispatch_deploy_test.php` checks the unit and settings files;
+  `systemd-analyze verify` must still be run on the server before installing.
 
 ### Production worker as installed (Steps 4 and 5, 13–14 Nov 2026)
 
@@ -484,13 +544,13 @@ loopback.
 
 | Part | As installed |
 |---|---|
-| Worker URL for the dispatcher | `http://127.0.0.1:8095` (plain HTTP is accepted only on loopback; no CA file) |
+| Worker URL for the dispatcher | `http://127.0.0.1:8095` (plain HTTP is accepted only on loopback; no CA file; see `deploy/systemd/ai-dispatch.env.example`) |
 | HTTP front | lighttpd, 127.0.0.1:8095 only, unit `smart-assess-ai-worker.service`, account `sa-ai-worker` |
 | PHP | PHP-FPM 8.5 pool, unit `smart-assess-ai-worker-fpm.service`, private socket, no database drivers loaded |
 | Network | nft table `inet sa_ai_worker_egress` (unit `smart-assess-ai-worker-egress.service`): the worker account may reach only Ollama on 127.0.0.1:11434; MySQL, DNS, metadata and the internet are rejected |
 | Limits | slice `smart-assess-ai-worker.slice` (1 CPU, 1 GiB) inside `smart-assess-ai.slice` (4.5 GiB with Ollama) |
 | Secret | `/etc/smart-assess-ai-worker/worker.env`, root 0600 |
-| Code | a copy of `worker/` and `app/services/` in `/opt/smart-assess-ai-worker`, refreshed by hand when a release changes them |
+| Code | a copy of `worker/` and `app/services/` in `/opt/smart-assess-ai-worker`, refreshed by hand when a release changes them. The copy installed in Step 4 answers result version 1, so until it is refreshed the application drops all model evidence |
 
 AI checking stays off until the dispatcher, its settings file and the website's
 `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` are set up, each with separate approval.

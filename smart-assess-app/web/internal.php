@@ -44,6 +44,8 @@ foreach ($page['documents'] ?? [] as $document) {
         'mime' => (string) ($document['mime_type'] ?? ''),
         'size' => $document['file_size'] === null ? null : (int) $document['file_size'],
         'status' => (string) ($document['file_status'] ?? 'missing'),
+        // False when an uploaded original cannot be opened (missing from storage, unsupported type).
+        'available' => (bool) ($document['file_available'] ?? false),
         'validation' => ucfirst(strtolower((string) ($document['validation_status'] ?? 'pending'))),
     ];
     $validation = strtolower((string) ($document['validation_status'] ?? 'pending'));

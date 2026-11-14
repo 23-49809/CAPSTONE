@@ -183,7 +183,8 @@ final class AiDocumentWorker
             ], $labels);
 
             return [
-                'version' => 1,
+                // Version 2: the model's "evidence" quotes were checked against the OCR text (askModel()).
+                'version' => DocumentAnalysis::WORKER_RESULT_VERSION,
                 'documents' => $checks,
                 'rule_findings' => $ruleFindings,
                 'model' => $this->askModel($declared, $texts, $deadline),
@@ -234,10 +235,12 @@ final class AiDocumentWorker
                 throw new RuntimeException($exception->getMessage() === 'ollama_timeout' ? 'model_timeout' : 'model_unavailable');
             }
             try {
-                // Checked here so a bad answer can be retried; returned as the model sent it,
-                // because the application validates it again independently.
+                // Checked here so a bad answer can be retried; returned in the model's own shape,
+                // because the application validates it again independently. Only here is the OCR
+                // text known, so here every "evidence" that is not an exact quote of it is removed.
                 DocumentAnalysis::validateModelOutput($output, $keys);
-                return ['status' => 'ok', 'name' => $this->modelName, 'digest' => $this->modelDigest, 'output' => $output];
+                return ['status' => 'ok', 'name' => $this->modelName, 'digest' => $this->modelDigest,
+                    'output' => DocumentAnalysis::keepQuotedEvidence($output, $texts)];
             } catch (UnexpectedValueException) {
                 continue;   // malformed or unexpected output is never used
             }

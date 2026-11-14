@@ -582,6 +582,20 @@ function sa_internal_bootstrap(): array
            ON recent.id = rd.request_id
          ORDER BY rd.request_id DESC, rd.id'
     )->fetchAll();
+    if ($roleId === 2 && $data['documents'] !== []) {
+        // Staff only: whether each original can actually be opened (the same check
+        // request-file.php and the AI review gate use). Only a yes/no leaves PHP, never the path.
+        $paths = [];
+        foreach ($pdo->query('SELECT rd.id, rd.stored_path FROM request_documents rd
+                 JOIN (SELECT id FROM requests ORDER BY created_at DESC LIMIT 500) recent ON recent.id = rd.request_id')->fetchAll() as $row) {
+            $paths[(int) $row['id']] = $row['stored_path'] === null ? null : (string) $row['stored_path'];
+        }
+        $appRoot = dirname(__DIR__);
+        foreach ($data['documents'] as &$document) {
+            $document['file_available'] = AiVerification::originalFile($appRoot, $paths[(int) $document['id']] ?? null, (string) $document['file_status']) !== null;
+        }
+        unset($document);
+    }
 
     if ($roleId === 3) {
         $data['accounts'] = $pdo->query(

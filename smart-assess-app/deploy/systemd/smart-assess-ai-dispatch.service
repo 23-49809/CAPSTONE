@@ -1,22 +1,31 @@
 # SMART ASSESS - AI document check dispatcher (Sydney web server).
 #
-# Sends queued AI document checks to the private AI worker and stores the
-# validated results. It never changes a request's status. Started every minute
-# by smart-assess-ai-dispatch.timer; a new run starts only after the previous
-# one has finished, so runs never overlap.
+# Sends queued AI document checks to the local AI worker (http://127.0.0.1:8095,
+# installed in Steps 4-5) and stores the validated results. It never changes a
+# request's status and never sends SMS or email. Started every minute by
+# smart-assess-ai-dispatch.timer; a new run starts only after the previous one has
+# finished, so runs never overlap.
 #
-# NOT INSTALLED. To install (only with approval, after the migration):
-#   sudo install -o root -g root -m 0644 smart-assess-ai-dispatch.service smart-assess-ai-dispatch.timer /etc/systemd/system/
-#   sudo install -o root -g root -m 0600 /dev/null /etc/smart-assess/ai-dispatch.env   # then fill it in (see ai-dispatch.env.example)
-#   sudo systemd-analyze verify /etc/systemd/system/smart-assess-ai-dispatch.service
-#   sudo systemctl daemon-reload
-#   sudo systemctl start smart-assess-ai-dispatch.service      # one manual run first; check: journalctl -u smart-assess-ai-dispatch
-#   sudo systemctl enable --now smart-assess-ai-dispatch.timer
+# NOT INSTALLED. To install (only with approval, after the 20261111 migration):
+#   1. Its own non-login system account (never www-data, so Apache processes cannot
+#      read this service's environment, which holds the worker secret):
+#        sudo useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin sa-ai-dispatch
+#   2. Its own least-privilege MySQL account: deploy/mysql/ai-dispatch-db-user.sql.example
+#   3. sudo install -o root -g root -m 0644 smart-assess-ai-dispatch.service smart-assess-ai-dispatch.timer /etc/systemd/system/
+#      sudo install -o root -g root -m 0600 /dev/null /etc/smart-assess/ai-dispatch.env   # then fill it in (see ai-dispatch.env.example)
+#      sudo systemd-analyze verify /etc/systemd/system/smart-assess-ai-dispatch.service
+#      sudo systemctl daemon-reload
+#      sudo systemctl start smart-assess-ai-dispatch.service      # one manual run first; check: journalctl -u smart-assess-ai-dispatch
+#      sudo systemctl enable --now smart-assess-ai-dispatch.timer
 # To stop AI checking (submissions keep working; jobs stay queued):
 #   sudo systemctl disable --now smart-assess-ai-dispatch.timer
 #
-# Paths assume the application root /var/www/smart-assess (the smart-assess-app
-# folder of the repository). Confirm it in the readiness report before installing.
+# File access (production, checked 14 Nov 2026): the application folder is
+# ubuntu:www-data 0750 and request uploads www-data:www-data 0750/0640, so the
+# account reads them through the www-data group (SupplementaryGroups below), read
+# only. That group cannot read apache.env (root 0600) or the Gmail folder (owner
+# only, 0700); both are also hidden below, as are the drafts uploads, which the
+# dispatcher never needs. Paths assume the application root /var/www/smart-assess.
 #
 # Exit codes (see bin/ai-verification-dispatch.php): 0 done or nothing to do;
 # 2 not configured; 3 the worker refused the shared secret; 75 the worker is not
@@ -26,15 +35,17 @@
 [Unit]
 Description=SMART ASSESS AI document check dispatcher
 Documentation=file:///var/www/smart-assess/docs/AI_DOCUMENT_VERIFICATION.md
-After=network-online.target mysql.service
+After=network-online.target mysql.service smart-assess-ai-worker.service
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=www-data
-Group=www-data
+User=sa-ai-dispatch
+Group=sa-ai-dispatch
+# Read-only access to the application code and the request uploads (see above).
+SupplementaryGroups=www-data
 # Database and worker settings for the dispatcher only (KEY=VALUE lines).
-# root:root 0600: systemd reads it before switching to www-data.
+# root:root 0600: systemd reads it before switching to sa-ai-dispatch.
 EnvironmentFile=/etc/smart-assess/ai-dispatch.env
 WorkingDirectory=/var/www/smart-assess
 # Up to 20 jobs, starting new ones for at most 30 minutes. Errors go to the journal.
@@ -51,12 +62,20 @@ TasksMax=16
 Nice=10
 IOSchedulingClass=idle
 
+# Network: loopback only. The worker is http://127.0.0.1:8095 and MySQL is reached
+# through its local socket (AF_UNIX, not affected) or 127.0.0.1. No DNS, internet or
+# instance metadata is needed or reachable.
+IPAddressDeny=any
+IPAddressAllow=localhost
+
 # Hardening: reads the application and uploads, writes nothing to disk.
 NoNewPrivileges=yes
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes
@@ -68,13 +87,15 @@ RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
+RemoveIPC=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
 SystemCallArchitectures=native
 UMask=0077
 ReadOnlyPaths=/var/www/smart-assess
 # It needs only its own settings (read by systemd before the sandbox starts), the
-# database, the request's uploads and the worker. It never sends SMS or email, so the
+# database, the request uploads and the worker. It never sends SMS or email, so the
 # website's settings file (Gmail and IPROG credentials), the Gmail token folder, the
-# backups and the worker's own secret file are hidden from it ("-": if present).
-InaccessiblePaths=-/etc/smart-assess/apache.env -/etc/smart-assess/gmail -/var/backups -/etc/smart-assess-ai-worker -/var/lib/smart-assess-ai-worker -/opt/actions-runner -/etc/mysql/debian.cnf
+# drafts uploads, the backups and the worker's own secret file are hidden from it
+# ("-": skipped if absent).
+InaccessiblePaths=-/etc/smart-assess/apache.env -/etc/smart-assess/gmail -/var/www/smart-assess/private_uploads/drafts -/var/backups -/etc/smart-assess-ai-worker -/var/lib/smart-assess-ai-worker -/opt/actions-runner -/etc/mysql/debian.cnf
