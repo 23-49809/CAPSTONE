@@ -942,3 +942,34 @@ part of the Terms acceptance, so this change does not ask clients to accept agai
 - [ ] Dispatcher timer enabled; worker php-fpm, nginx and Ollama restart on failure.
 - [ ] Test with synthetic documents passed; Admin/Head checked.
 - [ ] Office informed: AI results are advice; Staff make every decision.
+
+## Performance (Step 12 benchmark, 14 Nov 2026)
+
+Measured locally with synthetic documents only (fictional names and numbers; clear, multi-page,
+low-quality, photographed and number-heavy scans), the real `AiDocumentWorker`, Tesseract 5.5 and
+llama3.2:3b (the same digest as production) on one CPU thread without a GPU. Production times are
+estimated from token counts at the rates measured on the server in Step 4/5 (about 35 prompt and
+4 generated tokens per second).
+
+* **The model is 95–98 % of a job.** OCR and the rule checks take 1–5 s per job; the model call
+  45–120 s locally, about 70–150 s estimated in production (a 4-document land transfer is the
+  slowest). Generation (output tokens) is the larger share at production speed.
+* **OCR settings stay as they are** (`-r 150 -scale-to 2000`, Tesseract defaults). Higher resolution
+  (200 or 300 dpi, 2500 px) recovered 8-pt text on clean scans but multiplied errors on 120–150 dpi
+  noisy scans (character error 42 % → 73–100 %); Sauvola thresholding fixed one noisy scan
+  (42 % → 8 %) but destroyed a dark one (8 % → 83 %). No setting was at least as accurate on every
+  document, and OCR is not where the time goes.
+* **Implemented:** the model is asked for a shorter `note` (60) and `explanation` (100 characters),
+  which are never shown. 9 jobs: output tokens −15 %, estimated time −9 %, document-type answers,
+  evidence quotes and manual-review flags unchanged, fewer repeated codes (48 → 19) and wrong
+  "missing" claims (47 % → 38 %). The validator's limits are unchanged.
+* **Measured, not changed:** duplicate jobs are already impossible (one job per request, leases, one
+  dispatcher at a time); a model retry never repeats OCR; OCR text is already whitespace-collapsed;
+  `num_predict` 1500 is never reached (answers end at 90–340 tokens). The model reloads after 5
+  idle minutes (Ollama's default `keep_alive`; about 7 s locally, likely longer on the server):
+  keeping it loaded longer holds about 2.9 GB of memory and needs a separate decision.
+* **Recommended production settings:** keep `SMART_ASSESS_WORKER_OLLAMA_TIMEOUT` 180, the worker's
+  job budget 900 and the dispatcher's lease; a 30 s budget always ends in `model_timeout`.
+* **Model quality on these synthetic documents is weak:** about 4 in 10 "missing field" claims name a
+  field that is in the text, and every "possible inconsistency" was a false positive. This is why
+  all model output is shown only as unverified suggestions and never decides anything.

@@ -36,6 +36,16 @@ final class DocumentAnalysis
     private const MAX_EXPLANATION = 400;
     private const MAX_EVIDENCE = 160;
     private const MAX_NOTE = 300;
+    /*
+     * Shorter limits sent to the MODEL only (its JSON schema; Ollama enforces maxLength while it
+     * generates). Its "note" and "explanation" are validated but never shown (findings are worded
+     * by the server), so long free text only costs generation time: about 4 tokens/s on the
+     * production CPU. Step 12 benchmark (9 synthetic jobs): 15% fewer output tokens, about 9% less
+     * time, no loss of document-type answers, evidence or manual-review flags. The validator keeps
+     * MAX_NOTE / MAX_EXPLANATION, so answers from any worker version stay accepted.
+     */
+    private const MODEL_MAX_NOTE = 60;
+    private const MODEL_MAX_EXPLANATION = 100;
     private const MAX_FIELD_NAME = 80;
     private const MAX_MISSING_FIELDS = 10;
     private const KEY_PATTERN = '/^[A-Za-z][A-Za-z0-9_]{0,39}$/';
@@ -103,7 +113,7 @@ final class DocumentAnalysis
                         'key' => $key,
                         'expected_type_match' => ['type' => 'string', 'enum' => self::TYPE_MATCH],
                         'missing_fields' => ['type' => 'array', 'maxItems' => self::MAX_MISSING_FIELDS, 'items' => ['type' => 'string', 'enum' => array_keys(self::MISSING_FIELD_LABELS)]],
-                        'note' => $string(self::MAX_NOTE),
+                        'note' => $string(self::MODEL_MAX_NOTE),
                     ],
                 ]],
                 'findings' => ['type' => 'array', 'maxItems' => self::MAX_FINDINGS, 'items' => [
@@ -114,7 +124,7 @@ final class DocumentAnalysis
                         'category' => ['type' => 'string', 'enum' => self::CATEGORIES],
                         'field' => ['type' => 'string', 'enum' => ['name', 'property_identifier', 'date', 'document_type', 'required_field', 'other']],
                         'document_keys' => ['type' => 'array', 'items' => $key],
-                        'explanation' => $string(self::MAX_EXPLANATION),
+                        'explanation' => $string(self::MODEL_MAX_EXPLANATION),
                         'evidence' => $string(self::MAX_EVIDENCE),
                     ],
                 ]],

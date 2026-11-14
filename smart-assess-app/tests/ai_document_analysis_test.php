@@ -75,6 +75,17 @@ foreach ($variants as $label => $output) {
 }
 $check('the model schema has no field that could approve, reject or change a request',
     !preg_match('/approv|reject|status|decision|action/i', (string) json_encode(DocumentAnalysis::modelSchema($keys))));
+$modelProps = DocumentAnalysis::modelSchema($keys)['properties'];
+$check('Step 12: the model is asked for short free text (note <= 60, explanation <= 100 characters), never shown anyway',
+    $modelProps['documents']['items']['properties']['note']['maxLength'] === 60
+    && $modelProps['findings']['items']['properties']['explanation']['maxLength'] === 100
+    && $modelProps['findings']['items']['properties']['evidence']['maxLength'] === 160);
+$longAnswer = ['documents' => [['key' => $keys[0], 'expected_type_match' => 'yes', 'missing_fields' => [], 'note' => str_repeat('n', 300)]],
+    'findings' => [['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => [$keys[0]], 'explanation' => str_repeat('e', 400), 'evidence' => '']],
+    'manual_review_recommended' => true];
+foreach (array_slice($keys, 1) as $k) { $longAnswer['documents'][] = ['key' => $k, 'expected_type_match' => 'yes', 'missing_fields' => [], 'note' => '']; }
+try { DocumentAnalysis::validateModelOutput($longAnswer, $keys); $acceptedLong = true; } catch (UnexpectedValueException) { $acceptedLong = false; }
+$check('Step 12: the validator still accepts the old limits (a 300-character note, a 400-character explanation)', $acceptedLong);
 $check('the model schema allows only this job\'s document keys', DocumentAnalysis::modelSchema($keys)['properties']['documents']['items']['properties']['key']['enum'] === $keys);
 
 // ================= Outcome rules =================
