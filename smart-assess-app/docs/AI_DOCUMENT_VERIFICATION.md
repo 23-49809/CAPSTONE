@@ -80,6 +80,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `deploy/sbin/smart-assess-ai-egress-guard.sh`, `deploy/systemd/smart-assess-ai-egress-guard.service`, `.timer`, `deploy/systemd/nftables.service.d/50-smart-assess-ai-egress.conf` | Keep both AI egress filters loaded or stop what they protect (not installed). |
 | `deploy/systemd/smart-assess-ai-worker-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-ollama-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf` | Step 13: the dispatcher and the worker pool run without network; these socket links are their only connections (not installed). |
 | `deploy/systemd/smart-assess-ai-worker-http.socket`, `deploy/systemd/smart-assess-ai-worker.service.d/50-private-network.conf`, `deploy/systemd/worker-lighttpd.conf.example` | Step 15: lighttpd runs without network; systemd holds 127.0.0.1:8095 and hands it over (not installed). |
+| `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf`, `deploy/systemd/smart-assess-ai-dispatch.service` (Step 16 lines) | Step 16: PHP-FPM and the dispatcher see nothing in `/run` but the sockets they use; the pool keeps its runtime folder across restarts (not installed). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -630,12 +631,23 @@ password, because PHP's built-in server drops empty environment variables.
     socket; a missing activation line or an invalid configuration makes lighttpd fail, and after
     3 failed starts systemd closes the address so callers are refused at once (recovery:
     `systemctl reset-failed` both units, then start them); the guard stops the socket unit first.
-  * **Remaining (not changed):** the worker's PHP-FPM pool and the dispatcher have no network,
-    but still see most of `/run`, including world-connectable socket files (snapd, local SSH,
-    polkit, systemd's own sockets). These need authentication or give read-only answers, and
-    none is used by the AI check; the same empty-`/run` approach could be applied to both after
-    review (PHP-FPM needs its own socket folder, the Ollama link, systemd's notify socket and
-    the journal; the dispatcher needs the MySQL socket and its link).
+  * **Nothing else in `/run` for PHP-FPM and the dispatcher (Step 16).** Both had no network but
+    still saw most of `/run`; measured in the VM, each could connect to 22 socket files there besides the ones it uses
+    (snapd, the local SSH socket, polkit, systemd's control sockets, the journal, userdb, uuidd,
+    multipathd), and to any socket created there later. Now both get an empty read-only `/run`
+    except what they use:
+    PHP-FPM (drop-in `smart-assess-ai-worker-fpm.service.d/50-private-network.conf`) its own
+    runtime folder (writable: it creates `fpm.sock`), the Ollama link, systemd's notify socket
+    (`Type=notify`: without it the pool's start times out, measured) and the journal's syslog
+    socket (`error_log = syslog`); the dispatcher (`smart-assess-ai-dispatch.service`) MySQL's
+    socket folder (`DB_HOST=localhost`) and its worker link. Folders are bound, never socket
+    files, so sockets recreated by restarts are still seen. The pool also keeps its runtime
+    folder across restarts (`RuntimeDirectoryPreserve=restart`), so lighttpd's bind of it stays
+    valid even if lighttpd is not restarted with the pool (on systemd 259 it is: measured).
+    Verified in the VM: each reaches only those sockets, also after new 0666 sockets appear, after
+    a flush and after a reboot; SIGKILL and an out-of-memory kill of the pool, a killed pool
+    child, restarts of the Ollama link and the worker refresh all recover; real worker-to-Ollama
+    jobs and the dispatcher's database connection work.
   * **Database:** its own MySQL account (`deploy/mysql/ai-dispatch-db-user.sql.example`)
     reads only nine columns of `requests` (no contact details), eight of
     `request_documents`, and reads and updates `ai_verification_jobs`; the

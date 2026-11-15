@@ -126,4 +126,11 @@ UMask=0077
 # Hidden: all of /etc/smart-assess (website settings, the website's database login, Gmail),
 # the resolver's local sockets and D-Bus (no DNS by another route), backups, the worker's
 # secret and state, the GitHub runner, MySQL's data and maintenance login ("-": if present).
+# Step 16: nothing in /run but MySQL's socket folder (DB_HOST=localhost connects through
+# /run/mysqld/mysqld.sock) and the worker link. Every other world-connectable socket there (snapd, the local
+# SSH socket, polkit, systemd's control sockets, the journal, userdb) is gone from its view, including any
+# created later. Read only: connecting to a socket needs no write access. Folders, not socket files, are bound,
+# so a socket recreated by a restart is still seen. If either is missing the run does not start (fails closed).
+TemporaryFileSystem=/run:ro
+BindReadOnlyPaths=/run/mysqld /run/smart-assess-ai-link
 InaccessiblePaths=-/etc/smart-assess -/run/systemd/resolve -/run/dbus -/var/backups -/etc/smart-assess-ai-worker -/var/lib/smart-assess-ai-worker -/opt/actions-runner -/etc/mysql/debian.cnf -/var/lib/mysql
