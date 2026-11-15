@@ -342,8 +342,9 @@ $check('Step 17: the checklist has the three approved stages, the smoke test in 
     str_contains($checklist, '**Window A: worker (#19, #20, #21). AI stays off.**') && str_contains($checklist, '**Window B: dispatcher. It stays unable to run.**')
     && substr_count($checklist, 'bin/ai-worker-smoke-test.php') >= 2 && str_contains($checklist, 'ai-verification-dispatch.php --only-job=<ID>')
     && str_contains($checklist, 'installed but **disabled**') && strpos($checklist, 'enable --now smart-assess-ai-dispatch.timer') > strpos($checklist, '--only-job=<ID>'));
-$check('Step 17: the checklist names the Privacy Policy wording as an activation blocker (it still describes a separate server)',
-    str_contains($checklist, 'still describes "a separate document-check server"') && str_contains($checklist, 'The Office must approve wording'));
+$check('the checklist says the corrected Privacy Policy (single server, no encrypted-connection claim) must be published and acknowledged before activation',
+    str_contains($checklist, 'the corrected text describes the single server as built') && str_contains($checklist, 'acknowledged by the Office before activation')
+    && !str_contains($checklist, 'still describes "a separate document-check server"'));
 
 // ---- systemd's own check, where available ----
 $analyze = trim((string) shell_exec('command -v systemd-analyze 2>/dev/null'));

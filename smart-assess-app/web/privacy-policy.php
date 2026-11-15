@@ -8,20 +8,28 @@ require_once dirname(__DIR__) . '/app/services/AiVerification.php';
 /*
  * CONFIRM BEFORE PUBLICATION (these PHP comments are never sent to visitors;
  * the full list is in docs/AI_DOCUMENT_VERIFICATION.md, "Privacy Policy review"):
- *  1. The Office has reviewed and approved this text, including section 2's
- *     "Automatic document check".
+ *  1. The Municipal Assessors approved SMART ASSESS, including the automatic
+ *     document check (the approval record is kept by the Office, not in this
+ *     repository). On 15 Nov 2026 the text was corrected to describe the system
+ *     as built: one server, no separate document-check server, no claim of an
+ *     encrypted connection. Purposes, data, recipients, region and access are
+ *     unchanged; the Office acknowledges the corrected wording before it is published.
  *  2. The date below is the date the reviewed text goes live.
- *  3. The website server and the document-check server are both in the AWS
- *     Asia Pacific (Sydney) Region (ap-southeast-2).
- *  4. The document-check server has no public internet address and accepts
- *     connections only from the website server.
+ *  3. The website, its database and stored files, and the automatic document
+ *     check all run on one server in the AWS Asia Pacific (Sydney) Region
+ *     (ap-southeast-2).
+ *  4. The checking service is not reachable from the internet: its parts listen
+ *     only on the loopback address or local socket files (127.0.0.1:8095, held by
+ *     systemd; Ollama on 127.0.0.1:11434), its accounts run without network access
+ *     (PrivateNetwork=yes), and every job is signed with the shared secret.
  *  5. Publish the automatic-check text no later than the day AI checking is
  *     turned on (the migration and the dispatcher timer).
  *  6. The worker's SMART_ASSESS_WORKER_OLLAMA_URL is its own loopback address
  *     (http://127.0.0.1:11434), so "not sent to outside AI services" holds.
- *  7. Temporary request-body files of the worker's web server and PHP (nginx
- *     client_body_temp, PHP temp folder) are on the worker's encrypted disk;
- *     this text makes no promise about them beyond "kept only to check".
+ *  7. The checking service's working copies (its state folder and its web
+ *     server's private temporary folder) are on the server's disk, which is NOT
+ *     encrypted (verified 15 Nov 2026). This text therefore makes no encryption
+ *     claim, and no promise about these files beyond "kept only to check them".
  *  8. Decided: requests submitted before the AI check's effective date and
  *     time are not checked by AI, automatically or by Staff. The server
  *     enforces it with SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT, set to the same
@@ -37,7 +45,7 @@ $saAiEffectiveText = $saAiEffectiveFrom === null ? null
 sa_legal_header(
     'Privacy Policy',
     "How SMART ASSESS, the online service of the Municipal Assessor's Office of Mabini, Batangas, collects, uses, stores and shares personal information, including its use of the Gmail API and its automatic document check.",
-    'November 13, 2026'
+    'November 15, 2026'
 );
 ?>
 <nav class="legal-toc" aria-labelledby="toc-title">
@@ -94,11 +102,11 @@ sa_legal_header(
 <p class="legal-note"><strong>The automatic document check is not yet enabled:</strong> its effective date has not been established, so no request is checked by AI. When it is enabled, its effective date and time will be shown here, and only requests submitted on or after it will be checked. This is separate from the "Last updated" date at the top of this page.</p>
 <?php endif; ?>
 <ul>
-  <li><strong>What it does:</strong> first, the website's own fixed rules check which documents your type of application requires and whether each one was uploaded in an accepted file type; no AI is used for this step. Then, on a separate document-check server, the text of the uploaded documents is extracted: text already stored inside a PDF is read directly, and images and scanned PDF pages are read with optical character recognition (OCR) software. Fixed rules compare that text with your surname and the ARP / Tax Declaration number you entered, and a language model looks for other possible problems, such as documents that do not match each other, a document that does not look like the expected type, or a detail that seems to be missing.</li>
+  <li><strong>What it does:</strong> first, the website's own fixed rules check which documents your type of application requires and whether each one was uploaded in an accepted file type; no AI is used for this step. Then, on the same server that runs the website, a separate restricted checking service extracts the text of the uploaded documents: text already stored inside a PDF is read directly, and images and scanned PDF pages are read with the Tesseract optical character recognition (OCR) software. Fixed rules compare that text with your surname and the ARP / Tax Declaration number you entered, and a language model (currently Llama 3.2, run on that server with the Ollama software) looks for other possible problems, such as documents that do not match each other, a document that does not look like the expected type, or a detail that seems to be missing.</li>
   <li><strong>Limits:</strong> up to 10 documents per request, and the first 10 pages of each PDF, are checked. A file that cannot be read, an image larger than 25 megapixels, or a document that does not fit in the time allowed for one check is not read automatically; it is marked for Staff to inspect by hand. Not every file goes through OCR, and text extraction can miss or misread words.</li>
   <li><strong>What is sent for the check:</strong> the files uploaded with that request, your first and last name, the ARP / Tax Declaration number, the type of application, whether you are the registered owner, and the document or type of transfer requested. The mobile number, email address and home address you typed in are not sent, although an uploaded document such as an ID may itself show some of them.</li>
-  <li><strong>Where it runs:</strong> on a separate server operated for the Office in the same Amazon Web Services region as the website (see section 5). <?php /* CONFIRM item 3 and 4 */ ?>The website sends each check to that server over an encrypted, authenticated connection. Documents are not sent to outside AI services, and the model is not trained with your information.</li>
-  <li><strong>What is kept:</strong> the document-check server keeps your files only to check them, and normally deletes them when the check ends. If a check is interrupted, for example because that server or its software stops unexpectedly, files can remain on it for a while: they are deleted automatically the next time the server starts a check or is asked whether it is ready, and if they cannot be deleted, the server stops taking checks until an administrator removes them. SMART ASSESS stores the result with your request: the findings, a short quoted excerpt where a finding needs one, which checks ran, and the model and OCR software used. The full text read from your documents is not stored.</li>
+  <li><strong>Where it runs:</strong> on the server operated for the Office that also runs the website, in the Amazon Web Services Asia Pacific (Sydney) region (see section 5). <?php /* CONFIRM items 3 and 4 */ ?>The checking service runs under its own restricted system accounts without network access; the files and details for each check are passed to it within that server, and every check is authenticated. Documents are not sent to outside AI services, and the model is not trained with your information.</li>
+  <li><strong>What is kept:</strong> the checking service keeps a working copy of your files only to check them, and normally deletes these files when the check ends. If a check is interrupted, for example because the checking service stops unexpectedly, the files can remain for a while: they are deleted automatically the next time the service starts a check or is asked whether it is ready, and if they cannot be deleted, the service stops taking checks until an administrator removes them. SMART ASSESS stores the result with your request: the findings, a short quoted excerpt where a finding needs one, which checks ran, and the model and OCR software used. The full text read from your documents is not stored.</li>
   <li><strong>Who sees the result:</strong> Staff only. It is not shown to you, to administrator or department head accounts, or in request tracking.</li>
   <li><strong>Staff decide:</strong> the result is advice. The check does not approve or reject requests, change a request's status, or send you messages, and it cannot tell whether a document, signature or seal is genuine. It can be wrong. Staff open your original documents and make every decision.</li>
 </ul>
@@ -107,6 +115,7 @@ sa_legal_header(
 <ul>
   <li><strong>Staff</strong> of the Office review and process requests. They can view your details, including your mobile number, email address and home address, and your uploaded documents, and they use your number or email address to send you messages about your request.</li>
   <li><strong>Administrator and department head accounts</strong> can access request records for their oversight and reporting duties, such as the applicant's name, the property and service details, and the request's status. They do not receive your mobile number, email address, home address, client account name, or the names of your uploaded files. Uploaded files are opened through a viewer limited to Staff accounts, and automatic document check results are shown only to Staff.</li>
+  <li><strong>The automatic document check</strong> runs under separate system accounts, not as a Staff account. The part that passes requests to the check can read only the uploaded documents of submitted requests and the request details listed in section 2 (not your mobile number, email address or home address), and can record only the check result; it cannot change your request, its status or its messages. The checking service itself cannot open the database or any stored file other than those passed to it for a check.</li>
   <li><strong>People who maintain the server</strong> may have technical access to stored information when keeping the system running.</li>
 </ul>
 <p>We may also disclose information when the law or a competent authority requires it.</p>
@@ -119,8 +128,8 @@ sa_legal_header(
 <div class="legal-table-wrap"><table>
   <thead><tr><th scope="col">Provider</th><th scope="col">Purpose</th><th scope="col">Information involved</th></tr></thead>
   <tbody>
-    <?php /* CONFIRM item 3: both servers are in ap-southeast-2 (Sydney). */ ?>
-    <tr><td>Amazon Web Services</td><td>Hosts the website, its stored information and the automatic document check on servers in the Asia Pacific (Sydney) region, in Australia, outside the Philippines</td><td>Everything stored in SMART ASSESS, and the documents and details sent for the automatic document check</td></tr>
+    <?php /* CONFIRM item 3: one server, in ap-southeast-2 (Sydney). */ ?>
+    <tr><td>Amazon Web Services</td><td>Hosts the website, its stored information and the automatic document check on a server in the Asia Pacific (Sydney) region, in Australia, outside the Philippines</td><td>Everything stored in SMART ASSESS, including the documents and details used for the automatic document check</td></tr>
     <tr><td>IPROG SMS</td><td>Delivers SMS messages: the confirmation of each submission and messages that staff send</td><td>Your mobile number and the message text</td></tr>
     <tr><td>Google (Gmail API)</td><td>Delivers email messages: the confirmation of each submission (when you give an email address) and messages that staff send</td><td>Your name, email address, reference number and the message text</td></tr>
   </tbody>
@@ -149,8 +158,8 @@ sa_legal_header(
   <li>Connections to the public website use HTTPS.</li>
   <li>Staff, administrator and department head pages require signing in, and access depends on the account's role. Passwords are stored as hashes.</li>
   <li>Uploaded files are stored outside the public web folder, checked by file type on upload, and opened only through the Staff-only viewer.</li>
-  <?php /* CONFIRM item 4: the worker has no public address and its security group allows only the website server. */ ?>
-  <li>The automatic document check runs on a server that is not reachable from the internet. The website and that server authenticate every check, and the connection between them is encrypted.</li>
+  <?php /* CONFIRM item 4: loopback and local sockets only, accounts without network access, signed jobs. No encryption claim (item 7). */ ?>
+  <li>The automatic document check runs on the website's server under restricted system accounts without network access. Its parts accept connections only from within that server and are not reachable from the internet, every check is authenticated, and the files and details for a check do not leave the server.</li>
   <li>Message-provider tokens and credentials are kept in server configuration or private files, not in the website's public pages.</li>
 </ul>
 <p>No system is completely secure, and we cannot guarantee absolute security. If you think your information has been accessed without permission, contact the Office right away.</p>
@@ -160,7 +169,7 @@ sa_legal_header(
   <li><strong>Saved applications not submitted:</strong> set to expire 7 days after your last change, and no later than 30 days after they were started. Expired applications and their files are then removed.</li>
   <li><strong>Submitted applications:</strong> the saved copy is cleared on submission; a small receipt record is kept for about one day to catch duplicate submissions.</li>
   <li><strong>Connection-based rate-limit records:</strong> removed after about one day.</li>
-  <li><strong>Automatic document check:</strong> the document-check server normally deletes the files when the check ends; after an interrupted check, they are deleted by the automatic cleanup described in section 2. The result is kept with the request, as described in the next item.</li>
+  <li><strong>Automatic document check:</strong> the checking service normally deletes its working copy of the files when the check ends; after an interrupted check, they are deleted by the automatic cleanup described in section 2. The result is kept with the request, as described in the next item.</li>
   <li><strong>Submitted requests, uploaded documents, automatic document check results, status history, messages, and Terms acceptance records:</strong> SMART ASSESS does not delete these automatically, and the Office has not published a fixed retention period in this system. They are kept as the Office's transaction records, subject to applicable records rules. You may ask the Office about the retention of your records.</li>
 </ul>
 
