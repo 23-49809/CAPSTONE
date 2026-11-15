@@ -129,7 +129,7 @@ $pdo = new PDO(sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $dbHos
 // The application stores and compares times in Philippine time (sa_db() sets +08:00); so does this test.
 $pdo->exec("SET time_zone = '+08:00'");
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['request_document_views', 'deadlock_probe', 'deadlock_filler', 'deadlock_conn', 'ai_verification_jobs', 'terms_acceptances', 'roles', 'users', 'clients', 'requests', 'request_documents', 'document_validation', 'request_status_log',
+foreach (['ai_processor_settings', 'ai_remote_nonces', 'ai_remote_events', 'ai_remote_downloads', 'request_document_views', 'deadlock_probe', 'deadlock_filler', 'deadlock_conn', 'ai_verification_jobs', 'terms_acceptances', 'roles', 'users', 'clients', 'requests', 'request_documents', 'document_validation', 'request_status_log',
     'audit_log', 'announcements', 'settings', 'user_sessions', 'notifications', 'document_types', 'transfer_types'] as $table) {
     $pdo->exec("DROP TABLE IF EXISTS {$table}");
 }
@@ -182,6 +182,10 @@ $runMigration($project . '/smart-assess-app/database/migrations/20261111_ai_docu
 $runMigration($project . '/smart-assess-app/database/migrations/20261111_ai_document_verification.sql');   // safe to run twice
 $runMigration($project . '/smart-assess-app/database/migrations/20261114_request_document_views.sql');
 $runMigration($project . '/smart-assess-app/database/migrations/20261114_request_document_views.sql');   // safe to run twice
+// Processor selection (20261116): after the migration nobody may claim until a processor is chosen.
+$runMigration($project . '/smart-assess-app/database/migrations/20261116_ai_remote_worker.sql');
+$runMigration($project . '/smart-assess-app/database/migrations/20261116_ai_remote_worker.sql');   // safe to run twice
+$pdo->exec("UPDATE ai_processor_settings SET processor = 'aws' WHERE id = 1");   // this test exercises the AWS dispatcher
 
 $password = 'Ai-Test-Only-' . bin2hex(random_bytes(4));
 $hash = password_hash($password, PASSWORD_DEFAULT);

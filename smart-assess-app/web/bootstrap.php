@@ -33,7 +33,9 @@ function sa_start_session(): void
 // Web requests only: command-line scripts (the AI dispatcher, draft cleanup) need no
 // session, and starting one there would write session files or, under the
 // dispatcher's read-only systemd sandbox, log warnings on every run.
-if (PHP_SAPI !== 'cli') {
+// SA_NO_SESSION: a machine-to-machine endpoint (web/ai-remote.php) authenticated by its
+// own signature, which must never create or read a browser session.
+if (PHP_SAPI !== 'cli' && !defined('SA_NO_SESSION')) {
     sa_start_session();
 }
 

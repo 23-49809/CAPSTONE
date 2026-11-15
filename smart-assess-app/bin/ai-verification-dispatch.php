@@ -40,7 +40,8 @@ declare(strict_types=1);
  * are missing (including the Privacy Policy effective date); 3 a setting on the worker side must be fixed (shared secret or
  * clock, worker settings, TLS certificate or CA, web-server limits or URL,
  * leftover files the worker cannot remove, a stuck job); 75 the worker is not ready, became
- * unavailable or crashed (temporary; jobs wait); 4 --only-job: that job is not waiting to be processed.
+ * unavailable or crashed (temporary; jobs wait); 4 --only-job: that job is not waiting to be processed;
+ * 5 the selected AI processor is not 'aws' (bin/ai-processor.php; migration 20261116): nothing claimed.
  *
  * Prints only job IDs, statuses and outcomes: never names, numbers or text.
  * It never changes a request's status.
@@ -85,6 +86,7 @@ const SA_DISPATCH_EXIT_WORKER_CONFIGURATION = 3;
 const SA_DISPATCH_EXIT_WORKER_NOT_READY = 75;   // EX_TEMPFAIL
 const SA_DISPATCH_EXIT_NOT_CONFIRMED = 1;        // --retire-mismatched: the confirmation code does not match
 const SA_DISPATCH_EXIT_ONLY_JOB_NOT_DUE = 4;     // --only-job: that job is not waiting to be processed
+const SA_DISPATCH_EXIT_OTHER_PROCESSOR = 5;      // another processor (or none) is selected: nothing claimed
 
 if ((isset($options['confirm']) || isset($options['website-date'])) && !$retireMode) {
     fwrite(STDERR, "--confirm and --website-date are only used with --retire-mismatched.\n");
@@ -112,9 +114,19 @@ try {
             . ' (YYYY-MM-DDTHH:MM:SS+08:00), so no AI check may run. Set it to the confirmed Privacy Policy effective date.');
     }
     $client = $retireMode ? null : AiWorkerClient::fromEnvironment();   // the recovery never contacts the worker
+    // Only one processor may claim jobs (migration 20261116; before it, always 'aws' as before).
+    // claim() checks it again inside its own transaction.
+    $processor = AiVerification::processor($pdo);
 } catch (Throwable $exception) {
-    fwrite(STDERR, 'Not configured: ' . $exception->getMessage() . "\n");
+    fwrite(STDERR, 'Not configured: ' . ($exception->getMessage() === 'processor_setting_unreadable'
+        ? 'the AI processor setting (ai_processor_settings) cannot be read: grant SELECT on it to the dispatcher\'s database account (see deploy/mysql/ai-dispatch-db-user.sql.example)'
+        : $exception->getMessage()) . "\n");
     exit(SA_DISPATCH_EXIT_NOT_CONFIGURED);
+}
+if (!$retireMode && $processor !== AiVerification::PROCESSOR_AWS) {
+    fwrite(STDERR, "The selected AI processor is '{$processor}', not 'aws' (bin/ai-processor.php --show). No job was claimed.\n");
+    echo "0 job(s) processed.\n";
+    exit(SA_DISPATCH_EXIT_OTHER_PROCESSOR);
 }
 
 /*

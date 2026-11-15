@@ -7,7 +7,10 @@
 --   * requests: the submission time and the declared details it compares with the
 --     documents (no contact details, no address, no client link);
 --   * request_documents: where each uploaded original is stored and its type;
---   * ai_verification_jobs: read, claim and store results (it never inserts or deletes).
+--   * ai_verification_jobs: read, claim and store results (it never inserts or deletes);
+--   * ai_processor_settings: read which processor may claim jobs (migration 20261116). MySQL
+--     only grants on an existing table, so run this line right after that migration; until
+--     it is granted, a dispatcher run after the migration refuses to claim (fails closed).
 -- It cannot read clients, users, notifications, audit_log, status history or any
 -- contact column, and cannot change any request. Its password goes only into
 -- /etc/smart-assess/ai-dispatch.env (root 0600), never into apache.env.
@@ -23,6 +26,7 @@ GRANT SELECT (id, created_at, flow, is_owner, first_name, last_name, arp_number,
 GRANT SELECT (id, request_id, doc_key, label, stored_path, mime_type, file_size, file_status)
   ON smart_assess_sydney.request_documents TO 'smart_assess_ai_dispatch'@'localhost';
 GRANT SELECT, UPDATE ON smart_assess_sydney.ai_verification_jobs TO 'smart_assess_ai_dispatch'@'localhost';
+GRANT SELECT ON smart_assess_sydney.ai_processor_settings TO 'smart_assess_ai_dispatch'@'localhost';
 
 -- Check: SHOW GRANTS FOR 'smart_assess_ai_dispatch'@'localhost';
 -- Remove:  DROP USER 'smart_assess_ai_dispatch'@'localhost';
