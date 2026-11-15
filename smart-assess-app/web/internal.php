@@ -300,7 +300,7 @@ $requestedView = (string) ($_GET['view'] ?? 'dashboard');
 $allowedViews = [
     'dashboard', 'staff-accounts', 'archived-accounts', 'create-account',
     'staff-info', 'profile', 'announcements', 'reports', 'timestamp',
-    'document-requests', 'land-transfer-requests', 'requirement-results',
+    'document-requests', 'land-transfer-requests', 'document-check', 'requirement-results',
     'notifications',
 ];
 if (!in_array($requestedView, $allowedViews, true)) {
@@ -316,6 +316,7 @@ $page['search'] = [
     'docRequests' => '',
     'landRequests' => '',
     'reqResults' => '',
+    'docCheck' => '',
     'reports' => '',
     'announcements' => '',
 ];
@@ -324,6 +325,7 @@ $page['filters'] = [
     'docStatus' => 'all',
     'landStatus' => 'all',
     'reqResult' => 'all',
+    'docCheck' => 'attention',
     'reportType' => 'all',
     'annStatus' => 'all',
 ];
