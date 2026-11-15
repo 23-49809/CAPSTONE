@@ -12,7 +12,7 @@
 # and the deploy script are unaffected):
 #   - pass through (x) the folders on the way, nothing else in them;
 #   - read the dispatcher's own code: bin/ai-verification-dispatch.php, bin/ai-worker-compat-check.php,
-#     web/bootstrap.php, app/services/*.php;
+#     bin/ai-worker-smoke-test.php (synthetic documents only), web/bootstrap.php, app/services/*.php;
 #   - read the request uploads in private_uploads/requests, including new ones (a default
 #     entry on the folder). Never drafts, logs, other code, settings or credentials.
 #
@@ -46,7 +46,7 @@ safe_path() {
     done
     if [[ "$kind" == file ]]; then [[ -f "$path" ]]; else [[ -d "$path" ]]; fi || { echo "not a $kind: $path" >&2; return 1; }
 }
-FILES=("$APP/bin/ai-verification-dispatch.php" "$APP/bin/ai-worker-compat-check.php" "$APP/web/bootstrap.php")
+FILES=("$APP/bin/ai-verification-dispatch.php" "$APP/bin/ai-worker-compat-check.php" "$APP/bin/ai-worker-smoke-test.php" "$APP/web/bootstrap.php")
 DIRS=("$APP" "$APP/bin" "$APP/web" "$APP/app" "$APP/app/services" "$APP/private_uploads" "$APP/private_uploads/requests")
 check_all() {
     local item

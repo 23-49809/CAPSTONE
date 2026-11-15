@@ -342,21 +342,40 @@ final class AiVerification
      * True when at least one eligible job is waiting and due, so the dispatcher
      * can skip the worker check when idle. Jobs of requests submitted before
      * the Privacy Policy effective date are never due (they stay as they are).
+     * With $onlyJobId (dispatcher --only-job), only that job is considered.
      */
-    public static function hasDueJob(PDO $pdo): bool
+    public static function hasDueJob(PDO $pdo, ?int $onlyJobId = null): bool
     {
         $from = self::privacyEffectiveFrom();
-        if ($from === null) {
+        if ($from === null || ($onlyJobId !== null && $onlyJobId < 1)) {
             return false;
         }
         $stmt = $pdo->prepare(
             "SELECT 1 FROM ai_verification_jobs j JOIN requests r ON r.id = j.request_id
              WHERE ((j.status = 'pending' AND j.next_attempt_at <= NOW()) OR (j.status = 'processing' AND j.lease_expires_at < NOW()))
-               AND UNIX_TIMESTAMP(r.created_at) >= ? AND j.privacy_effective_from = ?
+               AND UNIX_TIMESTAMP(r.created_at) >= ? AND j.privacy_effective_from = ?" . ($onlyJobId !== null ? ' AND j.id = ?' : '') . "
              LIMIT 1"
         );
-        $stmt->execute([$from, $from]);
+        $stmt->execute($onlyJobId !== null ? [$from, $from, $onlyJobId] : [$from, $from]);
         return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * How many other eligible jobs are due besides $jobId (reported by --only-job, which leaves them alone).
+     */
+    public static function otherDueJobCount(PDO $pdo, int $jobId): int
+    {
+        $from = self::privacyEffectiveFrom();
+        if ($from === null) {
+            return 0;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM ai_verification_jobs j JOIN requests r ON r.id = j.request_id
+             WHERE ((j.status = 'pending' AND j.next_attempt_at <= NOW()) OR (j.status = 'processing' AND j.lease_expires_at < NOW()))
+               AND UNIX_TIMESTAMP(r.created_at) >= ? AND j.privacy_effective_from = ? AND j.id <> ?"
+        );
+        $stmt->execute([$from, $from, $jobId]);
+        return (int) $stmt->fetchColumn();
     }
 
     /**
@@ -367,11 +386,16 @@ final class AiVerification
      * Only jobs of requests submitted on or after the Privacy Policy effective
      * date, and queued by the website under that same date, are claimed; with no
      * valid date, nothing is (others are left as they are).
+     * With $onlyJobId (dispatcher --only-job) the query itself is limited to that
+     * one job, so no other job can ever be claimed, whatever else is waiting.
      */
-    public static function claim(PDO $pdo, int $leaseSeconds = self::LEASE_SECONDS): ?array
+    public static function claim(PDO $pdo, int $leaseSeconds = self::LEASE_SECONDS, ?int $onlyJobId = null): ?array
     {
         if ($leaseSeconds < 60 || $leaseSeconds > 7200) {
             throw new InvalidArgumentException('The job lease is out of range.');
+        }
+        if ($onlyJobId !== null && $onlyJobId < 1) {
+            throw new InvalidArgumentException('The job ID must be a positive integer.');
         }
         $from = self::privacyEffectiveFrom();
         if ($from === null) {
@@ -385,14 +409,19 @@ final class AiVerification
                     "SELECT j.id, j.request_id, j.status, j.attempts, j.max_attempts, j.transient_failures, j.crash_failures
                      FROM ai_verification_jobs j JOIN requests r ON r.id = j.request_id
                      WHERE ((j.status = 'pending' AND j.next_attempt_at <= NOW()) OR (j.status = 'processing' AND j.lease_expires_at < NOW()))
-                       AND UNIX_TIMESTAMP(r.created_at) >= ? AND j.privacy_effective_from = ?
+                       AND UNIX_TIMESTAMP(r.created_at) >= ? AND j.privacy_effective_from = ?" . ($onlyJobId !== null ? ' AND j.id = ?' : '') . "
                      ORDER BY j.next_attempt_at, j.id LIMIT 1 FOR UPDATE OF j SKIP LOCKED"
                 );
-                $select->execute([$from, $from]);
+                $select->execute($onlyJobId !== null ? [$from, $from, $onlyJobId] : [$from, $from]);
                 $row = $select->fetch(PDO::FETCH_ASSOC);
                 if (!$row) {
                     $pdo->commit();
                     return null;
+                }
+                if ($onlyJobId !== null && (int) $row['id'] !== $onlyJobId) {
+                    // Cannot happen (the query names the job); refuse rather than process another job.
+                    $pdo->rollBack();
+                    throw new LogicException('only_job_mismatch');
                 }
                 if ((int) $row['attempts'] >= (int) $row['max_attempts']) {
                     $pdo->prepare("UPDATE ai_verification_jobs SET status = 'failed', error_code = :code, claim_token = NULL, lease_expires_at = NULL WHERE id = :id")
@@ -510,9 +539,9 @@ final class AiVerification
      * @param Closure(array):array $send
      * @return null|array{job_id:int,status:string,outcome:?string,error:?string,retry:?string}
      */
-    public static function processNext(PDO $pdo, string $appRoot, Closure $send, int $leaseSeconds = self::LEASE_SECONDS): ?array
+    public static function processNext(PDO $pdo, string $appRoot, Closure $send, int $leaseSeconds = self::LEASE_SECONDS, ?int $onlyJobId = null): ?array
     {
-        $job = self::claim($pdo, $leaseSeconds);
+        $job = self::claim($pdo, $leaseSeconds, $onlyJobId);
         if ($job === null) {
             return null;
         }

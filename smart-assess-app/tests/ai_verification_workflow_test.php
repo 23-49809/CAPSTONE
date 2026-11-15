@@ -1470,6 +1470,92 @@ $check('after the lost connection, the next submission is saved normally', $stat
 $pdo->exec('DROP TABLE deadlock_probe');
 $pdo->exec('DROP TABLE deadlock_filler');
 
+// ================= Controlled test: --only-job processes that one job and nothing else =================
+[$status, $refOnly] = $submit('docreq', 'Santos', ['ownerId' => 'id-santos.png']);
+[$status2, $refOther] = $submit('docreq', 'Santos', ['ownerId' => 'id-santos.png']);
+$check('only-job: two eligible submissions are waiting (the test one and another)', $status === 200 && $status2 === 200 && $hasJob($refOnly) && $hasJob($refOther)
+    && ($jobRow($refOnly)['status'] ?? '') === 'pending' && ($jobRow($refOther)['status'] ?? '') === 'pending', [$status, $status2]);
+$onlyId = (int) ($jobRow($refOnly)['id'] ?? 0);
+$othersOf = static fn (): array => array_values(array_filter($allJobs(), static fn (array $j): bool => (int) $j['id'] !== $onlyId));
+$jobsBefore = $allJobs();
+$requestsBefore = $allRequests();
+$historyBefore = $statusLogCount();
+$attemptsBefore = (string) @file_get_contents($sendAttempts);
+foreach ([['--only-job=0'], ['--only-job=abc'], ['--only-job=-1'], ['--only-job='], ['--only-job=1.5'], ['--only-job=99999999999'],
+          ['--only-job=' . $onlyId, '--only-job=' . $onlyId], ['--only-job=' . $onlyId, '--retire-mismatched', '--website-date=x'],
+          ['--only-job'], ['--only-job', (string) $onlyId], ['--only_job=' . $onlyId], ['--onlyjob=' . $onlyId], ['--only-job=' . $onlyId, 'extra'], ['-o', (string) $onlyId]] as $arguments) {
+    $out = $runDispatcher($arguments);
+    $check('only-job: refused, nothing processed: ' . implode(' ', $arguments), $exitCode($out) === 2 && str_contains($out, 'Nothing was processed') && $allJobs() === $jobsBefore, $out);
+}
+$out = $runDispatcher(['--only-job=' . ($onlyId + 100000)]);
+$check('only-job: an unknown job ID processes nothing (exit 4) and changes nothing', $exitCode($out) === 4 && str_contains($out, '0 job(s) processed') && $allJobs() === $jobsBefore, $out);
+$pdo->prepare('UPDATE ai_verification_jobs SET next_attempt_at = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?')->execute([$onlyId]);
+$notDue = $allJobs();
+$out = $runDispatcher(['--only-job=' . $onlyId]);
+$check('only-job: a job that is not yet due is not processed (exit 4), and no other job is taken instead', $exitCode($out) === 4 && $allJobs() === $notDue, $out);
+$pdo->prepare('UPDATE ai_verification_jobs SET next_attempt_at = NOW() WHERE id = ?')->execute([$onlyId]);
+$othersBefore = $othersOf();
+$out = $runDispatcher(['--only-job=' . $onlyId]);
+$afterOnly = $jobRow($refOnly);
+$check('only-job: the named job is processed (completed, one attempt)', $exitCode($out) === 0 && str_contains($out, '1 job(s) processed')
+    && ($afterOnly['status'] ?? '') === 'completed' && (int) ($afterOnly['attempts'] ?? 0) === 1, [$out, $afterOnly['status'] ?? null]);
+$check('only-job: it reports how many other jobs it left waiting (a count only)', (bool) preg_match('/--only-job=' . $onlyId . ': [1-9][0-9]* other waiting job\(s\) will not be touched/', $out), $out);
+$check('only-job: every other job is exactly as it was (the other waiting submission was not touched)', $othersOf() === $othersBefore
+    && ($jobRow($refOther)['status'] ?? '') === 'pending' && (int) ($jobRow($refOther)['attempts'] ?? -1) === 0);
+$check('only-job: no request status or history changed, and nothing was sent', $allRequests() === $requestsBefore && $statusLogCount() === $historyBefore
+    && (string) @file_get_contents($sendAttempts) === $attemptsBefore);
+$finished = $allJobs();
+$out = $runDispatcher(['--only-job=' . $onlyId]);
+$check('only-job: running it again for the finished job processes nothing (exit 4)', $exitCode($out) === 4 && $allJobs() === $finished, $out);
+// An expired lease on another job is also left alone (a normal run would claim it again).
+$pdo->prepare("UPDATE ai_verification_jobs SET status = 'processing', lease_expires_at = DATE_SUB(NOW(), INTERVAL 1 MINUTE), claim_token = 'x' WHERE id = ?")
+    ->execute([(int) $jobRow($refOther)['id']]);
+$leased = $allJobs();
+$out = $runDispatcher(['--only-job=' . $onlyId]);
+$check('only-job: another job with an expired lease is not claimed either', $exitCode($out) === 4 && $allJobs() === $leased, $out);
+$pdo->prepare("UPDATE ai_verification_jobs SET status = 'pending', lease_expires_at = NULL, claim_token = NULL WHERE id = ?")->execute([(int) $jobRow($refOther)['id']]);
+$out = $runDispatcher(['--limit=20']);
+$check('only-job: afterwards a normal run still processes the other waiting job', $exitCode($out) === 0 && ($jobRow($refOther)['status'] ?? '') === 'completed', $out);
+
+// ================= bin/ai-worker-smoke-test.php: synthetic document only, real worker code =================
+require_once $project . '/smart-assess-app/bin/ai-worker-smoke-test.php';   // only its functions (same image as the copy it runs); it does not run when included
+$smokeImage = sa_smoke_image();
+$map = (array) json_decode((string) file_get_contents($ocrMap), true);
+$map[md5($smokeImage)] = "SYNTHETIC TEST DOCUMENT - NOT A REAL ID\nSAMPLE IDENTIFICATION CARD\nLast Name: SAMPLE\nGiven Name: TESTER\nDate of Birth: 1990-01-01\nCard No. 0000-0000-0000-0000\n";
+file_put_contents($ocrMap, json_encode($map));
+$smoke = static function (array $arguments = [], array $environment = []) use ($work, $secret, $workerPort): string {
+    $process = proc_open(array_merge([PHP_BINARY, $work . '/smart-assess-app/bin/ai-worker-smoke-test.php'], $arguments),
+        [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $work,
+        $environment + ['PATH' => '/usr/bin:/bin', 'SMART_ASSESS_AI_WORKER_URL' => 'http://127.0.0.1:' . $workerPort, 'SMART_ASSESS_AI_WORKER_SECRET' => $secret, 'SMART_ASSESS_AI_WORKER_TIMEOUT' => '60']);
+    $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+    return (string) $output . '[exit ' . proc_close($process) . ']';
+};
+$jobsBefore = $allJobs();
+$requestsBefore = $allRequests();
+$attemptsBefore = (string) @file_get_contents($sendAttempts);
+$out = $smoke();
+$check('smoke test: every check passes against the real worker code (OCR through Tesseract, model ok, version 2, accepted)', $exitCode($out) === 0
+    && str_contains($out, '7 / 7 passed') && str_contains($out, 'method "image_ocr"') && str_contains($out, 'model "fake-model:1"'), $out);
+$check('smoke test: it prints no text read from the document', !str_contains($out, 'SAMPLE IDENTIFICATION') && !str_contains($out, 'TESTER') && !str_contains($out, '1990-01-01'), $out);
+$check('smoke test: it uses no database and sends nothing (jobs, requests and send attempts unchanged)', $allJobs() === $jobsBefore && $allRequests() === $requestsBefore
+    && (string) @file_get_contents($sendAttempts) === $attemptsBefore);
+$out = $smoke(['/etc/passwd']);
+$check('smoke test: refuses any argument (it can only send its own synthetic image), exit 2', $exitCode($out) === 2 && str_contains($out, 'takes no arguments') && !str_contains($out, 'PASS'), $out);
+$out = $smoke([], ['SMART_ASSESS_AI_WORKER_URL' => '']);
+$check('smoke test: not configured is exit 2', $exitCode($out) === 2 && str_contains($out, 'Not configured'), $out);
+$out = $smoke([], ['SMART_ASSESS_AI_WORKER_SECRET' => '', 'SMART_ASSESS_WORKER_SECRET' => $secret]);
+$check('smoke test: also accepts the worker\'s own secret name (SMART_ASSESS_WORKER_SECRET)', $exitCode($out) === 0 && str_contains($out, '7 / 7 passed'), $out);
+$out = $smoke([], ['SMART_ASSESS_AI_WORKER_URL' => 'http://127.0.0.1:' . $freePort()]);
+$check('smoke test: a worker that does not answer is "not ready" (exit 75), nothing sent', $exitCode($out) === 75 && str_contains($out, 'nothing was sent'), $out);
+touch($work . '/ollama-down');
+$out = $smoke();
+@unlink($work . '/ollama-down');
+$check('smoke test: with the model down it fails (never reports success)', $exitCode($out) !== 0 && !str_contains($out, '7 / 7 passed'), $out);
+unset($map[md5($smokeImage)]);
+file_put_contents($ocrMap, json_encode($map));
+$out = $smoke();
+$check('smoke test: when OCR reads nothing it fails (the text check is real)', $exitCode($out) === 1 && str_contains($out, 'FAIL  enough text was read'), $out);
+
 // ================= The queue table missing does not block submissions =================
 $pdo->exec('RENAME TABLE ai_verification_jobs TO ai_verification_jobs_off');
 $stop($appPort);

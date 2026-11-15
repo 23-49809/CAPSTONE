@@ -305,6 +305,46 @@ $check('Step 16: the folders the pool binds are the ones its configuration uses 
     str_contains($lighttpdConf, '/run/smart-assess-ai-worker/fpm.sock') && str_contains($pool, '/run/smart-assess-ai-ollama/ollama.sock')
     && $unitValue((string) @file_get_contents($app . '/deploy/systemd/smart-assess-ai-ollama-link.socket'), 'ListenStream') === ['/run/smart-assess-ai-ollama/ollama.sock']);
 
+// ---- Step 17: controlled-test tools (--only-job, smoke test) and the single-server checklist ----
+$dispatcherCode = (string) file_get_contents($app . '/bin/ai-verification-dispatch.php');
+$verificationCode = (string) file_get_contents($app . '/app/services/AiVerification.php');
+$smokeCode = (string) file_get_contents($app . '/bin/ai-worker-smoke-test.php');
+$check('Step 17: the dispatcher refuses every argument it does not know exactly, before reading options (an ignored --only-job would run the whole queue)',
+    (bool) preg_match('/foreach \(array_slice\(\$argv, 1\) as \$argument\) \{\s*if \(\$argument !== \'--retire-mismatched\' && !preg_match\(\'\/\^--\(limit\|max-seconds\|confirm\|website-date\|only-job\)=\.\/s\', \$argument\)\) \{[^}]*exit\(2\);/', $dispatcherCode)
+    && strpos($dispatcherCode, 'foreach (array_slice($argv, 1)') < strpos($dispatcherCode, '$options = getopt('));
+$check('Step 17: --only-job takes one positive ID, never with --retire-mismatched, and limits the run to one job',
+    str_contains($dispatcherCode, "preg_match('/^[1-9][0-9]{0,9}$/', \$value)") && str_contains($dispatcherCode, '|| $retireMode)')
+    && (bool) preg_match('/if \(\$onlyJob !== null\) \{\s*\$limit = 1;/', $dispatcherCode));
+$check('Step 17: the named job is passed to the due check and to the claim (processNext), and a different job stops the run',
+    str_contains($dispatcherCode, 'AiVerification::hasDueJob($pdo, $onlyJob)') && str_contains($dispatcherCode, '$client->leaseSeconds(), $onlyJob);')
+    && str_contains($dispatcherCode, "\$summary['job_id'] !== \$onlyJob") && str_contains($dispatcherCode, 'SA_DISPATCH_EXIT_ONLY_JOB_NOT_DUE = 4'));
+$check('Step 17: the claim query itself names the job (no other job can be locked or claimed), and checks the row it got',
+    substr_count($verificationCode, "(\$onlyJobId !== null ? ' AND j.id = ?' : '')") === 2
+    && (bool) preg_match('/if \(\$onlyJobId !== null && \(int\) \$row\[\'id\'\] !== \$onlyJobId\) \{\s*\/\/[^\n]*\n\s*\$pdo->rollBack\(\);\s*throw new LogicException\(\'only_job_mismatch\'\);/', $verificationCode)
+    && str_contains($verificationCode, '$job = self::claim($pdo, $leaseSeconds, $onlyJobId);'));
+$check('Step 17: the smoke test sends only its own synthetic image (no argument accepted, no file read from outside)',
+    (bool) preg_match('/if \(count\(\$argv\) > 1\) \{[^}]*return 2;/', $smokeCode) && !preg_match('/file_get_contents\(\s*\$argv|fopen\(\s*\$argv|getopt\(/', $smokeCode)
+    && str_contains($smokeCode, "'content_base64' => base64_encode(\$png)") && str_contains($smokeCode, 'SYNTHETIC TEST DOCUMENT - NOT A REAL ID'));
+$check('Step 17: the smoke test uses no database and nothing that sends (no bootstrap, PDO, mailer or SMS)',
+    !preg_match('/bootstrap\.php|new PDO|sa_db\(|gmail-mailer|iprog|IprogSms|mail\(/i', $smokeCode));
+$check('Step 17: the smoke test passes only when Tesseract read the image and the model ran (version 2, image_ocr, model ok with digest)',
+    str_contains($smokeCode, "(\$raw['version'] ?? null) === 2") && str_contains($smokeCode, "(\$document['method'] ?? null) === 'image_ocr'")
+    && str_contains($smokeCode, "(\$model['status'] ?? null) === 'ok'") && str_contains($smokeCode, "is_string(\$model['digest'] ?? null)")
+    && str_contains($smokeCode, 'DocumentAnalysis::validateWorkerResult($raw'));
+$check('Step 17: the dispatcher account may read the smoke test (permissions script), nothing else new',
+    str_contains($perm, 'FILES=("$APP/bin/ai-verification-dispatch.php" "$APP/bin/ai-worker-compat-check.php" "$APP/bin/ai-worker-smoke-test.php" "$APP/web/bootstrap.php")'));
+$checklistStart = strpos($docs, '### Production installation checklist (single server, as built)');
+$checklist = $checklistStart === false ? '' : substr($docs, $checklistStart, (int) strpos($docs, '### Deployment sequence (original two-server plan, superseded)') - $checklistStart);
+$check('Step 17: the docs carry the single-server checklist and mark the two-server plan as superseded',
+    $checklist !== '' && str_contains($checklist, 'does **not** use a separate worker server') && str_contains($docs, '### Checklist before production (original two-server plan, superseded)')
+    && !str_contains($docs, "### Checklist before production\n"));
+$check('Step 17: the checklist has the three approved stages, the smoke test in both, the --only-job run, and keeps the timer off until the end',
+    str_contains($checklist, '**Window A: worker (#19, #20, #21). AI stays off.**') && str_contains($checklist, '**Window B: dispatcher. It stays unable to run.**')
+    && substr_count($checklist, 'bin/ai-worker-smoke-test.php') >= 2 && str_contains($checklist, 'ai-verification-dispatch.php --only-job=<ID>')
+    && str_contains($checklist, 'installed but **disabled**') && strpos($checklist, 'enable --now smart-assess-ai-dispatch.timer') > strpos($checklist, '--only-job=<ID>'));
+$check('Step 17: the checklist names the Privacy Policy wording as an activation blocker (it still describes a separate server)',
+    str_contains($checklist, 'still describes "a separate document-check server"') && str_contains($checklist, 'The Office must approve wording'));
+
 // ---- systemd's own check, where available ----
 $analyze = trim((string) shell_exec('command -v systemd-analyze 2>/dev/null'));
 if ($analyze === '') {

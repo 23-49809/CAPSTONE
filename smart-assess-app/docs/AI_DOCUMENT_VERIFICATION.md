@@ -81,6 +81,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `deploy/systemd/smart-assess-ai-worker-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-ollama-link.socket`/`.service`, `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf` | Step 13: the dispatcher and the worker pool run without network; these socket links are their only connections (not installed). |
 | `deploy/systemd/smart-assess-ai-worker-http.socket`, `deploy/systemd/smart-assess-ai-worker.service.d/50-private-network.conf`, `deploy/systemd/worker-lighttpd.conf.example` | Step 15: lighttpd runs without network; systemd holds 127.0.0.1:8095 and hands it over (not installed). |
 | `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf`, `deploy/systemd/smart-assess-ai-dispatch.service` (Step 16 lines) | Step 16: PHP-FPM and the dispatcher see nothing in `/run` but the sockets they use; the pool keeps its runtime folder across restarts (not installed). |
+| `bin/ai-worker-smoke-test.php`; `bin/ai-verification-dispatch.php --only-job=ID` | Step 17: a smoke test that sends only its own synthetic image to the worker (real Tesseract and model; prints statuses only), and a dispatcher mode that processes one named job and never claims another (for the controlled activation test). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
 
 ### Database
@@ -704,7 +705,10 @@ AI checking stays off until the dispatcher, its settings file and the website's
 
 ## Production deployment (not done; needs explicit approval)
 
-Nothing below has been applied. Every step needs approval, a backup first and
+**Production runs on one server: follow "Production installation checklist (single server,
+as built)" at the end of this section.** The two-server sections below are the original plan.
+
+Apart from the items the checklist lists as done, nothing below has been applied. Every step needs approval, a backup first and
 the rollback named in the sequence at the end.
 
 ### Architecture
@@ -967,35 +971,178 @@ like other request records (nothing deletes them automatically). The Terms
 version is `2026-11-12` (the file-format rule and the tracking-name wording); the Privacy Policy is not
 part of the Terms acceptance, so this change does not ask clients to accept again.
 
-### Deployment sequence
+### Production installation checklist (single server, as built)
 
-| # | Step | Check | Rollback |
-|---|---|---|---|
-| 1 | Readiness report from the Sydney server (read-only script) | deploy script copies `app/` and deletes nothing server-only; MySQL ≥ 8.0.1; `requests.id`/`users.id` signed INT InnoDB; DB user privileges; memory and disk; `apache.env` format | — |
-| 2 | Review, commit, PR and merge (approval) | tests pass in CI/locally | revert the merge |
-| 3 | Back up database and `private_uploads/`, then deploy with `deploy-sydney.yml` (manual) — AI stays off: no migration, no timer | site, submissions, Staff pages, Terms re-acceptance, SMS/Gmail unchanged; private paths 404 | redeploy the previous commit; restore from the backup only if data was harmed |
-| 4 | Build the worker (private subnet, SG, TLS, chrony, Ollama, model) | `GET /v1/health` from the web server is `{"ok":true}`; port 11434 closed | stop or terminate the worker instance |
-| 5 | Evaluate the model on synthetic documents (`bin/ai-model-evaluation.php`) and measure job times on the worker | typical job well under the 780 s budget | choose another model / instance |
-| 6 | Create `/etc/smart-assess/ai-dispatch.env` and the worker pool file with the shared secret (root 0600) | `systemd-analyze verify` | delete the files |
-| 7 | Fresh database backup, then run `20261111_ai_document_verification.sql` | table exists; new submissions queue `pending` jobs (harmless; nothing processes them yet) | `DROP TABLE ai_verification_jobs;` (AI off again) |
-| 8 | Publish the reviewed Privacy Policy (if held back); install the units; one manual run with a synthetic test request on an approved test record or staging copy | job reaches `completed`; Staff see it; Admin/Head see nothing; request status unchanged | `systemctl disable --now smart-assess-ai-dispatch.timer` |
-| 9 | Enable the timer; watch `journalctl -u smart-assess-ai-dispatch`; brief Staff that results are advice | jobs complete within minutes of submission | disable the timer (jobs stay queued; submissions unaffected) |
+Production does **not** use a separate worker server. Everything runs on the one Sydney
+instance (ap-southeast-2):
+- Apache + PHP website, MySQL `smart_assess_sydney`;
+- the dispatcher (systemd timer, account `sa-ai-dispatch`, no network: MySQL through
+  `/run/mysqld/mysqld.sock`, the worker through `/run/smart-assess-ai-link/worker.sock`);
+- the worker: systemd holds 127.0.0.1:8095 and hands it to lighttpd, which passes requests
+  to the PHP-FPM pool `sa-ai-worker` (Tesseract, Poppler). The pool reaches Ollama
+  (127.0.0.1:11434, `llama3.2:3b`) only through `/run/smart-assess-ai-ollama/ollama.sock`.
 
-### Checklist before production
+Traffic never leaves the instance: loopback and Unix sockets, every job signed with the shared
+secret. There is no HTTPS between the parts, no CA file, no second instance and no security
+group change. The separate-server design in "Architecture" and "AWS resources" above was the
+original plan and is not used; its HTTPS, CA and security-group items do not apply. No paid
+service or extra AWS resource is needed. Model memory and concurrency stay as installed
+(`smart-assess-ai.slice` 4.5 GiB, one job at a time).
 
-- [ ] Code reviewed, committed and merged with approval.
-- [ ] Readiness report reviewed: deploy script copies `app/`, deletes nothing server-only.
-- [ ] Model chosen from evaluation results; job times measured; Tagalog OCR decision made.
-- [ ] Worker private: no public IP, 11434 closed, SG limited to the web server.
-- [ ] HTTPS between web server and worker, certificate verified (`SMART_ASSESS_AI_WORKER_CA_FILE`).
-- [ ] Secret generated, stored in Secrets Manager/SSM, identical on both sides.
-- [ ] Clocks synchronized (chrony/NTP) on both servers.
-- [ ] Document root is `/var/www/smart-assess/web` (`app/`, `bin/`, `deploy/`, `worker/` not reachable by URL).
-- [ ] Database backed up; migration applied.
-- [ ] Privacy Policy reviewed and published (see "Privacy Policy review").
-- [ ] Dispatcher timer enabled; worker php-fpm, nginx and Ollama restart on failure.
-- [ ] Test with synthetic documents passed; Admin/Head checked.
-- [ ] Office informed: AI results are advice; Staff make every decision.
+Each window needs its own approval, a backup first, and the rollback named below. AI stays off
+until the activation step.
+
+| Already done on production | When |
+|---|---|
+| Migration `20261111_ai_document_verification` (table `ai_verification_jobs`, 0 rows) | 13 Nov 2026 |
+| Tesseract and Poppler; Ollama 0.40.13 with `llama3.2:3b`, loopback only | 13–14 Nov 2026 |
+| Worker (Step 5): lighttpd + PHP-FPM as `sa-ai-worker`, worker egress filter, `smart-assess-ai.slice` | 14 Nov 2026 |
+| Application code of #19, #20 and #21 deployed (the deploy copies files only; it installs no unit) | 14–15 Nov 2026 |
+| Migration `20261114_request_document_views` | 14 Nov 2026 |
+
+**0. Read-only readiness check (approval: read-only).**
+- free memory and disk; PHP CLI modules (`curl`, `pdo_mysql`, `gd`; without GD the smoke
+  test draws its image with `pdftoppm`);
+- `systemctl --version` (259);
+- `/run/mysqld/mysqld.sock` exists;
+- `apt-cache policy acl`;
+- which units are installed (the Step 12 guard?);
+- the worker copy's result version (`bin/ai-worker-compat-check.php`);
+- `ollama list` (name and digest);
+- `ai_verification_jobs` counts by status (expected: none);
+- `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` is set nowhere.
+
+**Window A: worker (#19, #20, #21). AI stays off.**
+1. Back up: database dump (SHA-256 recorded); `/etc/smart-assess*`;
+   `/etc/systemd/system/smart-assess*`; `/opt/smart-assess-ai-worker`;
+   `/etc/smart-assess-ai-worker-runtime/`.
+2. Refresh the worker: install `deploy/sbin/smart-assess-ai-worker-refresh.sh`, run it with
+   `--check-only`, then run it. Check that health is `{"ok":true}` and that the worker
+   answers result version 2.
+3. Ollama link (#19, #21):
+   - install `smart-assess-ai-ollama-link.socket` and `.service`;
+   - add `SMART_ASSESS_WORKER_OLLAMA_SOCKET=/run/smart-assess-ai-ollama/ollama.sock` to
+     `/etc/smart-assess-ai-worker/worker.env`, and
+     `env[SMART_ASSESS_WORKER_OLLAMA_SOCKET] = $SMART_ASSESS_WORKER_OLLAMA_SOCKET` to the
+     runtime `php-fpm.conf`;
+   - install `smart-assess-ai-worker-fpm.service.d/50-private-network.conf` (the #21 version);
+   - `daemon-reload`; enable `--now` the link socket; restart the pool (lighttpd restarts
+     with it).
+4. lighttpd (#20):
+   - add `server.systemd-socket-activation = "enable"` to the runtime `lighttpd.conf`;
+   - install `smart-assess-ai-worker-http.socket`, `smart-assess-ai-worker.service.d/50-private-network.conf`
+     and the updated `smart-assess-ai-egress-guard.sh`;
+   - stop lighttpd; enable `--now` the HTTP socket; start lighttpd.
+5. Guard (Step 12), if the readiness check shows it is missing: the guard service and timer,
+   and `nftables.service.d/50-smart-assess-ai-egress.conf`.
+6. Check, without touching the firewall:
+   - health;
+   - `systemctl show -p Type,StatusText smart-assess-ai-worker-fpm` shows `notify`, "Ready";
+   - the pool's syslog lines (`journalctl _PID=<pool PID> _TRANSPORT=syslog`);
+   - `nsenter -t <PID> -m ls -A /run` shows `smart-assess-ai-ollama smart-assess-ai-worker systemd`
+     for the pool and `smart-assess-ai-worker` for lighttpd.
+7. Real OCR and model, synthetic document only:
+
+   ```sh
+   sudo systemd-run --pipe --wait --collect -p DynamicUser=yes -p SupplementaryGroups=www-data -p PrivateTmp=yes \
+     -p EnvironmentFile=/etc/smart-assess-ai-worker/worker.env -p Environment=SMART_ASSESS_AI_WORKER_URL=http://127.0.0.1:8095 \
+     /usr/bin/php /var/www/smart-assess/bin/ai-worker-smoke-test.php
+   ```
+
+   All 7 checks must pass: Tesseract read the image, the model ran (name and digest as in
+   `ollama list`), result version 2. Record the time, and the slice's `memory.peak`.
+   - Rollback: restore the backed-up units, configuration and `/opt` copy, `daemon-reload`,
+     restart the worker units.
+
+**Window B: dispatcher. It stays unable to run.**
+1. `sudo apt-get install acl` (Ubuntu archive, free).
+2. Accounts: the `sa-ai-dispatch` user and the `sa-ai-read` group, as in the dispatcher
+   unit's header.
+3. MySQL account `smart_assess_ai_dispatch` from `deploy/mysql/ai-dispatch-db-user.sql.example`,
+   with a generated password kept only in `/etc/smart-assess/ai-dispatch.env` (root 0600).
+4. Check the account: `SHOW GRANTS` equals the example exactly. These must be refused:
+   - reading `requests.email`, `contact_number` and the address;
+   - reading `notifications`;
+   - any write to `requests` or `request_status_log`.
+5. Install the rest:
+   - the permissions script (it now also grants read of `bin/ai-worker-smoke-test.php`) and
+     its service;
+   - `ai-dispatch-egress.nft` and its service;
+   - `smart-assess-ai-worker-link.socket` and `.service`;
+   - `smart-assess-ai-dispatch.service` (the #21 version);
+   - `smart-assess-ai-dispatch.timer`, installed but **disabled**.
+6. Write `ai-dispatch.env` with the worker secret and the database settings, **without**
+   `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT`.
+7. Check:
+   - `sudo systemctl start smart-assess-ai-dispatch.service` fails with exit 2 (no effective
+     date): proof that it cannot run;
+   - the permissions service succeeds;
+   - the dispatcher's `/run` shows only `mysqld smart-assess-ai-link`;
+   - the smoke test passes through the dispatcher's own path:
+
+   ```sh
+   sudo systemctl start smart-assess-ai-dispatch-permissions.service
+   sudo systemd-run --pipe --wait --collect --uid=sa-ai-dispatch --gid=sa-ai-dispatch -p SupplementaryGroups=sa-ai-read \
+     -p PrivateNetwork=yes -p EnvironmentFile=/etc/smart-assess/ai-dispatch.env \
+     -p Environment=SMART_ASSESS_AI_WORKER_SOCKET=/run/smart-assess-ai-link/worker.sock \
+     /usr/bin/php /var/www/smart-assess/bin/ai-worker-smoke-test.php
+   ```
+
+   - Rollback: disable and remove the units, `DROP USER 'smart_assess_ai_dispatch'@'localhost'`,
+     remove the environment file.
+
+**Activation with one controlled test (approval, including the synthetic request).**
+
+Blocker: the published Privacy Policy still describes "a separate document-check server" reached
+"over an encrypted, authenticated" connection. The Office must approve wording that matches
+the single server before activation. This checklist does not change the page.
+
+1. Publish the approved Privacy Policy (PR and deploy).
+2. Set the same `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` in `apache.env` and `ai-dispatch.env`;
+   reload Apache. The timer stays disabled.
+3. A test client account submits one request with synthetic documents only (never a real ID),
+   labelled as a test.
+4. Find its job:
+
+   ```sql
+   SELECT j.id, j.status FROM ai_verification_jobs j JOIN requests r ON r.id = j.request_id WHERE r.reference_no = '<test reference>';
+   ```
+
+   It must be `pending`.
+5. Process exactly that job. Any other waiting job (a real submission that arrived meanwhile) is
+   never claimed; the run prints how many it left waiting:
+
+   ```sh
+   sudo systemctl start smart-assess-ai-dispatch-egress.service smart-assess-ai-dispatch-permissions.service
+   sudo systemd-run --pipe --wait --collect --uid=sa-ai-dispatch --gid=sa-ai-dispatch -p SupplementaryGroups=sa-ai-read \
+     -p PrivateNetwork=yes -p EnvironmentFile=/etc/smart-assess/ai-dispatch.env \
+     -p Environment=SMART_ASSESS_AI_WORKER_SOCKET=/run/smart-assess-ai-link/worker.sock -p WorkingDirectory=/var/www/smart-assess \
+     /usr/bin/php -d memory_limit=512M /var/www/smart-assess/bin/ai-verification-dispatch.php --only-job=<ID>
+   ```
+
+   `--only-job` refuses any malformed or unknown argument (exit 2) and a job that is not waiting
+   (exit 4). In both cases nothing is processed.
+6. Check, with the logins done by the Office, never by a script:
+   - **Staff:** the result appears; the originals open; "reviewed" is allowed only after
+     opening them.
+   - **Admin, Department Head and the test client:** no AI result, finding or OCR text;
+     originals refused.
+   - **Database:** the request's status and `request_status_log` are unchanged; no new
+     `notifications` row; no SMS or Gmail attempt in the logs.
+7. Keep the test request; record it with the other test records.
+8. `sudo systemctl enable --now smart-assess-ai-dispatch.timer`. Brief Staff that results are
+   advice only.
+   - Rollback: `systemctl disable --now smart-assess-ai-dispatch.timer` (jobs wait;
+     submissions unaffected). To withdraw fully, clear the effective date on both sides and
+     restore the previous Privacy Policy page.
+
+### Deployment sequence (original two-server plan, superseded)
+
+Replaced by "Production installation checklist (single server, as built)" above.
+
+### Checklist before production (original two-server plan, superseded)
+
+Replaced by "Production installation checklist (single server, as built)" above.
 
 ## Performance (Step 12 benchmark, 14 Nov 2026)
 
