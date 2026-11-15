@@ -7,6 +7,7 @@ declare(strict_types=1);
  * PHP server); there is no web route for it.
  *
  *   php bin/ai-verification-dispatch.php [--limit=N] [--max-seconds=N]
+ *   php bin/ai-verification-dispatch.php --only-job=ID        (controlled test: that one job, nothing else)
  *
  * Needs the same database settings as the web app (DB_HOST, DB_PORT, DB_NAME
  * and DB_USER must be set explicitly, so it never falls back to a default
@@ -26,6 +27,12 @@ declare(strict_types=1);
  * If any waiting job was queued by the website under a different effective date
  * than this dispatcher's, it claims nothing and exits with code 3.
  *
+ * --only-job=ID processes at most that one job and never claims another: the job query
+ * itself names the job, so a real submission that arrives during a controlled test
+ * keeps waiting for the timer. It prints how many other jobs were left waiting (a
+ * count only). If that job is not waiting to be processed (unknown, finished, not
+ * yet due, or not eligible) nothing is processed and it exits with code 4.
+ *
  * Operator recovery: --retire-mismatched --website-date=VALUE [--confirm=CODE] (see below and the docs).
  *
  * Exit codes: 0 done (or nothing to do); 1 --retire-mismatched refused an outdated or wrong
@@ -33,7 +40,7 @@ declare(strict_types=1);
  * are missing (including the Privacy Policy effective date); 3 a setting on the worker side must be fixed (shared secret or
  * clock, worker settings, TLS certificate or CA, web-server limits or URL,
  * leftover files the worker cannot remove, a stuck job); 75 the worker is not ready, became
- * unavailable or crashed (temporary; jobs wait).
+ * unavailable or crashed (temporary; jobs wait); 4 --only-job: that job is not waiting to be processed.
  *
  * Prints only job IDs, statuses and outcomes: never names, numbers or text.
  * It never changes a request's status.
@@ -49,8 +56,27 @@ require_once $appRoot . '/web/bootstrap.php';
 require_once $appRoot . '/app/services/AiVerification.php';
 require_once $appRoot . '/app/services/AiWorkerClient.php';
 
-$options = getopt('', ['limit:', 'max-seconds:', 'retire-mismatched', 'confirm:', 'website-date:']);
+// Every argument must be one this program knows, written exactly so (--name=value). getopt() silently
+// ignores what it does not understand ("--only-job=" with no value, "--only_job=7", "--only-job 7"), and an
+// ignored --only-job would turn a controlled one-job test into a normal run of the whole queue.
+foreach (array_slice($argv, 1) as $argument) {
+    if ($argument !== '--retire-mismatched' && !preg_match('/^--(limit|max-seconds|confirm|website-date|only-job)=./s', $argument)) {
+        fwrite(STDERR, 'Unknown or incomplete argument: ' . substr(preg_replace('/[^\x20-\x7e]/', '?', $argument), 0, 60)
+            . '. Use --name=value (see the top of this file). Nothing was processed.' . "\n");
+        exit(2);
+    }
+}
+$options = getopt('', ['limit:', 'max-seconds:', 'retire-mismatched', 'confirm:', 'website-date:', 'only-job:']);
 $retireMode = isset($options['retire-mismatched']);
+$onlyJob = null;
+if (array_key_exists('only-job', $options)) {
+    $value = $options['only-job'];
+    if (!is_string($value) || !preg_match('/^[1-9][0-9]{0,9}$/', $value) || (int) $value > 2147483647 || $retireMode) {
+        fwrite(STDERR, "--only-job needs one job ID (a positive whole number), given once, and cannot be combined with --retire-mismatched. Nothing was processed.\n");
+        exit(2);
+    }
+    $onlyJob = (int) $value;
+}
 $limit = isset($options['limit']) && ctype_digit((string) $options['limit']) ? max(1, (int) $options['limit']) : 20;
 $maxSeconds = isset($options['max-seconds']) && ctype_digit((string) $options['max-seconds']) ? max(1, (int) $options['max-seconds']) : 3000;
 
@@ -58,6 +84,7 @@ const SA_DISPATCH_EXIT_NOT_CONFIGURED = 2;
 const SA_DISPATCH_EXIT_WORKER_CONFIGURATION = 3;
 const SA_DISPATCH_EXIT_WORKER_NOT_READY = 75;   // EX_TEMPFAIL
 const SA_DISPATCH_EXIT_NOT_CONFIRMED = 1;        // --retire-mismatched: the confirmation code does not match
+const SA_DISPATCH_EXIT_ONLY_JOB_NOT_DUE = 4;     // --only-job: that job is not waiting to be processed
 
 if ((isset($options['confirm']) || isset($options['website-date'])) && !$retireMode) {
     fwrite(STDERR, "--confirm and --website-date are only used with --retire-mismatched.\n");
@@ -189,7 +216,16 @@ if ($mismatches !== []) {
     exit(SA_DISPATCH_EXIT_WORKER_CONFIGURATION);
 }
 
-if (!AiVerification::hasDueJob($pdo)) {
+if ($onlyJob !== null) {
+    $limit = 1;
+    $others = AiVerification::otherDueJobCount($pdo, $onlyJob);
+    echo "--only-job={$onlyJob}: {$others} other waiting job(s) will not be touched.\n";
+    if (!AiVerification::hasDueJob($pdo, $onlyJob)) {
+        fwrite(STDERR, "Job {$onlyJob} is not waiting to be processed (unknown, already finished, not yet due, or not eligible). Nothing was processed.\n");
+        echo "0 job(s) processed.\n";
+        exit(SA_DISPATCH_EXIT_ONLY_JOB_NOT_DUE);
+    }
+} elseif (!AiVerification::hasDueJob($pdo)) {
     echo "0 job(s) processed.\n";
     exit(0);
 }
@@ -217,9 +253,13 @@ $started = time();
 $processed = 0;
 $exitCode = 0;
 while ($processed < $limit && time() - $started < $maxSeconds) {
-    $summary = AiVerification::processNext($pdo, $appRoot, static fn (array $job): array => $client->analyze($job), $client->leaseSeconds());
+    $summary = AiVerification::processNext($pdo, $appRoot, static fn (array $job): array => $client->analyze($job), $client->leaseSeconds(), $onlyJob);
     if ($summary === null) {
         break;
+    }
+    if ($onlyJob !== null && $summary['job_id'] !== $onlyJob) {
+        fwrite(STDERR, "Internal error: a job other than {$onlyJob} was returned. Stopping.\n");
+        exit(SA_DISPATCH_EXIT_WORKER_CONFIGURATION);
     }
     $processed++;
     printf("job %d: %s%s%s\n", $summary['job_id'], $summary['status'], $summary['outcome'] !== null ? ' (' . $summary['outcome'] . ')' : '',
