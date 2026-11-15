@@ -56,7 +56,7 @@ final class AiVerification
     public const RETRY_PERMANENT = 'permanent';
     /** stored_file_unreadable: a stored original exists but this process may not read it yet (its read access is
      *  restored at the next dispatcher run); retried without using an attempt, never reported as a finding. */
-    private const TRANSIENT = ['worker_unavailable', 'worker_busy', 'stored_file_unreadable'];
+    private const TRANSIENT = ['worker_unavailable', 'worker_busy', 'stored_file_unreadable', 'remote_download_failed'];
     private const CRASH = ['worker_crashed', 'model_unavailable'];
     private const CONFIGURATION = ['worker_auth_failed', 'worker_not_configured', 'worker_cleanup_failed', 'worker_tls_failed',
         'worker_body_too_large', 'worker_proxy_error'];
@@ -179,6 +179,105 @@ final class AiVerification
             $known[$key] = (int) $stmt->fetchColumn() === 1;
         }
         return $known[$key];
+    }
+
+    /*
+     * Which processor may claim jobs (migration 20261116_ai_remote_worker.sql):
+     *   off    - nobody;
+     *   aws    - the AWS dispatcher, bin/ai-verification-dispatch.php;
+     *   remote - the remote pull worker, through web/ai-remote.php.
+     * One row, ai_processor_settings.id = 1. Every claim reads it with a shared lock in the
+     * claim transaction, and setProcessor() changes it only while no job holds a live lease,
+     * so two processors never work at the same time. Before the migration has run the
+     * dispatcher behaves exactly as before ('aws') and the remote endpoint claims nothing.
+     */
+    public const PROCESSOR_OFF = 'off';
+    public const PROCESSOR_AWS = 'aws';
+    public const PROCESSOR_REMOTE = 'remote';
+    public const PROCESSORS = [self::PROCESSOR_OFF, self::PROCESSOR_AWS, self::PROCESSOR_REMOTE];
+    /** Reason shown for a remote result that found nothing (it is never "passed"; review M-A). */
+    public const REMOTE_UNVERIFIED_REASON = 'Checked by the remote AI worker (remote, unverified). This server cannot verify a remote check, so it is never marked Passed: review the original documents.';
+
+    /**
+     * True once migration 20261116 has run. Detected from its column on ai_verification_jobs,
+     * which the dispatcher's least-privilege account can always see; a missing grant on the
+     * settings table then fails closed (processor() throws) instead of looking "not installed".
+     */
+    public static function processorSelectionInstalled(PDO $pdo): bool
+    {
+        static $known = [];
+        $key = spl_object_id($pdo);
+        if (!isset($known[$key])) {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'ai_verification_jobs' AND COLUMN_NAME = 'remote_result_token'");
+            $stmt->execute();
+            $known[$key] = (int) $stmt->fetchColumn() === 1;
+        }
+        return $known[$key];
+    }
+
+    /**
+     * The processor allowed to claim jobs. 'aws' before migration 20261116 (unchanged behaviour);
+     * afterwards the stored value, or 'off' when the row is missing or invalid (fail closed).
+     * $lock: read with a shared lock (inside a transaction). Throws
+     * RuntimeException('processor_setting_unreadable') when the setting cannot be read.
+     */
+    public static function processor(PDO $pdo, bool $lock = false): string
+    {
+        if (!self::processorSelectionInstalled($pdo)) {
+            return self::PROCESSOR_AWS;
+        }
+        try {
+            $stmt = $pdo->query('SELECT processor FROM ai_processor_settings WHERE id = 1' . ($lock ? ' FOR SHARE' : ''));
+            $value = $stmt === false ? false : $stmt->fetchColumn();
+        } catch (PDOException) {
+            throw new RuntimeException('processor_setting_unreadable');
+        }
+        return is_string($value) && in_array($value, self::PROCESSORS, true) ? $value : self::PROCESSOR_OFF;
+    }
+
+    /**
+     * Operator action (bin/ai-processor.php): selects the processor. Refused while any job is
+     * being processed under a live lease, so the old processor finishes (or its lease runs out)
+     * before the new one may claim. Never changes a job.
+     *
+     * @return array{changed:bool, from:?string, to:string, reason:?string}
+     */
+    public static function setProcessor(PDO $pdo, string $to, string $changedBy): array
+    {
+        if (!in_array($to, self::PROCESSORS, true)) {
+            throw new InvalidArgumentException('Unknown processor.');
+        }
+        if (!self::processorSelectionInstalled($pdo)) {
+            return ['changed' => false, 'from' => null, 'to' => $to, 'reason' => 'not_installed'];
+        }
+        $pdo->beginTransaction();
+        try {
+            $from = $pdo->query('SELECT processor FROM ai_processor_settings WHERE id = 1 FOR UPDATE')->fetchColumn();
+            if ($from === false) {
+                $pdo->exec("INSERT INTO ai_processor_settings (id, processor) VALUES (1, 'off')");
+                $from = self::PROCESSOR_OFF;
+            }
+            $from = (string) $from;
+            if ($from === $to) {
+                $pdo->commit();
+                return ['changed' => false, 'from' => $from, 'to' => $to, 'reason' => 'already_selected'];
+            }
+            $active = (int) $pdo->query("SELECT COUNT(*) FROM ai_verification_jobs WHERE status = 'processing' AND lease_expires_at > NOW() FOR SHARE")->fetchColumn();
+            if ($active > 0) {
+                $pdo->rollBack();
+                return ['changed' => false, 'from' => $from, 'to' => $to, 'reason' => 'jobs_in_progress'];
+            }
+            $pdo->prepare('UPDATE ai_processor_settings SET processor = :to, changed_at = NOW(), changed_by = :by WHERE id = 1')
+                ->execute(['to' => $to, 'by' => mb_substr(preg_replace('/[^\x20-\x7E]/', '', $changedBy) ?? '', 0, 100)]);
+            $pdo->commit();
+            return ['changed' => true, 'from' => $from, 'to' => $to, 'reason' => null];
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
     }
 
     /** error_code of a job an operator stopped because the effective date was corrected. */
@@ -318,11 +417,14 @@ final class AiVerification
                 return 'in_progress';
             }
             if ($job) {
+                // After migration 20261116 the remote result token is cleared too, so a remote worker that
+                // repeats an old completion is never told "already stored" for a check that was run again.
+                $remoteReset = self::processorSelectionInstalled($pdo) ? ', remote_result_token = NULL' : '';
                 $pdo->prepare(
                     "UPDATE ai_verification_jobs SET status = 'pending', outcome = NULL, outcome_reason = NULL, findings_json = NULL,
                             document_checks_json = NULL, model_name = NULL, model_digest = NULL, ocr_engine = NULL, attempts = 0, transient_failures = 0, crash_failures = 0,
                             privacy_effective_from = :from, next_attempt_at = NOW(), claim_token = NULL, lease_expires_at = NULL, started_at = NULL, completed_at = NULL,
-                            error_code = NULL, staff_review_status = 'not_reviewed', reviewed_by = NULL, reviewed_at = NULL
+                            error_code = NULL, staff_review_status = 'not_reviewed', reviewed_by = NULL, reviewed_at = NULL{$remoteReset}
                      WHERE id = :id"
                 )->execute(['id' => $job['id'], 'from' => $from]);
             } else {
@@ -388,8 +490,11 @@ final class AiVerification
      * valid date, nothing is (others are left as they are).
      * With $onlyJobId (dispatcher --only-job) the query itself is limited to that
      * one job, so no other job can ever be claimed, whatever else is waiting.
+     * $processor: who is claiming ('aws' or 'remote'). Nothing is claimed unless it is the
+     * selected processor (see processor()), checked with a shared lock in the same
+     * transaction, so a processor switch can never interleave with a claim.
      */
-    public static function claim(PDO $pdo, int $leaseSeconds = self::LEASE_SECONDS, ?int $onlyJobId = null): ?array
+    public static function claim(PDO $pdo, int $leaseSeconds = self::LEASE_SECONDS, ?int $onlyJobId = null, string $processor = self::PROCESSOR_AWS): ?array
     {
         if ($leaseSeconds < 60 || $leaseSeconds > 7200) {
             throw new InvalidArgumentException('The job lease is out of range.');
@@ -397,13 +502,24 @@ final class AiVerification
         if ($onlyJobId !== null && $onlyJobId < 1) {
             throw new InvalidArgumentException('The job ID must be a positive integer.');
         }
+        if ($processor !== self::PROCESSOR_AWS && $processor !== self::PROCESSOR_REMOTE) {
+            throw new InvalidArgumentException('Only the aws or remote processor can claim jobs.');
+        }
         $from = self::privacyEffectiveFrom();
         if ($from === null) {
             return null;
         }
+        $installed = self::processorSelectionInstalled($pdo);
+        if (!$installed && $processor !== self::PROCESSOR_AWS) {
+            return null;   // the remote processor needs migration 20261116
+        }
         for ($tries = 0; $tries < 5; $tries++) {
             $pdo->beginTransaction();
             try {
+                if ($installed && self::processor($pdo, true) !== $processor) {
+                    $pdo->commit();
+                    return null;   // another processor (or none) is selected
+                }
                 // Locks only the job row (OF j), never the request.
                 $select = $pdo->prepare(
                     "SELECT j.id, j.request_id, j.status, j.attempts, j.max_attempts, j.transient_failures, j.crash_failures
@@ -455,6 +571,38 @@ final class AiVerification
      */
     public static function buildJob(PDO $pdo, array $job, string $appRoot): array
     {
+        $manifest = self::jobManifest($pdo, $job, $appRoot);
+        $applicationFindings = $manifest['application_findings'];
+        $documents = [];
+        foreach ($manifest['documents'] as $document) {
+            $bytes = @file_get_contents($document['path']);
+            if (!is_string($bytes) || $bytes === '') {
+                $applicationFindings[] = self::unpreparedFinding($document['key'], $document['label']);
+                continue;
+            }
+            $documents[] = ['key' => $document['key'], 'label' => $document['label'], 'mime' => $document['mime'], 'content_base64' => base64_encode($bytes)];
+        }
+        return [
+            'payload' => ['version' => 1, 'job_id' => $job['id'], 'declared' => $manifest['declared'], 'documents' => $documents],
+            'requirements' => $manifest['requirements'],
+            'labels' => $manifest['labels'],
+            'keys' => array_column($documents, 'key'),
+            'application_findings' => $applicationFindings,
+        ];
+    }
+
+    /**
+     * What buildJob() sends, without reading any file: the request's declared details, and for
+     * each document that may be sent its key, authoritative label, stored type, size and checked
+     * path (inside private_uploads/requests, a regular file smaller than the size limit). Used by
+     * buildJob() and by the remote endpoint, which streams one checked file at a time.
+     * Throws RuntimeException('request_missing') or ('stored_file_unreadable').
+     *
+     * @return array{declared: array, documents: list<array{key:string,label:string,mime:string,size:int,path:string}>,
+     *               requirements: array, labels: array<string,string>, keys: list<string>, application_findings: list<array>}
+     */
+    public static function jobManifest(PDO $pdo, array $job, string $appRoot): array
+    {
         $stmt = $pdo->prepare(
             'SELECT flow, is_owner, first_name, last_name, arp_number, document_type, transfer_type FROM requests WHERE id = :id'
         );
@@ -484,19 +632,18 @@ final class AiVerification
             $uploaded[$key] = ['mime' => (string) $row['mime_type'], 'size' => (int) $row['file_size']];
             $path = (string) $row['stored_path'];
             $real = preg_match(self::UPLOAD_PATH, $path) && $uploadRoot !== false ? realpath($appRoot . '/' . $path) : false;
-            if ($real !== false && str_starts_with($real, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($real) && !is_readable($real)) {
+            $inside = $real !== false && str_starts_with($real, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($real);
+            if ($inside && !is_readable($real)) {
                 // Present but not readable by this process (for example a file that arrived during this
                 // dispatcher run, before its read access was restored): try the job again later.
                 throw new RuntimeException('stored_file_unreadable');
             }
-            $bytes = $real !== false && str_starts_with($real, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($real)
-                && filesize($real) < AiDocumentWorkerLimits::MAX_DOCUMENT_BYTES ? @file_get_contents($real) : false;
-            if (!is_string($bytes) || $bytes === '' || count($documents) >= AiDocumentWorkerLimits::MAX_DOCUMENTS) {
-                $applicationFindings[] = DocumentAnalysis::finding('ocr_uncertainty', 'other', [$key],
-                    'The stored file for ' . $labels[$key] . ' could not be prepared for the automatic check. Open it and inspect it manually.', '', 'ocr');
+            $size = $inside ? filesize($real) : false;
+            if ($size === false || $size < 1 || $size >= AiDocumentWorkerLimits::MAX_DOCUMENT_BYTES || count($documents) >= AiDocumentWorkerLimits::MAX_DOCUMENTS) {
+                $applicationFindings[] = self::unpreparedFinding($key, $labels[$key]);
                 continue;
             }
-            $documents[] = ['key' => $key, 'label' => $labels[$key], 'mime' => (string) $row['mime_type'], 'content_base64' => base64_encode($bytes)];
+            $documents[] = ['key' => $key, 'label' => $labels[$key], 'mime' => (string) $row['mime_type'], 'size' => (int) $size, 'path' => (string) $real];
         }
 
         $requirements = (new DocumentRequirements())->evaluate((string) $request['flow'], (bool) $request['is_owner'], $uploaded);
@@ -509,25 +656,27 @@ final class AiVerification
         unset($document);
 
         return [
-            'payload' => [
-                'version' => 1,
-                'job_id' => $job['id'],
-                'declared' => [
-                    'flow' => (string) $request['flow'],
-                    'is_owner' => (bool) $request['is_owner'],
-                    'first_name' => (string) $request['first_name'],
-                    'last_name' => (string) $request['last_name'],
-                    'arp_number' => (string) ($request['arp_number'] ?? ''),
-                    'document_type' => (string) ($request['document_type'] ?? ''),
-                    'transfer_type' => (string) ($request['transfer_type'] ?? ''),
-                ],
-                'documents' => $documents,
+            'declared' => [
+                'flow' => (string) $request['flow'],
+                'is_owner' => (bool) $request['is_owner'],
+                'first_name' => (string) $request['first_name'],
+                'last_name' => (string) $request['last_name'],
+                'arp_number' => (string) ($request['arp_number'] ?? ''),
+                'document_type' => (string) ($request['document_type'] ?? ''),
+                'transfer_type' => (string) ($request['transfer_type'] ?? ''),
             ],
+            'documents' => $documents,
             'requirements' => $requirements,
             'labels' => $labels,
             'keys' => array_column($documents, 'key'),
             'application_findings' => $applicationFindings,
         ];
+    }
+
+    private static function unpreparedFinding(string $key, string $label): array
+    {
+        return DocumentAnalysis::finding('ocr_uncertainty', 'other', [$key],
+            'The stored file for ' . $label . ' could not be prepared for the automatic check. Open it and inspect it manually.', '', 'ocr');
     }
 
     /**
@@ -557,7 +706,7 @@ final class AiVerification
 
         if ($built['keys'] === []) {
             // Nothing to read: the requirement check alone decides.
-            $worker = ['version' => 1, 'documents' => [], 'rule_findings' => [], 'model' => ['status' => 'skipped', 'name' => null, 'digest' => null, 'output' => null], 'ocr_engine' => 'none'];
+            $worker = self::noDocumentWorkerResult();
         } else {
             try {
                 $worker = DocumentAnalysis::validateWorkerResult($send($built['payload']), $built['keys']);
@@ -569,13 +718,43 @@ final class AiVerification
             }
         }
 
+        return self::finish($pdo, $job, $built, $worker, false);
+    }
+
+    /** The worker result used when a job has no document to read (the requirement check alone decides). */
+    public static function noDocumentWorkerResult(): array
+    {
+        return ['version' => 1, 'documents' => [], 'rule_findings' => [], 'model' => ['status' => 'skipped', 'name' => null, 'digest' => null, 'output' => null], 'ocr_engine' => 'none'];
+    }
+
+    /**
+     * Remote pull worker: stores a result that DocumentAnalysis::validateWorkerResult() has already
+     * accepted for exactly $built['keys']. Stored only while $job's claim token is current AND its
+     * lease has not run out, so a remote worker that slept past its lease can never overwrite a
+     * newer claim. Same outcome rules as the AWS dispatcher.
+     */
+    public static function storeRemoteResult(PDO $pdo, array $job, array $built, array $validatedWorker): array
+    {
+        return self::finish($pdo, $job, $built, $validatedWorker, true);
+    }
+
+    private static function finish(PDO $pdo, array $job, array $built, array $worker, bool $requireLiveLease): array
+    {
         $result = DocumentAnalysis::classify($built['requirements'], $worker, $built['labels'], $built['application_findings']);
         // The model could not give a usable answer: keep what the rules found, and ask Staff to look.
         $status = $worker['model']['status'] === 'invalid_output' ? 'needs_manual_review' : 'completed';
         if ($status === 'needs_manual_review' && $result['outcome'] === DocumentAnalysis::OUTCOME_PASSED) {
             $result['outcome'] = DocumentAnalysis::OUTCOME_NEEDS_REVIEW;
         }
-        $saved = self::store($pdo, $job, $status, $result, $worker, $status === 'needs_manual_review' ? 'model_output_invalid' : null);
+        // A remote result (review M-A) can never be "passed": this server cannot verify anything the
+        // remote worker reports, so a clean-looking remote result still asks Staff to review. Every
+        // remote result is stored through here (storeRemoteResult), whatever retries or re-runs led to it.
+        if ($requireLiveLease && $result['outcome'] === DocumentAnalysis::OUTCOME_PASSED) {
+            $result['outcome'] = DocumentAnalysis::OUTCOME_NEEDS_REVIEW;
+            $result['manual_review'] = true;
+            $result['reason'] = self::REMOTE_UNVERIFIED_REASON;
+        }
+        $saved = self::store($pdo, $job, $status, $result, $worker, $status === 'needs_manual_review' ? 'model_output_invalid' : null, $requireLiveLease);
         return ['job_id' => $job['id'], 'status' => $saved ? $status : 'lost_claim', 'outcome' => $saved ? $result['outcome'] : null,
             'error' => null, 'retry' => null];
     }
@@ -863,13 +1042,18 @@ final class AiVerification
             'model_output_invalid' => 'The AI model did not give a valid answer, so only the automatic rule checks are shown.',
             'job_build_failed' => 'The request\'s documents could not be prepared for checking.',
             'stored_file_unreadable' => 'A stored document could not be read by the AI check yet. The check is retried automatically.',
+            'remote_download_failed' => 'The remote AI worker could not download a document of this request. The check is retried automatically.',
             'lease_expired', 'too_many_attempts' => 'The check did not finish after several attempts.',
             default => 'The automatic check could not be completed.',
         };
     }
 
-    private static function store(PDO $pdo, array $job, string $status, array $result, array $worker, ?string $errorCode): bool
+    private static function store(PDO $pdo, array $job, string $status, array $result, array $worker, ?string $errorCode, bool $remote = false): bool
     {
+        // Remote results: only within a live lease, and the claim token is remembered so a repeated
+        // "complete" of the same claim is recognised (AiRemoteQueue). The AWS path is unchanged.
+        $remoteSet = $remote ? ', remote_result_token = claim_token' : '';
+        $remoteWhere = $remote ? ' AND lease_expires_at > NOW()' : '';
         $labels = [];
         foreach ($result['documents'] as $document) {
             $labels[$document['key']] = $document['label'];
@@ -881,9 +1065,9 @@ final class AiVerification
         $stmt = $pdo->prepare(
             "UPDATE ai_verification_jobs SET status = :status, outcome = :outcome, outcome_reason = :reason, findings_json = :findings,
                     document_checks_json = :documents, model_name = :model, model_digest = :digest, ocr_engine = :ocr,
-                    completed_at = NOW(), claim_token = NULL, lease_expires_at = NULL, error_code = :error,
+                    completed_at = NOW(){$remoteSet}, claim_token = NULL, lease_expires_at = NULL, error_code = :error,
                     staff_review_status = 'not_reviewed', reviewed_by = NULL, reviewed_at = NULL
-             WHERE id = :id AND claim_token = :token AND status = 'processing'"
+             WHERE id = :id AND claim_token = :token AND status = 'processing'{$remoteWhere}"
         );
         $stmt->execute([
             'status' => $status,

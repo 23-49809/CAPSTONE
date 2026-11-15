@@ -83,6 +83,10 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `deploy/systemd/smart-assess-ai-worker-fpm.service.d/50-private-network.conf`, `deploy/systemd/smart-assess-ai-dispatch.service` (Step 16 lines) | Step 16: PHP-FPM and the dispatcher see nothing in `/run` but the sockets they use; the pool keeps its runtime folder across restarts (not installed). |
 | `bin/ai-worker-smoke-test.php`; `bin/ai-verification-dispatch.php --only-job=ID` | Step 17: a smoke test that sends only its own synthetic image to the worker (real Tesseract and model; prints statuses only), and a dispatcher mode that processes one named job and never claims another (for the controlled activation test). |
 | `deploy/systemd/worker-php-fpm-pool.conf.example` | Example php-fpm pool for the worker server, with its time limits. |
+| `database/migrations/20261116_ai_remote_worker.sql` | Processor selection (`off`/`aws`/`remote`), remote request nonces, idempotent remote results (not applied). See "Remote pull worker". |
+| `web/ai-remote.php`, `app/services/AiRemoteQueue.php`, `app/services/RemoteWorkerSignature.php` | Remote pull worker, website side: signed machine-to-machine endpoint (disabled by default; answers 404). |
+| `bin/ai-remote-pull.php`, `app/services/AiRemoteClient.php` | Remote pull worker, remote side (e.g. a Mac): connects out over HTTPS, runs OCR and the model locally. |
+| `bin/ai-processor.php` | Shows or selects the only processor allowed to claim jobs; `--status` for monitoring. |
 
 ### Database
 
@@ -702,6 +706,222 @@ loopback.
 
 AI checking stays off until the dispatcher, its settings file and the website's
 `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` are set up, each with separate approval.
+
+## Remote pull worker (Stage 1: code and tests only, NOT enabled anywhere)
+
+A second, optional processor: a machine such as a Mac runs OCR and the model
+itself and **connects out** to the website over HTTPS. Nothing connects to it; it
+opens no port, needs no tunnel and no port forwarding.
+
+```
+Mac: bin/ai-remote-pull.php ──HTTPS, signed──► https://<site>/ai-remote.php (web/ai-remote.php)
+     │ local Tesseract/Poppler + Ollama          │ AiRemoteQueue → AiVerification (same claim, lease,
+     │ (AiDocumentWorker, unchanged)              │ eligibility, validation and storage as the dispatcher)
+     └─ health → claim → document (one at a time) → complete | fail
+```
+
+**Only one processor at a time.** `ai_processor_settings` (migration 20261116) holds
+`off`, `aws` or `remote`. Every claim reads it with a shared lock inside the claim
+transaction; `bin/ai-processor.php --set=…` changes it only while no job holds a live
+lease. The AWS dispatcher exits with code 5 unless `aws` is selected; the endpoint
+answers `processor_not_selected` unless `remote` is. After the migration the value is
+`off`. Before the migration the dispatcher behaves exactly as before.
+
+**Privacy rules are unchanged.** The remote worker claims through the same query as the
+dispatcher: only requests submitted on or after `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT`
+and queued under that date. With no date set it gets nothing (`not_enabled`). There is
+no Staff override. **Processing real applicant documents on a personal computer needs
+Office approval and Privacy Policy wording that describes it before it is ever enabled**:
+the current policy describes a single AWS server.
+
+**Authentication** (`RemoteWorkerSignature`): a separate secret
+(`SMART_ASSESS_AI_REMOTE_SECRET` on the website, at least 32 characters; the endpoint
+refuses to run if it equals the AWS worker's secret). On the Mac the secret is read only
+from `SMART_ASSESS_AI_REMOTE_SECRET_FILE` (mode 0600, owned by the user; a secret in the
+environment is refused). Requests are signed over method, path, timestamp, nonce and the
+body's SHA-256 (±5 minutes); nonces are stored in `ai_remote_nonces`, so a replay is
+refused (409). Every answer is signed over the request's nonce, status and body (documents:
+over their SHA-256), so the Mac accepts only the website's real answer. Message prefixes
+differ from the AWS worker protocol, so a signature of one is never valid for the other.
+
+**Endpoint** `web/ai-remote.php`: answers 404 to everything unless
+`SMART_ASSESS_AI_REMOTE_ENABLED=1` and the secret are set. POST and JSON only, at most
+1 MB, no session or cookie (`SA_NO_SESSION`), exact fields per operation:
+
+| Operation | What it does |
+|---|---|
+| `health` | processor and whether AI is enabled (no job data) |
+| `claim` | the next eligible job: ID, claim token, lease left, time budget, declared details, and each document's key, label, type, size and SHA-256 (never a path) |
+| `document` | one document of a job the caller holds a **live** claim on, found through `jobManifest()`; streamed, with its SHA-256 signed |
+| `complete` | validated with `DocumentAnalysis::validateWorkerResult()` against that job's documents and stored only within the live lease; a repeat answers `already_stored` |
+| `fail` | one of `AiRemoteQueue::FAIL_CODES`, with the normal retry rules |
+
+**Recovery.** The Mac tracks the lease on the wall clock (which keeps running while it
+sleeps). A result whose lease ran out is never sent; the website refuses it anyway
+(`lease_expired`, or `stale` once the job was claimed again). An abandoned claim simply
+expires and the job is claimed again (one attempt used). Downloads that fail or do not
+match their size and SHA-256 are reported as `remote_download_failed` (no attempt used, up
+to `REMOTE_TRANSIENT_LIMIT` = 5 times per job; after that a failed download uses an attempt).
+Leftover job folders are removed before every claim, under the client's lock. After a failed
+job the client pauses for its poll interval before claiming again. A result that cannot be
+delivered (website unreachable, maintenance, rate limit) is retried after 5, 10, 20 and 40
+seconds while the lease allows; a repeat of a stored result is answered `already_stored`.
+
+**Limits against a stolen or misused secret (review H1).** These hold whatever the remote
+worker does:
+- **One live remote claim at a time.** While any job holds a live claim, `claim` answers
+  `{"job":null,"active_claim":true}`. The check and the claim run under a MySQL named lock,
+  so two simultaneous requests can never both get a job. A Mac that restarts mid-job waits
+  for its old lease to run out.
+- **Claim and download limits (review H-A)**, sized for SMART ASSESS's real volume:
+  `SMART_ASSESS_AI_REMOTE_MAX_CLAIMS_PER_HOUR` (default **3**, at most 20),
+  `SMART_ASSESS_AI_REMOTE_MAX_CLAIMS_PER_DAY` (default **10**, at most 50) and
+  `SMART_ASSESS_AI_REMOTE_MAX_DOWNLOADS_PER_HOUR` (default **15**, at most 100), counted from
+  `ai_remote_events`. Every claim counts whatever happens to it afterwards, so failing or
+  completing jobs quickly never frees more claims. Over a limit: `429 rate_limited`; the job
+  keeps waiting. Claims are checked under one named lock and downloads under another, so
+  concurrent requests cannot overshoot a limit.
+- **Each document once per claim.** `ai_remote_downloads` (primary key job + SHA-256 of the
+  claim token + document key) refuses a second download of the same document under the same
+  claim (`409 already_downloaded`), atomically, even for simultaneous requests. The only
+  retry: the Mac reports `remote_download_failed`, the job is given back, and a **new** claim
+  (counted against the limits) may download it again.
+- **Time-boxed (required):** `SMART_ASSESS_AI_REMOTE_ENABLED_UNTIL` (date and time with offset,
+  `YYYY-MM-DDTHH:MM:SS+08:00`). Unset, invalid, past, or more than 31 days ahead: every request
+  gets 404, even with `SMART_ASSESS_AI_REMOTE_ENABLED=1`. Set it to the end of the agreed
+  testing window only. A correctly signed claim outside the window is logged as
+  `claim_outside_window` (monitor line) for alerting; other requests as `outside_window`.
+  **If the window closes while a job is claimed:** from that moment every request gets 404, so
+  the Mac can neither deliver the result nor report a failure (it retries delivery until its
+  lease runs out, then discards the result). The job stays `processing` until its lease expires
+  (up to `SMART_ASSESS_AI_REMOTE_LEASE_SECONDS`, default 17 minutes) and then waits as an
+  expired claim: nothing is stored, no request is changed. It is processed later only by the
+  processor selected then (the AWS dispatcher if `aws` is selected, or the remote worker in a
+  new window), and that try counts as an attempt. Staff see it as "Checking now" until then.
+  End a window only when the Mac is idle (`--status`: 0 jobs under a live claim).
+- **Exposure if the secret leaks while the window is open:** at most 3 jobs per hour and 10 a
+  day (with their declared names and ARP numbers), and at most 15 documents per hour, each
+  document once per claim, until the window ends, the processor is set `off`, or the secret is
+  rotated. Keep the window short and watch the monitor lines.
+- **Optional address allowlist** `SMART_ASSESS_AI_REMOTE_ALLOWED_IPS` (comma-separated IPv4/IPv6
+  addresses and IPv4 CIDR ranges). An extra layer only: an allowed address still needs a valid
+  signature, and a refused one gets the same 404 as a disabled endpoint.
+  **How the address is determined (review L-D):** only PHP's `REMOTE_ADDR`, the address of the
+  TCP connection Apache received. Forwarded headers (`X-Forwarded-For`, `Forwarded`,
+  `X-Real-IP`) are **never** read: anyone can send them, so they must never be trusted unless a
+  design explicitly adds and secures a known proxy. Consequences:
+  - If Apache listens on an IPv6 socket, an IPv4 client can appear as an IPv4-mapped IPv6 address
+    (`::ffff:203.0.113.5`), which does **not** match the IPv4 entry `203.0.113.5`: such a request
+    is refused (fails closed). Check `REMOTE_ADDR` in the access log and list the address in the
+    form it actually appears.
+  - Behind a reverse proxy, load balancer or CDN, `REMOTE_ADDR` is the proxy's address, so the
+    allowlist would admit everyone the proxy forwards. Do not rely on the allowlist in such a
+    setup (the signature, window and limits still apply). Today the production site has no proxy.
+  - A home or mobile connection's address changes; the allowlist is then an obstacle, not
+    protection. It is an extra layer only.
+- **Failure codes** accepted from the remote worker: `AiRemoteQueue::FAIL_CODES` only.
+  `worker_busy` and `worker_unavailable` are refused; `worker_not_configured` after a claim
+  is recorded as `worker_error` and uses an attempt (the worker checks its settings before it
+  claims), so no job can cycle without limit.
+
+**Remote results are less trusted (review H2).** The website never sees the remote worker's
+OCR text, so it cannot check anything the worker quotes. Before a remote result is stored,
+`AiRemoteQueue::distrustRemoteText()` removes every evidence quote (model and rule findings),
+re-words every rule finding on the server from its validated codes as *"Automatic check
+reported by the remote AI worker (unverified): …"*, replaces the model name with the fixed
+label *"remote, unverified"* (and drops the digest), replaces the OCR engine with the fixed
+label *"remote worker"*, and maps every OCR error code that `OcrService` cannot produce
+(`AiRemoteQueue::OCR_ERROR_CODES`) to `unreadable_document` (review H-B). Nothing the remote
+worker wrote is shown to Staff: not as document text, a label, an explanation or an error.
+(Model findings are always worded by the server.)
+
+**A remote result is never "Passed" (review M-A).** The outcome column only has passed,
+needs_review and missing_information, so a remote result that found nothing is stored as
+**needs_review** with the reason *"Checked by the remote AI worker (remote, unverified). This
+server cannot verify a remote check, so it is never marked Passed: review the original
+documents."* This is applied in `AiVerification::finish()` for every remote result
+(`storeRemoteResult()`), so retries, Staff re-runs and repeated completions cannot bypass it.
+Results from the AWS worker on this server are unchanged.
+
+**Maintenance (review M1).** While the deployment maintenance flag exists, `claim`, `complete`
+and `fail` answer `503 maintenance` (downloads are read-only and still work; `health` reports
+`"maintenance": true`). The Mac client waits and retries.
+
+**Monitoring (review M3).** `ai_remote_events` records claim, download, complete, fail,
+rejected, replay, rate_limited and maintenance events with the job ID only (no names, text,
+addresses or secrets; kept 30 days). Requests refused **before** authentication (bad
+signature, refused address, outside the window) never touch the database: they are counted in a
+small counter file and summarized in at most one log line per kind per minute,
+prefixed `[SMART_ASSESS_REMOTE] monitor:` (use that prefix for alerts).
+
+**Monitoring storage (review L-A).** The counter lives in an application-owned private folder,
+`smart-assess-app/logs/ai-remote-monitor/` (outside the web root, never the shared temporary
+folder). The folder is created 0700 when missing; an existing one must be a real folder (not a
+symbolic link) owned by the web-server user, and is tightened to 0700 if it is looser. The
+counter file `smart-assess-remote-monitor.json` must not be a symbolic link; it is created 0600
+(umask 077), checked after opening to be the same file as its path (device and inode) and owned
+by the web-server user, and tightened to 0600 if it is looser. If any of this fails the counter is
+not used, `monitor: unavailable` is logged, and **the endpoint refuses every request with 404**
+(fail closed). On the server, `smart-assess-app/logs/` must therefore be writable by the web
+server user (www-data), and nothing else may own `logs/ai-remote-monitor`. Check the state with
+`php bin/ai-processor.php --status` (live claims, limits, event counts for the last hour and
+24 hours). Investigate: any `replay`, repeated `unauthenticated` summaries, `rate_limited`,
+or claims outside the agreed testing times.
+
+**One secret per environment (review L-B).** Signatures cover the method, path, time, nonce and
+body, but not the host name, and each environment keeps its own nonce table. A request captured
+on one environment could therefore be replayed to another environment within 5 minutes **if both
+used the same secret**. Never reuse a remote-worker secret: generate a separate one
+(`openssl rand -hex 32`) for production, for each test or staging server and for each local
+setup, and never copy one between them. Each must also differ from that environment's AWS
+worker secret (the endpoint refuses to run otherwise).
+
+**Credential rotation (review M4).** The website accepts an optional second secret,
+`SMART_ASSESS_AI_REMOTE_SECRET_NEXT`, and signs each answer with the secret that verified the
+request. Neither may equal the AWS worker secret (the endpoint then answers 404). Rotate at
+least after every testing period, whenever the Mac or its account may be compromised, and when
+someone with access leaves:
+1. Generate a new secret (`openssl rand -hex 32`) on the Mac into a new 0600 file.
+2. On the website, set `SMART_ASSESS_AI_REMOTE_SECRET_NEXT` to it; reload Apache gracefully.
+3. Point the Mac's `SMART_ASSESS_AI_REMOTE_SECRET_FILE` at the new file; run one `--once`.
+4. On the website, move the new value to `SMART_ASSESS_AI_REMOTE_SECRET`, remove `_NEXT`,
+   reload Apache; securely delete the old secret file on the Mac.
+5. If the old secret may have leaked: set the processor `off` first, then rotate, then review
+   `--status` and the monitor log lines for the exposure period.
+
+**Clock synchronisation (review L6).** Signatures allow 5 minutes of clock difference. Keep
+"Set time and date automatically" on for the Mac (System Settings > General > Date & Time) and
+NTP (systemd-timesyncd) on the server. A wrong clock shows as `remote_auth_failed` on the Mac;
+the client then says to check the clock and the secret file.
+
+**Dispatcher exit code 5 (review L4).** After the migration the processor is `off`, so an
+enabled dispatcher timer would exit with code 5 every minute and systemd would show the unit as
+failed. That is fail-closed and intended: keep the timer disabled unless `aws` is selected.
+
+**Remote side settings** (`bin/ai-remote-pull.php`): `SMART_ASSESS_AI_REMOTE_URL`
+(https, or http only to loopback for tests), `SMART_ASSESS_AI_REMOTE_SECRET_FILE`,
+optional `SMART_ASSESS_AI_REMOTE_CA_FILE`, `SMART_ASSESS_WORKER_STATE_DIR` (0700) and the
+same `SMART_ASSESS_WORKER_*` OCR and Ollama settings as `worker/index.php`.
+Website: `SMART_ASSESS_AI_REMOTE_ENABLED`, `SMART_ASSESS_AI_REMOTE_SECRET`, optional
+`SMART_ASSESS_AI_REMOTE_SECRET_NEXT` (rotation only), `SMART_ASSESS_AI_REMOTE_LEASE_SECONDS`
+(300-3600, default 1020), `SMART_ASSESS_AI_REMOTE_MAX_CLAIMS_PER_HOUR`,
+`SMART_ASSESS_AI_REMOTE_MAX_CLAIMS_PER_DAY`, `SMART_ASSESS_AI_REMOTE_MAX_DOWNLOADS_PER_HOUR`,
+`SMART_ASSESS_AI_REMOTE_ALLOWED_IPS`, and the required `SMART_ASSESS_AI_REMOTE_ENABLED_UNTIL`.
+
+**Order if it is ever installed (each step needs approval):** deploy the code (the endpoint
+stays 404); back up; apply migration 20261116 (processor becomes `off`); immediately add
+`GRANT SELECT ON <db>.ai_processor_settings` for the dispatcher account; only after Office
+approval and a Privacy Policy update, add the website settings (including
+`SMART_ASSESS_AI_REMOTE_ENABLED_UNTIL` = the end of the approved window) and select `remote`.
+Rollback: `bin/ai-processor.php --set=off`, remove the website settings (404 again), then,
+if wanted, the rollback lines in the migration.
+
+Tests: `tests/ai_remote_pull_test.php` (Part A without a database; Part B with a `_test`
+database: authentication, replay, expired timestamps, one live claim and simultaneous claims,
+claim and download limits, address allowlist, lease expiry, stale and repeated completion,
+invalid results, remote text distrust, failed downloads and the retry limits, maintenance gate,
+secret rotation, disconnection and recovery, model timeout and outage, processor switching,
+monitoring, Staff-only results).
 
 ## Production deployment (not done; needs explicit approval)
 

@@ -230,13 +230,15 @@ $check('the worker client still refuses plain HTTP to any non-loopback address',
 $sql = (string) preg_replace('/^\s*--.*$/m', '', (string) file_get_contents($app . '/deploy/mysql/ai-dispatch-db-user.sql.example'));
 $grants = array_values(array_filter(array_map('trim', explode(';', $sql)), static fn (string $s): bool => str_starts_with($s, 'GRANT')));
 $check('the grant file creates the account for local socket connections only', (bool) preg_match("/CREATE USER IF NOT EXISTS 'smart_assess_ai_dispatch'@'localhost'/", $sql));
-$check('exactly three grants: two column-limited reads and the AI job table', count($grants) === 3, $grants);
+$check('exactly four grants: two column-limited reads, the AI job table and the processor setting', count($grants) === 4, $grants);
+$check('ai_processor_settings: read only (the dispatcher never selects the processor itself)',
+    (bool) preg_grep('/^GRANT SELECT ON smart_assess_sydney\.ai_processor_settings TO/', $grants), $grants);
 $check('no broad privilege (ALL, GRANT OPTION, FILE, SUPER, *.*)', !preg_match('/\bALL\b|GRANT OPTION|\bFILE\b|\bSUPER\b|\*\.\*/i', $sql));
 $requestGrant = (string) (preg_grep('/ON smart_assess_sydney\.requests TO/', $grants)[array_key_first(preg_grep('/ON smart_assess_sydney\.requests TO/', $grants) ?: [0])] ?? '');
 $check('requests: only the columns the check needs, no contact details or address', $requestGrant !== ''
     && !preg_match('/contact_number|email|address_line|province|city|zip_code|client_id|middle_name|property_address/', $requestGrant), $requestGrant);
 $check('ai_verification_jobs: read and update only (it never inserts or deletes)', (bool) preg_grep('/^GRANT SELECT, UPDATE ON smart_assess_sydney\.ai_verification_jobs TO/', $grants));
-$check('no grant on any other table', preg_grep('/ON smart_assess_sydney\.(?!requests |request_documents |ai_verification_jobs )/', $grants) === []);
+$check('no grant on any other table', preg_grep('/ON smart_assess_sydney\.(?!requests |request_documents |ai_verification_jobs |ai_processor_settings )/', $grants) === []);
 
 $permLines = preg_grep('/^\s*setfacl /', explode("\n", (string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-dispatch-permissions.sh')));
 $check('Step 13: every setfacl line is physical (-P): a symbolic link swapped in after the check is never followed',
