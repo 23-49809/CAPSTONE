@@ -1,0 +1,31 @@
+# SMART ASSESS - reference copy of /etc/smart-assess-ai-worker-runtime/lighttpd.conf (Step 5), with the Step 15 change.
+# NOT INSTALLED. Only the "server.systemd-socket-activation" line is new.
+# SMART ASSESS local AI worker: HTTP front on 127.0.0.1:8095 only. Passes every request to the PHP-FPM pool's
+# private socket; serves no files. Runs as sa-ai-worker under systemd (never root).
+server.compat-module-load = "disable"
+server.modules = ( "mod_rewrite", "mod_fastcgi" )
+# Step 15: the address below is held by systemd (smart-assess-ai-worker-http.socket) and handed over;
+# lighttpd runs without network (PrivateNetwork=yes) and could not bind it itself.
+server.systemd-socket-activation = "enable"
+server.bind = "127.0.0.1"
+server.port = 8095
+server.use-ipv6 = "disable"
+server.document-root = "/opt/smart-assess-ai-worker/worker"
+server.upload-dirs = ( "/var/tmp" )
+server.tag = ""
+# 80 MiB (in KiB); the worker itself refuses bodies over 75 MiB
+server.max-request-size = 81920
+server.max-request-field-size = 8192
+server.max-connections = 16
+server.max-fds = 128
+server.max-keep-alive-requests = 0
+server.max-read-idle = 60
+server.max-write-idle = 1100
+url.rewrite-once = ( "" => "/index.php" )
+fastcgi.server = ( ".php" => ( (
+    "socket" => "/run/smart-assess-ai-worker/fpm.sock",
+    "check-local" => "disable",
+    "connect-timeout" => 5,
+    "write-timeout" => 120,
+    "read-timeout" => 1080
+) ) )

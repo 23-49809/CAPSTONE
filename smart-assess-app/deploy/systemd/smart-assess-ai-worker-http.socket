@@ -1,0 +1,20 @@
+# SMART ASSESS - the AI worker's HTTP address, 127.0.0.1:8095, held by systemd itself (Step 15).
+# NOT INSTALLED. Install (with approval) with smart-assess-ai-worker.service.d/50-private-network.conf and
+# "server.systemd-socket-activation" in lighttpd.conf (worker-lighttpd.conf.example):
+#   sudo install -o root -g root -m 0644 smart-assess-ai-worker-http.socket /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now smart-assess-ai-worker-http.socket
+# systemd binds the address in the host network and hands the listening socket to lighttpd, which itself
+# runs with PrivateNetwork=yes: it can answer connections made to this address but cannot open any
+# connection of its own, whatever happens to the host firewall. Callers (the dispatcher's link, the
+# refresh script's health check) see no difference.
+[Unit]
+Description=SMART ASSESS AI worker HTTP address (127.0.0.1:8095, handed to lighttpd)
+
+[Socket]
+ListenStream=127.0.0.1:8095
+BindIPv6Only=default
+Backlog=16
+Service=smart-assess-ai-worker.service
+
+[Install]
+WantedBy=sockets.target
