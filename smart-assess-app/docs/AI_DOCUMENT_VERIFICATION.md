@@ -149,7 +149,7 @@ second is checked).
 | Dispatcher (`ai-dispatch.env`) | claims only jobs of eligible requests (`AiVerification::claim()`/`hasDueJob()` join `requests`) | refuses to run, exit code 2 |
 | Staff page | shows "Not checked by AI ... Inspect its documents manually" and no Run button | "not enabled" |
 
-Both servers' values must be identical. The website records on each job the
+Both settings (`apache.env` and `ai-dispatch.env`) must be identical. The website records on each job the
 value it used (`privacy_effective_from`); the dispatcher refuses to run (exit
 code 3, both dates in the message) while any waiting job carries a different
 value or none, claims nothing and changes nothing, and claims only jobs whose
@@ -944,22 +944,32 @@ HTTP 500. The commit must include **every** path below (check with
 
 ### Privacy Policy review
 
-`web/privacy-policy.php` now describes the automatic document check. Before it
-goes live (no later than the day AI checking is turned on), confirm:
+`web/privacy-policy.php` describes the automatic document check as built: one server
+runs the website and the check (there is no separate document-check server). The
+Municipal Assessors approved SMART ASSESS, including the automatic document check; the
+approval record is kept by the Office and is not part of this repository. On 15 Nov 2026
+seven passages were corrected to match the single-server system (no change of purpose,
+data, recipients, region or access; the claim of an encrypted connection was removed).
+Before it goes live (no later than the day AI checking is turned on), confirm:
 
-1. The Office has reviewed and approved the text, including section 2's
-   "Automatic document check".
+1. The Office acknowledges the corrected wording (the seven passages listed in the
+   pull request), including section 2's "Automatic document check".
 2. The date at the top is the date the reviewed text goes live.
-3. Both servers are in the AWS Asia Pacific (Sydney) Region (ap-southeast-2).
-4. The worker has no public internet address and accepts connections only from
-   the web server (security group).
+3. The website, its stored files and the check run on one server in the AWS Asia
+   Pacific (Sydney) Region (ap-southeast-2).
+4. The checking service is not reachable from the internet: it listens only on the
+   loopback address or local socket files (127.0.0.1:8095 held by systemd; Ollama on
+   127.0.0.1:11434), its accounts run without network access (Windows A and B), and every
+   job is signed with the shared secret.
 5. Publication timing: deployed with the code (step 3 below) but the AI is not
    yet on, the page describes a check that is not running yet; if that is not
    acceptable, hold the page until step 8.
 6. The worker's `SMART_ASSESS_WORKER_OLLAMA_URL` is its loopback address, so
    documents are not sent to an outside AI service.
-7. The worker's web-server and PHP temporary request-body files are on its
-   encrypted disk (the text promises only that files are kept to check them).
+7. The checking service's working copies (its state folder and its web server's private
+   temporary folder) are on the server's disk, which is not encrypted (verified 15 Nov
+   2026). The text makes no encryption claim and promises only that files are kept to
+   check them.
 8. `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` is the confirmed effective date and
    time, identical on the website and the dispatcher (the dispatcher refuses a
    mismatch). The page prints it in the "Automatic document check" section; it
@@ -968,7 +978,7 @@ goes live (no later than the day AI checking is turned on), confirm:
 
 The policy makes no new retention promise: AI results are kept with the request
 like other request records (nothing deletes them automatically). The Terms
-version is `2026-11-12` (the file-format rule and the tracking-name wording); the Privacy Policy is not
+version is `2026-11-13`; the Privacy Policy is not
 part of the Terms acceptance, so this change does not ask clients to accept again.
 
 ### Production installation checklist (single server, as built)
@@ -1093,9 +1103,10 @@ until the activation step.
 
 **Activation with one controlled test (approval, including the synthetic request).**
 
-Blocker: the published Privacy Policy still describes "a separate document-check server" reached
-"over an encrypted, authenticated" connection. The Office must approve wording that matches
-the single server before activation. This checklist does not change the page.
+Privacy Policy: the corrected text describes the single server as built (no separate
+document-check server, no claim of an encrypted connection). It must be published (merged and
+deployed) and its wording acknowledged by the Office before activation; the effective date is set
+only at activation, never in the policy text.
 
 1. Publish the approved Privacy Policy (PR and deploy).
 2. Set the same `SMART_ASSESS_AI_PRIVACY_EFFECTIVE_AT` in `apache.env` and `ai-dispatch.env`;

@@ -808,8 +808,25 @@ $check('privacy (M-A): the rest of the policy is the same in both states', str_r
 $check('privacy: the page renders', str_contains($text, 'Privacy Policy') && str_contains($text, 'Contact and privacy concerns'), substr($text, 0, 200));
 $check('privacy: the outdated "does not read uploaded documents automatically" is gone', !str_contains($text, 'does not read uploaded documents automatically'));
 $check('privacy: Singapore is no longer named; Sydney is', !str_contains($text, 'Singapore') && str_contains($text, 'Asia Pacific (Sydney)'));
-$check('privacy: the automatic check, OCR, what is sent and the separate server are described', str_contains($text, 'Automatic document check')
-    && str_contains($text, 'optical character recognition (OCR)') && str_contains($text, 'What is sent for the check') && str_contains($text, 'separate server'));
+$check('privacy: the automatic check, Tesseract OCR, the local model and what is sent are described', str_contains($text, 'Automatic document check')
+    && str_contains($text, 'Tesseract optical character recognition (OCR)') && str_contains($text, 'currently Llama 3.2, run on that server with the Ollama software')
+    && str_contains($text, 'What is sent for the check'));
+$check('privacy: the single server as built is described (website and check on one server in Sydney)', str_contains($text, 'on the same server that runs the website')
+    && str_contains($text, 'on the server operated for the Office that also runs the website, in the Amazon Web Services Asia Pacific (Sydney) region')
+    && str_contains($text, 'automatic document check on a server in the Asia Pacific (Sydney) region'));
+$check('privacy: no separate document-check server is claimed anywhere visitors can read', !str_contains($text, 'separate document-check server')
+    && !str_contains($text, 'separate server') && !str_contains($text, 'document-check server'), $text);
+$check('privacy: no encryption is claimed for the check or for storage (the server disk is not encrypted)', !preg_match('/encrypt/i', $text), $text);
+$check('privacy: what is claimed instead is true and verified: restricted accounts without network access, authenticated checks, data stays on the server',
+    str_contains($text, 'runs under its own restricted system accounts without network access') && str_contains($text, 'every check is authenticated')
+    && str_contains($text, 'the files and details for a check do not leave the server') && str_contains($text, 'not reachable from the internet'));
+$check('privacy: section 3 describes the check\'s own restricted access (no contact details; result only; no access to the database for the checking service)',
+    str_contains($text, 'runs under separate system accounts, not as a Staff account') && str_contains($text, 'not your mobile number, email address or home address')
+    && str_contains($text, 'can record only the check result') && str_contains($text, 'cannot open the database or any stored file other than those passed to it'));
+$source = (string) file_get_contents($app . '/web/privacy-policy.php');   // the PHP source, including the internal review notes
+$check('privacy: the internal review notes record that no encryption claim is made and the disk is not encrypted', str_contains($source, 'which is NOT')
+    && str_contains($source, 'encrypted (verified 15 Nov 2026). This text therefore makes no encryption')
+    && !str_contains($source, "worker's encrypted disk") && !str_contains($source, 'security group allows only the website server'));
 $check('privacy: advisory only; Staff decide; results are Staff-only', str_contains($text, 'does not approve or reject requests') && str_contains($text, 'Staff open your original documents and make every decision')
     && str_contains($text, 'Staff only'));
 $check('privacy: the website\'s requirement rules are described separately from the AI model', str_contains($text, "the website's own fixed rules check which documents")
