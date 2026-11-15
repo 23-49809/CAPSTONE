@@ -64,9 +64,15 @@ $check('Step 13: it reaches the worker only through the link socket, set in the 
 $check('no privileges or capabilities can be gained', $one('NoNewPrivileges') === 'yes' && $one('CapabilityBoundingSet') === '' && $one('AmbientCapabilities') === '');
 $check('the whole file system is read-only for it, home folders hidden, nothing writable', $one('ProtectSystem') === 'strict' && $one('ProtectHome') === 'yes'
     && !isset($service['ReadWritePaths']) && !isset($service['ReadOnlyPaths']));
-$check('only its code and the request uploads exist in its view of /var/www (Step 10, R2)', $one('TemporaryFileSystem') === '/var/www:ro'
-    && $words('BindReadOnlyPaths') === ['/var/www/smart-assess/bin/ai-verification-dispatch.php', '/var/www/smart-assess/bin/ai-worker-compat-check.php', '/var/www/smart-assess/web/bootstrap.php',
+$check('only its code and the request uploads exist in its view of /var/www (Step 10, R2)', in_array('/var/www:ro', $service['TemporaryFileSystem'] ?? [], true)
+    && array_values(array_filter($words('BindReadOnlyPaths'), static fn (string $p): bool => str_starts_with($p, '/var/www/'))) === ['/var/www/smart-assess/bin/ai-verification-dispatch.php', '/var/www/smart-assess/bin/ai-worker-compat-check.php', '/var/www/smart-assess/web/bootstrap.php',
         '/var/www/smart-assess/app/services', '/var/www/smart-assess/private_uploads/requests'] && !isset($service['BindPaths']), $words('BindReadOnlyPaths'));
+$check('Step 16: only MySQL\'s socket folder and the worker link exist in its view of /run (snapd, SSH, polkit, systemd and journal sockets are gone)',
+    ($service['TemporaryFileSystem'] ?? []) === ['/var/www:ro', '/run:ro']
+    && array_values(array_filter($words('BindReadOnlyPaths'), static fn (string $p): bool => str_starts_with($p, '/run'))) === ['/run/mysqld', '/run/smart-assess-ai-link'],
+    [$service['TemporaryFileSystem'] ?? null, $words('BindReadOnlyPaths')]);
+$check('Step 16: the dispatcher binds folders, never socket files (a socket recreated by a restart is still seen)',
+    !preg_grep('/\.sock$/', $words('BindReadOnlyPaths')) && !preg_grep('/\.sock$/', $words('BindPaths')));
 $check('the permissions unit is required and runs before every dispatcher run (outside its read-only sandbox)', !str_contains(implode(' ', $service['ExecStartPre'] ?? []), 'permissions')
     && (bool) preg_match('/^Requires=.*smart-assess-ai-dispatch-permissions\.service/m', $unitText) && (bool) preg_match('/^After=.*smart-assess-ai-dispatch-permissions\.service/m', $unitText));
 $permUnit = (string) file_get_contents($app . '/deploy/systemd/smart-assess-ai-dispatch-permissions.service');
@@ -282,6 +288,22 @@ $check('Step 15: the lighttpd configuration takes the address from systemd, and 
     && (bool) preg_match('/^server\.port = 8095$/m', $lighttpdConf) && (bool) preg_match('#"socket" => "/run/smart-assess-ai-worker/fpm\.sock"#', $lighttpdConf));
 $check('Step 15: the guard stops the HTTP socket before lighttpd (or socket activation would start it again)',
     str_contains((string) file_get_contents($app . '/deploy/sbin/smart-assess-ai-egress-guard.sh'), 'smart-assess-ai-worker-http.socket smart-assess-ai-worker.service smart-assess-ai-worker-fpm.service'));
+
+// ---- Step 16: the worker pool survives its own restarts, and sees only what it needs in /run ----
+$check('Step 16: the pool keeps its runtime folder across restarts (automatic or manual), so lighttpd\'s bind of it stays valid',
+    $unitValue($fpmDropIn, 'RuntimeDirectoryPreserve') === ['restart'], $unitValue($fpmDropIn, 'RuntimeDirectoryPreserve'));
+$check('Step 16: lighttpd\'s drop-in only adds to Requires= (never resets it), so the Step 5 unit\'s Requires= on the pool still applies (an explicit stop of the pool stops lighttpd), and it binds exactly the pool\'s folder',
+    !in_array('', $unitValue($lighttpdDropIn, 'Requires'), true) && $unitValue($lighttpdDropIn, 'BindReadOnlyPaths') === ['/run/smart-assess-ai-worker']
+    && $unitValue($fpmDropIn, 'RuntimeDirectory') === [] && $unitValue($fpmDropIn, 'BindsTo') === [] && $unitValue($fpmDropIn, 'PartOf') === []);
+$check('Step 16: the pool sees nothing in /run but its own folder (writable), the Ollama link, the notify socket and the journal\'s syslog socket',
+    $unitValue($fpmDropIn, 'TemporaryFileSystem') === ['/run:ro'] && $unitValue($fpmDropIn, 'BindPaths') === ['/run/smart-assess-ai-worker']
+    && $unitValue($fpmDropIn, 'BindReadOnlyPaths') === ['/run/smart-assess-ai-ollama /run/systemd/notify /run/systemd/journal/dev-log'],
+    [$unitValue($fpmDropIn, 'TemporaryFileSystem'), $unitValue($fpmDropIn, 'BindPaths'), $unitValue($fpmDropIn, 'BindReadOnlyPaths')]);
+$check('Step 16: the pool binds folders, never its socket files (fpm.sock and ollama.sock are recreated on restarts)',
+    !str_contains(implode(' ', $unitValue($fpmDropIn, 'BindPaths')), '.sock') && !str_contains(implode(' ', $unitValue($fpmDropIn, 'BindReadOnlyPaths')), '.sock'));
+$check('Step 16: the folders the pool binds are the ones its configuration uses (FPM socket, Ollama socket)',
+    str_contains($lighttpdConf, '/run/smart-assess-ai-worker/fpm.sock') && str_contains($pool, '/run/smart-assess-ai-ollama/ollama.sock')
+    && $unitValue((string) @file_get_contents($app . '/deploy/systemd/smart-assess-ai-ollama-link.socket'), 'ListenStream') === ['/run/smart-assess-ai-ollama/ollama.sock']);
 
 // ---- systemd's own check, where available ----
 $analyze = trim((string) shell_exec('command -v systemd-analyze 2>/dev/null'));
