@@ -1206,8 +1206,246 @@
   .table-wrap table.dc-table td:not([colspan]):not(.actions-cell),
   .table-wrap table.dc-table td.cell-name, .table-wrap table.dc-table td .cell-sub{ white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; vertical-align:top; }
   .dc-table .badge{ white-space:normal; }
+  .table-wrap table.dc-table td.actions-cell{ vertical-align:top; }
   .ai-guide{ border-top:1px solid var(--line); margin-top:12px; padding-top:4px; }
   .ai-guide-list{ margin:6px 0 0 18px; padding:0; display:grid; gap:4px; }
+
+  /* ================= Staff interface design system (html.staff-ui) =================
+     One light, compact look for every Staff page, modal and table, following the
+     office's Document Check design: white cards on a pale background, bold sans-serif
+     headings with a green accent bar, light table headers, 8px controls, text labels
+     only. Applied only while a Staff account is signed in; Admin and Head are unchanged. */
+  html.staff-ui{ color-scheme:light;
+    --paper:#f4f6f4; --surface:#ffffff; --surface-2:#f3f6f4; --line:#e2e7e3; --line-strong:#cfd8d2;
+    --ink:#17211b; --ink-soft:#3f4a43; --ink-faint:#66726a;
+    --navy:#173f2f; --accent:#1f6f4a; --head-green:#f5f7f5; --row-alt:transparent; --row-hover:#f1f5f2;
+    --st-primary:#1b4332; --st-primary-hover:#245740; --st-bar:#2d6a4f;
+    --st-shadow:0 1px 2px rgba(16,32,24,.05), 0 10px 24px -20px rgba(16,32,24,.28);
+    --st-radius:12px; --sidebar-w:240px; }
+  html.staff-ui body{ font-size:14.5px; line-height:1.5; }
+  html.staff-ui h1, html.staff-ui h2, html.staff-ui h3, html.staff-ui h4, html.staff-ui h5,
+  html.staff-ui .modal.req-detail, html.staff-ui .modal.req-detail *{ font-family:var(--font-body); }
+
+  /* Shell */
+  html.staff-ui .sidebar{ padding:18px 12px 14px; }
+  html.staff-ui .sidebar-art{ display:none; }
+  html.staff-ui .sidebar .sb-brand{ padding:0 4px 18px 6px; gap:10px; }
+  html.staff-ui .sb-brand img{ width:42px; height:42px; }
+  html.staff-ui .sidebar .sb-brand .hb-name{ font-size:17px; }
+  html.staff-ui .sidebar nav{ gap:2px; }
+  html.staff-ui .sidebar .side-link{ font-size:14px; padding:10px 14px; border-radius:8px; }
+  html.staff-ui .main-content{ --main-pad-x:28px; padding:10px var(--main-pad-x) 40px; }
+  html.staff-ui .main-content .app-header{ margin-bottom:6px; }
+  html.staff-ui .main-content .app-header .hd-inner{ min-height:46px; }
+  html.staff-ui .main-content .app-header .hd-avatar .avatar-circle{ width:36px; height:36px; flex:0 0 36px; font-size:13px; background:var(--st-primary); }
+  html.staff-ui .main-content .app-header .hd-avatar .hd-name{ font-size:13.5px; }
+  html.staff-ui .hd-divider{ height:30px; }
+  html.staff-ui .hd-bell{ color:var(--navy); }
+
+  /* Page heading: bold sans-serif title with a green accent bar */
+  html.staff-ui .main-content .page-head{ position:relative; padding:0 0 0 16px; margin:2px 0 18px; align-items:center; gap:12px; }
+  html.staff-ui .main-content .page-head::before{ left:0; right:auto; top:2px; bottom:2px; width:4px; height:auto; border-radius:4px; background:var(--st-bar); }
+  html.staff-ui .main-content .page-head h1{ font-family:var(--font-body); font-weight:700; font-size:clamp(22px,2vw,26px); letter-spacing:-.01em; line-height:1.2; color:var(--navy); text-box:none; }
+  html.staff-ui .main-content .page-head p, html.staff-ui .main-content .page-head .dash-welcome{ margin-top:3px; font-size:14px; color:var(--ink-soft); max-width:860px; }
+  html.staff-ui .page-head-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
+
+  /* Cards and section headings */
+  html.staff-ui .table-wrap, html.staff-ui .panel-card, html.staff-ui .dash-panel, html.staff-ui .notif-card,
+  html.staff-ui .dash-stat, html.staff-ui .dc-stat, html.staff-ui .dc-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--st-radius); box-shadow:var(--st-shadow); }
+  html.staff-ui .panel-card{ padding:18px 20px; margin-bottom:16px; }
+  html.staff-ui .dash-panel{ padding:16px 18px 6px; }
+  html.staff-ui .notif-card{ border-top:1px solid var(--line); padding:18px 20px 20px; }
+  html.staff-ui .notif-card .nc-head{ border-bottom:0; padding-bottom:0; margin-bottom:14px; }
+  html.staff-ui .dash-panel-head h3, html.staff-ui .panel-card h3, html.staff-ui .nc-head h3, html.staff-ui .dc-section-title h2{
+    font-family:var(--font-body); font-size:16px; font-weight:700; color:var(--navy); line-height:1.3; padding-left:11px; border-left:3px solid var(--st-bar); }
+  html.staff-ui .panel-card h3{ margin-bottom:14px; }
+  html.staff-ui .nc-head p, html.staff-ui .dc-section-title p{ font-size:13px; color:var(--ink-faint); margin-top:3px; padding-left:14px; }
+  html.staff-ui .two-col{ gap:16px; }
+  html.staff-ui .review-card{ background:var(--surface-2); border:0; border-radius:10px; padding:6px 14px; }
+
+  /* Dashboard statistics */
+  html.staff-ui .dash-stats{ gap:14px; margin-bottom:16px; }
+  html.staff-ui .dash-stat{ padding:14px 16px; border-radius:var(--st-radius); }
+  html.staff-ui .dash-stat-label{ font-size:13.5px; }
+  html.staff-ui .dash-stat-num{ font-size:28px; padding-top:6px; }
+  html.staff-ui .dash-stat-sub{ font-size:12.5px; }
+  html.staff-ui .staff-dash-grid, html.staff-ui .staff-dash-main{ gap:16px; }
+  html.staff-ui .staff-dash-side{ min-height:360px; }
+
+  /* Tables: light header, compact rows */
+  html.staff-ui thead th{ background:var(--head-green); color:var(--ink-faint); font-size:11px; font-weight:700; letter-spacing:.05em; padding:10px 14px; }
+  html.staff-ui tbody td{ padding:10px 14px; font-size:13.5px; }
+  html.staff-ui tbody tr:hover{ background:var(--row-hover); }
+  html.staff-ui .badge{ border-radius:6px; font-weight:600; padding:3px 8px; }
+  html.staff-ui .table-wrap td .badge{ white-space:normal; line-height:1.3; }
+  html.staff-ui .dash-table-wrap{ border-radius:10px; margin-bottom:10px; }
+  html.staff-ui .dash-table thead th{ background:var(--head-green); color:var(--ink-faint); font-size:11px; padding:9px 12px; }
+  html.staff-ui .dash-table tbody td{ padding:9px 12px; font-size:13.5px; }
+  html.staff-ui .dash-table td.dash-status .badge{ font-size:11.5px; }
+  html.staff-ui .table-wrap table.has-actions th.actions-cell, html.staff-ui .table-wrap table.has-actions td.actions-cell{ width:120px; min-width:0; }
+  html.staff-ui .table-wrap table.has-actions.staff-request-table th.actions-cell,
+  html.staff-ui .table-wrap table.has-actions.staff-request-table td.actions-cell{ width:auto; }
+  html.staff-ui .actions-container{ gap:6px; }
+  html.staff-ui .actions-container .action-button{ height:32px; padding:4px 12px; }
+  html.staff-ui .pager{ padding:10px 14px; }
+  html.staff-ui .empty-state{ padding:32px 16px; }
+  html.staff-ui .dc-table col.dc-c-ref{ width:13%; } html.staff-ui .dc-table col.dc-c-app{ width:18%; } html.staff-ui .dc-table col.dc-c-date{ width:10%; }
+  html.staff-ui .dc-table col.dc-c-ai{ width:15%; } html.staff-ui .dc-table col.dc-c-found{ width:20%; } html.staff-ui .dc-table col.dc-c-rev{ width:12%; } html.staff-ui .dc-table col.dc-c-act{ width:12%; }
+  html.staff-ui .table-wrap table td.mono{ white-space:nowrap; font-size:13px; }
+  html.staff-ui .table-wrap table.dc-table td.actions-cell{ width:auto; }
+
+  /* Buttons and form controls */
+  html.staff-ui .btn{ border-radius:8px; font-size:13.5px; font-weight:600; padding:8px 16px; border-width:1px; }
+  html.staff-ui .btn-sm{ padding:6px 12px; font-size:13px; }
+  html.staff-ui .btn-primary{ background:var(--st-primary); box-shadow:none; }
+  html.staff-ui .btn-primary:hover{ background:var(--st-primary-hover); }
+  html.staff-ui .btn-outline{ color:var(--st-primary); border-color:var(--line-strong); background:var(--surface); }
+  html.staff-ui .btn-outline:hover{ background:var(--surface-2); border-color:var(--st-primary); }
+  html.staff-ui .icon-btn, html.staff-ui .action-btn{ border:1px solid var(--line-strong); border-radius:8px; font-weight:600; background:var(--surface); }
+  html.staff-ui .icon-btn:hover, html.staff-ui .action-btn:hover{ border-color:var(--st-primary); background:var(--surface-2); }
+  html.staff-ui .action-btn.primary{ background:var(--st-primary); border-color:var(--st-primary); }
+  html.staff-ui .field{ gap:5px; margin-bottom:12px; }
+  html.staff-ui .field label{ font-size:12.5px; font-weight:600; color:var(--ink-soft); }
+  html.staff-ui .field input, html.staff-ui .field select, html.staff-ui .field textarea, html.staff-ui .contact-prefix, html.staff-ui .dt-trigger{
+    padding:9px 12px; font-size:14px; border-width:1px; border-radius:8px; }
+  html.staff-ui .search-box input{ padding:9px 12px; border-radius:8px; border-width:1px; font-size:13.5px; }
+  html.staff-ui .toolbar{ gap:8px; margin-bottom:12px; }
+  html.staff-ui .toolbar select{ padding:9px 12px; border-radius:8px; border-width:1px; }
+  html.staff-ui .seg{ border-radius:8px; padding:3px; }
+  html.staff-ui .seg button{ border-radius:6px; padding:6px 13px; }
+  html.staff-ui .seg button.active{ background:var(--st-primary); }
+  html.staff-ui .pager button, html.staff-ui .sent-arrow{ border-width:1px; border-radius:8px; }
+
+  /* Time stamp */
+  html.staff-ui .clock-card{ background:var(--st-primary); border-radius:var(--st-radius); padding:16px 20px; margin-bottom:16px; }
+  html.staff-ui .clock-card .btn-ghost-w{ border-color:rgba(255,255,255,.45); }
+
+  /* Notifications */
+  html.staff-ui .notif-grid{ gap:16px; }
+  html.staff-ui .notif-form .field{ margin-bottom:14px; }
+  html.staff-ui .notif-form select, html.staff-ui .notif-form input[type="text"], html.staff-ui .notif-form textarea, html.staff-ui .notif-form .owner-name-display{ min-height:40px; border-radius:8px; }
+  html.staff-ui .nf-message textarea{ min-height:130px; }
+  html.staff-ui .nf-actions .btn, html.staff-ui .nf-ai{ border-radius:8px; padding:8px 16px; }
+  html.staff-ui .nf-services, html.staff-ui .nf-draft{ border-radius:8px; padding:10px 12px; margin-bottom:14px; }
+  html.staff-ui .sent-tools .search-box input, html.staff-ui .sent-period{ border-radius:8px; height:40px; }
+  html.staff-ui .sent-item{ padding:12px 6px; }
+  html.staff-ui .si-pill{ border-radius:6px; }
+
+  /* Modals */
+  html.staff-ui .modal-overlay{ background:rgba(16,28,22,.45); }
+  html.staff-ui .modal{ border-radius:14px; padding:22px 24px; }
+  html.staff-ui .modal-head{ margin-bottom:14px; }
+  html.staff-ui .modal-head h3{ font-size:18px; font-weight:700; color:var(--navy); }
+  html.staff-ui .modal-close{ background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; color:var(--ink-soft); }
+  html.staff-ui .modal-close:hover{ border-color:var(--st-primary); color:var(--ink); }
+  html.staff-ui .rd-caption{ font-size:14.5px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--navy); padding-left:10px; border-left:3px solid var(--st-bar); }
+  html.staff-ui .rd-block{ margin-bottom:18px; }
+  html.staff-ui .rd-wrap{ border-radius:10px; }
+  html.staff-ui .rd-table th, html.staff-ui .rd-table td{ padding:9px 14px; }
+  html.staff-ui .rd-table thead th{ font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-faint); background:var(--head-green); }
+  html.staff-ui .rd-table tbody th{ background:var(--head-green); color:var(--ink-faint); }
+  html.staff-ui .rd-table thead th{ white-space:normal; line-height:1.35; }
+  html.staff-ui .checklist .dot{ width:10px; height:10px; margin-top:6px; }
+  @media (min-width:761px){
+    html.staff-ui .modal.req-detail{ padding:0 24px 22px; min-height:0; width:94vw; max-width:1240px; }
+    html.staff-ui .modal.req-detail .rd-head{ top:0; margin:0 -24px 16px; padding:14px 24px; }
+  }
+  html.staff-ui .ai-outcome{ border-radius:10px; padding:12px 14px; }
+  html.staff-ui .ai-outcome.tone-green{ background:#eef6f0; border-color:#cfe5d6; }
+  html.staff-ui .ai-outcome.tone-amber{ background:#fdf6ea; border-color:#f0dcb6; }
+  html.staff-ui .ai-outcome.tone-red{ background:#fcefed; border-color:#efc9c3; }
+  html.staff-ui .ai-findings li{ background:var(--surface); border-radius:10px; }
+  html.staff-ui .ai-guide{ background:#f3f6f4; border:0; border-radius:10px; padding:10px 14px 12px; margin-top:14px; }
+  html.staff-ui .ai-guide .rd-caption{ border-left:0; padding-left:0; }
+
+  /* Document Check detail (reference design) */
+  html.staff-ui .dc-stats{ gap:8px; margin-bottom:14px; }
+  html.staff-ui .dc-stat{ padding:7px 12px; border-radius:10px; }
+  .dc-card{ padding:20px 22px; margin-bottom:16px; }
+  .dc-status-card{ text-align:center; padding:28px 22px; }
+  .dc-status-card h2{ font-family:var(--font-body); font-size:20px; font-weight:700; color:var(--ink); margin:12px 0 4px; }
+  .dc-status-card p{ color:var(--ink-soft); font-size:14px; }
+  .dc-progress{ position:relative; height:8px; max-width:520px; margin:16px auto 0; border-radius:999px; background:#e6ebe7; overflow:hidden; }
+  .dc-progress span{ position:absolute; top:0; bottom:0; width:35%; border-radius:999px; background:var(--st-primary, #1b4332); animation:dcSlide 1.6s ease-in-out infinite; }
+  @keyframes dcSlide{ from{ left:-35%; } to{ left:100%; } }
+  .dc-actions{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; }
+  .dc-status-card .dc-actions{ justify-content:center; margin-top:14px; }
+  .dc-results-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .dc-chip{ font-size:12.5px; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border-radius:8px; padding:5px 10px; white-space:nowrap; }
+  .dc-outcome{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; font-size:14px; margin:0 0 16px; }
+  .dc-results-grid{ display:grid; grid-template-columns:minmax(220px, 300px) minmax(0, 1fr); gap:18px; align-items:start; }
+  .dc-docs{ border-right:1px solid var(--line); padding-right:18px; }
+  .dc-docs h3, .dc-panel h3{ font-family:var(--font-body); font-size:14.5px; font-weight:700; color:var(--ink); margin:0 0 8px; }
+  .dc-docs ul{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  .dc-doc{ background:var(--surface-2); border-radius:10px; padding:10px 12px; }
+  .dc-doc-name{ font-weight:600; font-size:13.5px; overflow-wrap:anywhere; }
+  .dc-doc-meta{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; justify-content:space-between; margin-top:6px; }
+  .dc-panels{ display:grid; gap:10px; min-width:0; }
+  .dc-panel{ border-radius:10px; padding:12px 16px; background:var(--surface-2); font-size:13.5px; min-width:0; }
+  .dc-panel.tone-green{ background:#eef6f0; }
+  .dc-panel.tone-amber{ background:#fdf5e7; }
+  .dc-panel.tone-neutral{ background:#f1f4f2; }
+  .dc-panel p{ color:var(--ink-soft); }
+  .dc-panel h4{ font-family:var(--font-body); font-size:12.5px; font-weight:700; color:var(--ink-soft); margin:8px 0 2px; }
+  .dc-issues{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  .dc-issues li{ background:rgba(255,255,255,.7); border-radius:8px; padding:8px 10px; }
+  .dc-issues .ai-f-head{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; font-size:13px; }
+  .dc-issues p{ margin-top:4px; color:var(--ink); }
+  .dc-issues q{ display:block; margin-top:4px; font-size:12px; color:var(--ink-soft); }
+  .dc-results-foot{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .dc-review-note{ margin-top:8px; text-align:right; }
+  .dc-disclaimer{ margin-top:4px; }
+  @media (max-width:900px){
+    .dc-results-grid{ grid-template-columns:minmax(0, 1fr); }
+    .dc-docs{ border-right:0; padding-right:0; border-bottom:1px solid var(--line); padding-bottom:14px; }
+    .dc-review-note{ text-align:left; }
+  }
+
+  /* Laptop widths (1101–1340px): Staff tables stay tables instead of stacked cards. */
+  @media (min-width:1101px) and (max-width:1340px){
+    html.staff-ui .table-wrap{ border:1px solid var(--line); background:var(--surface); }
+    html.staff-ui .table-wrap table, html.staff-ui .table-wrap table.has-actions{ display:table; table-layout:fixed; border-collapse:collapse; }
+    html.staff-ui .table-wrap table thead{ position:static; width:auto; height:auto; overflow:visible; clip:auto; display:table-header-group; }
+    html.staff-ui .table-wrap table thead th{ white-space:normal; }
+    html.staff-ui .table-wrap table tbody{ display:table-row-group; }
+    html.staff-ui .table-wrap table tbody tr{ display:table-row; padding:0; border:0; border-radius:0; background:none; }
+    html.staff-ui .table-wrap table tbody tr:hover{ background:var(--row-hover); }
+    html.staff-ui .table-wrap table tbody td, html.staff-ui .table-wrap table tbody td.cell-name, html.staff-ui .table-wrap table tbody td[colspan],
+    html.staff-ui .table-wrap table tbody td.actions-cell, html.staff-ui .table-wrap table.has-actions tbody td.actions-cell{
+      display:table-cell; padding:10px 12px; border:0; border-bottom:1px solid var(--line); vertical-align:middle; }
+    html.staff-ui .table-wrap table tbody tr:last-child td{ border-bottom:0; }
+    html.staff-ui .table-wrap table tbody td::before{ content:none !important; }
+    html.staff-ui .table-wrap table thead th{ padding:9px 10px; }
+    html.staff-ui .table-wrap table tbody td, html.staff-ui .table-wrap table tbody td.actions-cell, html.staff-ui .table-wrap table.has-actions tbody td.actions-cell{ padding:9px 10px; }
+    html.staff-ui .actions-container .action-button{ padding:4px 9px; }
+  }
+
+  /* Phones and tablets */
+  @media (max-width:900px){
+    html.staff-ui .page-head-actions{ margin-left:0; }
+  }
+  @media (max-width:640px){
+    html.staff-ui .main-content{ --main-pad-x:14px; padding:10px var(--main-pad-x) 36px; }
+    html.staff-ui .main-content .page-head{ margin-bottom:14px; }
+    html.staff-ui .dc-card{ padding:16px; }
+    html.staff-ui .panel-card, html.staff-ui .notif-card{ padding:16px; }
+    html.staff-ui .modal{ padding:18px 16px; }
+  }
+
+  /* Production also loads /assets/internal-tables.css (dark table headers, striped rows,
+     boxed cells) after this stylesheet; these more specific rules keep the Staff tables light. */
+  html.staff-ui .table-wrap table thead th{ color:var(--ink-faint); background-color:var(--head-green); border:0; border-bottom:1px solid var(--line); }
+  html.staff-ui .table-wrap table tbody tr, html.staff-ui .table-wrap table tbody tr:nth-child(even){ background-color:var(--surface); }
+  html.staff-ui .table-wrap table tbody tr:hover{ background-color:var(--row-hover); }
+  html.staff-ui .table-wrap table tbody td{ color:var(--ink); border:0; border-bottom:1px solid var(--line); }
+  html.staff-ui .table-wrap table tbody tr:last-child td{ border-bottom:0; }
+  html.staff-ui .table-wrap table tbody td .cell-sub{ color:var(--ink-faint); }
+  @media (max-width:1100px){
+    html.staff-ui .table-wrap{ border:0; background:transparent; box-shadow:none; }
+    html.staff-ui .table-wrap table tbody tr{ box-shadow:var(--st-shadow); }
+    html.staff-ui .table-wrap table tbody td{ border:0; }
+    html.staff-ui .table-wrap table tbody td.actions-cell{ border-top:1px solid var(--line); }
+  }
 </style>
 
 <div id="app"></div>
@@ -1681,10 +1919,21 @@ if(!window._saDrawerKeys){
   document.addEventListener('keydown', function(ev){ if(ev.key==='Escape' && state.sidebarOpen){ setSidebar(false); } });
   window.matchMedia('(min-width:901px)').addEventListener('change', function(e){ if(e.matches && state.sidebarOpen){ state.sidebarOpen = false; render(); } });
 }
+/* Staff interface design system: the Staff pages use one light, compact theme
+   (html.staff-ui, styles at the end of the stylesheet). Admin and Head keep the
+   original look and the device's light/dark preference. */
+function applyRoleTheme(acct){
+  var root = document.documentElement, staff = !!(acct && acct.role==='staff');
+  root.classList.toggle('staff-ui', staff);
+  if(staff){ root.setAttribute('data-theme','light'); root.setAttribute('data-staff-theme','1'); }
+  else if(root.hasAttribute('data-staff-theme')){ root.removeAttribute('data-theme'); root.removeAttribute('data-staff-theme'); }
+}
+
 function render(){
   publishDueAnnouncements();
   document.body.classList.toggle('drawer-open', !!state.sidebarOpen);
   var app = document.getElementById('app');
+  applyRoleTheme(state.session ? currentAccount() : null);
   if(!state.session){
     app.innerHTML = renderLogin();
     saveState();
@@ -1694,6 +1943,7 @@ function render(){
   var acct = currentAccount();
   if(!acct || acct.status!=='active'){
     state.session = null;
+    applyRoleTheme(null);
     app.innerHTML = renderLogin();
     saveState();
     bindEvents();
@@ -2513,7 +2763,7 @@ function renderTimestamp(acct){
   var today = '2026-09-04';
   var clocked = state.todayClock[acct.username]||{};
   return ''
-  + '<div class="page-head"><div><h1>Time Stamp Tracking</h1><p>Your daily attendance record and time-in/time-out log.</p></div></div>'
+  + '<div class="page-head"><div><h1>Time Stamp Tracking</h1><p>Record your time in and time out, and review your attendance.</p></div></div>'
   + '<div class="clock-card">'
     + '<div><div class="cc-status">Today — '+fmtDate(today)+'</div><div class="cc-time">'+(clocked.timeIn?('Time In: '+clocked.timeIn):'Not yet timed in')+(clocked.timeOut?(' &middot; Time Out: '+clocked.timeOut):'')+'</div></div>'
     + '<div style="display:flex;gap:10px;">'
@@ -2589,7 +2839,7 @@ function renderDocRequests(acct){
   });
   var pg = paginate(list, 'docRequests');
   return ''
-  + '<div class="page-head"><div><h1>Document Requests</h1><p>Review, check requirements, and update the status of submitted requests.</p></div></div>'
+  + '<div class="page-head"><div><h1>Document Requests</h1><p>Review submitted document requests and update their status.</p></div></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docRequests)+'" data-input="search-doc"></div>'
     + '<select data-input="filter-doc-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
@@ -2608,7 +2858,7 @@ function renderLandRequests(acct){
   });
   var pg = paginate(list, 'landRequests');
   return ''
-  + '<div class="page-head"><div><h1>Land Transfer Requests</h1><p>Review documents, check requirements, and track land transfer transactions.</p></div></div>'
+  + '<div class="page-head"><div><h1>Land Transfer Requests</h1><p>Review land transfer requests and update their status.</p></div></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.landRequests)+'" data-input="search-land"></div>'
     + '<select data-input="filter-land-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
@@ -2629,6 +2879,9 @@ var AI_CHECK_STATES = {
   running:['Checking now','blue'], waiting:['Waiting to be checked','blue'], failed:['Could not finish','red'],
   none:['Not checked yet','slate'], before:['Submitted before AI checks','slate'], off:['AI check not enabled','slate']
 };
+/* Finding labels shared by the request popup and the Document Check page. */
+var AI_FINDING_CAT = {missing_information:['Missing information','red'], possible_inconsistency:['Possible inconsistency','amber'], ocr_uncertainty:['Reading problem','amber'], cannot_verify:['Cannot be verified from text','slate']};
+var AI_FINDING_SRC = {requirements:'Requirement check', ocr:'Text reading', rule:'Automatic comparison', model:'AI suggestion (unverified)'};
 var AI_CHECK_FILTERS = [['attention','Needs Staff review'],['all','All requests'],['reviewed','Reviewed'],['clear','No concerns found'],
   ['inprogress','Waiting or checking'],['failed','Could not finish'],['unchecked','Not checked']];
 function aiCheckState(r){
@@ -2661,11 +2914,15 @@ function aiFindingSummary(ai){
   return parts;
 }
 function renderDocumentCheck(acct){
+  var all = docCheckItems();
+  if(state.docCheckRef){
+    var sel = null;
+    all.forEach(function(x){ if(x.kind===state.docCheckRef.kind && String(x.r.id)===String(state.docCheckRef.id)) sel = x; });
+    if(sel) return renderDocCheckDetail(sel);
+    state.docCheckRef = null;
+  }
   var q = (state.search.docCheck||'').toLowerCase();
   var filterF = state.filters.docCheck || 'attention';
-  var all = state.docRequests.map(function(r){ return {r:r, kind:'doc', type:r.docType}; })
-    .concat(state.landRequests.map(function(r){ return {r:r, kind:'land', type:r.transferType ? 'Land Transfer: '+r.transferType : 'Land Transfer'}; }));
-  all.forEach(function(x){ x.state = aiCheckState(x.r); });
   var counts = {};
   all.forEach(function(x){ counts[x.state] = (counts[x.state]||0)+1; });
   var inFilter = function(s){
@@ -2684,13 +2941,14 @@ function renderDocumentCheck(acct){
     return '<div class="dc-stat"><span class="badge '+m[1]+'">'+esc(label||m[0])+'</span><strong>'+(counts[key]||0)+'</strong></div>';
   };
   return ''
-  + '<div class="page-head"><div><h1>Document Check</h1><p>AI Document Check results for every request: what was found, what to check, and what to ask the client. The results are advice only; Staff open the originals and decide.</p></div></div>'
+  + '<div class="page-head"><div><h1>Document Check</h1><p>OCR reads the uploaded documents and the AI compares them with the request. Results are advice only; Staff open the originals and decide.</p></div></div>'
   + '<div class="dc-stats" aria-label="Document Check summary">'+stat('attention')+stat('waiting')+stat('running')+stat('failed')+stat('reviewed')+stat('clear')+'</div>'
   + '<div class="toolbar">'
     + '<div class="search-box"><input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docCheck||'')+'" data-input="search-doc-check" aria-label="Search Document Check"></div>'
     + '<select data-input="filter-doc-check" aria-label="Show">'+AI_CHECK_FILTERS.map(function(o){ return '<option value="'+o[0]+'"'+(filterF===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'
   + '</div>'
-  + '<div class="table-wrap"><table class="has-actions dc-table"><thead><tr><th>Reference No.</th><th>Applicant / Request</th><th>Date Submitted</th><th>AI Check</th><th>What was found</th><th>Staff Review</th><th>Action</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="has-actions dc-table"><colgroup><col class="dc-c-ref"><col class="dc-c-app"><col class="dc-c-date"><col class="dc-c-ai"><col class="dc-c-found"><col class="dc-c-rev"><col class="dc-c-act"></colgroup>'
+  + '<thead><tr><th>Reference No.</th><th>Applicant / Request</th><th>Date Submitted</th><th>AI Check</th><th>What was found</th><th>Staff Review</th><th>Action</th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(x){
       var r = x.r, ai = r.ai, m = AI_CHECK_STATES[x.state];
       var found = ai && (ai.status==='completed' || ai.status==='needs_manual_review')
@@ -2704,10 +2962,124 @@ function renderDocumentCheck(acct){
         + '<td data-label="AI Check"><span class="badge '+m[1]+'">'+esc(m[0])+'</span>'+(ai && ai.completedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.completedAt))+'</div>' : '')+'</td>'
         + '<td data-label="What was found">'+esc(found)+'</td>'
         + '<td data-label="Staff Review">'+review+'</td>'
-        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-'+x.kind+'-req" data-id="'+esc(r.id)+'">Open check</button></div></td></tr>';
+        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="dc-open" data-kind="'+x.kind+'" data-id="'+esc(r.id)+'">Open check</button></div></td></tr>';
     }).join('') : '<tr><td colspan="7"><div class="empty-state">No requests match this view.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('docCheck', pg)+'</div>'
-  + '<p class="ai-note">The AI check reads the uploaded files with OCR and points out possible problems. It can be wrong, never approves or rejects a request, and cannot tell whether a document, signature or seal is genuine. Always open the originals.</p>';
+  + docCheckDisclaimer();
+}
+
+function docCheckItems(){
+  var all = state.docRequests.map(function(r){ return {r:r, kind:'doc', type:r.docType}; })
+    .concat(state.landRequests.map(function(r){ return {r:r, kind:'land', type:r.transferType ? 'Land Transfer: '+r.transferType : 'Land Transfer'}; }));
+  all.forEach(function(x){ x.state = aiCheckState(x.r); });
+  return all;
+}
+
+/* "Checked in 1 min 14 s" from the job's own start and finish times (no estimate). */
+function aiDurationText(ai){
+  if(!ai || !ai.startedAt || !ai.completedAt) return '';
+  var p = function(s){ return new Date(String(s).replace(' ', 'T')).getTime(); };
+  var secs = Math.round((p(ai.completedAt) - p(ai.startedAt)) / 1000);
+  if(!isFinite(secs) || secs < 0 || secs > 86400) return '';
+  return secs < 60 ? secs+' s' : Math.floor(secs/60)+' min'+(secs%60 ? ' '+(secs%60)+' s' : '');
+}
+
+/* One request's AI Document Check, laid out like the office's Document Check design:
+   documents on the left; data extraction, issues found and recommendation on the right.
+   Every original opens through /request-file.php (Staff only; opening is recorded). */
+function renderDocCheckDetail(x){
+  var r = x.r, ai = r.ai, st = x.state, m = AI_CHECK_STATES[st];
+  var elig = r.aiEligibility || {eligible:false, reason:'not_enabled'};
+  var finished = ai && (ai.status==='completed' || ai.status==='needs_manual_review');
+  var html = '<div class="page-head"><div><h1>Document Check</h1><p><span class="mono">'+esc(r.id)+'</span> &middot; '+esc(r.applicant)+' &middot; '+esc(x.type||'')+'</p></div>'
+    + '<div class="page-head-actions"><button type="button" class="btn btn-outline btn-sm" data-action="dc-back">Back to list</button>'
+    + '<button type="button" class="btn btn-outline btn-sm" data-action="view-'+x.kind+'-req" data-id="'+esc(r.id)+'">Open full request</button></div></div>';
+  var runBtn = function(text){ return elig.eligible ? '<button type="button" class="btn btn-outline btn-sm" data-action="ai-requeue" data-ref="'+esc(r.id)+'">'+esc(text)+'</button>' : ''; };
+
+  if(!finished){
+    var title = {waiting:'Waiting to be checked', running:'Checking documents…', failed:'The check could not finish', none:'Not checked yet',
+      before:'Not checked by AI', off:'AI check not enabled'}[st] || m[0];
+    var sub = st==='waiting' ? 'The check runs in the background. Reload this page later to see the result.'
+      : st==='running' ? 'OCR is reading the uploaded documents and comparing them with the request.'
+      : st==='failed' ? 'Inspect the documents manually, or run the check again.'
+      : st==='none' ? 'No AI check has been run for this request.'
+      : st==='before' ? 'This request was submitted before the Privacy Policy described the AI document check. Inspect its documents manually.'
+      : 'AI document checking is not enabled on this server. Inspect the documents manually.';
+    html += '<section class="dc-card dc-status-card" aria-live="polite">'
+      + '<span class="badge '+m[1]+'">'+esc(m[0])+'</span>'
+      + '<h2>'+esc(title)+'</h2><p>'+esc(sub)+'</p>'
+      + ((st==='waiting' || st==='running') ? '<div class="dc-progress" role="progressbar" aria-label="'+esc(title)+'"><span></span></div>' : '')
+      + (ai && ai.error ? '<p class="ai-note">'+esc(ai.error)+(ai.status==='pending' && ai.nextAttemptAt ? ' Next try: '+esc(fmtDateTime(ai.nextAttemptAt))+'.' : '')+'</p>' : '')
+      + ((st==='none' || st==='failed') ? '<div class="dc-actions">'+runBtn(st==='none' ? 'Run AI check' : 'Run check again')+'</div>' : '')
+      + '</section>';
+    return html + docCheckDisclaimer();
+  }
+
+  var outcome = {passed:['No concerns found','green'], needs_review:['Needs review','amber'], missing_information:['Missing information','red']}[ai.outcome] || ['Needs review','amber'];
+  var dur = aiDurationText(ai);
+  var chip = dur ? 'Checked in '+dur : (ai.completedAt ? 'Checked '+fmtDateTime(ai.completedAt) : '');
+  var fileByKey = {};
+  (r.files||[]).forEach(function(f){ if(f.key) fileByKey[f.key] = f; });
+  var docs = ai.documents || [];
+  var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
+  var docsHtml = docs.length ? docs.map(function(d){
+      var f = fileByKey[d.key], badge;
+      if(d.requirement==='missing') badge = ['Not uploaded','red'];
+      else if(d.ocr_status==='failed' || d.readability==='unreadable') badge = ['Could not be read','red'];
+      else if(d.readability==='poor' || d.readability==='partial') badge = [readText[d.readability],'amber'];
+      else if(d.requirement==='uploaded_invalid_format') badge = ['Unusual file type','amber'];
+      else badge = ['Readable','green'];
+      var open = f && f.name && f.available===false ? '<span class="cell-sub">Cannot be opened</span>'
+        : f && f.name ? '<a class="btn btn-outline btn-sm" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener">Open original</a>' : '';
+      return '<li class="dc-doc"><div class="dc-doc-name">'+esc(d.label)+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</div>'
+        + '<div class="dc-doc-meta"><span class="badge '+badge[1]+'">'+esc(badge[0])+'</span>'+open+'</div></li>';
+    }).join('') : '<li class="dc-doc"><span class="cell-sub">No document details were returned.</span></li>';
+
+  var uploaded = docs.filter(function(d){ return d.requirement!=='missing'; });
+  var read = uploaded.filter(function(d){ return d.ocr_status!=='failed' && (d.readability==='good' || d.readability==='partial'); });
+  var extractTone = uploaded.length && read.length===uploaded.length ? 'green' : 'amber';
+  var extractText = uploaded.length
+    ? 'Text was read from '+read.length+' of '+uploaded.length+' uploaded file'+(uploaded.length===1?'':'s')+(ai.ocrEngine ? ' ('+ai.ocrEngine+' OCR)' : '')+'.'
+      + (read.length<uploaded.length ? ' Files that could not be read reliably must be checked by eye.' : '')
+    : 'No uploaded files to read.';
+
+  var findings = ai.findings || [];
+  var issuesHtml = findings.length ? '<ul class="dc-issues">'+findings.map(function(f){
+      var c = (f.category==='missing_information' && f.source!=='requirements') ? ['Possibly missing (not confirmed)','amber'] : (AI_FINDING_CAT[f.category] || [f.category,'slate']);
+      return '<li><div class="ai-f-head"><span class="badge '+c[1]+'">'+esc(c[0])+'</span>'+(f.documents && f.documents.length ? '<b>'+esc(f.documents.join(', '))+'</b>' : '')
+        + '<span class="cell-sub">'+esc(AI_FINDING_SRC[f.source]||f.source)+'</span></div><p>'+esc(f.explanation)+'</p>'
+        + (f.evidence ? '<q><span class="cell-sub">Text read from the document (OCR, may contain reading errors):</span> '+esc(f.evidence)+'</q>' : '')+'</li>';
+    }).join('')+'</ul>' : '<p>No issues found.</p>';
+  var g = aiGuidance(r);
+  var li = function(items){ return '<ul class="ai-guide-list">'+items.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>'; };
+  var recHtml = (g.check.length ? '<h4>What to check</h4>'+li(g.check) : '<p>Open the originals to confirm the result.</p>')
+    + (g.ask.length ? '<h4>What to ask the client (if needed)</h4>'+li(g.ask) : '');
+
+  html += '<section class="dc-card dc-results" aria-labelledby="dc-results-title">'
+    + '<div class="dc-results-head"><div class="dc-section-title"><h2 id="dc-results-title">AI Analysis Results</h2><p>What the automatic check found in the uploaded documents.</p></div>'
+      + (chip ? '<span class="dc-chip">'+esc(chip)+'</span>' : '')+'</div>'
+    + '<div class="dc-outcome"><span class="badge '+outcome[1]+'">'+esc(outcome[0])+'</span><span>'+esc(ai.reason||'')+'</span></div>'
+    + '<div class="dc-results-grid">'
+      + '<div class="dc-docs"><h3>Documents</h3><ul>'+docsHtml+'</ul></div>'
+      + '<div class="dc-panels">'
+        + '<div class="dc-panel tone-'+extractTone+'"><h3>Data extraction</h3><p>'+esc(extractText)+'</p></div>'
+        + '<div class="dc-panel tone-'+(findings.length ? 'amber' : 'green')+'"><h3>Issues found'+(findings.length ? ' ('+findings.length+')' : '')+'</h3>'+issuesHtml+'</div>'
+        + '<div class="dc-panel tone-neutral"><h3>Recommendation</h3>'+recHtml+'</div>'
+      + '</div>'
+    + '</div>'
+    + '<div class="dc-results-foot">'
+      + '<p class="cell-sub">'+esc([ai.model ? 'Model: '+ai.model : '', 'Attempts: '+ai.attempts+' of '+ai.maxAttempts].filter(Boolean).join(' · '))+'</p>'
+      + '<div class="dc-actions">'+runBtn('Run check again')
+        + (ai.reviewed ? '<span class="badge slate">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>'
+          : '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button>')
+      + '</div>'
+    + '</div>'
+    + (ai.reviewed ? '' : '<p class="cell-sub dc-review-note">Open every original that can be opened before marking as reviewed; the server checks that you have. Opening is recorded, not proof of inspection.</p>')
+  + '</section>';
+  return html + docCheckDisclaimer();
+}
+function docCheckDisclaimer(){
+  return '<p class="ai-note dc-disclaimer">The AI check can be wrong. It never approves or rejects a request and cannot tell whether a document, signature or seal is genuine. Nothing is sent to the client automatically.</p>';
 }
 
 function renderRequirementResults(acct){
@@ -2721,7 +3093,7 @@ function renderRequirementResults(acct){
     return matchQ && matchR;
   });
   return ''
-  + '<div class="page-head"><div><h1>Requirement Checking Results</h1><p>Results from the AI Rule-Based Requirement Checker for every submitted request.</p></div></div>'
+  + '<div class="page-head"><div><h1>Requirement Checking Results</h1><p>Rule-based requirement check for each submitted request.</p></div></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.reqResults)+'" data-input="search-req"></div>'
     + '<div class="seg">'
@@ -2942,7 +3314,7 @@ function renderNotifications(acct){
       + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="next" aria-label="Next page"'+(pg.page>=pg.totalPages?' disabled':'')+'>Next</button></div>'
     : '';
   return ''
-  + '<div class="page-head"><div><h1>Notifications</h1><p>Send updates to one client by SMS or email, and review what has been sent. Status changes never send SMS or email; clients see them in request tracking.</p></div></div>'
+  + '<div class="page-head"><div><h1>Notifications</h1><p>Send an SMS or email update to one client and review sent messages. Status changes never send SMS or email; clients see them in request tracking.</p></div></div>'
   + '<div class="notif-page"><div class="notif-grid">'
     + '<section class="notif-card notif-send">'
       + '<div class="nc-head"><div><h3>Send a Notification</h3><p>Nothing is sent until you click Send Notification. Review the recipient and message first.</p></div></div>'
@@ -2972,7 +3344,7 @@ function renderNotifications(acct){
       + '</form>'
     + '</section>'
     + '<section class="notif-card notif-sent" aria-labelledby="sent-notifs-title">'
-      + '<div class="nc-head"><div><h3 id="sent-notifs-title">Notification History</h3><p>SMS and email messages sent by staff, and status updates shown in request tracking.</p></div></div>'
+      + '<div class="nc-head"><div><h3 id="sent-notifs-title">Notification History</h3><p>Messages sent by Staff, and status updates shown in request tracking.</p></div></div>'
       + '<div class="sent-tools"><div class="sent-tools-row"><div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by reference number, client name…" value="'+esc((state.search && state.search.sentNotifs)||'')+'" data-input="search-sent-notifs" aria-label="Search notification history"></div>'
         + '<select class="sent-period" data-input="filter-sent-period" aria-label="Sent date">'+SENT_PERIODS.map(function(o){ return '<option value="'+o[0]+'"'+(period===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></div>'
         + (period==='custom' ? '<div class="sent-filters">'
@@ -3372,8 +3744,7 @@ function reqAiHtml(r){
         }).join('') + '</tbody></table></div>';
   }
   if(ai.findings && ai.findings.length){
-    var catText = {missing_information:['Missing information','red'], possible_inconsistency:['Possible inconsistency','amber'], ocr_uncertainty:['Reading problem','amber'], cannot_verify:['Cannot be verified from text','slate']};
-    var srcText = {requirements:'Requirement check', ocr:'Text reading', rule:'Automatic comparison', model:'AI suggestion (unverified)'};
+    var catText = AI_FINDING_CAT, srcText = AI_FINDING_SRC;
     html += '<h5 class="rd-caption" style="margin-top:14px">Findings</h5><ul class="ai-findings">'
       + ai.findings.map(function(f){
           var c = (f.category==='missing_information' && f.source!=='requirements') ? ['Possibly missing (not confirmed)','amber'] : (catText[f.category] || [f.category,'slate']);
@@ -3402,10 +3773,9 @@ function reqAiHtml(r){
 /* "What to check" and "What to ask the client": written here from the server's validated
    finding codes (category, field, source) and the server's document labels only, never from
    text the AI wrote. Suggestions for Staff, not decisions. */
-function aiGuidanceHtml(r){
-  var ai = r.ai;
-  if(!ai || !(ai.status==='completed' || ai.status==='needs_manual_review') || !ai.findings || !ai.findings.length) return '';
-  var check = [], ask = [];
+function aiGuidance(r){
+  var ai = r.ai, check = [], ask = [];
+  if(!ai || !(ai.status==='completed' || ai.status==='needs_manual_review') || !ai.findings || !ai.findings.length) return {check:check, ask:ask};
   var add = function(list, text){ if(text && list.indexOf(text)===-1) list.push(text); };
   ai.findings.forEach(function(f){
     var docs = f.documents && f.documents.length ? f.documents.join(', ') : 'the documents';
@@ -3440,6 +3810,11 @@ function aiGuidanceHtml(r){
       add(check, 'Inspect '+docs+' yourself: signatures, seals and notarization can only be judged from the original document.');
     }
   });
+  return {check:check, ask:ask};
+}
+function aiGuidanceHtml(r){
+  var g = aiGuidance(r), check = g.check, ask = g.ask;
+  if(!check.length && !ask.length) return '';
   var li = function(items){ return '<ul class="ai-guide-list">'+items.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>'; };
   return '<div class="ai-guide"><h5 class="rd-caption" style="margin-top:14px">What to check</h5>'+li(check)
     + (ask.length ? '<h5 class="rd-caption" style="margin-top:10px">What to ask the client (if needed)</h5>'+li(ask) : '')
@@ -4131,6 +4506,14 @@ function bindEvents(){
       state.view = el.getAttribute('data-view');
       state.sidebarOpen = false;
       state.modal = null;
+      state.docCheckRef = null;
+      render();
+    } else if(action==='dc-open'){
+      state.docCheckRef = {kind:el.getAttribute('data-kind'), id:el.getAttribute('data-id')};
+      state.modal = null;
+      render(); window.scrollTo(0,0);
+    } else if(action==='dc-back'){
+      state.docCheckRef = null;
       render();
     } else if(action==='nav-notify'){
       state.modal = null;
