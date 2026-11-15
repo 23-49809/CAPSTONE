@@ -1188,6 +1188,26 @@
     .sr-card, .notif-card, .panel-card{ padding:12px; }
     .modal{ padding:16px 12px; }
   }
+
+  /* ============ Text-only controls (icons removed from the internal interface) ============ */
+  .icon{ display:none !important; }
+  .pager button, .cal-nav, .modal-close, .sb-close, .hd-bell, .hd-menu-btn, .sent-arrow, .send-more, .password-toggle,
+  .composer-discard, .sched-chip-x, .sched-cal-head button{ width:auto !important; min-width:0; height:auto; min-height:30px; padding:4px 10px;
+    border-radius:8px; font-size:13px; font-weight:600; line-height:1.2; white-space:nowrap; }
+  .hd-bell, .hd-menu-btn{ min-height:38px; }
+  .modal.req-detail .rd-close{ height:auto; font-size:13px; font-weight:600; line-height:1.2; }
+  .sidebar .side-link{ gap:0; }
+
+  /* ============ Document Check ============ */
+  .dc-stats{ display:flex; flex-wrap:wrap; gap:10px; margin:0 0 16px; }
+  .dc-stat{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  .dc-stat strong{ font-size:18px; }
+  /* Findings and AI status must be readable in full, so these cells wrap instead of being cut off. */
+  .table-wrap table.dc-table td:not([colspan]):not(.actions-cell),
+  .table-wrap table.dc-table td.cell-name, .table-wrap table.dc-table td .cell-sub{ white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; vertical-align:top; }
+  .dc-table .badge{ white-space:normal; }
+  .ai-guide{ border-top:1px solid var(--line); margin-top:12px; padding-top:4px; }
+  .ai-guide-list{ margin:6px 0 0 18px; padding:0; display:grid; gap:4px; }
 </style>
 
 <div id="app"></div>
@@ -1248,7 +1268,9 @@ var ICONS = {
   building: svg('<rect x="5" y="2" width="14" height="20" rx="1"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><line x1="10" y1="22" x2="10" y2="18"/><line x1="14" y1="22" x2="14" y2="18"/>'),
   printIcon: svg('<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>')
 };
-function ic(name, size){ return '<span class="icon" style="width:'+(size||'17px')+';height:'+(size||'17px')+'">'+ICONS[name]+'</span>'; }
+/* Icons were removed from the internal interface (text labels only). ic() is kept so existing
+   call sites stay valid; it renders nothing. Icon-only controls carry a text label instead. */
+function ic(name, size){ return ''; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}); }catch(e){ return iso; } }
 function fmtDateTime(iso){ try{ return new Date(iso).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return iso; } }
@@ -1496,8 +1518,8 @@ function pagerHtml(key, pageInfo){
   if(pageInfo.total===0) return '';
   return '<div class="pager"><span>Showing '+((pageInfo.page-1)*8+1)+'–'+Math.min(pageInfo.page*8,pageInfo.total)+' of '+pageInfo.total+'</span>'
     + '<div class="pbtns">'
-    + '<button data-action="page" data-key="'+key+'" data-dir="prev" aria-label="Previous page" '+(pageInfo.page<=1?'disabled':'')+'>'+ic('chevLeft','15px')+'</button>'
-    + '<button data-action="page" data-key="'+key+'" data-dir="next" aria-label="Next page" '+(pageInfo.page>=pageInfo.totalPages?'disabled':'')+'>'+ic('chevRight','15px')+'</button>'
+    + '<button data-action="page" data-key="'+key+'" data-dir="prev" aria-label="Previous page" '+(pageInfo.page<=1?'disabled':'')+'>Previous</button>'
+    + '<button data-action="page" data-key="'+key+'" data-dir="next" aria-label="Next page" '+(pageInfo.page>=pageInfo.totalPages?'disabled':'')+'>Next</button>'
     + '</div></div>';
 }
 
@@ -1522,6 +1544,7 @@ var NAV = {
     {view:'timestamp', label:'Time Stamp Tracking', icon:'timer'},
     {view:'document-requests', label:'Document Requests', icon:'doc'},
     {view:'land-transfer-requests', label:'Land Transfer Requests', icon:'swap'},
+    {view:'document-check', label:'Document Check', icon:'checklistIcon'},
     {view:'requirement-results', label:'Requirement Checking Results', icon:'checklistIcon'},
     {view:'notifications', label:'Notifications', icon:'sms'},
     {view:'profile', label:'Profile', icon:'user'}
@@ -1708,7 +1731,7 @@ function renderLogin(){
     + (err ? '<div class="login-error">'+ic('alert','16px')+'<span>'+esc(err)+'</span></div>' : '')
     + '<form data-form="login">'
       + '<div class="field"><label for="li-user">Username</label><input id="li-user" name="username" type="text" placeholder="e.g. jessica.staff" autocomplete="username" required></div>'
-      + '<div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">'+ic('eye','19px')+'</button></div></div>'
+      + '<div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">Show</button></div></div>'
       + '<button type="submit" class="btn btn-primary btn-block">Sign In</button>'
     + '</form>'
     + '<div class="login-note">Sign-in is restricted to authorized Assessor’s Office personnel.</div>'
@@ -1722,24 +1745,24 @@ function shellChrome(acct, innerHtml){
   var navHtml = nav.map(function(item){
     var active = state.view===item.view;
     return '<button class="side-link'+(active?' active':'')+'" data-action="nav" data-view="'+item.view+'"'+(active?' aria-current="page"':'')+'>'
-      + '<span class="icon">'+ICONS[item.icon]+'</span><span>'+esc(item.label)+'</span></button>';
+      + '<span>'+esc(item.label)+'</span></button>';
   }).join('');
   return ''
   + '<div class="app-body">'
     + '<aside class="sidebar'+(state.sidebarOpen?' open':'')+'" id="app-sidebar" aria-label="Main navigation">'
       + SIDEBAR_ART
       + '<div class="sb-brand"><img src="data:image/png;base64,'+LOGO_B64+'" alt="Bayan ng Mabini seal"><div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor’s Office System</div></div>'
-        + '<button type="button" class="sb-close" data-action="close-sidebar" aria-label="Close menu">'+ic('x','20px')+'</button></div>'
+        + '<button type="button" class="sb-close" data-action="close-sidebar" aria-label="Close menu">Close</button></div>'
       + '<div class="sidebar-label">Menu</div><nav>'+navHtml+'</nav>'
       + '<div class="sidebar-foot"><button class="side-link" data-action="logout">'+ic('logout','18px')+'<span>Logout</span></button></div>'
     + '</aside>'
     + '<div class="sidebar-backdrop'+(state.sidebarOpen?' open':'')+'" data-action="close-sidebar" aria-hidden="true"></div>'
     + '<main class="main-content role-'+esc(acct.role)+'">'
       + '<header class="app-header"><div class="hd-inner">'
-        + '<button type="button" class="hd-menu-btn" data-action="toggle-sidebar" aria-controls="app-sidebar" aria-expanded="'+(state.sidebarOpen?'true':'false')+'" aria-label="Open menu">'+ic('menu','22px')+'</button>'
+        + '<button type="button" class="hd-menu-btn" data-action="toggle-sidebar" aria-controls="app-sidebar" aria-expanded="'+(state.sidebarOpen?'true':'false')+'" aria-label="Open menu">Menu</button>'
         + '<div class="hd-mobile-brand" aria-hidden="true"><img src="data:image/png;base64,'+LOGO_B64+'" alt=""><span>Smart Assess</span></div>'
         + '<div class="hd-right">'
-          + (acct.role==='staff' ? '<button class="hd-bell" data-action="nav" data-view="notifications" aria-label="Notifications" title="Notifications">'+ic('bell')+'</button><span class="hd-divider" aria-hidden="true"></span>' : '')
+          + (acct.role==='staff' ? '<button class="hd-bell" data-action="nav" data-view="notifications" aria-label="Notifications" title="Notifications">Notifications</button><span class="hd-divider" aria-hidden="true"></span>' : '')
           + '<button class="hd-avatar" data-action="nav" data-view="profile"><span class="avatar-circle">'+esc(initials(acct.fullName))+'</span><span><span class="hd-name">'+esc(acct.fullName)+'</span>'+(acct.role==='admin'?'':'<br><span class="hd-role">'+esc(acct.position)+'</span>')+'</span></button>'
         + '</div>'
       + '</div></header>'
@@ -1771,6 +1794,7 @@ function renderShell(acct){
     else if(view==='timestamp') body = renderTimestamp(acct);
     else if(view==='document-requests') body = renderDocRequests(acct);
     else if(view==='land-transfer-requests') body = renderLandRequests(acct);
+    else if(view==='document-check') body = renderDocumentCheck(acct);
     else if(view==='requirement-results') body = renderRequirementResults(acct);
     else if(view==='notifications') body = renderNotifications(acct);
     else if(view==='profile') body = renderProfile(acct);
@@ -1789,7 +1813,7 @@ function renderConfirm(){
   if(!state.confirm) return '';
   var c = state.confirm;
   return '<div class="modal-overlay" data-action="close-confirm"><div class="modal narrow fade-in">'
-    + '<div class="modal-head"><div><h3>'+esc(c.title)+'</h3></div><button class="modal-close" data-action="close-confirm">'+ic('x','15px')+'</button></div>'
+    + '<div class="modal-head"><div><h3>'+esc(c.title)+'</h3></div><button class="modal-close" data-action="close-confirm">Close</button></div>'
     + '<p style="font-size:13.5px;color:var(--ink-soft);">'+esc(c.message)+'</p>'
     + '<div class="modal-foot"><button class="btn btn-outline" data-action="close-confirm">Cancel</button>'
     + '<button class="btn btn-primary" style="'+(c.danger?'background:var(--danger);':'')+'" data-action="confirm-yes">'+esc(c.confirmLabel||'Confirm')+'</button></div>'
@@ -1864,7 +1888,7 @@ function renderStaffAccounts(acct, jumpToInfo){
           + '<button class="icon-btn action-button staff-action-view" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
           + '<button class="icon-btn action-button staff-action-edit" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
           + '<button class="icon-btn action-button staff-action-status" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
-          + '<button class="icon-btn action-button archive-button" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">'+ic('archive','13px')+'</button>'
+          + '<button class="icon-btn action-button archive-button" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">Archive</button>'
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('users','30px')+'No staff accounts match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('staffAccounts', pg)+'</div>';
@@ -2120,7 +2144,7 @@ function srStatCard(label, value, prev, tone, worseIsUp){
   if(prev>0){
     var pct = Math.round((value-prev)/prev*100);
     var up = pct>0, bad = worseIsUp ? up : (pct<0);
-    delta = '<span class="sr-delta '+(pct===0?'flat':(bad?'bad':'good'))+'">'+(pct===0?'→':(up?'↗':'↘'))+' '+Math.abs(pct)+'%</span>';
+    delta = '<span class="sr-delta '+(pct===0?'flat':(bad?'bad':'good'))+'">'+(pct===0?'No change':(up?'Up ':'Down ')+Math.abs(pct)+'%')+'</span>';
   } else if(value>0){
     delta = '<span class="sr-delta flat">new</span>';
   }
@@ -2594,6 +2618,98 @@ function renderLandRequests(acct){
   + '</tbody></table>'+pagerHtml('landRequests', pg)+'</div>';
 }
 
+/* ======================= Document Check (Staff only) =======================
+   One place to see every request's AI Document Check. It reuses the existing engine and
+   data: OCR reads each uploaded file, the server checks the required documents and compares
+   the surname, ARP/TCT number and dates, and the AI (an unverified suggestion) compares the
+   documents with the request. r.ai and r.aiEligibility are sent to Staff accounts only
+   (sa_internal_bootstrap, role 2); this page never approves, rejects or changes a request. */
+var AI_CHECK_STATES = {
+  attention:['Needs Staff review','amber'], clear:['No concerns found','green'], reviewed:['Reviewed','slate'],
+  running:['Checking now','blue'], waiting:['Waiting to be checked','blue'], failed:['Could not finish','red'],
+  none:['Not checked yet','slate'], before:['Submitted before AI checks','slate'], off:['AI check not enabled','slate']
+};
+var AI_CHECK_FILTERS = [['attention','Needs Staff review'],['all','All requests'],['reviewed','Reviewed'],['clear','No concerns found'],
+  ['inprogress','Waiting or checking'],['failed','Could not finish'],['unchecked','Not checked']];
+function aiCheckState(r){
+  var ai = r.ai, elig = r.aiEligibility || {eligible:false, reason:'not_enabled'};
+  if(!ai) return elig.eligible ? 'none' : (elig.reason==='before_effective_date' ? 'before' : 'off');
+  if(ai.status==='pending') return 'waiting';
+  if(ai.status==='processing') return 'running';
+  if(ai.status==='failed') return 'failed';
+  if(ai.reviewed) return 'reviewed';
+  return ai.outcome==='passed' ? 'clear' : 'attention';
+}
+/* Counts by kind, from the server's validated finding codes only. */
+function aiFindingCounts(ai){
+  var c = {missing:0, maybeMissing:0, inconsistent:0, unreadable:0, staffOnly:0};
+  ((ai && ai.findings) || []).forEach(function(f){
+    if(f.category==='missing_information') c[f.source==='requirements' ? 'missing' : 'maybeMissing']++;
+    else if(f.category==='possible_inconsistency') c.inconsistent++;
+    else if(f.category==='ocr_uncertainty') c.unreadable++;
+    else if(f.category==='cannot_verify') c.staffOnly++;
+  });
+  return c;
+}
+function aiFindingSummary(ai){
+  var c = aiFindingCounts(ai), parts = [];
+  if(c.missing) parts.push(c.missing+' missing document'+(c.missing===1?'':'s'));
+  if(c.maybeMissing) parts.push(c.maybeMissing+' possibly missing detail'+(c.maybeMissing===1?'':'s'));
+  if(c.inconsistent) parts.push(c.inconsistent+' possible inconsistenc'+(c.inconsistent===1?'y':'ies'));
+  if(c.unreadable) parts.push(c.unreadable+' reading problem'+(c.unreadable===1?'':'s'));
+  if(c.staffOnly) parts.push(c.staffOnly+' for Staff to verify');
+  return parts;
+}
+function renderDocumentCheck(acct){
+  var q = (state.search.docCheck||'').toLowerCase();
+  var filterF = state.filters.docCheck || 'attention';
+  var all = state.docRequests.map(function(r){ return {r:r, kind:'doc', type:r.docType}; })
+    .concat(state.landRequests.map(function(r){ return {r:r, kind:'land', type:r.transferType ? 'Land Transfer: '+r.transferType : 'Land Transfer'}; }));
+  all.forEach(function(x){ x.state = aiCheckState(x.r); });
+  var counts = {};
+  all.forEach(function(x){ counts[x.state] = (counts[x.state]||0)+1; });
+  var inFilter = function(s){
+    if(filterF==='all') return true;
+    if(filterF==='inprogress') return s==='waiting' || s==='running';
+    if(filterF==='unchecked') return s==='none' || s==='before' || s==='off';
+    return s===filterF;
+  };
+  var list = all.filter(function(x){
+    var matchQ = !q || String(x.r.applicant||'').toLowerCase().indexOf(q)>-1 || String(x.r.id||'').toLowerCase().indexOf(q)>-1;
+    return matchQ && inFilter(x.state);
+  }).sort(function(a, b){ return String(b.r.submitted||'').localeCompare(String(a.r.submitted||'')); });
+  var pg = paginate(list, 'docCheck');
+  var stat = function(key, label){
+    var m = AI_CHECK_STATES[key];
+    return '<div class="dc-stat"><span class="badge '+m[1]+'">'+esc(label||m[0])+'</span><strong>'+(counts[key]||0)+'</strong></div>';
+  };
+  return ''
+  + '<div class="page-head"><div><h1>Document Check</h1><p>AI Document Check results for every request: what was found, what to check, and what to ask the client. The results are advice only; Staff open the originals and decide.</p></div></div>'
+  + '<div class="dc-stats" aria-label="Document Check summary">'+stat('attention')+stat('waiting')+stat('running')+stat('failed')+stat('reviewed')+stat('clear')+'</div>'
+  + '<div class="toolbar">'
+    + '<div class="search-box"><input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docCheck||'')+'" data-input="search-doc-check" aria-label="Search Document Check"></div>'
+    + '<select data-input="filter-doc-check" aria-label="Show">'+AI_CHECK_FILTERS.map(function(o){ return '<option value="'+o[0]+'"'+(filterF===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'
+  + '</div>'
+  + '<div class="table-wrap"><table class="has-actions dc-table"><thead><tr><th>Reference No.</th><th>Applicant / Request</th><th>Date Submitted</th><th>AI Check</th><th>What was found</th><th>Staff Review</th><th>Action</th></tr></thead><tbody>'
+  + (pg.items.length ? pg.items.map(function(x){
+      var r = x.r, ai = r.ai, m = AI_CHECK_STATES[x.state];
+      var found = ai && (ai.status==='completed' || ai.status==='needs_manual_review')
+        ? (aiFindingSummary(ai).join(', ') || 'No findings')
+        : (ai && ai.error ? ai.error : '—');
+      var review = ai && ai.reviewed ? 'Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.reviewedAt))+'</div>' : '')
+        : (ai && (ai.status==='completed' || ai.status==='needs_manual_review') ? '<span class="badge amber">Not reviewed</span>' : '—');
+      return '<tr><td class="mono" data-label="Reference No.">'+esc(r.id)+'</td>'
+        + '<td class="cell-name" data-label="Applicant / Request">'+esc(r.applicant)+'<div class="cell-sub">'+esc(x.type||'')+'</div></td>'
+        + '<td data-label="Date Submitted">'+fmtDate(r.submitted)+'</td>'
+        + '<td data-label="AI Check"><span class="badge '+m[1]+'">'+esc(m[0])+'</span>'+(ai && ai.completedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.completedAt))+'</div>' : '')+'</td>'
+        + '<td data-label="What was found">'+esc(found)+'</td>'
+        + '<td data-label="Staff Review">'+review+'</td>'
+        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="view-'+x.kind+'-req" data-id="'+esc(r.id)+'">Open check</button></div></td></tr>';
+    }).join('') : '<tr><td colspan="7"><div class="empty-state">No requests match this view.</div></td></tr>')
+  + '</tbody></table>'+pagerHtml('docCheck', pg)+'</div>'
+  + '<p class="ai-note">The AI check reads the uploaded files with OCR and points out possible problems. It can be wrong, never approves or rejects a request, and cannot tell whether a document, signature or seal is genuine. Always open the originals.</p>';
+}
+
 function renderRequirementResults(acct){
   var q=(state.search.reqResults||'').toLowerCase(); var resF=state.filters.reqResult;
   var all = state.docRequests.map(function(r){ return {ref:r.id, applicant:r.applicant, type:'Document Request', checklist:r.checklist, when:r.submitted}; })
@@ -2818,12 +2934,12 @@ function renderNotifications(acct){
         + '<div class="si-msg">'+esc(n.message)+'</div>'
         + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div>'+notifProviderHtml(n, 'si-extra')+'</div>'
       + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(pillText)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
-      + '<span class="si-chev" aria-hidden="true">'+ic('chevRight','16px')+'</span></div>';
+      + '</div>';
   }).join('');
   var pager = pg.totalPages > 1
     ? '<div class="sent-pager">'
-      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="prev" aria-label="Previous page"'+(pg.page<=1?' disabled':'')+'>'+ic('chevLeft','18px')+'</button>'
-      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="next" aria-label="Next page"'+(pg.page>=pg.totalPages?' disabled':'')+'>'+ic('chevRight','18px')+'</button></div>'
+      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="prev" aria-label="Previous page"'+(pg.page<=1?' disabled':'')+'>Previous</button>'
+      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="next" aria-label="Next page"'+(pg.page>=pg.totalPages?' disabled':'')+'>Next</button></div>'
     : '';
   return ''
   + '<div class="page-head"><div><h1>Notifications</h1><p>Send updates to one client by SMS or email, and review what has been sent. Status changes never send SMS or email; clients see them in request tracking.</p></div></div>'
@@ -2916,8 +3032,8 @@ function renderModal(){
 
 function modalViewStaff(id){
   var a = findAccount(id);
-  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
-  return '<div class="modal-head"><div><h3>'+esc(a.fullName)+'</h3><p>Staff Information</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
+  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
+  return '<div class="modal-head"><div><h3>'+esc(a.fullName)+'</h3><p>Staff Information</p></div><button class="modal-close" data-action="close-modal">Close</button></div>'
     + '<div class="review-card">'
       + '<div class="review-row"><span class="k">Username</span><span class="v mono">'+esc(a.username)+'</span></div>'
       + '<div class="review-row"><span class="k">Email Address</span><span class="v">'+esc(a.email)+'</span></div>'
@@ -2932,8 +3048,8 @@ function modalViewStaff(id){
 
 function modalEditStaff(id){
   var a = findAccount(id);
-  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
-  return '<div class="modal-head"><div><h3>Edit Staff Account</h3><p>'+esc(a.fullName)+'</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
+  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
+  return '<div class="modal-head"><div><h3>Edit Staff Account</h3><p>'+esc(a.fullName)+'</p></div><button class="modal-close" data-action="close-modal">Close</button></div>'
     + '<form data-form="edit-staff" data-id="'+a.id+'">'
       + accountFormFields(Object.assign({}, a, {position:a.position}))
       + '<div class="modal-foot"><button type="button" class="btn btn-outline" data-action="close-modal">Cancel</button><button type="submit" class="btn btn-primary">'+ic('check','16px')+' Save Changes</button></div>'
@@ -2986,7 +3102,7 @@ function modalAnnEdit(id){
   var schedDate = ph.date, schedTime = ph.time;
   var primaryLabel = id && a.status==='Published' ? 'Save Changes' : 'Publish Now';
   return '<div class="composer-head"><h3>'+(id?'Edit Announcement':'New Announcement')+'</h3>'
-      + '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','16px')+'</button></div>'
+      + '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">Close</button></div>'
     + '<form data-form="save-ann" data-id="'+(id||'')+'" class="composer" novalidate>'
       + '<div class="composer-row"><label for="ann-audience">To</label><select id="ann-audience" name="postTo" required>'
         + '<option value=""'+(a.postTo?'':' selected')+'>Select audience…</option>'
@@ -3004,7 +3120,7 @@ function modalAnnEdit(id){
       + '<div class="sched-picker" data-schedule-picker role="dialog" aria-modal="true" aria-labelledby="sched-picker-title" hidden><div class="sched-card">'
         + '<h4 id="sched-picker-title">Pick date &amp; time</h4>'
         + '<div class="sched-cols">'
-          + '<div class="sched-cal"><div class="sched-cal-head"><span data-cal-title></span><div><button type="button" data-cal-prev aria-label="Previous month">'+ic('chevLeft','18px')+'</button><button type="button" data-cal-next aria-label="Next month">'+ic('chevRight','18px')+'</button></div></div>'
+          + '<div class="sched-cal"><div class="sched-cal-head"><span data-cal-title></span><div><button type="button" data-cal-prev aria-label="Previous month">Previous</button><button type="button" data-cal-next aria-label="Next month">Next</button></div></div>'
             + '<div class="sched-dow" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>'
             + '<div class="sched-grid" data-cal-grid></div></div>'
           + '<div class="sched-fields"><label><span>Date</span><input type="text" data-pick-date autocomplete="off"></label>'
@@ -3018,19 +3134,19 @@ function modalAnnEdit(id){
       + '<div class="modal-foot composer-actions">'
         + '<div class="send-split">'
           + '<button type="submit" name="saveMode" value="'+(scheduled?'schedule':'publish')+'" class="send-main" data-send-main data-publish-label="'+esc(primaryLabel==='Publish Now'?'Send':primaryLabel)+'">'+ic('send','16px')+'<span data-send-label>'+(scheduled?'Schedule send':(primaryLabel==='Publish Now'?'Send':esc(primaryLabel)))+'</span></button>'
-          + '<button type="button" class="send-more" data-send-more aria-haspopup="menu" aria-expanded="false" aria-label="More send options" title="More send options">'+ic('chevDown','16px')+'</button>'
+          + '<button type="button" class="send-more" data-send-more aria-haspopup="menu" aria-expanded="false" aria-label="More send options" title="More send options">More</button>'
           + '<div class="send-menu" role="menu" aria-label="Schedule send" data-send-menu hidden></div>'
         + '</div>'
-        + '<span class="sched-chip" data-schedule-chip hidden><button type="button" class="sched-chip-text" data-chip-edit title="Change schedule">'+ic('clock','15px')+'<span data-chip-text></span></button><button type="button" class="sched-chip-x" data-chip-clear aria-label="Remove schedule" title="Remove schedule">'+ic('x','14px')+'</button></span>'
+        + '<span class="sched-chip" data-schedule-chip hidden><button type="button" class="sched-chip-text" data-chip-edit title="Change schedule">'+ic('clock','15px')+'<span data-chip-text></span></button><button type="button" class="sched-chip-x" data-chip-clear aria-label="Remove schedule" title="Remove schedule">Remove</button></span>'
         + '<button type="submit" name="saveMode" value="draft" class="btn btn-outline composer-draft">'+ic('doc','16px')+' Save Draft</button>'
-        + '<button type="button" class="composer-discard" data-action="close-modal" aria-label="Discard" title="Discard">'+ic('trash','18px')+'</button>'
+        + '<button type="button" class="composer-discard" data-action="close-modal" aria-label="Discard" title="Discard">Discard</button>'
       + '</div>'
     + '</form>';
 }
 
 function modalReportDetail(id){
   var r = findReport(id);
-  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
+  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
   var s = r.stats;
   var rows = [];
   var requestDetails = [];
@@ -3049,7 +3165,7 @@ function modalReportDetail(id){
     ['Date Generated', fmtDate(r.dateGenerated)],
     ['Prepared By', preparedBy]
   ];
-  return '<div class="modal-head"><div><h3>'+esc(r.title)+'</h3><p>Generated '+fmtDate(r.dateGenerated)+'</p></div><button class="modal-close no-print" data-action="close-modal">'+ic('x','15px')+'</button></div>'
+  return '<div class="modal-head"><div><h3>'+esc(r.title)+'</h3><p>Generated '+fmtDate(r.dateGenerated)+'</p></div><button class="modal-close no-print" data-action="close-modal">Close</button></div>'
     + '<div id="report-printable">'
       + '<div class="report-print-head">'+esc(r.title)+'</div>'
       + '<div class="review-card">'
@@ -3075,7 +3191,7 @@ function checklistHtml(checklist){
   return '<ul class="checklist">'+checklist.map(function(c){
     var dotCls = c.validation==='Invalid' ? 'flag' : (c.submitted==='Missing' ? 'no' : 'yes');
     var dotIcon = c.validation==='Invalid' ? 'alert' : (c.submitted==='Missing' ? 'x' : 'check');
-    return '<li><span class="dot '+dotCls+'"><span class="icon">'+ICONS[dotIcon]+'</span></span>'
+    return '<li><span class="dot '+dotCls+'" aria-hidden="true"></span>'
       + '<div><div class="ci-name">'+esc(c.name)+' <span class="badge '+(c.submitted==='Missing'?'amber':'slate')+'" style="margin-left:6px;">'+c.submitted+'</span> <span class="badge '+(c.validation==='Invalid'?'red':(c.validation==='Valid'?'green':'slate'))+'">'+c.validation+'</span></div>'
       + '<div class="ci-remark">'+esc(c.remarks)+'</div></div></li>';
   }).join('')+'</ul>';
@@ -3098,7 +3214,7 @@ function rdTable(caption, items){
 
 function modalReqDetail(id, kind){
   var r = kind==='doc' ? findDocReq(id) : findLandReq(id);
-  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal" aria-label="Close">&times;</button></div>';
+  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal" aria-label="Close">Close</button></div>';
   var account = currentAccount();
   var canProcess = account && account.role==='staff';
   var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
@@ -3146,7 +3262,7 @@ function modalReqDetail(id, kind){
       + '<div class="rd-head-actions">'
         + (canProcess ? '<button type="button" class="btn btn-primary btn-sm rd-notify" data-action="nav-notify" data-ref="'+esc(r.id)+'">'+ic('send','15px')+' Send Notification</button>' : '')
         + (detailsHtml ? '<button type="button" class="btn btn-outline btn-sm rd-toggle" data-action="toggle-req-details" aria-expanded="'+showDetails+'" aria-controls="rd-client">'+(showDetails?'Hide Details':'View Details')+'</button>' : '')
-        + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">&times;</button>'
+        + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">Close</button>'
       + '</div></div>'
     + summary
     + (canProcess && ('ai' in r) ? reqAiHtml(r) : '')
@@ -3272,6 +3388,7 @@ function reqAiHtml(r){
   if(ai.ocrEngine) meta.push('OCR: '+ai.ocrEngine);
   if(ai.completedAt) meta.push('Checked: '+fmtDateTime(ai.completedAt));
   meta.push('Attempts: '+ai.attempts+' of '+ai.maxAttempts);
+  html += aiGuidanceHtml(r);
   html += '<p class="ai-note">'+esc(meta.join(' · '))+'</p>';
   var finished = ai.status==='completed' || ai.status==='needs_manual_review';
   html += '<div class="ai-actions">'
@@ -3280,6 +3397,53 @@ function reqAiHtml(r){
     + (ai.reviewed ? '<span class="cell-sub">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>' : '')
     + '</div>' + blocked + disclaimer + '</section>';
   return html;
+}
+
+/* "What to check" and "What to ask the client": written here from the server's validated
+   finding codes (category, field, source) and the server's document labels only, never from
+   text the AI wrote. Suggestions for Staff, not decisions. */
+function aiGuidanceHtml(r){
+  var ai = r.ai;
+  if(!ai || !(ai.status==='completed' || ai.status==='needs_manual_review') || !ai.findings || !ai.findings.length) return '';
+  var check = [], ask = [];
+  var add = function(list, text){ if(text && list.indexOf(text)===-1) list.push(text); };
+  ai.findings.forEach(function(f){
+    var docs = f.documents && f.documents.length ? f.documents.join(', ') : 'the documents';
+    if(f.category==='missing_information' && f.source==='requirements'){
+      add(check, 'Confirm that '+docs+' was not uploaded.');
+      add(ask, 'Ask the client to upload '+docs+'.');
+    } else if(f.category==='missing_information'){
+      add(check, 'Open '+docs+' and check whether these details are really missing: '+String(f.explanation||'').replace(/^AI suggestion \(unverified\): /,''));
+      add(ask, 'If the details are missing, ask the client for a complete, readable copy of '+docs+'.');
+    } else if(f.category==='possible_inconsistency' && f.field==='file_format'){
+      add(check, 'Open '+docs+' and confirm it is the right document and can be read.');
+      add(ask, 'If it cannot be used, ask the client to upload '+docs+' again as a clear JPG, PNG or PDF.');
+    } else if(f.category==='possible_inconsistency' && f.field==='name'){
+      add(check, 'Compare the name in '+docs+' with the name on the request form.');
+      add(ask, 'If the names differ, ask the client to explain the difference or provide a matching document (for example proof of a name change, or an authorization letter if someone else is applying).');
+    } else if(f.category==='possible_inconsistency' && f.field==='property_identifier'){
+      add(check, 'Compare the ARP, TCT, OCT or lot number in '+docs+' with the request form.');
+      add(ask, 'If the numbers differ, ask the client to confirm the correct property number or submit the document for the right property.');
+    } else if(f.category==='possible_inconsistency' && f.field==='date'){
+      add(check, 'Check the dates in '+docs+'.');
+      add(ask, 'If a date is wrong or impossible, ask the client for a corrected or updated copy.');
+    } else if(f.category==='possible_inconsistency' && f.field==='document_type'){
+      add(check, 'Confirm that '+docs+' is the document that was required.');
+      add(ask, 'If it is a different document, ask the client to upload the correct one.');
+    } else if(f.category==='possible_inconsistency'){
+      add(check, 'Open '+docs+' and look at the detail the check pointed out.');
+      add(ask, 'If something does not match the request, ask the client to clarify it.');
+    } else if(f.category==='ocr_uncertainty'){
+      add(check, 'Open '+docs+': its text could not be read reliably, so compare it with the request yourself.');
+      add(ask, 'If the file is blurry, cut off or rotated, ask the client for a clearer photo or scan of '+docs+'.');
+    } else if(f.category==='cannot_verify'){
+      add(check, 'Inspect '+docs+' yourself: signatures, seals and notarization can only be judged from the original document.');
+    }
+  });
+  var li = function(items){ return '<ul class="ai-guide-list">'+items.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>'; };
+  return '<div class="ai-guide"><h5 class="rd-caption" style="margin-top:14px">What to check</h5>'+li(check)
+    + (ask.length ? '<h5 class="rd-caption" style="margin-top:10px">What to ask the client (if needed)</h5>'+li(ask) : '')
+    + '<p class="ai-note">Suggestions to help your review, based on the automatic checks. You decide what to ask the client; nothing is sent automatically.</p></div>';
 }
 
 function reqSubmittedFilesHtml(r){
@@ -3314,10 +3478,10 @@ function reqSubmittedFilesHtml(r){
 
 function modalReqResultDetail(ref){
   var r = findDocReq(ref) || findLandReq(ref);
-  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
+  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
   var res = overallResult(r.checklist);
   var bannerCls = res==='Complete'?'ok':(res==='Incomplete'?'bad':'invalid');
-  return '<div class="modal-head"><div><h3>'+r.id+'</h3><p>'+esc(r.applicant)+' — Requirement Checking Result</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
+  return '<div class="modal-head"><div><h3>'+r.id+'</h3><p>'+esc(r.applicant)+' — Requirement Checking Result</p></div><button class="modal-close" data-action="close-modal">Close</button></div>'
     + '<div class="check-banner '+bannerCls+'">'+ic(res==='Complete'?'check':(res==='Incomplete'?'alert':'x'),'18px')+'<span>Overall Result: <b>'+res+'</b></span></div>'
     + checklistHtml(r.checklist)
     + '<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Close</button></div>';
@@ -3437,9 +3601,9 @@ function buildCalendarGrid(viewYear, viewMonth, selectedISO, minISO){
   }
   var monthLabel = first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
   return '<div class="cal-head">'
-      + '<button type="button" class="cal-nav" data-cal-prev '+(atMin?'disabled':'')+' aria-label="Previous month">'+ic('chevLeft','14px')+'</button>'
+      + '<button type="button" class="cal-nav" data-cal-prev '+(atMin?'disabled':'')+' aria-label="Previous month">Previous</button>'
       + '<span class="cal-title">'+esc(monthLabel)+'</span>'
-      + '<button type="button" class="cal-nav" data-cal-next aria-label="Next month">'+ic('chevRight','14px')+'</button>'
+      + '<button type="button" class="cal-nav" data-cal-next aria-label="Next month">Next</button>'
     + '</div>'
     + '<div class="cal-grid">'
       + WEEKDAY_LABELS.map(function(w){ return '<span class="cal-weekday">'+w+'</span>'; }).join('')
@@ -3941,7 +4105,7 @@ function bindEvents(){
       if(!passwordInput) return;
       var showPassword = passwordInput.type==='password';
       passwordInput.type = showPassword ? 'text' : 'password';
-      el.innerHTML = ic(showPassword?'eyeOff':'eye','19px');
+      el.textContent = showPassword ? 'Hide' : 'Show';
       el.setAttribute('aria-label', showPassword?'Hide password':'Show password');
       el.setAttribute('aria-pressed', String(showPassword));
       passwordInput.focus();
@@ -4145,6 +4309,7 @@ function bindEvents(){
     if(key==='search-staff') state.search.staffAccounts = el.value;
     else if(key==='search-doc') state.search.docRequests = el.value;
     else if(key==='search-land') state.search.landRequests = el.value;
+    else if(key==='search-doc-check'){ state.search.docCheck = el.value; setPage('docCheck',1); }
     else if(key==='search-req') state.search.reqResults = el.value;
     else if(key==='search-announcements') state.search.announcements = el.value;
     else if(key==='search-reports') state.search.reports = el.value;
@@ -4164,6 +4329,7 @@ function bindEvents(){
     if(key==='filter-staff-status') state.filters.staffAccountsStatus = el.value;
     else if(key==='filter-doc-status') state.filters.docStatus = el.value;
     else if(key==='filter-land-status') state.filters.landStatus = el.value;
+    else if(key==='filter-doc-check'){ state.filters.docCheck = el.value; setPage('docCheck',1); }
     else if(key==='filter-report-type') state.filters.reportType = el.value;
     else if(key==='filter-sent-period'){ state.filters.sentPeriod = el.value; setPage('sentNotifs',1); }
     else if(key==='filter-sent-from'){ state.filters.sentFrom = el.value; setPage('sentNotifs',1); }
