@@ -71,7 +71,8 @@ $check('Admin and Head keep the wide layout (two pairs per row)', str_contains($
 $check('document previews are still available in the details', str_contains($detail . $between($internal, 'function reqSubmittedFilesHtml(r){', "\nfunction "), 'toggle-file-preview'));
 $portraitCss = $between($internal, '/* Portrait request details (Staff)', "\n  }\n");
 $check('the portrait layout does not change font families or sizes', $portraitCss !== '' && !preg_match('/font-(family|size)\s*:/', $portraitCss), $portraitCss);
-$check('Staff still choose only Rejected or Out for Release in Update Status', str_contains($detail, "['Rejected','Out for Release'].map("));
+$check('Update Status offers Processing, Rejected and Approve (Approve saves Out for Release)', str_contains($detail, "var statusChoices = [['Processing','Processing']];")
+    && str_contains($detail, "statusChoices.push(['Rejected','Rejected'], ['Out for Release','Approve']);"));
 
 $check('the receipt\'s "View My Request Status" loads the live status from the server',
     str_contains($between($public, 'function viewSubmittedStatus(){', "\nfunction "), "if(draftServer()){ window.location.assign('/index.php?track='+encodeURIComponent(submission.id)); return; }"));
@@ -260,14 +261,14 @@ imagefill($image, 0, 0, imagecolorallocate($image, 20, 120, 60));
 imagepng($image, $fixtures . '/id.png');
 
 /** A client submits a request through the real draft + submit API; returns [browser, reference]. */
-$submit = static function (string $flow, string $first, string $last) use ($browser, $termsVersion, $fixtures, $check): array {
+$submit = static function (string $flow, string $first, string $last, string $middle = '') use ($browser, $termsVersion, $fixtures, $check): array {
     $client = $browser();
     [, $accepted] = $client->json('terms_accept', ['flow' => $flow, 'agreed' => true, 'terms_version' => $termsVersion]);
     [, $draft] = $client->json('draft_save', ['flow' => $flow, 'step' => 3, 'fields' => ['firstName' => $first]]);
     $code = str_replace('-', '', (string) ($draft['data']['code'] ?? ''));
     $client->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $client->csrf,
         'draft_token' => $code, 'doc_key' => 'ownerId']), 'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]);
-    $fields = ['flow' => $flow, 'first_name' => $first, 'last_name' => $last, 'contact_number' => '+639170007' . random_int(100, 999),
+    $fields = ['flow' => $flow, 'first_name' => $first, 'middle_name' => $middle, 'last_name' => $last, 'contact_number' => '+639170007' . random_int(100, 999),
         'address_line' => '1 Test Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0007-0' . random_int(1000, 9999),
         'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true]
         + ($flow === 'docreq' ? ['document_type' => 'Certified True Copy of Tax Declaration', 'purpose' => 'Test'] : ['transfer_type' => 'Deed of Absolute Sale']);
@@ -279,7 +280,7 @@ $submit = static function (string $flow, string $first, string $last) use ($brow
 };
 
 // ================= 1. Clients submit =================
-[$docClient, $docRef] = $submit('docreq', 'Ana', 'Dimaculangan');
+[$docClient, $docRef] = $submit('docreq', 'Ana', 'Dimaculangan', 'Reyes');
 [$landClient, $landRef] = $submit('landtransfer', 'Ben', 'Macalindong');
 [$otherClient, $otherRef] = $submit('docreq', 'Carla', 'Panganiban');
 [$approvedClient, $approvedRef] = $submit('docreq', 'Dino', 'Ilagan');
@@ -349,6 +350,49 @@ foreach ($flows as [$client, $reference, $kind, $final]) {
     $check("{$reference}: a closed request cannot be reopened", $code >= 400 && $dbStatus($reference) === $final, $code);
 }
 
+// ================= Processing from Update Status, Processing End, rejection reasons =================
+[$procClient, $procRef] = $submit('docreq', 'Fe', 'Atienza');
+$timing = static function (string $reference) use ($pdo): array {
+    $stmt = $pdo->prepare('SELECT status, processing_started_at, processing_completed_at, processing_duration_seconds, processing_staff_id FROM requests WHERE reference_no = ?');
+    $stmt->execute([$reference]);
+    return (array) $stmt->fetch();
+};
+// Update Status > Processing posts start_processing (php-bridge.js); the server's own Processing route is the same function.
+[$code, $res] = $staff->json('update_request_status', ['id' => $procRef, 'kind' => 'doc', 'status' => 'Processing']);
+$started = $timing($procRef);
+$check('Update Status > Processing starts the processing timer and assigns the Staff member', $code === 200 && $started['status'] === 'Processing'
+    && $started['processing_started_at'] !== null && (int) $started['processing_staff_id'] === $staffId && $started['processing_completed_at'] === null, [$code, $res, $started]);
+sleep(1);
+[$code] = $staff->json('start_processing', ['id' => $procRef]);
+$again = $timing($procRef);
+$processingRows = array_values(array_filter($history($procRef), static fn (array $row): bool => $row['status'] === 'Processing'));
+$check('choosing Processing again keeps the running timer (start time and history not reset)', $code === 200
+    && $again['processing_started_at'] === $started['processing_started_at'] && count($processingRows) === 1, [$started, $again, $processingRows]);
+[$code, $res] = $staff->json('update_request_status', ['id' => $procRef, 'kind' => 'doc', 'status' => 'Out for Release']);
+$ended = $timing($procRef);
+$check('Approve saves Out for Release and ends processing (Processing End time and final duration kept)', $code === 200 && $ended['status'] === 'Out for Release'
+    && $ended['processing_completed_at'] !== null && $ended['processing_duration_seconds'] !== null && (int) $ended['processing_duration_seconds'] >= 1
+    && $ended['processing_started_at'] === $started['processing_started_at'], [$code, $res, $ended]);
+[, $result] = $procClient->track($procRef);
+$check('the client tracking page shows the release status after Approve', ($result['status'] ?? '') === 'Out for Release' && isset($result['timestamps']['Out for Release']), $result);
+
+// Send Updates: the recipient is the exact submitted name; rejection reasons fit the request type.
+[$code, $res] = $staff->json('lookup_request_owner', ['reference' => $docRef]);
+$check('Send Updates shows the full name exactly as submitted (with middle name)', $code === 200 && ($res['data']['submittedName'] ?? '') === 'Ana Reyes Dimaculangan', $res);
+[$code, $res] = $staff->json('send_notification', ['request_ref' => $landRef, 'message' => 'Test', 'category' => 'Incomplete Request Details',
+    'channel_choice' => '1', 'send_email' => '1']);
+$check('a Document Request rejection reason is refused for a Land Transfer request', $code === 422 && str_contains((string) ($res['error'] ?? $res['message'] ?? json_encode($res)), 'rejection category'), [$code, $res]);
+[$code, $res] = $staff->json('send_notification', ['request_ref' => $docRef, 'message' => 'Test', 'category' => 'Missing Vicinity Map',
+    'channel_choice' => '1', 'send_email' => '1']);
+$check('a Land Transfer rejection reason is refused for a Document Request', $code === 422 && str_contains((string) json_encode($res), 'rejection category'), [$code, $res]);
+[$code, $res] = $staff->json('send_notification', ['request_ref' => $landRef, 'message' => 'Test', 'category' => 'Missing Vicinity Map',
+    'channel_choice' => '1', 'send_email' => '1']);
+$check('a Land Transfer reason is accepted for a Land Transfer request (stops later: no email on file, nothing sent)', $code === 422
+    && !str_contains((string) json_encode($res), 'rejection category') && str_contains((string) json_encode($res), 'no valid email'), [$code, $res]);
+[$code, $res] = $staff->json('send_notification', ['request_ref' => $docRef, 'message' => 'Test', 'category' => 'Invalid or Missing Government ID',
+    'channel_choice' => '1', 'send_email' => '1']);
+$check('the shared Government ID reason is accepted for a Document Request', $code === 422 && !str_contains((string) json_encode($res), 'rejection category'), [$code, $res]);
+
 // The two remaining statuses the server accepts.
 [$code] = $staff->json('start_processing', ['id' => $approvedRef]);
 [$code, $res] = $staff->json('update_request_status', ['id' => $approvedRef, 'kind' => 'doc', 'status' => 'Approved']);
@@ -364,7 +408,7 @@ $check('another client\'s request is unaffected (still Received)', ($result['sta
 $check('another client\'s history is unchanged', $history($otherRef) === $untouchedBefore, [$untouchedBefore, $history($otherRef)]);
 $changed = $pdo->query("SELECT reference_no, status FROM requests ORDER BY id")->fetchAll(PDO::FETCH_KEY_PAIR);
 $check('each update changed only its own request', $changed === [$docRef => 'Out for Release', $landRef => 'Rejected', $otherRef => 'Received',
-    $approvedRef => 'Approved', $timeoutRef => 'Timed Out'], $changed);
+    $approvedRef => 'Approved', $timeoutRef => 'Timed Out', $procRef => 'Out for Release'], $changed);
 
 $otherStaff = $browser('/internal.php');
 $otherStaff->json('internal_login', ['username' => 'other.staff', 'password' => PW]);

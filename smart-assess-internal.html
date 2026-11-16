@@ -552,6 +552,9 @@
   .dash-stat{ display:flex; flex-direction:column; gap:2px; padding:20px 22px; background:var(--surface); border:1px solid var(--line); border-radius:10px; color:inherit; text-align:left; font:inherit; cursor:pointer; transition:border-color .15s ease; }
   .dash-stat:hover{ border-color:var(--line-strong); }
   .dash-stat:hover .dash-stat-label{ color:var(--accent); }
+  .dash-stat.dash-stat-info{ cursor:default; }
+  .proc-end{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:var(--surface-2); border:1px solid var(--line-strong); color:var(--navy); font-weight:600; white-space:nowrap; }
+  .dash-stat.dash-stat-info:active{ transform:none; }
   .dash-stat-label{ display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--navy); }
   .dash-stat-dot{ width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:var(--brand-600); }
   .dash-stat.amber .dash-stat-dot{ background:var(--dot-amber); }
@@ -597,6 +600,9 @@
   .dash-ann.expanded p{ display:block; overflow:visible; }
   .dash-ann-toggle{ margin-top:6px; }
   .dash-ann-list .empty-state{ padding:36px 8px; }
+  .modal.ann-inbox{ max-width:620px; }
+  .ann-inbox-list{ max-height:min(62vh, 560px); overflow-y:auto; }
+  .ann-inbox-list .dash-ann p{ display:block; overflow:visible; white-space:pre-line; }
 
   @container staffdash (max-width:860px){
     .staff-dash-grid{ grid-template-columns:minmax(0,1fr); }
@@ -635,6 +641,8 @@
   .nf-services{ display:flex; flex-direction:column; gap:4px; margin:0 0 16px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); font-size:13px; line-height:1.45; }
   .nf-services .is-down{ color:var(--danger); font-weight:600; }
   .nf-channels{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:4px 0 16px; padding:0; border:0; }
+  .nf-channels[hidden]{ display:none; }
+  .nf-route{ margin:0 0 14px; }
   .nf-channels legend{ width:100%; margin-bottom:6px; font-size:13px; font-weight:600; }
   .nf-channel{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; cursor:pointer; min-height:32px; }
   .nf-channel input{ width:18px; height:18px; margin:0; }
@@ -1216,15 +1224,10 @@
     --navy:#173f2f; --accent:#1f6f4a; --head-green:#f5f7f5; --row-alt:transparent; --row-hover:#f1f5f2;
     --st-primary:#1b4332; --st-primary-hover:#245740; --st-bar:#2d6a4f;
     --st-shadow:0 1px 2px rgba(16,32,24,.05), 0 10px 24px -20px rgba(16,32,24,.28);
-    --st-radius:12px; --sidebar-w:240px; }
+    --st-radius:12px; }
 
-  /* Shell */
-  html.staff-ui .sidebar{ padding:18px 12px 14px; }
-  html.staff-ui .sidebar-art{ display:none; }
-  html.staff-ui .sidebar .sb-brand{ padding:0 4px 18px 6px; gap:10px; }
-  html.staff-ui .sb-brand img{ width:42px; height:42px; }
-  html.staff-ui .sidebar nav{ gap:2px; }
-  html.staff-ui .sidebar .side-link{ padding:10px 14px; border-radius:8px; }
+  /* Shell. The sidebar is not restyled for Staff: every role keeps the original green
+     sidebar with the office photo (sidebar-art), seal, width and spacing. */
   html.staff-ui .main-content{ --main-pad-x:28px; padding:10px var(--main-pad-x) 40px; }
   html.staff-ui .main-content .app-header{ margin-bottom:6px; }
   html.staff-ui .main-content .app-header .hd-inner{ min-height:46px; }
@@ -1877,7 +1880,7 @@ var NAV = {
     {view:'land-transfer-requests', label:'Land Transfer Requests', icon:'swap'},
     {view:'document-check', label:'Document Check', icon:'checklistIcon'},
     {view:'requirement-results', label:'Requirement Checking Results', icon:'checklistIcon'},
-    {view:'notifications', label:'Notifications', icon:'sms'},
+    {view:'notifications', label:'Send Updates', icon:'sms'},
     {view:'profile', label:'Profile', icon:'user'}
   ]
 };
@@ -2166,7 +2169,8 @@ function shellChrome(acct, innerHtml){
         + '<button type="button" class="hd-menu-btn" data-action="toggle-sidebar" aria-controls="app-sidebar" aria-expanded="'+(state.sidebarOpen?'true':'false')+'" aria-label="Open menu">'+ic('menu','22px')+'</button>'
         + '<div class="hd-mobile-brand" aria-hidden="true"><img src="data:image/png;base64,'+LOGO_B64+'" alt=""><span>Smart Assess</span></div>'
         + '<div class="hd-right">'
-          + (acct.role==='staff' ? '<button class="hd-bell" data-action="nav" data-view="notifications" aria-label="Notifications" title="Notifications">'+ic('bell')+'</button><span class="hd-divider" aria-hidden="true"></span>' : '')
+          // The bell opens the Announcements for this account (all internal roles), never the client Send Updates page.
+          + '<button type="button" class="hd-bell" data-action="open-ann-inbox" aria-haspopup="dialog" aria-label="Announcements" title="Announcements">'+ic('bell')+'</button><span class="hd-divider" aria-hidden="true"></span>'
           + '<button class="hd-avatar" data-action="nav" data-view="profile"><span class="avatar-circle">'+esc(initials(acct.fullName))+'</span><span><span class="hd-name">'+esc(acct.fullName)+'</span>'+(acct.role==='admin'?'':'<br><span class="hd-role">'+esc(acct.position)+'</span>')+'</span></button>'
         + '</div>'
       + '</div></header>'
@@ -2856,9 +2860,9 @@ function renderStaffDashboard(acct){
   + '<div class="page-head dash-head"><div><h1>Staff Dashboard</h1>'
     + '<div class="dash-welcome">Welcome back, '+esc(acct.fullName.split(' ')[0])+'. Here is what needs attention today.</div></div></div>'
   + '<div class="dash-stats">'
-    + dashStatCard('', docPending, 'Pending / Under Review', 'Document requests', 'document-requests')
-    + dashStatCard('amber', incomplete, 'Requirements Incomplete', 'Needs applicant follow-up', 'document-requests')
-    + dashStatCard('blue', readyRelease, 'Ready for Release', 'Awaiting claim', 'document-requests')
+    + dashStatCard('', docPending, 'Pending / Under Review', 'Document requests', null)
+    + dashStatCard('amber', incomplete, 'Requirements Incomplete', 'Needs applicant follow-up', null)
+    + dashStatCard('blue', readyRelease, 'Ready for Release', 'Awaiting claim', null)
   + '</div>'
   + '<div class="staff-dash"><div class="staff-dash-grid">'
     + '<div class="staff-dash-main">'
@@ -2869,10 +2873,12 @@ function renderStaffDashboard(acct){
   + '</div></div>';
 }
 
+/* view = null: an information-only summary (Staff Dashboard), same look and hover, no click. */
 function dashStatCard(tone, value, label, sub, view){
-  return '<button type="button" class="dash-stat'+(tone?' '+tone:'')+'" data-action="nav" data-view="'+view+'">'
-    + '<span class="dash-stat-label"><span class="dash-stat-dot" aria-hidden="true"></span>'+esc(label)+'</span>'
-    + '<span class="dash-stat-num">'+value+'</span><span class="dash-stat-sub">'+esc(sub)+'</span></button>';
+  var inner = '<span class="dash-stat-label"><span class="dash-stat-dot" aria-hidden="true"></span>'+esc(label)+'</span>'
+    + '<span class="dash-stat-num">'+value+'</span><span class="dash-stat-sub">'+esc(sub)+'</span>';
+  if(!view) return '<div class="dash-stat dash-stat-info'+(tone?' '+tone:'')+'" role="group" aria-label="'+esc(label)+': '+esc(String(value))+'">'+inner+'</div>';
+  return '<button type="button" class="dash-stat'+(tone?' '+tone:'')+'" data-action="nav" data-view="'+view+'">'+inner+'</button>';
 }
 
 function dashRequestPanel(kind, rows){
@@ -2944,8 +2950,11 @@ function processingTimerHtml(r, inline){
   if(r.processingStartedEpoch==null) return '';
   var finalDuration = r.processingDurationSeconds==null ? '' : Number(r.processingDurationSeconds);
   var initial = finalDuration==='' ? Math.max(0, Math.floor(Date.now()/1000-Number(r.processingStartedEpoch))) : finalDuration;
-  return (inline?'Elapsed: ':'<div class="cell-sub">Processing time: ')
+  // Once processing has ended the timer is frozen at the final duration and marked Processing End.
+  var ended = finalDuration!=='';
+  return (inline?'':'<div class="cell-sub">Processing time: ')
     + '<span class="mono processing-timer" data-processing-timer data-started-epoch="'+Number(r.processingStartedEpoch)+'" data-final-seconds="'+finalDuration+'">'+formatDuration(initial)+'</span>'
+    + (ended ? ' <span class="proc-end">Processing End</span>' : '')
     + (inline?'':'</div>');
 }
 function processingStaffHtml(r, inline){
@@ -2987,6 +2996,8 @@ function reqTableRow(r, kind){
 
 function renderDocRequests(acct){
   var q=(state.search.docRequests||'').toLowerCase(); var statusF=state.filters.docStatus;
+  // Timed Out is not offered here any more; an older saved choice falls back to All Statuses.
+  if(statusF==='Timed Out'){ statusF = state.filters.docStatus = 'all'; }
   var list = state.docRequests.filter(function(r){
     var matchQ = !q || r.applicant.toLowerCase().indexOf(q)>-1 || r.id.toLowerCase().indexOf(q)>-1;
     var matchS = statusF==='all' || r.status===statusF;
@@ -2997,10 +3008,10 @@ function renderDocRequests(acct){
   + '<div class="page-head"><div><h1>Document Requests</h1><p>Review submitted document requests and update their status.</p></div></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docRequests)+'" data-input="search-doc"></div>'
-    + '<select data-input="filter-doc-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
+    + '<select data-input="filter-doc-status"><option value="all">All Statuses</option>'+STATUS_ORDER.filter(function(s){ return s!=='Timed Out'; }).map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions staff-request-table"><colgroup><col class="request-reference-col"><col class="request-applicant-col"><col class="request-barangay-col"><col class="request-date-col"><col class="request-status-col"><col class="request-actions-col"></colgroup><thead><tr><th>Reference No.</th><th>Applicant / Document Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
-  + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'doc'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('doc','30px')+'No document requests match your search.</div></td></tr>')
+  + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'doc'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+(state.docRequests.length?'No document requests match your search.':'No document requests yet.')+'</div></td></tr>')
   + '</tbody></table>'+pagerHtml('docRequests', pg)+'</div>';
 }
 
@@ -3019,7 +3030,7 @@ function renderLandRequests(acct){
     + '<select data-input="filter-land-status"><option value="all">All Statuses</option>'+STATUS_ORDER.map(function(s){return '<option value="'+s+'"'+(statusF===s?' selected':'')+'>'+statusLabel(s)+'</option>';}).join('')+'</select>'
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions staff-request-table"><colgroup><col class="request-reference-col"><col class="request-applicant-col"><col class="request-barangay-col"><col class="request-date-col"><col class="request-status-col"><col class="request-actions-col"></colgroup><thead><tr><th>Reference No.</th><th>Applicant / Transfer Type</th><th>Barangay</th><th>Date Submitted</th><th>Status</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
-  + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'land'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('swap','30px')+'No land transfer requests match your search.</div></td></tr>')
+  + (pg.items.length ? pg.items.map(function(r){ return reqTableRow(r,'land'); }).join('') : '<tr><td colspan="6"><div class="empty-state">'+(state.landRequests.length?'No land transfer requests match your search.':'No land transfer requests yet.')+'</div></td></tr>')
   + '</tbody></table>'+pagerHtml('landRequests', pg)+'</div>';
 }
 
@@ -3272,6 +3283,54 @@ function renderRequirementResults(acct){
 }
 
 var NOTIF_CATEGORIES = ['Missing Document','Additional Requirements','Request Status Update','Land Transfer Status','Completion / Approval','Other Instruction'];
+/* Rejection reasons for a rejected request, by request type (the server accepts each only for its
+   own type). Each maps to the requirement it concerns: [reason in the message, what to provide]. */
+var REJECTION_CATEGORIES = {
+  doc: {
+    'Invalid or Missing Government ID': ['a valid government-issued ID was missing or could not be accepted', 'Please prepare a clear copy of a valid government-issued ID'],
+    'Incomplete Request Details': ['some required request details were incomplete', 'Please complete all the required request details'],
+    'Missing Property Information': ['the property or tax declaration information was missing', 'Please provide the property’s tax declaration (ARP) number and property details'],
+    'Missing Authorization Documents': ['the authorization letter and the representative’s valid ID were missing', 'If you are filing for the property owner, please prepare the owner’s signed authorization letter and your valid government-issued ID']
+  },
+  land: {
+    'Missing or Invalid Tax Declaration / Title': ['the Certified True Copy of the Tax Declaration or Title was missing or could not be accepted', 'Please prepare a Certified True Copy of the Tax Declaration or Title'],
+    'Missing Deed of Sale / Donation': ['the Notarial Deed of Sale or Donation was missing', 'Please prepare the Notarial Deed of Sale or Donation'],
+    'Missing Vicinity Map': ['the Vicinity Map was missing', 'Please prepare the Vicinity Map of the property'],
+    'Missing Certification of No Improvement': ['the Certification of No Improvement was missing', 'Please prepare the Certification of No Improvement'],
+    'Missing Tax Clearance': ['the Tax Clearance was missing', 'Please prepare the Tax Clearance'],
+    'Invalid or Missing Government ID': ['a valid government-issued ID was missing or could not be accepted', 'Please prepare a clear copy of a valid government-issued ID']
+  }
+};
+function notifRequestKind(ref){ return ref ? (findDocReq(ref) ? 'doc' : (findLandReq(ref) ? 'land' : '')) : ''; }
+/* A rejected request offers only its own type's rejection reasons (plus Other Instruction). */
+function notifCategoriesFor(ref){
+  var r = ref ? (findDocReq(ref) || findLandReq(ref)) : null;
+  if(r && r.status==='Rejected') return Object.keys(REJECTION_CATEGORIES[notifRequestKind(ref)]).concat(['Other Instruction']);
+  return NOTIF_CATEGORIES;
+}
+function notifCategoryOptions(ref, selected){
+  return '<option value="">Select a category…</option>' + notifCategoriesFor(ref).map(function(c){ return '<option value="'+esc(c)+'"'+(selected===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
+}
+function rejectionMessage(name, ref, kind, category){
+  var reason = (REJECTION_CATEGORIES[kind]||{})[category];
+  if(!reason) return '';
+  return 'Good day, '+(name||'Client').replace(/\s+/g,' ').trim()+'. Your request '+ref+' at the Municipal Assessor’s Office of Mabini was not approved because '+reason[0]+'. '
+    + reason[1]+' and submit a new request, or visit the office for help, Monday to Friday, 8:00 AM to 5:00 PM. You may also call 0998-9695-966. Thank you.';
+}
+/* Philippine mobile numbers are shown in local form (+639XXXXXXXXX -> 09XXXXXXXXX). Display only:
+   the stored number and the SMS format are unchanged. */
+function phLocalMobile(value){
+  var raw = String(value==null?'':value).trim();
+  var m = /^\+?63(9\d{9})$/.exec(raw.replace(/[\s()-]/g,''));
+  return m ? '0'+m[1] : raw;
+}
+/* The client's full name exactly as entered on the request (first, middle, last). */
+function submittedFullName(r){
+  if(!r) return '';
+  var d = r.details || {};
+  return [d.firstName, d.middleName, d.lastName].map(function(x){ return String(x||'').trim(); }).filter(Boolean).join(' ')
+    || String(r.applicant||'').replace(/\s+/g,' ').trim();
+}
 
 /* The selected request's own record (no identifying data leaves this). */
 function notifRequestInfo(ref){
@@ -3279,7 +3338,7 @@ function notifRequestInfo(ref){
   if(!r) r = findLandReq(ref);
   if(!r) return null;
   return {
-    owner: r.applicant || '',
+    owner: submittedFullName(r),
     kind: isDoc ? 'Document Request' : 'Land Transfer',
     status: statusLabel(r.status),
     missing: (r.checklist||[]).filter(function(c){ return c.submitted==='Missing' || c.validation==='Invalid'; })
@@ -3337,7 +3396,9 @@ function applyNotifTemplate(form, force){
   var pickupField = form.querySelector('[data-pickup-field]'), pickupIn = form.elements.pickupDate;
   if(pickupField) pickupField.hidden = category!=='Completion / Approval';
   if(category==='Completion / Approval' && pickupIn && !pickupIn.value) pickupIn.value = nextWorkday(phToday());
-  var autoMsg = info && category==='Completion / Approval' && pickupIn && pickupIn.value ? releaseMessage(info.owner, ref, pickupIn.value)
+  var rejectMsg = info ? rejectionMessage(info.owner, ref, notifRequestKind(ref), category) : '';
+  var autoMsg = rejectMsg ? rejectMsg
+    : info && category==='Completion / Approval' && pickupIn && pickupIn.value ? releaseMessage(info.owner, ref, pickupIn.value)
     : info && tpl.details ? 'Good day, '+(info.owner||'Client').replace(/\s+/g,' ').trim()+'. Regarding your request '+ref+': '+tpl.details : '';
   form._pickupLabel = pickupIn ? pickupLabel(pickupIn.value) : '';
   if(msg && (msg.value==='' || msg.value===auto.message) && msg.value!==autoMsg){ msg.value = autoMsg; msg.dispatchEvent(new Event('input',{bubbles:true})); }
@@ -3360,6 +3421,10 @@ function onNotifReferenceChange(select){
   setNotifOutput(form.querySelector('#notification-owner-name'), info && info.owner);
   var type = form.querySelector('#notification-request-type');
   if(type) type.value = info ? info.kind : '';
+  // Rejected requests list their own type's rejection reasons; keep the choice if it still applies.
+  var catSel = form.elements.category, keep = catSel.value;
+  catSel.innerHTML = notifCategoryOptions(select.value, keep);
+  if(catSel.value!==keep){ form._notifAuto = null; }
   // "Land Transfer Status" does not apply to a document request.
   var ltOption = form.elements.category.querySelector('option[value="Land Transfer Status"]');
   var ltBlocked = !!info && info.kind==='Document Request';
@@ -3432,23 +3497,21 @@ function takeNotifDraft(){
   if(!raw || !raw.ref) return;
   var r = findDocReq(raw.ref) || findLandReq(raw.ref);
   if(!r) return;
-  var d = r.details || {};
-  var name = [d.firstName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ') || r.applicant || 'Client';
+  var name = submittedFullName(r) || 'Client';
   if(raw.kind==='release'){
     var pickup = nextWorkday(phToday());
     state.notifDraft = { ref: r.id, release: true, category: 'Completion / Approval', topic: 'Ready for pickup: '+r.id, pickupDate: pickup,
       message: releaseMessage(name, r.id, pickup) };
     return;
   }
-  state.notifDraft = {
-    ref: r.id, rejection: 'Rejected', category: 'Request Status Update', topic: 'Request rejected: '+r.id,
-    message: 'Good day, '+name+'. Your request '+r.id+' at the Municipal Assessor\'s Office of Mabini was rejected. Please contact the office for more information. Thank you.'
-  };
+  // Rejected: no fixed message. Staff choose the rejection reason for this request type, which
+  // prepares an editable draft with the client's name and reference, or write their own.
+  state.notifDraft = { ref: r.id, rejection: 'Rejected', category: '', topic: '', message: '' };
 }
 function notifRecipient(ref){
   var r = ref ? (findDocReq(ref) || findLandReq(ref)) : null;
   var d = (r && r.details) || {};
-  return { name: r ? ([d.firstName, d.middleName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ') || r.applicant) : '', phone: String(d.contact||'').trim(), email: String(d.email||'').trim() };
+  return { name: submittedFullName(r), phone: String(d.contact||'').trim(), email: String(d.email||'').trim() };
 }
 
 function renderNotifications(acct){
@@ -3486,7 +3549,7 @@ function renderNotifications(acct){
     var pillText = status==='Recorded' ? 'Tracking only' : (isEmail?'Email':'SMS')+' · '+status;
     return '<div class="sent-item" role="button" tabindex="0" aria-expanded="false" data-action="toggle-sent-item">'
       + '<div class="si-main"><div class="si-title">'+esc(notifCategoryName(n.category)||'Notification')+'</div>'
-        + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')'+(n.destination?' &middot; '+esc(n.destination):'')+'</div>'
+        + '<div class="si-to"><b>To:</b> '+esc(name)+' (Ref. '+esc(n.requestRef)+')'+(n.destination?' &middot; '+esc(phLocalMobile(n.destination)):'')+'</div>'
         + '<div class="si-msg">'+esc(n.message)+'</div>'
         + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div>'+notifProviderHtml(n, 'si-extra')+'</div>'
       + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(pillText)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
@@ -3498,7 +3561,7 @@ function renderNotifications(acct){
       + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="next" aria-label="Next page"'+(pg.page>=pg.totalPages?' disabled':'')+'>'+ic('chevRight','18px')+'</button></div>'
     : '';
   return ''
-  + '<div class="page-head"><div><h1>Notifications</h1><p>Send an SMS or email update to one client and review sent messages. Status changes never send SMS or email; clients see them in request tracking.</p></div></div>'
+  + '<div class="page-head"><div><h1>Send Updates</h1><p>Send a client an update about their request’s status or availability, and review sent messages. Status changes never send SMS or email; clients see them in request tracking.</p></div></div>'
   + '<div class="notif-page"><div class="notif-grid">'
     + '<section class="notif-card notif-send">'
       + '<div class="nc-head"><div><h3>Send a Notification</h3><p>Nothing is sent until you click Send Notification. Review the recipient and message first.</p></div></div>'
@@ -3506,18 +3569,21 @@ function renderNotifications(acct){
         + '<div class="nf-grid">'
           + '<div class="field"><label for="notification-reference">Reference Number</label><select id="notification-reference" name="requestRef" required><option value="">Select a request…</option>'+allRefs.map(function(id){return '<option value="'+id+'"'+(draft&&draft.ref===id?' selected':'')+'>'+id+'</option>';}).join('')+'</select></div>'
           + '<div class="field"><label for="notification-owner-name">Property Owner / Client Name</label><output id="notification-owner-name" class="owner-name-display'+(rcpt.name?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.name||'Select a reference number')+'</output></div>'
-          + '<div class="field"><label for="notification-phone">Phone Number</label><output id="notification-phone" class="owner-name-display'+(rcpt.phone?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.phone||(draft?'No phone number on file':'Select a reference number'))+'</output></div>'
+          + '<div class="field"><label for="notification-phone">Phone Number</label><output id="notification-phone" class="owner-name-display'+(rcpt.phone?'':' is-empty')+'" aria-live="polite">'+esc(phLocalMobile(rcpt.phone)||(draft?'No phone number on file':'Select a reference number'))+'</output></div>'
           + '<div class="field"><label for="notification-email">Email Address</label><output id="notification-email" class="owner-name-display'+(rcpt.email?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.email||(draft?'No email address on file':'Select a reference number'))+'</output></div>'
-          + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required><option value="">Select a category…</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'"'+(draft&&draft.category===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select></div>'
+          + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required>'+notifCategoryOptions(draft&&draft.ref, draft&&draft.category)+'</select></div>'
           + '<div class="field"><label for="notification-request-type">Type of Request</label><select id="notification-request-type" disabled aria-describedby="notification-request-type-hint"><option value="">Select a reference number</option><option value="Document Request"'+(draft&&findDocReq(draft.ref)?' selected':'')+'>Document Request</option><option value="Land Transfer"'+(draft&&findLandReq(draft.ref)?' selected':'')+'>Land Transfer</option></select><span id="notification-request-type-hint" class="sr-only">Set automatically from the selected reference number.</span></div>'
           + '<div class="field nf-pickup" data-pickup-field'+((draft&&draft.category==='Completion / Approval')?'':' hidden')+'><label for="notification-pickup">Available for pickup on</label><input id="notification-pickup" name="pickupDate" type="date" min="'+esc(phToday())+'" value="'+esc((draft&&draft.pickupDate)||'')+'"></div>'
         + '</div>'
         + '<div class="field"><label for="notification-message">Message</label>'
-          + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="Type the message for the applicant…" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
-        + '<fieldset class="nf-channels"><legend>Send by</legend><input type="hidden" name="channel_choice" value="1">'
+          + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="'+(draft&&draft.rejection?'Choose the rejection reason in Category to prepare a draft, or type your message for the client…':'Type the message for the applicant…')+'" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
+        // No Send by choice: the channels follow the client's saved contact details (phone -> SMS,
+        // email -> email, both -> both); php-bridge.js sets these hidden boxes after loading them.
+        + '<fieldset class="nf-channels" hidden><legend>Send by</legend><input type="hidden" name="channel_choice" value="1">'
           + '<label class="nf-channel"><input type="checkbox" name="send_sms" value="1"'+(draft&&!rcpt.phone?' disabled':' checked')+'> SMS to the phone number</label>'
           + '<label class="nf-channel"><input type="checkbox" name="send_email" value="1"'+(rcpt.email?' checked':' disabled')+'> Email to the email address</label>'
         + '</fieldset>'
+        + '<p class="cell-sub nf-route" data-channel-summary aria-live="polite">'+(draft ? (rcpt.phone&&rcpt.email?'This update will be sent by SMS and email.':rcpt.phone?'This update will be sent by SMS.':rcpt.email?'This update will be sent by email.':'No phone number or email address on this request can be used, so this update cannot be sent.') : 'Select a reference number to see how this update will be sent.')+'</p>'
         + '<div class="nf-actions"><button type="reset" class="btn btn-outline nf-clear" data-action="clear-notif-draft">'+ic('refresh','16px')+' Clear Form</button><button type="submit" class="btn btn-primary nf-send">'+ic('send','16px')+' Send Notification</button></div>'
       + '</form>'
     + '</section>'
@@ -3537,21 +3603,30 @@ function renderNotifications(acct){
   + '</div></div>';
 }
 
+/* Staff profile: an eye button shows or hides each password field (same control as sign-in). */
+function profilePasswordInput(id, name, attrs){
+  return '<div class="password-input-wrap"><input id="'+id+'" name="'+name+'" type="password" '+attrs+'>'
+    + '<button class="password-toggle" type="button" data-action="toggle-login-password" data-target="'+id+'" aria-label="Show password" aria-pressed="false">'+ic('eye','19px')+'</button></div>';
+}
 function renderProfile(acct){
+  var isStaff = acct.role==='staff';
   return ''
   + '<div class="page-head"><div><h1>My Profile</h1><p>Your account information for the Assessor’s Office system.</p></div></div>'
   + '<div class="two-col">'
-    + '<div class="panel-card"><h3>'+ic('user')+'Account Details</h3>'
+    + '<div class="panel-card"><h3>'+(isStaff?'':ic('user'))+'Account Details</h3>'
       + '<form data-form="update-profile">'
         + '<div class="field"><label>Full Name</label><input name="fullName" type="text" value="'+esc(acct.fullName)+'" required></div>'
         + '<div class="field-row"><div class="field"><label>Email Address <span class="cell-sub">(optional)</span></label><input name="email" type="email" value="'+esc(acct.email)+'"></div>'
         + contactNumberField(acct.contact)+'</div>'
-        + '<div class="field"><label>Current Password (required to change password)</label><input name="current_password" type="password" autocomplete="current-password"></div>'
-        + '<div class="field"><label>New Password (leave blank to keep current)</label><input name="password" type="password" minlength="10" placeholder="••••••••" autocomplete="new-password"></div>'
+        + (isStaff
+          ? '<div class="field"><label for="profile-current-password">Current Password (required to change password)</label>'+profilePasswordInput('profile-current-password', 'current_password', 'autocomplete="current-password"')+'</div>'
+            + '<div class="field"><label for="profile-new-password">New Password (leave blank to keep current)</label>'+profilePasswordInput('profile-new-password', 'password', 'minlength="10" placeholder="••••••••" autocomplete="new-password"')+'</div>'
+          : '<div class="field"><label>Current Password (required to change password)</label><input name="current_password" type="password" autocomplete="current-password"></div>'
+            + '<div class="field"><label>New Password (leave blank to keep current)</label><input name="password" type="password" minlength="10" placeholder="••••••••" autocomplete="new-password"></div>')
         + '<button type="submit" class="btn btn-primary">'+ic('check','17px')+' Save Changes</button>'
       + '</form>'
     + '</div>'
-    + '<div class="panel-card"><h3>'+ic('idCard')+'Role Information</h3>'
+    + '<div class="panel-card"><h3>'+(isStaff?'':ic('idCard'))+'Role Information</h3>'
       + '<div class="review-card">'
         + '<div class="review-row"><span class="k">Username</span><span class="v mono">'+esc(acct.username)+'</span></div>'
         + '<div class="review-row"><span class="k">Position</span><span class="v">'+esc(acct.position)+'</span></div>'
@@ -3577,7 +3652,29 @@ function renderModal(){
   if(m.type==='doc-detail') return modalWrap(modalReqDetail(m.id,'doc'), false, 'req-detail');
   if(m.type==='land-detail') return modalWrap(modalReqDetail(m.id,'land'), false, 'req-detail');
   if(m.type==='req-result-detail') return modalWrap(modalReqResultDetail(m.ref));
+  if(m.type==='ann-inbox') return modalWrap(modalAnnInbox(), false, 'ann-inbox');
   return '';
+}
+
+/* Header bell: published announcements for the internal interface (Post To: Internal, or
+   Client and Internal), within their schedule and expiry, for every internal role. Read-only:
+   it does not change announcement permissions or delivery. */
+function internalAnnouncementsVisible(){
+  return state.announcements.filter(function(a){
+    return (a.postTo==='staff' || a.postTo==='both') && annVisibleTo(a, 'staff');
+  }).sort(function(a,b){ return String(b.publishedAt||'').localeCompare(String(a.publishedAt||'')); });
+}
+function modalAnnInbox(){
+  var list = internalAnnouncementsVisible();
+  return '<div class="modal-head"><div><h3 id="ann-inbox-title">Announcements</h3><p>Published announcements for the Assessor’s Office staff.</p></div>'
+      + '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','15px')+'</button></div>'
+    + '<div class="dash-ann-list ann-inbox-list" role="list" aria-labelledby="ann-inbox-title">'
+    + (list.length ? list.map(function(a){
+        return '<article class="dash-ann" role="listitem">'
+          + '<div class="dash-ann-meta"><strong>'+(a.postTo==='staff'?'For Staff':'For All Users')+'</strong> &middot; '+esc(fmtDateTime(a.publishedAt))+(a.postedBy?' &middot; '+esc(a.postedBy):'')+'</div>'
+          + '<h4>'+esc(a.title)+'</h4>'+(a.content?'<p>'+esc(a.content)+'</p>':'')+'</article>';
+      }).join('') : '<div class="empty-state">No announcements right now.</div>')
+    + '</div>';
 }
 
 function modalViewStaff(id){
@@ -3772,25 +3869,23 @@ function modalReqDetail(id, kind){
   var canProcess = account && account.role==='staff';
   var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
   var terminalStatus = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
-  var procButton = '';
-  if(canProcess && !r.processingStaffId && !terminalStatus){
-    procButton = '<button type="button" class="btn btn-primary btn-process" data-action="start-processing" data-id="'+esc(r.id)+'">Process Request</button>';
-  } else if(isAssignedStaff && r.processingStartedAt && !r.processingCompletedAt && !terminalStatus){
-    procButton = '<button type="button" class="btn btn-primary btn-process" data-action="complete-processing" data-id="'+esc(r.id)+'">Complete Request</button>';
-  }
-  // Elapsed timer and its action button sit apart, so the button never crowds the timer.
-  var processing = (r.processingStartedAt || procButton)
-    ? '<div class="rd-proc">'+(r.processingStartedAt?'<span class="proc-elapsed">'+processingTimerHtml(r, true)+'</span>':'<span class="cell-sub">Not started. Process Request sets the status to Processing.</span>')
-      + (procButton?'<span class="proc-action">'+procButton+'</span>':'')+'</div>'
-    : '';
-  // Staff choose only the closing statuses here: Pending and Processing are
-  // set automatically (submission / Process Request).
-  var statusForm = isAssignedStaff && !terminalStatus
+  var canTakeRequest = canProcess && !terminalStatus && (!r.processingStaffId || isAssignedStaff);
+  // The processing time only (no action button beside it). It runs while processing and
+  // stops at the final duration, marked Processing End, once the request is closed.
+  var processing = r.processingStartedAt
+    ? '<div class="rd-proc"><span class="proc-elapsed">'+processingTimerHtml(r, true)+'</span></div>'
+    : (canTakeRequest ? '<div class="rd-proc"><span class="cell-sub">Not started. Choose Processing and click Update Status to start.</span></div>' : '');
+  // Processing starts the timer (or keeps the running one). Rejected and Approve close the
+  // request: Approve saves the existing Out for Release status, which clients see in tracking,
+  // then opens Send Updates with a pickup draft. Both need processing to have started.
+  var statusChoices = [['Processing','Processing']];
+  if(isAssignedStaff && r.processingStartedAt) statusChoices.push(['Rejected','Rejected'], ['Out for Release','Approve']);
+  var statusForm = canTakeRequest
     ? '<form class="rd-status-form" data-form="update-status" data-kind="'+kind+'" data-id="'+esc(r.id)+'">'
         + '<div class="rd-form-row">'
           + '<div class="field"><label class="sr-only" for="rd-status-'+esc(r.id)+'">New status</label><select id="rd-status-'+esc(r.id)+'" name="status" required>'
             + '<option value="">Choose a new status</option>'
-            + ['Rejected','Out for Release'].map(function(s){ return '<option value="'+s+'">'+statusLabel(s)+'</option>'; }).join('')
+            + statusChoices.map(function(c){ return '<option value="'+c[0]+'">'+c[1]+'</option>'; }).join('')
           + '</select></div>'
           + '<button type="submit" class="btn btn-primary">Update Status</button>'
         + '</div>'
@@ -3803,7 +3898,7 @@ function modalReqDetail(id, kind){
     ['Current Status', '<span class="badge '+(STATUS_META[r.status]||STATUS_META.Received).cls+'">'+esc(statusLabel(r.status))+'</span>'],
     ['Assigned Processor', r.processingStaffId ? esc(r.processingStaffName||'Staff account #'+r.processingStaffId)+' <span class="cell-sub">(Staff ID: '+esc(r.processingStaffId)+')</span>' : 'Unassigned'],
     r.processingStartedAt ? ['Processing Started', fmtDateTime(r.processingStartedAt)] : null,
-    r.processingCompletedAt ? ['Processing Completed', fmtDateTime(r.processingCompletedAt)] : null,
+    r.processingCompletedAt ? ['Processing End', fmtDateTime(r.processingCompletedAt)] : null,
     r.processingDurationSeconds!=null ? ['Final Processing Duration', '<span class="mono">'+formatDuration(r.processingDurationSeconds)+'</span>'] : null,
     processing ? ['Processing', processing, true] : null,
     statusForm ? ['Update Status', statusForm, true] : null
@@ -3842,10 +3937,12 @@ function reqSubmittedDetailsHtml(r){
       ['Requester Name', val(fullName)],
       // The owner's name is stored only when the requester is the owner; it is never substituted.
       ['Property Owner Name', d.isOwner ? val(fullName) : '<span class="cell-sub">Not recorded on this request (filed by a representative for the registered owner)</span>'],
-      ['Contact Number', '<span class="mono">'+val(d.contact)+'</span>'],
+      ['Contact Number', '<span class="mono">'+val(phLocalMobile(d.contact))+'</span>'],
       ['Email Address', val(d.email)],
       ['Address', val(address), true],
-      d.clientAccount ? ['Client Account', esc(d.clientAccount), true] : null
+      // The account holder is listed only when it is a different person from the requester.
+      d.clientAccount && d.clientAccount.replace(/\s+/g,' ').trim().toLowerCase()!==[d.firstName, d.lastName].join(' ').replace(/\s+/g,' ').trim().toLowerCase()
+        ? ['Client Account', esc(d.clientAccount), true] : null
     ])
     + rdTable('Property and Request Information', [
       ['ARP / Tax Declaration No.', '<span class="mono">'+val(d.arpNumber)+'</span>'],
@@ -4321,7 +4418,9 @@ function bindEvents(){
         var smsBox = form.querySelector('input[name="send_sms"]'); if(smsBox){ smsBox.checked = true; smsBox.disabled = false; }
         var typeSel = form.querySelector('#notification-request-type'); if(typeSel) typeSel.value = '';
         form._notifAuto = null;
+        form.elements.category.innerHTML = notifCategoryOptions(form.elements.requestRef.value, form.elements.category.value);
         var lt = form.elements.category.querySelector('option[value="Land Transfer Status"]'); if(lt) lt.disabled = false;
+        var route = form.querySelector('[data-channel-summary]'); if(route) route.textContent = 'Select a reference number to see how this update will be sent.';
       }, 0);
     });
     updateCount();
@@ -4746,6 +4845,8 @@ function bindEvents(){
       state.modal = {type:'report-detail', id:el.getAttribute('data-id')}; render();
     } else if(action==='print-report'){
       window.print();
+    } else if(action==='open-ann-inbox'){
+      state.modal = {type:'ann-inbox'}; render();
     } else if(action==='view-doc-req'){
       state.modal = {type:'doc-detail', id:el.getAttribute('data-id')}; render();
     } else if(action==='view-land-req'){
