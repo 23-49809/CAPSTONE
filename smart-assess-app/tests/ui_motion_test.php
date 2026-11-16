@@ -10,7 +10,10 @@ declare(strict_types=1);
  *    is skipped entirely when reduced motion is requested;
  *  - printing never hides a section that has not been revealed yet;
  *  - popups close through the existing close actions (only delayed by the fade);
- *  - no permanent compositing hints (will-change) are added.
+ *  - no permanent compositing hints (will-change) are added;
+ *  - public hover lifts apply only to real pointers and stop for reduced motion;
+ *    the Why Choose cards keep their wording, with decorative icons hidden from
+ *    screen readers.
  *
  * Reads the source files only (no database, no network).
  *
@@ -64,6 +67,20 @@ $check('public: the scroll reveal is skipped for reduced motion or without Inter
 $check('public: revealed elements are handed back to their own styles', str_contains($saMotion, "el.classList.remove('sa-reveal', 'sa-in')"));
 $check('public: printing shows sections that were not revealed yet', str_contains($client, '@media print{ .sa-reveal{ opacity:1 !important; transform:none !important; } }'));
 $check('public: reduced motion shows sections without the reveal', str_contains($client, '.sa-reveal{ opacity:1 !important; transform:none !important; }'));
+
+// Public polish: hover feedback and the Why Choose section.
+$polish = $between($client, 'Client polish: hover feedback and the Why Choose section', 'Motion (animations and transitions only)');
+$check('public: the polish stylesheet is present', $polish !== '');
+$check('public: hover lifts apply only to devices that can really hover', substr_count($polish, '@media (hover:hover) and (pointer:fine){') === 2
+    && !preg_match('/^\s*\.(service-card|why-grid li|btn-primary[^{]*):hover\{[^}]*transform/m', (string) preg_replace('/@media \(hover:hover\) and \(pointer:fine\)\{.*?\n  \}\n/s', '', $polish)));
+$check('public: hover lifts stop for reduced motion', str_contains($polish, '@media (prefers-reduced-motion: reduce){')
+    && str_contains($polish, '.service-card:hover, .why-grid li:hover, .why-grid li:hover .why-icon, .brand:hover .brand-mark{ transform:none; }'));
+$check('public: the polish never changes font sizes or families', !preg_match('/font-(size|family)\s*:/', $polish));
+foreach (['Convenient Online Applications', 'Clear Requirements', 'Application Status Updates', 'In-Person Assistance and Claiming'] as $benefit) {
+    $check("public: Why Choose keeps \"{$benefit}\"", substr_count($client, "<span class=\"why-icon\" aria-hidden=\"true\">'+ic(") >= 4
+        && str_contains($client, "</span><div><h4>{$benefit}</h4>"));
+}
+$check('public: the Why Choose cards still reveal on scroll', str_contains($client, '.section .why-grid > li'));
 
 // Legal pages.
 $check('legal pages: entrance animation respects reduced motion', str_contains($legal, '@media (prefers-reduced-motion: reduce){ .legal-page .section-head, .legal-page .legal-layout{ animation:none; } }'));
