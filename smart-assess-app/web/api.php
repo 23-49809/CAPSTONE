@@ -6,6 +6,8 @@ require_once __DIR__ . '/drafts.php';
 require_once __DIR__ . '/terms-acceptance.php';
 // Server-side document requirements, file types and size limit for every upload.
 require_once dirname(__DIR__) . '/app/services/DocumentRequirements.php';
+// Only for OcrService::MAX_IMAGE_PIXELS, so uploads and OCR share one image size limit.
+require_once dirname(__DIR__) . '/app/services/OcrService.php';
 
 /** Short random reference shown to the user and written to the log, so a
  *  reported error can be matched to its diagnostic entry. */
@@ -513,6 +515,20 @@ function sa_validate_upload(array $file, string $key): array
         throw new SaHttpException(422, $identity
             ? 'Upload IDs and the authorization letter as a JPG or PNG image with a matching file extension.'
             : 'Upload a JPG, PNG, WEBP, or PDF file with a matching file extension.');
+    }
+    // Images the OCR step would refuse as too large (over 25 megapixels) are refused here
+    // instead, so the applicant can fix the photo now rather than Staff finding later that
+    // it "could not be read". Measured from the header only; a header without readable
+    // dimensions is left for OCR to judge, as before. PDFs are not affected.
+    if ($mime !== 'application/pdf') {
+        $dimensions = @getimagesize((string) $file['tmp_name']);
+        if (is_array($dimensions) && is_int($dimensions[0] ?? null) && is_int($dimensions[1] ?? null)
+            && $dimensions[0] > 0 && $dimensions[1] > 0
+            && $dimensions[0] * $dimensions[1] > OcrService::MAX_IMAGE_PIXELS) {
+            throw new SaHttpException(422,
+                'This photo\'s resolution is too high for automatic processing (over 25 megapixels). '
+                . 'Please retake it at a lower resolution or crop it closer to the document, keeping the text sharp, and upload it again.');
+        }
     }
     return [$original, $mime, $size, $allowed[$mime]];
 }
