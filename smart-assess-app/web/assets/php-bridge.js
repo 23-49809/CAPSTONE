@@ -311,43 +311,6 @@
     reason.focus();
   }
 
-  function generateAiMessage(button) {
-    var form = button.closest('form');
-    var generationType = button.getAttribute('data-ai-type');
-    if (!form || (generationType !== 'notification' && generationType !== 'announcement')) return;
-
-    var topicField = generationType === 'announcement'
-      ? form.elements.namedItem('title')
-      : form.elements.namedItem('aiTopic');
-    var detailsField = form.elements.namedItem('aiDetails');
-    var messageField = form.elements.namedItem(generationType === 'announcement' ? 'content' : 'message');
-    if (!topicField || !messageField || !topicField.value.trim()) {
-      notice('Enter a topic before generating a message.');
-      if (topicField) topicField.focus();
-      return;
-    }
-
-    var originalContent = button.innerHTML;
-    button.disabled = true;
-    button.setAttribute('aria-busy', 'true');
-    button.textContent = 'Generating…';
-    jsonRequest('generate_ai_message', {
-      generation_type: generationType,
-      topic: topicField.value.trim(),
-      details: detailsField ? detailsField.value.trim() : ''
-    }).then(function (result) {
-      messageField.value = result.data.message;
-      messageField.dispatchEvent(new Event('input', { bubbles: true }));
-      messageField.focus();
-    }).catch(function (error) {
-      notice(error.message || 'AI message generation is unavailable. You can enter the message manually.');
-    }).finally(function () {
-      button.disabled = false;
-      button.removeAttribute('aria-busy');
-      button.innerHTML = originalContent;
-    });
-  }
-
   // Recipient phone/email shown on the notification form; the email box can
   // only be ticked when the request has an email address.
   function setNotificationContact(form, phone, email, placeholder) {
@@ -521,11 +484,7 @@
     var internalAction = event.target.closest('[data-action]');
     if (!internalAction) return;
     var actionName = internalAction.getAttribute('data-action');
-    if (actionName === 'generate-ai-message') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      generateAiMessage(internalAction);
-    } else if (actionName === 'toggle-notification-client') {
+    if (actionName === 'toggle-notification-client') {
       event.preventDefault();
       event.stopImmediatePropagation();
       var clientName = internalAction.nextElementSibling;

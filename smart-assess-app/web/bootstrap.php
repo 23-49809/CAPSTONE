@@ -650,9 +650,9 @@ function sa_internal_bootstrap(): array
         )->fetchAll());
     }
 
-    if ($roleId === 4) {
+    if ($roleId === 3 || $roleId === 4) {
         sa_publish_due_announcements();
-        // The Head's list keeps every announcement (history/audit); each row
+        // The Head's and Admin's list keeps every announcement (history/audit); each row
         // carries its staff/client expiry so expired ones are marked, not deleted.
         [, $staffExpires] = sa_announcement_visibility_sql('staff');
         [, $clientExpires] = sa_announcement_visibility_sql('client');
@@ -662,6 +662,9 @@ function sa_internal_bootstrap(): array
                     {$staffExpires} AS staff_expires_at, {$clientExpires} AS client_expires_at
              FROM announcements ORDER BY created_at DESC, id DESC LIMIT 200"
         )->fetchAll();
+    }
+
+    if ($roleId === 4) {
         $data['server_now'] = sa_manila_now();
         $data['reports'] = [
             'total_requests' => (int) $pdo->query('SELECT COUNT(*) FROM requests')->fetchColumn(),

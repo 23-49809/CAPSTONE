@@ -160,7 +160,8 @@ $page['announcements'] = array_map(static function (array $announcement): array 
     ];
 }, $page['announcements'] ?? []);
 $page['serverNow'] = sa_manila_now();
-if ($user && (int) $user['role_id'] !== 4) {
+// Staff see only the internal announcements that are live; Head and Admin manage the full list.
+if ($user && !in_array((int) $user['role_id'], [3, 4], true)) {
     $page['announcements'] = array_map(static function (array $announcement): array {
         return [
             'id' => (string) $announcement['id'],
