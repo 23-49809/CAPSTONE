@@ -452,6 +452,37 @@ try {
             && $pageMethods($result) === ['1:embedded_text', '2:ocr', '3:embedded_text']
             && str_contains($result['text'], 'PAGE ONE') && str_contains($result['text'], 'PAGE THREE') && stripos($result['text'], 'SCANNED') !== false);
         $checkIntegration('real tools leave no temporary folders', $temporaryDirectories() === $temporaryBefore);
+
+        // ---- Regression: the fictional sample ID (repo asset, no real applicant data) ----
+        // A clear ID image must OCR successfully and classify as readable. Guards against
+        // configuration or threshold changes that would make Staff see a clear ID as
+        // "could not be read" (diagnosed 17 Nov 2026: the pipeline reads this sample fine;
+        // only an intact file arriving at the worker keeps it that way).
+        $sampleId = dirname(__DIR__, 2) . '/ID CLear.png';
+        if (!is_file($sampleId)) {
+            $skipIntegration('fictional sample ID CLear.png not present in the repository');
+        } else {
+            require_once __DIR__ . '/../app/services/DocumentAnalysis.php';
+            $samplePath = $uploadDirectory . DIRECTORY_SEPARATOR . 'sample-id.png';
+            copy($sampleId, $samplePath);
+            $result = $real->extract($samplePath);
+            $text = $result['success'] ? DocumentAnalysis::normalizeText($result['text']) : '';
+            $checkIntegration('the fictional sample ID is read by OCR (success, 1 page, image_ocr)',
+                $result['success'] && $result['pages_processed'] === 1 && $result['extraction_method'] === 'image_ocr'
+                && $result['error_code'] === null);
+            $checkIntegration('the sample ID\'s printed fields are extracted',
+                str_contains($text, 'DELA CRUZ') && str_contains($text, 'MARIA ANGELICA')
+                && str_contains($text, '1234 5678 9012') && stripos($text, 'NOT A GOVERNMENT ID') !== false);
+            $checkIntegration('the sample ID classifies as readable (never "cannot be read")',
+                DocumentAnalysis::readability('ownerId', $text, $result['success']) === 'good');
+            // The sample must stay within every pipeline limit, so an upload of it can never
+            // be refused for size: strictly under 5 MB and at most 25 megapixels.
+            $sampleSize = (int) filesize($samplePath);
+            $sampleDimensions = (array) getimagesize($samplePath);
+            $checkIntegration('the sample ID fits the upload and OCR limits (< 5 MB, <= 25 MP)',
+                $sampleSize > 0 && $sampleSize < 5 * 1024 * 1024
+                && (int) $sampleDimensions[0] * (int) $sampleDimensions[1] <= OcrService::MAX_IMAGE_PIXELS);
+        }
     }
 } catch (Throwable $exception) {
     fwrite(STDERR, 'Unexpected test setup or execution failure: ' . $exception::class . ' at line ' . $exception->getLine() . "\n");
