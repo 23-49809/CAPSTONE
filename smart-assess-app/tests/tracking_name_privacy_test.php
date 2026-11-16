@@ -10,7 +10,8 @@ declare(strict_types=1);
  *  - opening another person's receipt link shows tracking (initials), not the receipt;
  *  - a duplicate submission from another browser (same saved-application code)
  *    does not make that browser the submitter;
- *  - the receipt keeps its Current Status row, on screen and in the saved image;
+ *  - the receipt summary has no Current Status row (on screen or in the saved image),
+ *    while tracking still shows the status;
  *  - the Terms version and the upload rules match between the browser and PHP,
  *    and the legal text no longer says anyone can see the full name.
  *
@@ -65,8 +66,11 @@ $between = static function (string $source, string $start, string $end): string 
 };
 $onScreen = $between($publicPage, 'function renderConfirmation(){', "\nfunction ");
 $savedImage = $between($publicPage, 'function saveTrackingNumber(){', "\nfunction ");
-$check('the on-screen receipt keeps its Current Status row', str_contains($onScreen, "row('clock', 'Current Status', '<span class=\"rcpt-pill\">'+esc(receiptStatus(r))+'</span>')"));
-$check('the saved receipt image keeps its Current Status row', str_contains($savedImage, "['Current Status', receiptStatus(submission)]"));
+// The receipt summary no longer repeats the status (it is always "Received" at submission);
+// the status itself is unchanged and is shown on the Track Your Request page.
+$check('the on-screen receipt has no Current Status row', $onScreen !== '' && !str_contains($onScreen, 'Current Status'));
+$check('the saved receipt image has no Current Status row', $savedImage !== '' && !str_contains($savedImage, 'Current Status'));
+$check('tracking still shows the current status', str_contains($publicPage, '<div class="trk-sum-k" style="margin-bottom:6px">Current Status</div>'));
 $check('the receipt still shows the reference number, request type, date, client name and service',
     str_contains($onScreen, 'data-ref-no') && str_contains($onScreen, "'Request Type'") && str_contains($onScreen, "'Date Submitted'")
     && str_contains($onScreen, "'Client Name'") && str_contains($onScreen, "'Service'")

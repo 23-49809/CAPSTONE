@@ -99,6 +99,6 @@ sa_legal_header(
 <p>These terms may change to reflect changes in the system, office procedures, laws or policies. When they change, you will be asked to accept the updated version before your next application.</p>
 
 <h2 id="contact">13. Contact</h2>
-<p>Municipal Assessor's Office, Municipal Hall, Poblacion, Mabini, Batangas, Philippines<br>Phone: (043) 487-0123 &middot; Email: <a href="mailto:mao.smartassess@gmail.com">mao.smartassess@gmail.com</a><br>Monday to Friday, 8:00 AM to 5:00 PM</p>
+<p>Municipal Assessor's Office, Municipal Hall, Poblacion, Mabini, Batangas, Philippines<br>Phone: 0998-9695-966 &middot; Email: <a href="mailto:mao.smartassess@gmail.com">mao.smartassess@gmail.com</a><br>Monday to Friday, 8:00 AM to 5:00 PM</p>
 <?php
 sa_legal_footer();

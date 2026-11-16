@@ -190,7 +190,7 @@ sa_legal_header(
 
 <h2 id="contact">12. Contact and privacy concerns</h2>
 <p>For questions, requests or concerns about your personal information, including suspected unauthorized access, contact:</p>
-<p>Municipal Assessor's Office<br>Municipal Hall, Poblacion, Mabini, Batangas, Philippines<br>Phone: (043) 487-0123<br>Email: <a href="mailto:mao.smartassess@gmail.com">mao.smartassess@gmail.com</a><br>Office hours: Monday to Friday, 8:00 AM to 5:00 PM</p>
+<p>Municipal Assessor's Office<br>Municipal Hall, Poblacion, Mabini, Batangas, Philippines<br>Phone: 0998-9695-966<br>Email: <a href="mailto:mao.smartassess@gmail.com">mao.smartassess@gmail.com</a><br>Office hours: Monday to Friday, 8:00 AM to 5:00 PM</p>
 <p>If your concern is not resolved, you may contact the <a href="https://privacy.gov.ph/" rel="noopener">National Privacy Commission</a>.</p>
 
 <h2 id="changes">13. Changes to this policy</h2>

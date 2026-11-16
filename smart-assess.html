@@ -534,7 +534,7 @@
   .rcpt-copy .icon{ width:16px; height:16px; }
   .rcpt-copy.copied{ background:#dff1e7; color:#155c3b; }
   .rcpt-rows{ list-style:none; margin:8px 0 0; padding:0; text-align:left; }
-  .rcpt-row{ display:grid; grid-template-columns:22px minmax(0,auto) minmax(0,1fr); align-items:center; column-gap:12px; padding:8px 0; border-bottom:1px dashed #dfe7e2; font-size:14px; line-height:1.4; }
+  .rcpt-row{ display:grid; grid-template-columns:minmax(0,auto) minmax(0,1fr); align-items:center; column-gap:12px; padding:8px 0; border-bottom:1px dashed #dfe7e2; font-size:14px; line-height:1.4; }
   .rcpt-row:last-child{ border-bottom:0; }
   .rcpt-row .icon{ width:19px; height:19px; color:#2f5c47; }
   .rcpt-k{ color:#5c6a62; white-space:nowrap; }
@@ -565,8 +565,8 @@
     .confirm-actions .btn{ font-size:14px; padding:8px 10px; gap:6px; }
   }
   @media (max-width:359px){
-    .rcpt-row{ grid-template-columns:20px minmax(0,1fr); row-gap:2px; }
-    .rcpt-row .rcpt-v{ grid-column:2; text-align:left; }
+    .rcpt-row{ grid-template-columns:minmax(0,1fr); row-gap:2px; }
+    .rcpt-row .rcpt-v{ grid-column:1; text-align:left; }
     .rcpt-tagline{ font-size:12.5px; gap:6px; }
     .rcpt-tagline{ flex-wrap:wrap; text-align:center; }
     .rcpt-tagline::before, .rcpt-tagline::after{ display:none; }
@@ -1021,17 +1021,13 @@
     transition:transform .28s cubic-bezier(.2,.7,.2,1), box-shadow .28s ease, border-color .2s ease; }
   .why-grid li::before{ content:""; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--brand-700), var(--brand-500));
     transform:scaleX(.2); transform-origin:left center; transition:transform .4s cubic-bezier(.2,.7,.2,1); }
-  .why-icon{ display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; margin-bottom:14px; border-radius:13px;
-    background:var(--brand-100); color:var(--brand-700); transition:background-color .25s ease, color .25s ease, transform .25s cubic-bezier(.2,.7,.2,1); }
-  .why-icon .icon{ width:22px; height:22px; }
   @media (hover:hover) and (pointer:fine){
     .why-grid li:hover{ transform:translateY(-5px); border-color:color-mix(in srgb, var(--brand-500) 30%, var(--line)); box-shadow:0 28px 46px -32px rgba(4,78,59,.55); }
     .why-grid li:hover::before{ transform:scaleX(1); }
-    .why-grid li:hover .why-icon{ background:var(--brand-700); color:#fff; transform:scale(1.06); }
   }
-  @media (max-width:600px){ .why-grid li{ padding:18px 18px 20px; } .why-icon{ width:42px; height:42px; margin-bottom:10px; } }
+  @media (max-width:600px){ .why-grid li{ padding:18px 18px 20px; } }
   @media (prefers-reduced-motion: reduce){
-    .btn-primary:hover, .btn-hero:hover, .btn-ghost:hover, .service-card:hover, .why-grid li:hover, .why-grid li:hover .why-icon, .brand:hover .brand-mark{ transform:none; }
+    .btn-primary:hover, .btn-hero:hover, .btn-ghost:hover, .service-card:hover, .why-grid li:hover, .brand:hover .brand-mark{ transform:none; }
     .why-grid li::before{ transition:none; }
   }
 
@@ -1075,9 +1071,36 @@
     .notif-panel, .barangay-menu, [aria-busy="true"]{ animation:none !important; }
     :where(.btn):active{ transform:none; }
   }
+  /* ================= Client refinements: calmer popups, receipt and forms =================
+     Same fonts and sizes; typography, spacing and borders instead of icons. */
+  .requirements-close{ width:auto; flex:0 0 auto; height:38px; padding:0 16px; border-radius:999px; font-family:inherit; font-size:14px; font-weight:600; color:var(--ink);
+    transition:background-color .16s ease, border-color .16s ease; }
+  .requirements-close:hover{ border-color:var(--line-strong); }
+  .requirements-modal-card ul{ list-style:none; padding:0; margin:0 0 6px; border-top:1px solid var(--line); }
+  .requirements-modal-card li{ padding:11px 2px; border-bottom:1px solid var(--line); color:var(--ink); }
+  .announcement-empty{ color:var(--ink-soft); margin:6px 0 0; }
+  .home-slide .announcement-empty{ color:var(--hero-text); }
+  .announcement-detail .announcement-detail-note{ margin-top:20px; padding:14px 0 0; border-top:1px solid var(--line); border-radius:0; background:none; color:var(--ink-faint); }
+  .submit-modal{ position:relative; overflow:hidden; border-top:4px solid var(--brand-700); padding:28px 30px 24px; }
+  .submit-modal-kicker{ margin:0 0 6px !important; font-size:12px !important; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--brand-700) !important; }
+  .submit-modal-actions{ margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+  .submit-modal-actions .btn{ min-width:150px; }
+  @media (max-width:520px){ .submit-modal-actions .btn{ flex:1 1 100%; } .submit-modal{ padding:24px 20px 20px; } }
+  .rcpt-check{ margin:12px auto 8px; }
+  .rcpt h2{ margin-top:18px; }
+  .announcement-page-empty{ text-align:center; margin:0 auto 24px; }
+  /* Forms: a calm hover on every field; errors fade in when they first appear. */
+  @media (hover:hover) and (pointer:fine){
+    .field input:not(:focus):not(.invalid):hover, .field select:not(:focus):not(.invalid):hover, .field textarea:not(:focus):hover,
+    .contact-input:not(:focus-within):hover, .arp-input:not(:focus-within):not(.invalid):hover{ border-color:color-mix(in srgb, var(--brand-500) 45%, var(--line-strong)); }
+  }
+  .field textarea{ transition:border-color .15s ease, box-shadow .15s ease; }
+  @keyframes saErrIn{ from{ opacity:0; transform:translateY(-2px); } to{ opacity:1; transform:none; } }
+  #app.sa-errors-new .field-error{ animation:saErrIn .22s ease both; }
+  @media (prefers-reduced-motion: reduce){ #app.sa-errors-new .field-error{ animation:none; } }
 </style>
 
-<div id="app"><main class="wrap static-home"><h1>SMART ASSESS</h1><p><strong>Municipal Assessor’s Office of Mabini, Batangas</strong></p><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines. Phone: 09989695966. Email: mao.smartassess@gmail.com</p><nav class="static-legal" aria-label="Legal"><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav></main></div>
+<div id="app"><main class="wrap static-home"><h1>SMART ASSESS</h1><p><strong>Municipal Assessor’s Office of Mabini, Batangas</strong></p><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines. Phone: 0998-9695-966. Email: mao.smartassess@gmail.com</p><nav class="static-legal" aria-label="Legal"><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav></main></div>
 
 <script>
 (function(){
@@ -1435,7 +1458,7 @@ function renderRequirementsModal(){
     ? ['Certified True Copy of Tax Declaration or Title','Notarial Deed of Sale or Donation','Vicinity Map','Certification of No Improvement','Tax Clearance','Valid government-issued ID']
     : ['Valid government-issued ID','Completed request details','Property or tax declaration information','Authorization letter and representative ID, if filing for the owner'];
   return '<div class="requirements-modal" data-action="close-requirements"><div class="requirements-modal-card" role="dialog" aria-modal="true" aria-labelledby="requirements-title" tabindex="-1">'
-    + '<div class="requirements-modal-head"><h3 id="requirements-title">'+title+'</h3><button class="requirements-close" type="button" data-action="close-requirements" aria-label="Close requirements"><img class="requirements-close-icon" src="close.png" alt=""></button></div>'
+    + '<div class="requirements-modal-head"><h3 id="requirements-title">'+title+'</h3><button class="requirements-close" type="button" data-action="close-requirements" aria-label="Close requirements">Close</button></div>'
     + '<ul>'+items.map(function(item){ return '<li>'+esc(item)+'</li>'; }).join('')+'</ul>'
   + '</div></div>';
 }
@@ -1494,10 +1517,10 @@ function renderAnnouncementModal(){
   const announcement = announcementForModal();
   markAnnouncementRead(announcement);
   return '<div class="requirements-modal" data-action="close-announcement"><article class="requirements-modal-card announcement-detail" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title" tabindex="-1">'
-    + '<div class="requirements-modal-head"><div><span class="eyebrow" style="color:var(--brand-700);margin-bottom:8px;">Important Notice</span><h3 id="announcement-modal-title">Office Announcement</h3></div><button class="requirements-close" type="button" data-action="close-announcement" aria-label="Close announcement"><img class="requirements-close-icon" src="close.png" alt=""></button></div>'
+    + '<div class="requirements-modal-head"><div><span class="eyebrow" style="color:var(--brand-700);margin-bottom:8px;">Important Notice</span><h3 id="announcement-modal-title">Office Announcement</h3></div><button class="requirements-close" type="button" data-action="close-announcement" aria-label="Close announcement">Close</button></div>'
     + (announcement
-      ? '<div class="announcement-detail-meta">Announcement date: '+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</div><h2>'+esc(announcement.title)+'</h2><p>'+esc(announcement.content)+'</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the announcement and follow any additional instructions provided by the Assessor’s Office.</p></div>'
-      : '<div class="announcement-detail-meta">No current announcement</div><h2>No published announcements</h2><p>There are no announcements available at this time.</p>')
+      ? '<div class="announcement-detail-meta">Announcement date: '+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</div><h2>'+esc(announcement.title)+'</h2><p>'+esc(announcement.content)+'</p><p class="announcement-detail-note">Please plan your visit around this announcement and follow any further instructions from the Assessor’s Office.</p>'
+      : '<p class="announcement-empty">No announcements right now.</p>')
   + '</article></div>';
 }
 
@@ -1509,7 +1532,7 @@ function renderLanding(){
     + '<div class="hero-photo" role="img" aria-label="Mabini Municipal Assessor’s Office building"></div>'
     + '<svg class="hero-wave" viewBox="0 0 760 200" preserveAspectRatio="none" aria-hidden="true"><path class="wave-light" d="M0 40 C 180 110, 360 190, 760 200 L0 200 Z"/><path class="wave-dark" d="M0 95 C 160 150, 300 192, 540 200 L0 200 Z"/></svg>'
     + '<div class="home-slide active"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">MABINI MUNICIPAL ASSESSOR’S OFFICE</span><h1>Welcome to<br>SMART ASSESS</h1><p class="hero-tagline">Your Digital Gateway to Assessor Services</p><p>Access property document requests and land transfer services through a secure and convenient online platform designed to provide a more efficient service experience.</p><button class="btn btn-hero" data-action="get-started">Explore Services</button></div></div></div>'
-    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">LATEST UPDATES</span><h1>Announcements</h1><div class="announcement-copy"><h3>'+esc(announcement ? announcement.title : 'No published announcements')+'</h3><p>'+esc(announcement ? announcement.content : 'There are no current announcements from the Assessor’s Office.')+'</p><time>'+(announcement ? esc(fmtDateTime(announcement.publishedAt || announcement.datePosted)) : '')+'</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement</button></div></div></div>'
+    + '<div class="home-slide"><div class="wrap"><div class="hero-inner home-slide-inner"><span class="eyebrow">LATEST UPDATES</span><h1>Announcements</h1>'+(announcement ? '<div class="announcement-copy"><h3>'+esc(announcement.title)+'</h3><p>'+esc(announcement.content)+'</p><time>'+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</time></div><button class="btn btn-hero" data-action="show-announcement">View Announcement</button>' : '<p class="announcement-copy announcement-empty">No announcements right now.</p>')+'</div></div></div>'
     + '<button class="home-slide-control prev" data-action="slider-prev" aria-label="Previous slide">'+ic('arrowLeft')+'</button><button class="home-slide-control next" data-action="slider-next" aria-label="Next slide">'+ic('arrowRight')+'</button>'
     + '<div class="home-slide-dots" role="tablist" aria-label="Hero slides"><button class="active" data-action="slider-dot" data-slide="0" aria-label="Welcome to SMART ASSESS slide"></button><button data-action="slider-dot" data-slide="1" aria-label="Announcements slide"></button></div>'
   + '</section>'
@@ -1534,10 +1557,10 @@ function renderLanding(){
       + '<p class="why-title">A More Convenient Way to Request Property Documents</p>'
       + '<p class="why-desc">Prepare and submit your request online, then visit the Municipal Assessor’s Office to claim your documents when they are ready.</p></div>'
     + '<ul class="about-grid why-grid">'
-      + '<li><span class="why-icon" aria-hidden="true">'+ic('file')+'</span><div><h4>Convenient Online Applications</h4><p>Submit your application online without needing to visit the office just to start your request.</p></div></li>'
-      + '<li><span class="why-icon" aria-hidden="true">'+ic('checklistIcon')+'</span><div><h4>Clear Requirements</h4><p>Review the required information and documents before submitting your application.</p></div></li>'
-      + '<li><span class="why-icon" aria-hidden="true">'+ic('bell')+'</span><div><h4>Application Status Updates</h4><p>Check the status of your request and review available notifications about its progress.</p></div></li>'
-      + '<li><span class="why-icon" aria-hidden="true">'+ic('headset')+'</span><div><h4>In-Person Assistance and Claiming</h4><p>Once your request is ready, visit the Municipal Assessor’s Office during official office hours to claim your documents.</p></div></li>'
+      + '<li><div><h4>Convenient Online Applications</h4><p>Submit your application online without needing to visit the office just to start your request.</p></div></li>'
+      + '<li><div><h4>Clear Requirements</h4><p>Review the required information and documents before submitting your application.</p></div></li>'
+      + '<li><div><h4>Application Status Updates</h4><p>Check the status of your request and review available notifications about its progress.</p></div></li>'
+      + '<li><div><h4>In-Person Assistance and Claiming</h4><p>Once your request is ready, visit the Municipal Assessor’s Office during official office hours to claim your documents.</p></div></li>'
     + '</ul>'
   + '</div></section>'
 
@@ -1545,7 +1568,7 @@ function renderLanding(){
   + renderAnnouncementModal()
   + '<footer class="site-footer"><div class="wrap"><div class="footer-grid">'
     + '<div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>'
-    + '<div><h5>Contact</h5><p>Phone: 09989695966<br>Email: mao.smartassess@gmail.com</p></div>'
+    + '<div><h5>Contact</h5><p>Phone: 0998-9695-966<br>Email: mao.smartassess@gmail.com</p></div>'
     + '<div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>'
     + '<nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><button type="button" data-scroll-to="why-choose">Why Choose SMART ASSESS</button><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav>'
     + '</div><div class="footer-bottom"><span>&copy; 2026 Smart Assess. All rights reserved.</span></div></div></footer>';
@@ -1554,7 +1577,7 @@ function renderLanding(){
   function renderAnnouncementPage(){
     const announcement = currentPublicAnnouncement();
     markAnnouncementRead(announcement);
-    return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><p>Official updates from the Department Head.</p></div><article class="panel-card announcement-detail">'+(announcement ? '<div class="announcement-detail-meta">Announcement date: '+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</div><h2>'+esc(announcement.title)+'</h2><p>'+esc(announcement.content)+'</p><div class="announcement-detail-note"><strong>Important information for clients</strong><p>Please plan your visit around the announcement and follow any additional instructions provided by the Assessor’s Office.</p></div>' : '<div class="announcement-detail-meta">No current announcement</div><h2>No published announcements</h2><p>There are no announcements available at this time.</p>')+'</article><div class="detail-back"><button class="btn btn-ghost" data-nav="landing">Back to Home</button></div></div></section>';
+    return renderHeader() + '<section class="section"><div class="wrap public-detail-page"><div class="section-head"><span class="eyebrow">Important Notice</span><h1>Office Announcement</h1><p>Official updates from the Department Head.</p></div>'+(announcement ? '<article class="panel-card announcement-detail"><div class="announcement-detail-meta">Announcement date: '+esc(fmtDateTime(announcement.publishedAt || announcement.datePosted))+'</div><h2>'+esc(announcement.title)+'</h2><p>'+esc(announcement.content)+'</p><p class="announcement-detail-note">Please plan your visit around this announcement and follow any further instructions from the Assessor’s Office.</p></article>' : '<p class="announcement-empty announcement-page-empty">No announcements right now.</p>')+'<div class="detail-back"><button class="btn btn-ghost" data-nav="landing">Back to Home</button></div></div></section>';
   }
 
 /* ---------- Wizard ---------- */
@@ -1793,10 +1816,11 @@ function renderWizard(){
 function renderSubmitConfirmationModal(){
   return '<div class="submit-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="submit-confirm-title">'
     + '<div class="submit-modal">'
+      + '<p class="submit-modal-kicker">Final check</p>'
       + '<h2 id="submit-confirm-title">Are you sure your details are correct?</h2>'
       + '<p>Please review all the information and uploaded documents carefully before submitting your request. Once submitted, your request will be processed by the Municipal Assessor\'s Office.</p>'
       + '<div class="submit-modal-actions">'
-        + '<button class="btn btn-ghost" data-action="cancel-submit">Cancel</button>'
+        + '<button class="btn btn-ghost" data-action="cancel-submit">Review Again</button>'
         + '<button class="btn btn-primary" data-action="confirm-submit">Yes, Submit Request</button>'
       + '</div>'
     + '</div>'
@@ -1813,8 +1837,7 @@ function saveTrackingNumber(){
     ['Request Type', submission.flow==='docreq' ? 'Document Request' : 'Land Transfer'],
     ['Date Submitted', receiptDate(submission.submittedAt)],
     ['Client Name', submission.applicant || '—'],
-    ['Service', submission.docType || '—'],
-    ['Current Status', receiptStatus(submission)]
+    ['Service', submission.docType || '—']
   ];
   const display = getComputedStyle(document.documentElement).getPropertyValue('--font-display') || 'Georgia, serif';
   const body = getComputedStyle(document.documentElement).getPropertyValue('--font-body') || 'Arial, sans-serif';
@@ -1832,7 +1855,7 @@ function saveTrackingNumber(){
     const px = 80, pw = W - 160, inner = pw - 64, cx = W/2;
     // Measure the wrapped service value to size the canvas.
     ctx.font = '500 17px '+body;
-    const rowLines = details.map(function(d){ return d[0]==='Current Status' ? [d[1]] : wrap(ctx, d[1], inner - 190); });
+    const rowLines = details.map(function(d){ return wrap(ctx, d[1], inner - 190); });
     const rowsH = rowLines.reduce(function(h, l){ return h + Math.max(54, 30 + l.length*22); }, 0);
     const H = 1070 + rowsH;
     canvas.width = W*S; canvas.height = H*S; ctx.scale(S, S);
@@ -1854,13 +1877,13 @@ function saveTrackingNumber(){
     ctx.font = '700 16px '+body; ctx.fillText('Municipal Assessor’s Office', bx+102, y+56);
     ctx.fillStyle = '#3b4a42'; ctx.font = '15px '+body; ctx.fillText('Mabini, Batangas', bx+102, y+77);
     y += 120;
-    // Success check.
-    const g = ctx.createLinearGradient(cx, y, cx, y+72); g.addColorStop(0, '#66b892'); g.addColorStop(1, '#3f9a70');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, y+36, 36, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(cx-15, y+37); ctx.lineTo(cx-4, y+48); ctx.lineTo(cx+16, y+25); ctx.stroke();
+    // Heading, then the success check under it.
+    ctx.textAlign = 'center'; ctx.fillStyle = '#134e37'; ctx.font = '800 34px '+body; ctx.fillText('Request Submitted', cx, y+34);
+    const g = ctx.createLinearGradient(cx, y+52, cx, y+108); g.addColorStop(0, '#66b892'); g.addColorStop(1, '#3f9a70');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, y+80, 28, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(cx-12, y+81); ctx.lineTo(cx-3, y+90); ctx.lineTo(cx+13, y+71); ctx.stroke();
     y += 118;
-    ctx.textAlign = 'center'; ctx.fillStyle = '#134e37'; ctx.font = '800 34px '+body; ctx.fillText('Request Submitted', cx, y);
     y += 40; ctx.fillStyle = '#5c6a62'; ctx.font = '17px '+body;
     wrap(ctx, 'Your request has been successfully submitted to the Municipal Assessor’s Office. Please keep this receipt for your reference.', inner-40).forEach(function(l){ ctx.fillText(l, cx, y); y += 26; });
     y += 10; ctx.fillStyle = '#e1e9e4'; ctx.fillRect(px+32, y, inner, 1); y += 28;
@@ -1874,15 +1897,9 @@ function saveTrackingNumber(){
       const lines = rowLines[idx], h = Math.max(54, 30 + lines.length*22);
       ctx.textAlign = 'left'; ctx.fillStyle = '#5c6a62'; ctx.font = '17px '+body; ctx.fillText(d[0], px+32, y + h/2 + 6);
       ctx.textAlign = 'right';
-      if(d[0]==='Current Status'){
-        ctx.font = '600 15px '+body; const tw = ctx.measureText(d[1]).width + 28;
-        roundRect(ctx, px+32+inner-tw, y + h/2 - 16, tw, 32, 16); ctx.fillStyle = '#e3f2e9'; ctx.fill(); ctx.strokeStyle = '#cfe6d8'; ctx.stroke();
-        ctx.fillStyle = '#1f7a4d'; ctx.fillText(d[1], px+32+inner-14, y + h/2 + 5);
-      } else {
-        ctx.fillStyle = '#1f2a24'; ctx.font = '500 17px '+body;
-        const startY = y + h/2 + 6 - (lines.length-1)*11;
-        lines.forEach(function(l, k){ ctx.fillText(l, px+32+inner, startY + k*22); });
-      }
+      ctx.fillStyle = '#1f2a24'; ctx.font = '500 17px '+body;
+      const startY = y + h/2 + 6 - (lines.length-1)*11;
+      lines.forEach(function(l, k){ ctx.fillText(l, px+32+inner, startY + k*22); });
       y += h;
       if(idx < details.length-1){ ctx.strokeStyle = '#dfe7e2'; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(px+32, y); ctx.lineTo(px+32+inner, y); ctx.stroke(); ctx.setLineDash([]); }
     });
@@ -1890,10 +1907,8 @@ function saveTrackingNumber(){
     y += 24;
     // Info note.
     roundRect(ctx, px+32, y, inner, 82, 14); ctx.fillStyle = '#eef6f1'; ctx.fill(); ctx.strokeStyle = '#dcebe2'; ctx.stroke();
-    ctx.fillStyle = '#1f7a4d'; ctx.beginPath(); ctx.arc(px+66, y+41, 15, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '800 17px Georgia, serif'; ctx.fillText('i', px+66, y+47);
     ctx.textAlign = 'left'; ctx.fillStyle = '#2b3a32'; ctx.font = '15.5px '+body;
-    let ny = y + 34; wrap(ctx, 'You can track the status of your request using your tracking number on the “Track Your Request” page.', inner-80).forEach(function(l){ ctx.fillText(l, px+94, ny); ny += 22; });
+    let ny = y + 34; wrap(ctx, 'You can track the status of your request using your tracking number on the “Track Your Request” page.', inner-40).forEach(function(l){ ctx.fillText(l, px+52, ny); ny += 22; });
     y += 82 + 48;
     ctx.textAlign = 'center'; ctx.fillStyle = '#134e37'; ctx.font = '800 21px '+body; ctx.fillText('Thank you!', cx, y);
     ctx.fillStyle = '#6b7a71'; ctx.font = '15px '+body; ctx.fillText('Municipal Assessor’s Office', cx, y+28); ctx.fillText('Mabini, Batangas', cx, y+50);
@@ -1968,28 +1983,26 @@ function renderConfirmation(){
   const r = state.lastSubmission;
   if(!r) return renderLanding();
   const requestType = r.flow==='docreq' ? 'Document Request' : 'Land Transfer';
-  const row = function(icon, label, value){ return '<li class="rcpt-row">'+ic(icon)+'<span class="rcpt-k">'+label+'</span><span class="rcpt-v">'+value+'</span></li>'; };
+  const row = function(label, value){ return '<li class="rcpt-row"><span class="rcpt-k">'+label+'</span><span class="rcpt-v">'+value+'</span></li>'; };
   return renderHeader()
   + '<div class="confirm-shell"><div class="rcpt-wrap fade-in"><section class="rcpt" aria-labelledby="rcpt-title">'
     + '<div class="rcpt-brand"><img src="LOGO.png" alt="Bayan ng Mabini seal"><div><div class="rcpt-brand-name">SMART ASSESS</div><div class="rcpt-brand-office">Municipal Assessor’s Office</div><div class="rcpt-brand-place">Mabini, Batangas</div></div></div>'
-    + '<div class="rcpt-check" aria-hidden="true">'+ic('check')+'</div>'
     + '<h2 id="rcpt-title">Request Submitted</h2>'
+    + '<div class="rcpt-check" aria-hidden="true">'+ic('check')+'</div>'
     + '<p class="rcpt-lead">Your request has been successfully submitted to the Municipal Assessor’s Office. Please keep this receipt for your reference.</p>'
-    + '<p class="rcpt-lead">A confirmation with this reference number is being sent to the mobile number on this application, and to the email address if you gave one. Keep this receipt even if the message does not arrive.</p>'
     + '<div class="rcpt-rule"></div>'
     + '<div class="rcpt-ref"><div class="rcpt-ref-label" id="rcpt-ref-label">Your Tracking Number</div>'
       + '<div class="rcpt-ref-no" aria-labelledby="rcpt-ref-label" data-ref-no style="--len:'+Math.max(String(r.id).length, 13)+'">'+esc(r.id)+'</div>'
-      + '<button type="button" class="rcpt-copy" data-action="copy-tracking">'+ic('copy')+'<span data-copy-label>Copy Tracking Number</span></button>'
+      + '<button type="button" class="rcpt-copy" data-action="copy-tracking"><span data-copy-label>Copy Tracking Number</span></button>'
       + '<span class="rcpt-sr" role="status" aria-live="polite" data-copy-status></span></div>'
     + '<ul class="rcpt-rows">'
-      + row('doc', 'Request Type', esc(requestType))
-      + row('calendar', 'Date Submitted', esc(receiptDate(r.submittedAt)))
-      + row('user', 'Client Name', esc(r.applicant || '—'))
-      + row('service', 'Service', esc(r.docType || '—'))
-      + row('clock', 'Current Status', '<span class="rcpt-pill">'+esc(receiptStatus(r))+'</span>')
+      + row('Request Type', esc(requestType))
+      + row('Date Submitted', esc(receiptDate(r.submittedAt)))
+      + row('Client Name', esc(r.applicant || '—'))
+      + row('Service', esc(r.docType || '—'))
     + '</ul>'
     + '<div class="rcpt-cut" aria-hidden="true"></div>'
-    + '<div class="rcpt-note"><span class="rcpt-note-i" aria-hidden="true">i</span><span>You can track the status of your request using your tracking number on the “Track Your Request” page.</span></div>'
+    + '<div class="rcpt-note"><span>You can track the status of your request using your tracking number on the “Track Your Request” page.</span></div>'
     + '<div class="rcpt-thanks">Thank you!</div>'
     + '<div class="rcpt-thanks-sub">Municipal Assessor’s Office<br>Mabini, Batangas</div>'
     + '<div class="rcpt-bldg" aria-hidden="true"></div>'
@@ -1997,7 +2010,7 @@ function renderConfirmation(){
   + '</section></div>'
   + '<div class="confirm-actions">'
     + '<button class="btn btn-ghost" data-action="save-tracking">Save My Tracking Number</button>'
-    + '<button class="btn btn-primary" data-action="view-status">'+ic('search')+' View My Request Status</button>'
+    + '<button class="btn btn-primary" data-action="view-status">View My Request Status</button>'
   + '</div></div>';
 }
 function draftCopy(button, text){
@@ -2647,7 +2660,7 @@ function renderCardDraft(flow){
   const when = d.savedAt ? receiptDate(d.savedAt) : '';
   return '<div class="card-draft" role="region" aria-label="Unfinished '+name+'">'
     + '<div class="card-draft-text"><strong>You have an unfinished '+name+'</strong><span>Step '+(d.step||1)+' of 4'+(when?' · last saved '+esc(when):'')+'</span></div>'
-    + '<button type="button" class="btn btn-primary card-draft-btn" data-action="draft-resume" data-flow="'+flow+'">Continue Request</button></div>';
+    + '<button type="button" class="btn btn-primary card-draft-btn" data-action="draft-resume" data-flow="'+flow+'">Proceed</button></div>';
 }
 function draftApplyFields(flow, step, maxStep, fields, savedFiles){
   state.flow = flow; state.view = 'wizard';
@@ -2741,7 +2754,7 @@ window.addEventListener('pagehide', function(){
    popup, or a section scrolled into view. Re-renders of the same screen never replay
    them. Nothing here changes layout, colours or sizes; every effect ends on the
    element's normal style. Respects prefers-reduced-motion. */
-var SA_MOTION = {view:null, overlays:{}};
+var SA_MOTION = {view:null, overlays:{}, errors:0};
 var SA_OVERLAYS = ['.requirements-modal', '.submit-modal-backdrop', '.terms-backdrop'];
 var SA_REVEAL = '.section .section-head, .section .service-card, .section .why-head, .section .why-grid > li, .public-detail-page > *, .site-footer .footer-grid';
 function saReducedMotion(){
@@ -2784,6 +2797,9 @@ function saMotionAfterRender(app){
       });
     }
   }
+  const errorCount = Object.keys(state.errors || {}).length;
+  if(errorCount > SA_MOTION.errors){ app.classList.add('sa-errors-new'); setTimeout(function(){ app.classList.remove('sa-errors-new'); }, 400); }
+  SA_MOTION.errors = errorCount;
   SA_MOTION.view = viewKey;
 }
 
