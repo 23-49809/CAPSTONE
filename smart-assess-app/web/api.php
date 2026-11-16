@@ -108,6 +108,23 @@ function sa_request_data(): array
     return $decoded;
 }
 
+// Rejection reasons Staff choose when telling a client why a request was rejected. Each list
+// follows that request type's requirements; a reason only applies to its own request type.
+const SA_DOCREQ_REJECTION_CATEGORIES = [
+    'Invalid or Missing Government ID',
+    'Incomplete Request Details',
+    'Missing Property Information',
+    'Missing Authorization Documents',
+];
+const SA_LANDTRANSFER_REJECTION_CATEGORIES = [
+    'Missing or Invalid Tax Declaration / Title',
+    'Missing Deed of Sale / Donation',
+    'Missing Vicinity Map',
+    'Missing Certification of No Improvement',
+    'Missing Tax Clearance',
+    'Invalid or Missing Government ID',
+];
+
 const SA_NOTIFICATION_CATEGORIES = [
     'Missing Document',
     'Additional Requirements',
@@ -115,7 +132,23 @@ const SA_NOTIFICATION_CATEGORIES = [
     'Land Transfer Status',
     'Completion / Approval',
     'Other Instruction',
+    ...SA_DOCREQ_REJECTION_CATEGORIES,
+    ...SA_LANDTRANSFER_REJECTION_CATEGORIES,
 ];
+
+/** Whether a rejection reason belongs to the request's type (other categories always do). */
+function sa_category_fits_flow(?string $category, string $flow): bool
+{
+    if ($category === null) {
+        return true;
+    }
+    $isDocReason = in_array($category, SA_DOCREQ_REJECTION_CATEGORIES, true);
+    $isLandReason = in_array($category, SA_LANDTRANSFER_REJECTION_CATEGORIES, true);
+    if (!$isDocReason && !$isLandReason) {
+        return true;
+    }
+    return $flow === 'docreq' ? $isDocReason : $isLandReason;
+}
 
 /** The SMS category staff picked, or null when none was sent. */
 function sa_notification_category(array $data): ?string
@@ -1720,6 +1753,9 @@ function sa_send_notification(array $data): array
     if ($submittedRef !== '' && $submittedRef !== strtoupper((string) $request['reference_no'])) {
         throw new SaHttpException(422, 'The request ID and reference number do not match, so nothing was sent. Reload the page and try again.');
     }
+    if (!sa_category_fits_flow($category, (string) $request['flow'])) {
+        throw new SaHttpException(422, 'That rejection category does not apply to this type of request, so nothing was sent. Choose a category for this request.');
+    }
 
     // Check every chosen channel before sending anything.
     $hasDeliveryColumns = sa_has_column('request_status_log', 'delivery_status') && sa_has_column('request_status_log', 'sms_sent_by_id');
@@ -2051,7 +2087,13 @@ function sa_lookup_request_owner(array $data): array
     $contact = ['contactNumber' => trim((string) ($request['contact_number'] ?? '')) ?: null,
                 'email' => trim((string) ($request['email'] ?? '')) ?: null,
                 // Whose contact details these are; can differ from a client account holder.
-                'recipientName' => trim(trim((string) ($request['first_name'] ?? '')) . ' ' . trim((string) ($request['last_name'] ?? ''))) ?: null];
+                'recipientName' => trim(trim((string) ($request['first_name'] ?? '')) . ' ' . trim((string) ($request['last_name'] ?? ''))) ?: null,
+                // The full name exactly as the client entered it on this request (shown to Staff as is).
+                'submittedName' => trim(implode(' ', array_filter([
+                    trim((string) ($request['first_name'] ?? '')),
+                    trim((string) ($request['middle_name'] ?? '')),
+                    trim((string) ($request['last_name'] ?? '')),
+                ], static fn(string $part): bool => $part !== ''))) ?: null];
 
     $isOwner = filter_var($request['is_owner'], FILTER_VALIDATE_BOOLEAN);
     if ($isOwner) {

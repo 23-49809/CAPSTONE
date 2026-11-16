@@ -172,9 +172,13 @@ $extractFrom = static function (string $source, string $name): string {
 };
 $api = (string) file_get_contents($app . '/web/api.php');
 $drafts = (string) file_get_contents($app . '/web/drafts.php');
-preg_match('/^const SA_NOTIFICATION_CATEGORIES = \[.*?\];$/ms', $api, $categories);
-$code = $categories[0] . "\n";
-foreach (['sa_field_label', 'sa_text', 'sa_notification_category', 'sa_audit', 'sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_sms_failure_reason', 'sa_sms_provider_detail',
+// The category lists (rejection reasons per request type, then all categories).
+$code = '';
+foreach (['SA_DOCREQ_REJECTION_CATEGORIES', 'SA_LANDTRANSFER_REJECTION_CATEGORIES', 'SA_NOTIFICATION_CATEGORIES'] as $constant) {
+    preg_match('/^const ' . $constant . ' = \[.*?\];$/ms', $api, $categories);
+    $code .= $categories[0] . "\n";
+}
+foreach (['sa_field_label', 'sa_text', 'sa_notification_category', 'sa_category_fits_flow', 'sa_audit', 'sa_sms_enabled', 'sa_sms_load_service', 'sa_sms_deliver', 'sa_sms_failure_reason', 'sa_sms_provider_detail',
           'sa_sms_unconfirmed_reason', 'sa_sms_unconfirmed_ids', 'sa_sms_authorize_override', 'sa_email_config_dir', 'sa_email_configured', 'sa_email_deliver', 'sa_email_status', 'sa_send_notification'] as $function) {
     $code .= $extractFrom($api, $function) . "\n";
 }
