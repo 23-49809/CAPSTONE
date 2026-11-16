@@ -35,6 +35,7 @@ $dbUser = getenv('DB_USER') ?: 'root';
 $dbPass = (string) getenv('SMART_ASSESS_DB_PASS');
 $project = dirname(__DIR__, 2);
 require_once $project . '/smart-assess-app/app/services/DocumentRequirements.php';
+require_once $project . '/smart-assess-app/app/services/OcrService.php';   // only for MAX_IMAGE_PIXELS
 
 $work = sys_get_temp_dir() . '/sa-submission-req-' . bin2hex(random_bytes(4));
 foreach (['smart-assess-app/logs', 'smart-assess-app/private_uploads/requests', 'smart-assess-app/private_uploads/drafts', 'empty-gmail'] as $directory) {
@@ -224,6 +225,25 @@ $check('an upload of exactly 5 MiB is refused with a clear message', $status ===
 [$status, $ref] = $submit('docreq', true, ['ownerId' => $file($sized(5 * 1024 * 1024 - 1), 'image/png')]);
 $check('an upload one byte under 5 MiB is accepted', $status === 200 && $ref !== '', $status);
 
+// ================= 2b. One image resolution limit (shared with OCR) =================
+// A PNG header claiming the given size; enough for the header checks, tiny on disk - so a
+// "photo" over 25 megapixels can stay under the 5 MB byte limit, as real phone photos do.
+$pngClaiming = static function (int $width, int $height) use ($fixtures): string {
+    $path = $fixtures . sprintf('/claimed-%dx%d.png', $width, $height);
+    file_put_contents($path, "\x89PNG\r\n\x1a\n" . pack('N', 13) . 'IHDR' . pack('NN', $width, $height) . "\x08\x02\x00\x00\x00" . pack('N', 0));
+    return $path;
+};
+$before = $requestCount();
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($pngClaiming(6000, 4400), 'image/png')]);   // 26.4 MP, under 5 MB
+$check('an image over 25 megapixels is refused at upload with advice, and nothing is saved',
+    $status === 422 && str_contains($body, 'resolution is too high') && str_contains($body, 'lower resolution') && $requestCount() === $before, [$status, $body]);
+[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($pngClaiming(5000, 5000), 'image/png')]);   // exactly 25.0 MP
+$check('an image of exactly 25 megapixels is still accepted', $status === 200 && $ref !== '', $status);
+$check('the upload limit is OcrService\'s own (no separate number in api.php)',
+    str_contains((string) file_get_contents($project . '/smart-assess-app/web/api.php'), 'OcrService::MAX_IMAGE_PIXELS')
+    && !preg_match('/25[_,]?000[_,]?000/', (string) file_get_contents($project . '/smart-assess-app/web/api.php'))
+    && OcrService::MAX_IMAGE_PIXELS === 25_000_000);
+
 // ================= 3. File types per document =================
 $before = $requestCount();
 [$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/doc.pdf', 'application/pdf')]);
@@ -249,6 +269,8 @@ $check('a draft was started', strlen($code) === 20, $body);
 $check('draft: a PDF ID is refused', $status === 422, $status);
 [$status] = $upload('ownerId', $file($sized(5 * 1024 * 1024), 'image/png'));
 $check('draft: an exactly 5 MiB file is refused', $status === 422, $status);
+[$status] = $upload('ownerId', $file($pngClaiming(6000, 4400), 'image/png'));
+$check('draft: an image over 25 megapixels is refused', $status === 422, $status);
 [$status] = $upload('ctcTdOrTitle', $file($fixtures . '/doc.pdf', 'application/pdf'));
 $check('draft: a PDF supporting document is accepted', $status === 200, $status);
 [$status] = $upload('ownerId', $file($fixtures . '/id.png', 'image/png'));
