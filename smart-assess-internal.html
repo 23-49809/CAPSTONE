@@ -1440,6 +1440,60 @@
     html.staff-ui .table-wrap table tbody td{ border:0; }
     html.staff-ui .table-wrap table tbody td.actions-cell{ border-top:1px solid var(--line); }
   }
+
+  /* ================= Motion (animations and transitions only) =================
+     Every animation ends on the element's normal style, so the finished screens look
+     exactly as before. Applied to all internal roles. Entrance animations run only for
+     new content (see saMotionAfterRender). prefers-reduced-motion turns them off. */
+  @keyframes saRise{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+  @keyframes saFade{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes saFadeOut{ from{ opacity:1; } to{ opacity:0; } }
+  @keyframes saModalIn{ from{ opacity:0; transform:translateY(10px) scale(.985); } to{ opacity:1; transform:none; } }
+  @keyframes saModalOut{ from{ opacity:1; transform:none; } to{ opacity:0; transform:translateY(6px) scale(.99); } }
+  @keyframes saToastIn{ from{ opacity:0; transform:translateX(16px); } to{ opacity:1; transform:none; } }
+  @keyframes saPulse{ 50%{ opacity:.55; } }
+  @keyframes saNavIn{ from{ background-color:transparent; } }
+
+  /* Hover and press feedback: smooth the existing hover changes (zero-specificity
+     selectors, so any transition already defined on an element still wins). */
+  :where(.btn, .icon-btn, .action-btn, .side-link, .seg button, .pager button, .dash-link, .modal-close, .hd-bell, .hd-avatar,
+    .dash-stat, .sent-item, .sent-arrow, .tp-chip, .cal-day, .cal-nav, .publish-option, .dt-trigger, .notif-item,
+    .search-box input, .toolbar select, .field input, .field select, .field textarea, tbody tr, .dash-ann-toggle){
+    transition:background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, opacity .16s ease, transform .12s ease; }
+  :where(.btn, .icon-btn, .action-btn, .seg button, .pager button, .modal-close, .sent-arrow, .dash-stat, .tp-chip, .cal-nav):active:not(:disabled){ transform:scale(.97); }
+
+  /* Page entrance: the page content rises in, section by section. */
+  .main-content.sa-enter > :not(.app-header){ animation:saRise .32s cubic-bezier(.2,.7,.2,1) both; }
+  .main-content.sa-enter > :nth-child(3){ animation-delay:.04s; }
+  .main-content.sa-enter > :nth-child(4){ animation-delay:.08s; }
+  .main-content.sa-enter > :nth-child(n+5){ animation-delay:.11s; }
+  .sidebar.sa-nav .side-link.active{ animation:saNavIn .3s ease both; }
+  .login-shell.sa-enter .login-card{ animation:saRise .4s cubic-bezier(.2,.7,.2,1) both; }
+  /* New page of results or a new filter: the list fades in. */
+  .main-content.sa-refresh :is(.table-wrap tbody, .dash-table tbody, .sent-list, .dc-stats){ animation:saFade .2s ease both; }
+
+  /* Popups: backdrop fades, the card rises; closing reverses briefly. */
+  .modal-overlay:not(.sa-keep){ animation:saFade .18s ease both; }
+  .modal-overlay:not(.sa-keep) > .modal{ animation:saModalIn .24s cubic-bezier(.2,.8,.2,1) both; }
+  .modal-overlay.sa-keep > .modal.fade-in{ animation:none; }
+  .modal-overlay.sa-closing{ animation:saFadeOut .15s ease both; pointer-events:none; }
+  .modal-overlay.sa-closing > .modal{ animation:saModalOut .15s ease both; }
+
+  /* Dropdowns and pickers: a short fade when they open. */
+  .dt-popover:not([hidden]), .send-menu:not([hidden]){ animation:saFade .14s ease both; }
+
+  /* Toasts slide in once. */
+  .toast-wrap .toast:not(.sa-keep){ animation:saToastIn .28s cubic-bezier(.2,.8,.2,1) both; }
+  .toast-wrap .toast.sa-keep{ animation:none; }
+
+  /* Loading states that already exist: a gentle pulse. */
+  [aria-busy="true"], #notification-services .sa-loading{ animation:saPulse 1.2s ease-in-out infinite; }
+
+  @media (prefers-reduced-motion: reduce){
+    .main-content.sa-enter > *, .sidebar.sa-nav .side-link.active, .login-shell.sa-enter .login-card, .main-content.sa-refresh *,
+    .modal-overlay, .modal-overlay > .modal, .dt-popover, .send-menu, .toast, [aria-busy="true"], #notification-services .sa-loading{ animation:none !important; }
+    :where(.btn, .icon-btn, .action-btn, .seg button, .pager button, .modal-close, .sent-arrow, .dash-stat, .tp-chip, .cal-nav):active{ transform:none; }
+  }
 </style>
 
 <div id="app"></div>
@@ -1913,6 +1967,68 @@ if(!window._saDrawerKeys){
   document.addEventListener('keydown', function(ev){ if(ev.key==='Escape' && state.sidebarOpen){ setSidebar(false); } });
   window.matchMedia('(min-width:901px)').addEventListener('change', function(e){ if(e.matches && state.sidebarOpen){ state.sidebarOpen = false; render(); } });
 }
+/* ---------------- Motion (animations only) ----------------
+   The interface is re-rendered as a whole after every change, so entrance animations
+   are applied only when something really appears: a new page, a newly opened popup,
+   a new toast, or a new page of results. Re-renders of the same screen (typing,
+   timers, saving) never replay them. Nothing here changes layout, colours or sizes;
+   every animation ends on the element's normal style. Respects prefers-reduced-motion. */
+var SA_MOTION = {view:null, modal:null, confirm:null, content:null, toasts:{}};
+function saReducedMotion(){
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+function saMotionAfterRender(app){
+  var viewKey = state.session ? state.view+'|'+(state.docCheckRef ? state.docCheckRef.kind+':'+state.docCheckRef.id : '') : 'login';
+  var modalKey = state.modal ? state.modal.type+'|'+(state.modal.id||state.modal.ref||'') : '';
+  var confirmKey = state.confirm ? String(state.confirm.title||'confirm') : '';
+  var contentKey = JSON.stringify([state.pages||{}, state.filters||{}]);
+  var main = app.querySelector('.main-content'), login = app.querySelector('.login-shell');
+  if(main){
+    if(viewKey!==SA_MOTION.view){
+      saFlash(main, 'sa-enter', 700);
+      var sidebar = app.querySelector('.sidebar');
+      if(sidebar && SA_MOTION.view!==null) saFlash(sidebar, 'sa-nav', 500);
+    } else if(contentKey!==SA_MOTION.content){
+      saFlash(main, 'sa-refresh', 400);
+    }
+  }
+  if(login && viewKey!==SA_MOTION.view) saFlash(login, 'sa-enter', 700);
+  app.querySelectorAll('.modal-overlay').forEach(function(overlay){
+    var isConfirm = overlay.getAttribute('data-action')==='close-confirm';
+    if((isConfirm ? confirmKey===SA_MOTION.confirm : modalKey===SA_MOTION.modal)) overlay.classList.add('sa-keep');
+    else saSettle(overlay, 400);
+  });
+  var seen = {};
+  app.querySelectorAll('.toast[data-toast]').forEach(function(t){
+    var id = t.getAttribute('data-toast');
+    if(SA_MOTION.toasts[id]) t.classList.add('sa-keep'); else saSettle(t, 450);
+    seen[id] = true;
+  });
+  // Loading state: the service lines pulse gently until the bridge replaces "Checking…".
+  app.querySelectorAll('#notification-services [data-service]').forEach(function(line){
+    if(!/…$/.test(line.textContent)) return;
+    line.classList.add('sa-loading');
+    if(window.MutationObserver){
+      var mo = new MutationObserver(function(){ if(!/…$/.test(line.textContent)){ line.classList.remove('sa-loading'); mo.disconnect(); } });
+      mo.observe(line, {childList:true, characterData:true, subtree:true});
+    }
+  });
+  SA_MOTION.view = viewKey; SA_MOTION.modal = modalKey; SA_MOTION.confirm = confirmKey;
+  SA_MOTION.content = contentKey; SA_MOTION.toasts = seen;
+}
+/* Animation classes are removed once the animation has finished, so every element goes
+   back to exactly its normal rendering (no lingering animation layer). */
+function saFlash(el, cls, ms){ el.classList.add(cls); setTimeout(function(){ el.classList.remove(cls); }, ms); }
+function saSettle(el, ms){ setTimeout(function(){ el.classList.add('sa-keep'); }, ms); }
+/* Closing: the popup fades out briefly, then the existing close runs unchanged. */
+function saCloseOverlay(isConfirm, done){
+  var overlay = document.querySelector(isConfirm ? '.modal-overlay[data-action="close-confirm"]' : '.modal-overlay[data-action="close-modal"]');
+  if(!overlay || saReducedMotion()){ done(); return; }
+  if(overlay.classList.contains('sa-closing')) return;
+  overlay.classList.add('sa-closing');
+  setTimeout(done, 150);
+}
+
 /* Staff interface design system: the Staff pages use one light, compact theme
    (html.staff-ui, styles at the end of the stylesheet). Admin and Head keep the
    original look and the device's light/dark preference. */
@@ -1932,6 +2048,7 @@ function render(){
     app.innerHTML = renderLogin();
     saveState();
     bindEvents();
+  saMotionAfterRender(app);
     return;
   }
   var acct = currentAccount();
@@ -1941,11 +2058,13 @@ function render(){
     app.innerHTML = renderLogin();
     saveState();
     bindEvents();
+  saMotionAfterRender(app);
     return;
   }
   app.innerHTML = renderShell(acct);
   saveState();
   bindEvents();
+  saMotionAfterRender(app);
 }
 
 window.SMART_ASSESS_STATUS_UPDATED = function(data, result){
@@ -2050,7 +2169,7 @@ function renderShell(acct){
 function renderToasts(){
   if(!state.toasts.length) return '';
   return '<div class="toast-wrap">'+state.toasts.map(function(t){
-    return '<div class="toast fade-in">'+ic(t.icon,'16px')+'<span>'+esc(t.msg)+'</span></div>';
+    return '<div class="toast fade-in" data-toast="'+esc(t.id)+'">'+ic(t.icon,'16px')+'<span>'+esc(t.msg)+'</span></div>';
   }).join('')+'</div>';
 }
 function renderConfirm(){
@@ -4596,9 +4715,9 @@ function bindEvents(){
         if(state.modal.showDetails) clientBox.scrollIntoView({block:'nearest', behavior:'smooth'});
       }
     } else if(action==='close-modal'){
-      state.modal = null; render();
+      saCloseOverlay(false, function(){ state.modal = null; render(); });
     } else if(action==='close-confirm'){
-      state.confirm = null; render();
+      saCloseOverlay(true, function(){ state.confirm = null; render(); });
     } else if(action==='confirm-yes'){
       runConfirmAction();
     } else if(action==='page'){
