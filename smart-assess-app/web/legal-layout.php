@@ -66,7 +66,7 @@ function sa_legal_footer(): void
   <div class="wrap">
     <div class="footer-grid">
       <div><h5>Smart Assess</h5><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines</p></div>
-      <div><h5>Contact</h5><p>Phone: (043) 487-0123<br>Email: mao.smartassess@gmail.com</p></div>
+      <div><h5>Contact</h5><p>Phone: 0998-9695-966<br>Email: mao.smartassess@gmail.com</p></div>
       <div><h5>Office Hours</h5><p>Monday to Friday<br>8:00 AM &ndash; 5:00 PM</p></div>
       <nav class="footer-links" aria-label="About SMART ASSESS"><h5>Learn More</h5><a href="/">Home</a><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav>
     </div>
