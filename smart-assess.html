@@ -992,6 +992,47 @@
   .contact-input, .arp-input{ min-height:48px; }
   .barangay-trigger{ padding-top:10px; padding-bottom:10px; }
   .field .contact-input > input, .field .arp-input > input{ min-height:0; }
+
+  /* ================= Motion (animations and transitions only) =================
+     Every effect ends on the element's normal style, so the finished screens look
+     exactly as before. Entrance effects run only for new content (saMotionAfterRender).
+     prefers-reduced-motion turns them off. */
+  @keyframes saFade{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes saModalIn{ from{ opacity:0; transform:translateY(10px) scale(.985); } to{ opacity:1; transform:none; } }
+  @keyframes saPulse{ 50%{ opacity:.55; } }
+
+  /* Hover and press feedback (zero-specificity selectors: existing transitions win). */
+  :where(.btn, .service-card, .step-pill, .notif-bell, .home-slide-control, .home-slide-dots button, .site-footer a, .barangay-trigger,
+    .barangay-option, .requirements-close, .trk-search button, .field input, .field select, .field textarea){
+    transition:background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, opacity .16s ease, transform .12s ease; }
+  :where(.btn):active:not(:disabled){ transform:scale(.97); }
+
+  /* Same screen re-rendered: keep the existing view/step fade-in from replaying. */
+  #app.sa-static .fade-in{ animation:none; }
+
+  /* Sections reveal as they scroll into view; the classes are removed afterwards. */
+  .sa-reveal{ opacity:0; transform:translateY(14px); }
+  .sa-reveal.sa-in{ opacity:1; transform:none; transition:opacity .5s ease var(--sa-delay, 0ms), transform .5s cubic-bezier(.2,.7,.2,1) var(--sa-delay, 0ms); }
+
+  /* Popups: the backdrop fades and the card rises, once, when opened. */
+  .requirements-modal:not(.sa-keep), .submit-modal-backdrop:not(.sa-keep), .terms-backdrop:not(.sa-keep){ animation:saFade .18s ease both; }
+  .requirements-modal:not(.sa-keep) > .requirements-modal-card, .submit-modal-backdrop:not(.sa-keep) > .submit-modal,
+  .terms-backdrop:not(.sa-keep) > .terms-modal{ animation:saModalIn .24s cubic-bezier(.2,.8,.2,1) both; }
+
+  /* Dropdowns: a short fade when they open (opacity only: the barangay menu measures its position). */
+  .notif-panel:not([hidden]), .barangay-menu:not([hidden]){ animation:saFade .14s ease both; }
+
+  /* Loading states that already exist: a gentle pulse. */
+  [aria-busy="true"]{ animation:saPulse 1.2s ease-in-out infinite; }
+
+  /* Printing never hides a section that has not been scrolled to yet. */
+  @media print{ .sa-reveal{ opacity:1 !important; transform:none !important; } }
+  @media (prefers-reduced-motion: reduce){
+    .sa-reveal{ opacity:1 !important; transform:none !important; }
+    .requirements-modal, .submit-modal-backdrop, .terms-backdrop, .requirements-modal-card, .submit-modal, .terms-modal,
+    .notif-panel, .barangay-menu, [aria-busy="true"]{ animation:none !important; }
+    :where(.btn):active{ transform:none; }
+  }
 </style>
 
 <div id="app"><main class="wrap static-home"><h1>SMART ASSESS</h1><p><strong>Municipal Assessor’s Office of Mabini, Batangas</strong></p><p>Municipal Hall, Poblacion, Mabini, Batangas, Philippines. Phone: 09989695966. Email: mao.smartassess@gmail.com</p><nav class="static-legal" aria-label="Legal"><a href="/privacy-policy.php">Privacy Policy</a><a href="/terms.php">Terms of Service</a></nav></main></div>
@@ -2652,6 +2693,58 @@ window.addEventListener('pagehide', function(){
 });
 
 /* ======================= Root render + events ======================= */
+/* ---------------- Motion (animations only) ----------------
+   The page is re-rendered as a whole after every change, so entrance effects run
+   only when something really appears: a new view or wizard step, a newly opened
+   popup, or a section scrolled into view. Re-renders of the same screen never replay
+   them. Nothing here changes layout, colours or sizes; every effect ends on the
+   element's normal style. Respects prefers-reduced-motion. */
+var SA_MOTION = {view:null, overlays:{}};
+var SA_OVERLAYS = ['.requirements-modal', '.submit-modal-backdrop', '.terms-backdrop'];
+var SA_REVEAL = '.section .section-head, .section .service-card, .section .why-head, .section .why-grid > li, .public-detail-page > *, .site-footer .footer-grid';
+function saReducedMotion(){
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+function saOverlaysOpen(root){
+  const open = {};
+  SA_OVERLAYS.forEach(function(sel){ if(root.querySelector(sel)) open[sel] = true; });
+  return open;
+}
+function saMotionAfterRender(app){
+  const viewKey = state.view+'|'+(state.view==='wizard' ? state.step : '');
+  const changed = viewKey!==SA_MOTION.view;
+  // Same screen re-rendered: do not replay the step/view fade-in.
+  app.classList.toggle('sa-static', !changed);
+  SA_OVERLAYS.forEach(function(sel){
+    const el = app.querySelector(sel);
+    if(el && SA_MOTION.overlays[sel]) el.classList.add('sa-keep');
+    else if(el) setTimeout(function(){ el.classList.add('sa-keep'); }, 400);
+  });
+  SA_MOTION.overlays = saOverlaysOpen(app);
+  if(changed && !saReducedMotion() && 'IntersectionObserver' in window){
+    const items = Array.prototype.slice.call(app.querySelectorAll(SA_REVEAL));
+    if(items.length){
+      const io = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          if(!entry.isIntersecting) return;
+          const el = entry.target;
+          io.unobserve(el);
+          el.classList.add('sa-in');
+          // Hand the element back to its own styles once the reveal has finished.
+          setTimeout(function(){ el.classList.remove('sa-reveal', 'sa-in'); el.style.removeProperty('--sa-delay'); }, 700);
+        });
+      }, {threshold:0});
+      items.forEach(function(el, i){
+        const sib = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.children, el) : 0;
+        el.style.setProperty('--sa-delay', Math.min(sib, 4) * 60 + 'ms');
+        el.classList.add('sa-reveal');
+        io.observe(el);
+      });
+    }
+  }
+  SA_MOTION.view = viewKey;
+}
+
 function render(){
   const app = document.getElementById('app');
   let html = '';
@@ -2663,6 +2756,7 @@ function render(){
   html += renderTermsModal();
   app.innerHTML = html + (state.view==='wizard' ? '<input type="hidden" id="f-arp" data-bind="arp" value="'+esc(state.formData.arp||'')+'">' : '');
   bindEvents(app);
+  saMotionAfterRender(app);
   const bell = app.querySelector('[data-notif-toggle]');
   if(bell) bell.addEventListener('click', function(e){ e.stopPropagation(); const p = document.getElementById('notif-panel'); setNotifPanel(p.hidden); });
   updateNotifBadge();

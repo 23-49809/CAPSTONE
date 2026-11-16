@@ -123,3 +123,10 @@ a:focus-visible{ outline:3px solid #a7f3d0; outline-offset:2px; border-radius:4p
   .legal-article{ box-shadow:none; border:0; padding:0; }
   body, .legal-article p, .legal-article li{ background:#fff; color:#000; }
 }
+
+/* Motion (animations and transitions only; every effect ends on the normal style). */
+@keyframes saRise{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+.legal-page .section-head{ animation:saRise .4s cubic-bezier(.2,.7,.2,1) both; }
+.legal-page .legal-layout{ animation:saRise .45s cubic-bezier(.2,.7,.2,1) .06s both; }
+:where(a, .btn, .header-link, .legal-toc a, .footer-links a){ transition:color .16s ease, background-color .16s ease, border-color .16s ease, text-decoration-color .16s ease; }
+@media (prefers-reduced-motion: reduce){ .legal-page .section-head, .legal-page .legal-layout{ animation:none; } }
