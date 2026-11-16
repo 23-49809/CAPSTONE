@@ -1279,7 +1279,7 @@
   html.staff-ui .pager{ padding:10px 14px; }
   html.staff-ui .empty-state{ padding:32px 16px; }
   html.staff-ui .dc-table col.dc-c-ref{ width:13%; } html.staff-ui .dc-table col.dc-c-app{ width:18%; } html.staff-ui .dc-table col.dc-c-date{ width:10%; }
-  html.staff-ui .dc-table col.dc-c-ai{ width:15%; } html.staff-ui .dc-table col.dc-c-found{ width:20%; } html.staff-ui .dc-table col.dc-c-rev{ width:12%; } html.staff-ui .dc-table col.dc-c-act{ width:12%; }
+  html.staff-ui .dc-table col.dc-c-ai{ width:15%; } html.staff-ui .dc-table col.dc-c-found{ width:25%; } html.staff-ui .dc-table col.dc-c-rev{ width:12%; } html.staff-ui .dc-table col.dc-c-act{ width:7%; }
   html.staff-ui .table-wrap table td.mono{ white-space:nowrap; }
   html.staff-ui .table-wrap table.dc-table td.actions-cell{ width:auto; }
 
@@ -1346,47 +1346,69 @@
   html.staff-ui .ai-guide{ background:#f3f6f4; border:0; border-radius:10px; padding:10px 14px 12px; margin-top:14px; }
   html.staff-ui .ai-guide .rd-caption{ border-left:0; padding-left:0; }
 
-  /* Document Check detail (reference design) */
-  html.staff-ui .dc-stats{ gap:8px; margin-bottom:14px; }
-  html.staff-ui .dc-stat{ padding:7px 12px; border-radius:10px; }
-  .dc-card{ padding:20px 22px; margin-bottom:16px; }
+  /* Document Check (minimal): neutral text, no colour-coded badges, whole rows open things. */
+  .dc-stats{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+  .dc-stat{ display:flex; align-items:baseline; gap:10px; padding:7px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink-soft); font-size:13px; }
+  .dc-stat strong{ font-size:16px; color:var(--ink); }
+  .dc-state{ font-weight:500; }
+  .dc-state.is-flag, .dc-doc-row .is-flag{ font-weight:600; color:var(--ink); }
+  .dc-table tbody tr.dc-row{ cursor:pointer; }
+  .dc-view{ font-size:13px; font-weight:600; color:var(--brand-700); white-space:nowrap; }
+  .dc-view.is-off{ color:var(--ink-faint); font-weight:500; }
+  .table-wrap table.dc-table td.dc-view-cell{ text-align:right; }
+  .dc-head{ align-items:center; }
+  .dc-head-main{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .dc-back{ display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; flex:0 0 36px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink); cursor:pointer; }
+  .dc-back{ transition:background-color .16s ease, transform .12s ease; }
+  .dc-back:hover{ background:var(--surface-2); }
+  .dc-card{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:14px; }
   .dc-status-card{ text-align:center; padding:28px 22px; }
-  .dc-status-card h2{ font-size:19px; color:var(--ink); margin:12px 0 4px; }
+  .dc-status-card h2{ font-size:19px; color:var(--ink); margin:6px 0 4px; }
   .dc-status-card p{ color:var(--ink-soft); font-size:14px; }
-  .dc-progress{ position:relative; height:8px; max-width:520px; margin:16px auto 0; border-radius:999px; background:#e6ebe7; overflow:hidden; }
-  .dc-progress span{ position:absolute; top:0; bottom:0; width:35%; border-radius:999px; background:var(--st-primary, #1b4332); animation:dcSlide 1.6s ease-in-out infinite; }
+  .dc-kicker{ font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint) !important; }
+  .dc-progress{ position:relative; height:6px; max-width:480px; margin:16px auto 0; border-radius:999px; background:var(--surface-2); overflow:hidden; }
+  .dc-progress span{ position:absolute; top:0; bottom:0; width:35%; border-radius:999px; background:var(--ink-faint); animation:dcSlide 1.6s ease-in-out infinite; }
   @keyframes dcSlide{ from{ left:-35%; } to{ left:100%; } }
   .dc-actions{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; }
   .dc-status-card .dc-actions{ justify-content:center; margin-top:14px; }
-  .dc-results-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-  .dc-chip{ font-size:12.5px; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border-radius:8px; padding:5px 10px; white-space:nowrap; }
-  .dc-outcome{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; font-size:14px; margin:0 0 16px; }
-  .dc-results-grid{ display:grid; grid-template-columns:minmax(220px, 300px) minmax(0, 1fr); gap:18px; align-items:start; }
-  .dc-docs{ border-right:1px solid var(--line); padding-right:18px; }
-  .dc-docs h3, .dc-panel h3{ font-family:var(--font-body); font-size:14.5px; font-weight:700; color:var(--ink); margin:0 0 8px; }
-  .dc-docs ul{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
-  .dc-doc{ background:var(--surface-2); border-radius:10px; padding:10px 12px; }
-  .dc-doc-name{ font-weight:600; font-size:13.5px; overflow-wrap:anywhere; }
-  .dc-doc-meta{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; justify-content:space-between; margin-top:6px; }
-  .dc-panels{ display:grid; gap:10px; min-width:0; }
-  .dc-panel{ border-radius:10px; padding:12px 16px; background:var(--surface-2); font-size:13.5px; min-width:0; }
-  .dc-panel.tone-green{ background:#eef6f0; }
-  .dc-panel.tone-amber{ background:#fdf5e7; }
-  .dc-panel.tone-neutral{ background:#f1f4f2; }
-  .dc-panel p{ color:var(--ink-soft); }
-  .dc-panel h4{ font-family:var(--font-body); font-size:12.5px; font-weight:700; color:var(--ink-soft); margin:8px 0 2px; }
-  .dc-issues{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
-  .dc-issues li{ background:rgba(255,255,255,.7); border-radius:8px; padding:8px 10px; }
-  .dc-issues .ai-f-head{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; font-size:13px; }
-  .dc-issues p{ margin-top:4px; color:var(--ink); }
-  .dc-issues q{ display:block; margin-top:4px; font-size:12px; color:var(--ink-soft); }
-  .dc-results-foot{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
-  .dc-review-note{ margin-top:8px; text-align:right; }
+  .dc-h{ font-family:var(--font-body); font-size:15px; font-weight:700; color:var(--ink); margin:0; }
+  .dc-summary{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px 20px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid var(--line); }
+  .dc-outcome{ margin-top:4px; font-size:14px; color:var(--ink-soft); }
+  .dc-outcome strong{ color:var(--ink); }
+  .dc-meta{ text-align:right; }
+  .dc-section{ padding-top:14px; min-width:0; }
+  .dc-section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:6px 16px; flex-wrap:wrap; margin-bottom:8px; }
+  .dc-docs{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .dc-doc-row{ display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr) 90px; gap:12px; align-items:start; padding:10px 14px;
+    border-top:1px solid var(--line); color:var(--ink); text-decoration:none; font-size:13.5px; }
+  .dc-doc-row:first-child{ border-top:0; }
+  .dc-doc-headrow{ background:var(--surface-2); font-size:12px; font-weight:600; color:var(--ink-faint); }
+  a.dc-doc-row{ cursor:pointer; }
+  a.dc-doc-row:hover, a.dc-doc-row:focus-visible{ background:var(--surface-2); }
+  .dc-doc-row > .dc-view{ text-align:right; }
+  .dc-doc-name{ font-weight:600; overflow-wrap:anywhere; }
+  .dc-note{ display:block; margin-top:2px; }
+  .dc-cell-label{ display:none; }
+  .dc-split{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0 28px; }
+  .dc-issues{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+  .dc-issues li{ padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .dc-issues li:last-child{ border-bottom:0; padding-bottom:0; }
+  .dc-issue-head{ display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; font-size:13.5px; }
+  .dc-issues p{ margin-top:3px; font-size:13.5px; color:var(--ink-soft); }
+  .dc-issues q{ display:block; margin-top:3px; font-size:12px; color:var(--ink-soft); }
+  .dc-section h3{ font-family:var(--font-body); font-size:13px; font-weight:600; color:var(--ink-soft); margin:6px 0 2px; }
+  .dc-empty{ font-size:13.5px; color:var(--ink-soft); }
+  .dc-results-foot{ display:flex; justify-content:space-between; align-items:center; gap:10px 16px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .dc-review-note{ max-width:560px; }
   .dc-disclaimer{ margin-top:4px; }
   @media (max-width:900px){
-    .dc-results-grid{ grid-template-columns:minmax(0, 1fr); }
-    .dc-docs{ border-right:0; padding-right:0; border-bottom:1px solid var(--line); padding-bottom:14px; }
-    .dc-review-note{ text-align:left; }
+    .dc-split{ grid-template-columns:minmax(0,1fr); }
+    .dc-meta{ text-align:left; }
+    .dc-doc-headrow{ display:none !important; }
+    .dc-doc-row{ grid-template-columns:minmax(0,1fr) auto; gap:2px 12px; }
+    .dc-doc-row > span:not(.dc-doc-name):not(.dc-view){ grid-column:1; font-size:13px; color:var(--ink-soft); }
+    .dc-doc-row > .dc-view{ grid-column:2; grid-row:1; }
+    .dc-cell-label{ display:inline; color:var(--ink-faint); }
   }
 
   /* Laptop widths (1101–1340px): Staff tables stay tables instead of stacked cards. */
@@ -1480,12 +1502,25 @@
   .toast-wrap .toast.sa-keep{ animation:none; }
 
   /* Loading states that already exist: a gentle pulse. */
-  [aria-busy="true"], #notification-services .sa-loading{ animation:saPulse 1.2s ease-in-out infinite; }
+  [aria-busy="true"]{ animation:saPulse 1.2s ease-in-out infinite; }
 
   @media (prefers-reduced-motion: reduce){
     .main-content.sa-enter > *, .sidebar.sa-nav .side-link.active, .main-content.sa-refresh *,
-    .modal-overlay, .modal-overlay > .modal, .dt-popover, .send-menu, .toast, [aria-busy="true"], #notification-services .sa-loading{ animation:none !important; }
+    .modal-overlay, .modal-overlay > .modal, .dt-popover, .send-menu, .toast, [aria-busy="true"]{ animation:none !important; }
     :where(.btn, .icon-btn, .action-btn, .seg button, .pager button, .modal-close, .sent-arrow, .dash-stat, .tp-chip, .cal-nav):active{ transform:none; }
+  }
+  /* ================= Hover feedback (Staff, Admin, Head) =================
+     Existing colours only. Movement applies where a real pointer can hover (no stuck hover
+     after a tap) and is switched off for reduced motion. */
+  @media (hover:hover) and (pointer:fine){
+    .btn:not([disabled]):hover, .icon-btn:not([disabled]):hover, .action-btn:not([disabled]):hover{ transform:translateY(-1px); box-shadow:0 6px 14px -10px rgba(12,33,23,.45); }
+    .sidebar .side-link:hover{ transform:translateX(2px); }
+    .dash-stat:hover{ transform:translateY(-2px); box-shadow:0 12px 24px -18px rgba(12,33,23,.45); }
+    .modal-close:hover, .dc-back:hover{ transform:scale(1.06); }
+    .seg button:not(.active):hover{ background:var(--surface-2); color:var(--ink); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .btn:hover, .icon-btn:hover, .action-btn:hover, .sidebar .side-link:hover, .dash-stat:hover, .modal-close:hover, .dc-back:hover{ transform:none; }
   }
 </style>
 
@@ -2001,15 +2036,6 @@ function saMotionAfterRender(app){
     if(SA_MOTION.toasts[id]) t.classList.add('sa-keep'); else saSettle(t, 450);
     seen[id] = true;
   });
-  // Loading state: the service lines pulse gently until the bridge replaces "Checking…".
-  app.querySelectorAll('#notification-services [data-service]').forEach(function(line){
-    if(!/…$/.test(line.textContent)) return;
-    line.classList.add('sa-loading');
-    if(window.MutationObserver){
-      var mo = new MutationObserver(function(){ if(!/…$/.test(line.textContent)){ line.classList.remove('sa-loading'); mo.disconnect(); } });
-      mo.observe(line, {childList:true, characterData:true, subtree:true});
-    }
-  });
   SA_MOTION.view = viewKey; SA_MOTION.modal = modalKey; SA_MOTION.confirm = confirmKey;
   SA_MOTION.content = contentKey; SA_MOTION.toasts = seen;
 }
@@ -2105,7 +2131,7 @@ function shellChrome(acct, innerHtml){
   var navHtml = nav.map(function(item){
     var active = state.view===item.view;
     return '<button class="side-link'+(active?' active':'')+'" data-action="nav" data-view="'+item.view+'"'+(active?' aria-current="page"':'')+'>'
-      + '<span class="icon">'+ICONS[item.icon]+'</span><span>'+esc(item.label)+'</span></button>';
+      + '<span>'+esc(item.label)+'</span></button>';
   }).join('');
   return ''
   + '<div class="app-body">'
@@ -3047,10 +3073,7 @@ function renderDocumentCheck(acct){
     return matchQ && inFilter(x.state);
   }).sort(function(a, b){ return String(b.r.submitted||'').localeCompare(String(a.r.submitted||'')); });
   var pg = paginate(list, 'docCheck');
-  var stat = function(key, label){
-    var m = AI_CHECK_STATES[key];
-    return '<div class="dc-stat"><span class="badge '+m[1]+'">'+esc(label||m[0])+'</span><strong>'+(counts[key]||0)+'</strong></div>';
-  };
+  var stat = function(key){ return '<div class="dc-stat"><span>'+esc(AI_CHECK_STATES[key][0])+'</span><strong>'+(counts[key]||0)+'</strong></div>'; };
   return ''
   + '<div class="page-head"><div><h1>Document Check</h1><p>OCR reads the uploaded documents and the AI compares them with the request. Results are advice only; Staff open the originals and decide.</p></div></div>'
   + '<div class="dc-stats" aria-label="Document Check summary">'+stat('attention')+stat('waiting')+stat('running')+stat('failed')+stat('reviewed')+stat('clear')+'</div>'
@@ -3058,22 +3081,23 @@ function renderDocumentCheck(acct){
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docCheck||'')+'" data-input="search-doc-check" aria-label="Search Document Check"></div>'
     + '<select data-input="filter-doc-check" aria-label="Show">'+AI_CHECK_FILTERS.map(function(o){ return '<option value="'+o[0]+'"'+(filterF===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'
   + '</div>'
-  + '<div class="table-wrap"><table class="has-actions dc-table"><colgroup><col class="dc-c-ref"><col class="dc-c-app"><col class="dc-c-date"><col class="dc-c-ai"><col class="dc-c-found"><col class="dc-c-rev"><col class="dc-c-act"></colgroup>'
-  + '<thead><tr><th>Reference No.</th><th>Applicant / Request</th><th>Date Submitted</th><th>AI Check</th><th>What was found</th><th>Staff Review</th><th>Action</th></tr></thead><tbody>'
+  + '<div class="table-wrap"><table class="dc-table"><colgroup><col class="dc-c-ref"><col class="dc-c-app"><col class="dc-c-date"><col class="dc-c-ai"><col class="dc-c-found"><col class="dc-c-rev"><col class="dc-c-act"></colgroup>'
+  + '<thead><tr><th>Reference No.</th><th>Applicant / Request</th><th>Date Submitted</th><th>AI Check</th><th>What was found</th><th>Staff Review</th><th><span class="sr-only">Open</span></th></tr></thead><tbody>'
   + (pg.items.length ? pg.items.map(function(x){
       var r = x.r, ai = r.ai, m = AI_CHECK_STATES[x.state];
-      var found = ai && (ai.status==='completed' || ai.status==='needs_manual_review')
-        ? (aiFindingSummary(ai).join(', ') || 'No findings')
-        : (ai && ai.error ? ai.error : '—');
+      var finished = ai && (ai.status==='completed' || ai.status==='needs_manual_review');
+      var found = finished ? (aiFindingSummary(ai).join(', ') || 'No findings') : (ai && ai.error ? ai.error : '—');
       var review = ai && ai.reviewed ? 'Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.reviewedAt))+'</div>' : '')
-        : (ai && (ai.status==='completed' || ai.status==='needs_manual_review') ? '<span class="badge amber">Not reviewed</span>' : '—');
-      return '<tr><td class="mono" data-label="Reference No.">'+esc(r.id)+'</td>'
+        : (finished ? 'Not reviewed' : '—');
+      // The whole row opens the check (Enter/Space too, like the dashboard rows).
+      return '<tr class="dash-row dc-row" data-action="dc-open" data-kind="'+x.kind+'" data-id="'+esc(r.id)+'" tabindex="0" aria-label="Open the document check for '+esc(r.id)+'">'
+        + '<td class="mono" data-label="Reference No.">'+esc(r.id)+'</td>'
         + '<td class="cell-name" data-label="Applicant / Request">'+esc(r.applicant)+'<div class="cell-sub">'+esc(x.type||'')+'</div></td>'
         + '<td data-label="Date Submitted">'+fmtDate(r.submitted)+'</td>'
-        + '<td data-label="AI Check"><span class="badge '+m[1]+'">'+esc(m[0])+'</span>'+(ai && ai.completedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.completedAt))+'</div>' : '')+'</td>'
+        + '<td data-label="AI Check"><span class="dc-state'+(x.state==='attention'||x.state==='failed'?' is-flag':'')+'">'+esc(m[0])+'</span>'+(ai && ai.completedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.completedAt))+'</div>' : '')+'</td>'
         + '<td data-label="What was found">'+esc(found)+'</td>'
         + '<td data-label="Staff Review">'+review+'</td>'
-        + '<td class="actions-cell"><div class="actions-container"><button class="icon-btn action-button" data-action="dc-open" data-kind="'+x.kind+'" data-id="'+esc(r.id)+'">Open check</button></div></td></tr>';
+        + '<td class="dc-view-cell" data-label=""><span class="dc-view" aria-hidden="true">View</span></td></tr>';
     }).join('') : '<tr><td colspan="7"><div class="empty-state">No requests match this view.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('docCheck', pg)+'</div>'
   + docCheckDisclaimer();
@@ -3095,16 +3119,17 @@ function aiDurationText(ai){
   return secs < 60 ? secs+' s' : Math.floor(secs/60)+' min'+(secs%60 ? ' '+(secs%60)+' s' : '');
 }
 
-/* One request's AI Document Check, laid out like the office's Document Check design:
-   documents on the left; data extraction, issues found and recommendation on the right.
-   Every original opens through /request-file.php (Staff only; opening is recorded). */
+/* One request's AI Document Check: the only place Staff see AI and OCR results. Every model
+   judgement is labelled as an unverified AI suggestion; each uploaded document's row opens the
+   original through /request-file.php (Staff only; opening is recorded for "Mark as reviewed"). */
 function renderDocCheckDetail(x){
   var r = x.r, ai = r.ai, st = x.state, m = AI_CHECK_STATES[st];
   var elig = r.aiEligibility || {eligible:false, reason:'not_enabled'};
   var finished = ai && (ai.status==='completed' || ai.status==='needs_manual_review');
-  var html = '<div class="page-head"><div><h1>Document Check</h1><p><span class="mono">'+esc(r.id)+'</span> &middot; '+esc(r.applicant)+' &middot; '+esc(x.type||'')+'</p></div>'
-    + '<div class="page-head-actions"><button type="button" class="btn btn-outline btn-sm" data-action="dc-back">Back to list</button>'
-    + '<button type="button" class="btn btn-outline btn-sm" data-action="view-'+x.kind+'-req" data-id="'+esc(r.id)+'">Open full request</button></div></div>';
+  var html = '<div class="page-head dc-head"><div class="dc-head-main">'
+      + '<button type="button" class="dc-back" data-action="dc-back" aria-label="Back to Document Check list" title="Back">'+ic('chevLeft','20px')+'</button>'
+      + '<div><h1>Document Check</h1><p><span class="mono">'+esc(r.id)+'</span> &middot; '+esc(r.applicant)+' &middot; '+esc(x.type||'')+'</p></div></div>'
+    + '<div class="page-head-actions"><button type="button" class="btn btn-outline btn-sm" data-action="view-'+x.kind+'-req" data-id="'+esc(r.id)+'">View Requirements</button></div></div>';
   var runBtn = function(text){ return elig.eligible ? '<button type="button" class="btn btn-outline btn-sm" data-action="ai-requeue" data-ref="'+esc(r.id)+'">'+esc(text)+'</button>' : ''; };
 
   if(!finished){
@@ -3117,8 +3142,7 @@ function renderDocCheckDetail(x){
       : st==='before' ? 'This request was submitted before the Privacy Policy described the AI document check. Inspect its documents manually.'
       : 'AI document checking is not enabled on this server. Inspect the documents manually.';
     html += '<section class="dc-card dc-status-card" aria-live="polite">'
-      + '<span class="badge '+m[1]+'">'+esc(m[0])+'</span>'
-      + '<h2>'+esc(title)+'</h2><p>'+esc(sub)+'</p>'
+      + '<p class="dc-kicker">'+esc(m[0])+'</p><h2>'+esc(title)+'</h2><p>'+esc(sub)+'</p>'
       + ((st==='waiting' || st==='running') ? '<div class="dc-progress" role="progressbar" aria-label="'+esc(title)+'"><span></span></div>' : '')
       + (ai && ai.error ? '<p class="ai-note">'+esc(ai.error)+(ai.status==='pending' && ai.nextAttemptAt ? ' Next try: '+esc(fmtDateTime(ai.nextAttemptAt))+'.' : '')+'</p>' : '')
       + ((st==='none' || st==='failed') ? '<div class="dc-actions">'+runBtn(st==='none' ? 'Run AI check' : 'Run check again')+'</div>' : '')
@@ -3126,69 +3150,74 @@ function renderDocCheckDetail(x){
     return html + docCheckDisclaimer();
   }
 
-  var outcome = {passed:['No concerns found','green'], needs_review:['Needs review','amber'], missing_information:['Missing information','red']}[ai.outcome] || ['Needs review','amber'];
+  var outcome = {passed:'No concerns found', needs_review:'Needs review', missing_information:'Missing information'}[ai.outcome] || 'Needs review';
   var dur = aiDurationText(ai);
-  var chip = dur ? 'Checked in '+dur : (ai.completedAt ? 'Checked '+fmtDateTime(ai.completedAt) : '');
+  var meta = [dur ? 'Checked in '+dur : (ai.completedAt ? 'Checked '+fmtDateTime(ai.completedAt) : ''), ai.ocrEngine ? 'OCR: '+ai.ocrEngine : '', ai.model ? 'Model: '+ai.model : '', 'Attempts: '+ai.attempts+' of '+ai.maxAttempts]
+    .filter(Boolean).join(' · ');
   var fileByKey = {};
   (r.files||[]).forEach(function(f){ if(f.key) fileByKey[f.key] = f; });
   var docs = ai.documents || [];
+  var reqText = {missing:'Not uploaded', uploaded_valid_format:'Uploaded', uploaded_invalid_format:'Uploaded, unusual file type'};
   var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
+  // The model's judgement, never a verified fact: always labelled as an unverified AI suggestion.
+  var typeText = {yes:'AI suggestion (unverified): yes', no:'AI suggestion (unverified): no', unclear:'AI suggestion (unverified): unclear'};
+  var cells = function(d){
+    var reading = d.requirement==='missing' ? '—' : (d.ocr_status==='failed' ? 'Could not be read' : (readText[d.readability]||'—'));
+    var flag = d.requirement!=='uploaded_valid_format' || d.ocr_status==='failed' || d.readability==='poor' || d.readability==='unreadable';
+    return '<span class="dc-doc-name">'+esc(d.label)+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</span>'
+      + '<span class="'+(flag?'is-flag':'')+'"><span class="dc-cell-label">Uploaded: </span>'+esc(reqText[d.requirement]||'—')+'</span>'
+      + '<span><span class="dc-cell-label">Text reading: </span>'+esc(reading)+'</span>'
+      + '<span><span class="dc-cell-label">Looks like this document? </span>'+esc(typeText[d.expected_type_match]||'—')+(d.note ? '<span class="cell-sub dc-note">'+esc(d.note)+'</span>' : '')+'</span>';
+  };
   var docsHtml = docs.length ? docs.map(function(d){
-      var f = fileByKey[d.key], badge;
-      if(d.requirement==='missing') badge = ['Not uploaded','red'];
-      else if(d.ocr_status==='failed' || d.readability==='unreadable') badge = ['Could not be read','red'];
-      else if(d.readability==='poor' || d.readability==='partial') badge = [readText[d.readability],'amber'];
-      else if(d.requirement==='uploaded_invalid_format') badge = ['Unusual file type','amber'];
-      else badge = ['Readable','green'];
-      var open = f && f.name && f.available===false ? '<span class="cell-sub">Cannot be opened</span>'
-        : f && f.name ? '<a class="btn btn-outline btn-sm" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener">Open original</a>' : '';
-      return '<li class="dc-doc"><div class="dc-doc-name">'+esc(d.label)+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</div>'
-        + '<div class="dc-doc-meta"><span class="badge '+badge[1]+'">'+esc(badge[0])+'</span>'+open+'</div></li>';
-    }).join('') : '<li class="dc-doc"><span class="cell-sub">No document details were returned.</span></li>';
-
+      var f = fileByKey[d.key];
+      if(f && f.name && f.available!==false){
+        return '<a class="dc-doc-row" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener" aria-label="View '+esc(d.label)+' (opens in a new tab)">'
+          + cells(d)+'<span class="dc-view">View</span></a>';
+      }
+      return '<div class="dc-doc-row is-static">'+cells(d)+'<span class="dc-view is-off">'+(f && f.name ? 'Cannot be opened' : '—')+'</span></div>';
+    }).join('') : '<div class="dc-doc-row is-static"><span class="cell-sub">No document details were returned.</span></div>';
   var uploaded = docs.filter(function(d){ return d.requirement!=='missing'; });
   var read = uploaded.filter(function(d){ return d.ocr_status!=='failed' && (d.readability==='good' || d.readability==='partial'); });
-  var extractTone = uploaded.length && read.length===uploaded.length ? 'green' : 'amber';
   var extractText = uploaded.length
-    ? 'Text was read from '+read.length+' of '+uploaded.length+' uploaded file'+(uploaded.length===1?'':'s')+(ai.ocrEngine ? ' ('+ai.ocrEngine+' OCR)' : '')+'.'
-      + (read.length<uploaded.length ? ' Files that could not be read reliably must be checked by eye.' : '')
+    ? 'Text was read from '+read.length+' of '+uploaded.length+' uploaded file'+(uploaded.length===1?'':'s')+'.'+(read.length<uploaded.length ? ' Files that could not be read reliably must be checked by eye.' : '')
     : 'No uploaded files to read.';
 
   var findings = ai.findings || [];
   var issuesHtml = findings.length ? '<ul class="dc-issues">'+findings.map(function(f){
-      var c = (f.category==='missing_information' && f.source!=='requirements') ? ['Possibly missing (not confirmed)','amber'] : (AI_FINDING_CAT[f.category] || [f.category,'slate']);
-      return '<li><div class="ai-f-head"><span class="badge '+c[1]+'">'+esc(c[0])+'</span>'+(f.documents && f.documents.length ? '<b>'+esc(f.documents.join(', '))+'</b>' : '')
+      var c = (f.category==='missing_information' && f.source!=='requirements') ? 'Possibly missing (not confirmed)' : ((AI_FINDING_CAT[f.category]||[f.category])[0]);
+      return '<li><div class="dc-issue-head"><strong>'+esc(c)+'</strong>'+(f.documents && f.documents.length ? '<span>'+esc(f.documents.join(', '))+'</span>' : '')
         + '<span class="cell-sub">'+esc(AI_FINDING_SRC[f.source]||f.source)+'</span></div><p>'+esc(f.explanation)+'</p>'
         + (f.evidence ? '<q><span class="cell-sub">Text read from the document (OCR, may contain reading errors):</span> '+esc(f.evidence)+'</q>' : '')+'</li>';
-    }).join('')+'</ul>' : '<p>No issues found.</p>';
+    }).join('')+'</ul>' : '<p class="dc-empty">No issues found.</p>';
   var g = aiGuidance(r);
   var li = function(items){ return '<ul class="ai-guide-list">'+items.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>'; };
-  var recHtml = (g.check.length ? '<h4>What to check</h4>'+li(g.check) : '<p>Open the originals to confirm the result.</p>')
-    + (g.ask.length ? '<h4>What to ask the client (if needed)</h4>'+li(g.ask) : '');
+  var recHtml = (g.check.length ? '<h3>What to check</h3>'+li(g.check) : '<p class="dc-empty">Open the originals to confirm the result.</p>')
+    + (g.ask.length ? '<h3>What to ask the client (if needed)</h3>'+li(g.ask) : '');
 
-  html += '<section class="dc-card dc-results" aria-labelledby="dc-results-title">'
-    + '<div class="dc-results-head"><div class="dc-section-title"><h2 id="dc-results-title">AI Analysis Results</h2><p>What the automatic check found in the uploaded documents.</p></div>'
-      + (chip ? '<span class="dc-chip">'+esc(chip)+'</span>' : '')+'</div>'
-    + '<div class="dc-outcome"><span class="badge '+outcome[1]+'">'+esc(outcome[0])+'</span><span>'+esc(ai.reason||'')+'</span></div>'
-    + '<div class="dc-results-grid">'
-      + '<div class="dc-docs"><h3>Documents</h3><ul>'+docsHtml+'</ul></div>'
-      + '<div class="dc-panels">'
-        + '<div class="dc-panel tone-'+extractTone+'"><h3>Data extraction</h3><p>'+esc(extractText)+'</p></div>'
-        + '<div class="dc-panel tone-'+(findings.length ? 'amber' : 'green')+'"><h3>Issues found'+(findings.length ? ' ('+findings.length+')' : '')+'</h3>'+issuesHtml+'</div>'
-        + '<div class="dc-panel tone-neutral"><h3>Recommendation</h3>'+recHtml+'</div>'
-      + '</div>'
+  html += '<section class="dc-card dc-review" aria-labelledby="dc-results-title">'
+    + '<div class="dc-summary"><div><h2 id="dc-results-title" class="dc-h">AI Analysis Results</h2>'
+      + '<p class="dc-outcome"><strong>'+esc(outcome)+'</strong>'+(ai.reason ? ' &middot; '+esc(ai.reason) : '')+'</p>'
+      + '<p class="cell-sub">Automatic checks and AI suggestions (unverified), not a decision</p></div>'
+      + '<p class="cell-sub dc-meta">'+esc(meta)+'</p></div>'
+    + '<div class="dc-section"><div class="dc-section-head"><h2 class="dc-h">Documents</h2><p class="cell-sub">'+esc(extractText)+'</p></div>'
+      + '<div class="dc-docs" role="list">'
+        + '<div class="dc-doc-row dc-doc-headrow" aria-hidden="true"><span>Document</span><span>Uploaded</span><span>Text reading</span><span>Looks like this document? (AI suggestion, unverified)</span><span></span></div>'
+        + docsHtml
+      + '</div></div>'
+    + '<div class="dc-split">'
+      + '<div class="dc-section"><h2 class="dc-h">Issues found'+(findings.length ? ' ('+findings.length+')' : '')+'</h2>'+issuesHtml+'</div>'
+      + '<div class="dc-section"><h2 class="dc-h">Recommendation</h2>'+recHtml+'</div>'
     + '</div>'
-    + '<div class="dc-results-foot">'
-      + '<p class="cell-sub">'+esc([ai.model ? 'Model: '+ai.model : '', 'Attempts: '+ai.attempts+' of '+ai.maxAttempts].filter(Boolean).join(' · '))+'</p>'
+    + '<div class="dc-results-foot"><p class="cell-sub dc-review-note">'+(ai.reviewed ? '' : 'Open every original that can be opened before marking as reviewed; the server checks that you have. Opening is recorded, not proof of inspection.')+'</p>'
       + '<div class="dc-actions">'+runBtn('Run check again')
-        + (ai.reviewed ? '<span class="badge slate">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>'
+        + (ai.reviewed ? '<span class="cell-sub">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>'
           : '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button>')
-      + '</div>'
-    + '</div>'
-    + (ai.reviewed ? '' : '<p class="cell-sub dc-review-note">Open every original that can be opened before marking as reviewed; the server checks that you have. Opening is recorded, not proof of inspection.</p>')
+      + '</div></div>'
   + '</section>';
   return html + docCheckDisclaimer();
 }
+
 function docCheckDisclaimer(){
   return '<p class="ai-note dc-disclaimer">The AI check can be wrong. It never approves or rejects a request and cannot tell whether a document, signature or seal is genuine. Nothing is sent to the client automatically.</p>';
 }
@@ -3287,10 +3316,23 @@ function applyNotifTemplate(form, force){
   // Message starts from the template with the client's name and reference.
   // Staff text is never overwritten, and nothing is sent until they click Send.
   var ref = form.elements.requestRef.value, info = ref ? notifRequestInfo(ref) : null, msg = form.elements.message;
-  var autoMsg = info && tpl.details ? 'Good day, '+(info.owner||'Client').replace(/\s+/g,' ').trim()+'. Regarding your request '+ref+': '+tpl.details : '';
+  var pickupField = form.querySelector('[data-pickup-field]'), pickupIn = form.elements.pickupDate;
+  if(pickupField) pickupField.hidden = category!=='Completion / Approval';
+  if(category==='Completion / Approval' && pickupIn && !pickupIn.value) pickupIn.value = nextWorkday(phToday());
+  var autoMsg = info && category==='Completion / Approval' && pickupIn && pickupIn.value ? releaseMessage(info.owner, ref, pickupIn.value)
+    : info && tpl.details ? 'Good day, '+(info.owner||'Client').replace(/\s+/g,' ').trim()+'. Regarding your request '+ref+': '+tpl.details : '';
+  form._pickupLabel = pickupIn ? pickupLabel(pickupIn.value) : '';
   if(msg && (msg.value==='' || msg.value===auto.message) && msg.value!==autoMsg){ msg.value = autoMsg; msg.dispatchEvent(new Event('input',{bubbles:true})); }
   form._notifAuto = { message:autoMsg };
   if(category==='Other Instruction' && force && msg) msg.focus();
+}
+
+function onPickupDateChange(input){
+  var form = input.form, msg = form.elements.message, auto = form._notifAuto || {};
+  var oldLabel = form._pickupLabel || '', newLabel = pickupLabel(input.value);
+  if(form.elements.category.value==='Completion / Approval' && form.elements.requestRef.value && (msg.value==='' || msg.value===auto.message)){ applyNotifTemplate(form, false); return; }
+  if(oldLabel && newLabel && msg.value.indexOf(oldLabel)>-1){ msg.value = msg.value.split(oldLabel).join(newLabel); msg.dispatchEvent(new Event('input',{bubbles:true})); }
+  form._pickupLabel = newLabel;
 }
 
 function onNotifReferenceChange(select){
@@ -3346,8 +3388,26 @@ function sentPeriodRange(period, customFrom, customTo){
   }
 }
 
-/* Draft prepared after rejection (see php-bridge.js): taken once from
-   sessionStorage and kept in state until sent, so a re-render keeps edits. */
+/* Pickup notification (status changed to Out for Release): the date the document can be
+   claimed, written out in full in the message, e.g. "Tuesday, November 17, 2026". */
+function pickupLabel(key){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(key||''))) return '';
+  return new Date(key+'T00:00:00Z').toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone:'UTC'});
+}
+function nextWorkday(key){
+  var d = phAddDays(key, 1);
+  while(phWeekday(d)===0 || phWeekday(d)===6) d = phAddDays(d, 1);
+  return d;
+}
+function releaseMessage(name, ref, key){
+  var when = pickupLabel(key);
+  return 'Good day, '+(name||'Client').replace(/\s+/g,' ').trim()+'. Your request '+ref+' is ready for pickup at the Municipal Assessor’s Office of Mabini'
+    +(when ? ' starting '+when : '')+'. Please visit during office hours, Monday to Friday, 8:00 AM to 5:00 PM, and bring a valid ID. Thank you.';
+}
+
+/* Draft prepared after rejection or Out for Release (see php-bridge.js): taken once from
+   sessionStorage and kept in state until sent, so a re-render keeps edits. Nothing is sent
+   until Staff click Send. */
 function takeNotifDraft(){
   var raw = null;
   try { raw = JSON.parse(sessionStorage.getItem('smartAssessNotifDraft') || 'null'); sessionStorage.removeItem('smartAssessNotifDraft'); } catch(e){ raw = null; }
@@ -3356,6 +3416,12 @@ function takeNotifDraft(){
   if(!r) return;
   var d = r.details || {};
   var name = [d.firstName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ') || r.applicant || 'Client';
+  if(raw.kind==='release'){
+    var pickup = nextWorkday(phToday());
+    state.notifDraft = { ref: r.id, release: true, category: 'Completion / Approval', topic: 'Ready for pickup: '+r.id, pickupDate: pickup,
+      message: releaseMessage(name, r.id, pickup) };
+    return;
+  }
   state.notifDraft = {
     ref: r.id, rejection: 'Rejected', category: 'Request Status Update', topic: 'Request rejected: '+r.id,
     message: 'Good day, '+name+'. Your request '+r.id+' at the Municipal Assessor\'s Office of Mabini was rejected. Please contact the office for more information. Thank you.'
@@ -3418,10 +3484,6 @@ function renderNotifications(acct){
   + '<div class="notif-page"><div class="notif-grid">'
     + '<section class="notif-card notif-send">'
       + '<div class="nc-head"><div><h3>Send a Notification</h3><p>Nothing is sent until you click Send Notification. Review the recipient and message first.</p></div></div>'
-      + (draft ? '<div class="nf-draft" role="status">'+(draft.fromRequest
-          ? 'Notification for request '+esc(draft.ref)+'. It goes only to the phone number and email address on this request. Write the message, choose SMS and/or email, then send.'
-          : 'Draft prepared for the rejected request '+esc(draft.ref)+' ('+esc(draft.rejection)+'). Review and edit the message, choose SMS and/or email, then send.')+'</div>' : '')
-      + '<div class="nf-services" id="notification-services" aria-live="polite"><strong>Service status</strong><span data-service="sms">Checking SMS…</span><span data-service="email">Checking email…</span></div>'
       + '<form data-form="send-notif" class="notif-form">'
         + '<div class="nf-grid">'
           + '<div class="field"><label for="notification-reference">Reference Number</label><select id="notification-reference" name="requestRef" required><option value="">Select a request…</option>'+allRefs.map(function(id){return '<option value="'+id+'"'+(draft&&draft.ref===id?' selected':'')+'>'+id+'</option>';}).join('')+'</select></div>'
@@ -3430,6 +3492,7 @@ function renderNotifications(acct){
           + '<div class="field"><label for="notification-email">Email Address</label><output id="notification-email" class="owner-name-display'+(rcpt.email?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.email||(draft?'No email address on file':'Select a reference number'))+'</output></div>'
           + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required><option value="">Select a category…</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'"'+(draft&&draft.category===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select></div>'
           + '<div class="field"><label for="notification-request-type">Type of Request</label><select id="notification-request-type" disabled aria-describedby="notification-request-type-hint"><option value="">Select a reference number</option><option value="Document Request"'+(draft&&findDocReq(draft.ref)?' selected':'')+'>Document Request</option><option value="Land Transfer"'+(draft&&findLandReq(draft.ref)?' selected':'')+'>Land Transfer</option></select><span id="notification-request-type-hint" class="sr-only">Set automatically from the selected reference number.</span></div>'
+          + '<div class="field nf-pickup" data-pickup-field'+((draft&&draft.category==='Completion / Approval')?'':' hidden')+'><label for="notification-pickup">Available for pickup on</label><input id="notification-pickup" name="pickupDate" type="date" min="'+esc(phToday())+'" value="'+esc((draft&&draft.pickupDate)||'')+'"></div>'
         + '</div>'
         + '<div class="field"><label for="notification-message">Message</label>'
           + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="Type the message for the applicant…" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
@@ -3730,7 +3793,6 @@ function modalReqDetail(id, kind){
         + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','16px')+'</button>'
       + '</div></div>'
     + summary
-    + (canProcess && ('ai' in r) ? reqAiHtml(r) : '')
     + (detailsHtml ? '<div class="rd-client" id="rd-client"'+(showDetails?'':' hidden')+' aria-label="Client details">'+detailsHtml+'</div>' : '');
 }
 
@@ -3753,10 +3815,11 @@ function reqSubmittedDetailsHtml(r){
   var fullName = [d.firstName, d.middleName, d.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ');
   var address = [d.addressLine, d.city, d.province].filter(function(x){ return String(x||'').trim(); }).join(', ') + (String(d.zip||'').trim() ? ' '+d.zip : '');
   return rdTable('Applicant Information', [
-      ['Full Name', val(fullName)],
+      ['Requester Name', val(fullName)],
+      // The owner's name is stored only when the requester is the owner; it is never substituted.
+      ['Property Owner Name', d.isOwner ? val(fullName) : '<span class="cell-sub">Not recorded on this request (filed by a representative for the registered owner)</span>'],
       ['Contact Number', '<span class="mono">'+val(d.contact)+'</span>'],
       ['Email Address', val(d.email)],
-      ['Registered Owner', d.isOwner ? 'Yes, the applicant is the registered owner' : 'No, applying for the registered owner'],
       ['Address', val(address), true],
       d.clientAccount ? ['Client Account', esc(d.clientAccount), true] : null
     ])
@@ -3774,69 +3837,6 @@ function reqFileSize(bytes){
   if(bytes==null) return '';
   return bytes >= 1048576 ? (bytes/1048576).toFixed(1)+' MB' : Math.max(1, Math.round(bytes/1024))+' KB';
 }
-/* AI document check: advice for Staff only (r.ai is sent to Staff accounts
-   only). Every value is escaped; the original files open through
-   request-file.php, which checks the Staff session. */
-function reqAiHtml(r){
-  var ai = r.ai;
-  var head = '<section class="rd-block" aria-labelledby="ai-check-'+esc(r.id)+'"><h4 class="rd-caption" id="ai-check-'+esc(r.id)+'">AI Document Check</h4>';
-  var disclaimer = '<p class="ai-note">The AI check reads the uploaded files with OCR and points out possible problems. It can be wrong. It never approves or rejects a request and cannot tell whether a document, signature or seal is genuine. Always open the original documents and decide yourself.</p>';
-  // The server decides whether AI may check this request (Privacy Policy effective date) and refuses otherwise.
-  var elig = r.aiEligibility || {eligible:false, reason:'not_enabled'};
-  var blocked = elig.eligible ? '' : '<p class="ai-note"><strong>'+esc(elig.reason==='before_effective_date'
-      ? 'Not checked by AI: this request was submitted before the Privacy Policy described the AI document check'+(elig.effectiveFrom ? ' (in effect from '+fmtDateTime(elig.effectiveFrom)+')' : '')+'. Inspect its documents manually.'
-      : 'AI document checking is not enabled on this server yet.')+'</strong></p>';
-  var runBtn = function(text){ return elig.eligible ? '<button type="button" class="btn btn-outline btn-sm" data-action="ai-requeue" data-ref="'+esc(r.id)+'">'+esc(text)+'</button>' : ''; };
-  if(!ai){
-    return head + (elig.eligible ? '<div class="ai-outcome"><span>No AI check has been run for this request.</span></div><div class="ai-actions">'+runBtn('Run AI check')+'</div>' : blocked)+disclaimer+'</section>';
-  }
-  var statusText = {pending:'Waiting in the queue', processing:'Checking now', completed:'Finished', failed:'Could not finish', needs_manual_review:'Finished with problems'}[ai.status] || ai.status;
-  var outcome = {passed:['Passed','green','The required documents appear present and readable, and no inconsistency was detected.'],
-    needs_review:['Needs review','amber','Something needs a closer look by Staff.'],
-    missing_information:['Missing information','red','A required document or detail appears to be missing.']}[ai.outcome];
-  var html = head;
-  if(outcome && (ai.status==='completed' || ai.status==='needs_manual_review')){
-    html += '<div class="ai-outcome tone-'+outcome[1]+'"><span class="badge '+outcome[1]+'">'+esc(outcome[0])+'</span><strong>'+esc(outcome[2])+'</strong><span class="cell-sub">Automatic checks and AI suggestions (unverified), not a decision</span></div>'
-      + '<p class="ai-note">'+esc(ai.reason)+'</p>'
-      + (ai.outcome!=='passed' ? '<p class="ai-note"><strong>Manual review recommended.</strong></p>' : '');
-  } else {
-    html += '<div class="ai-outcome"><span class="badge '+(ai.status==='failed'?'red':'slate')+'">'+esc(statusText)+'</span>'
-      + '<span>'+esc(ai.status==='pending' ? 'The check runs in the background. Reload the page later to see the result.' : (ai.status==='processing' ? 'The documents are being checked now.' : 'The automatic check did not finish. Inspect the documents manually.'))+'</span></div>';
-  }
-  if(ai.error) html += '<p class="ai-note">'+esc(ai.error)+(ai.status==='pending' && ai.nextAttemptAt ? ' Next try: '+esc(fmtDateTime(ai.nextAttemptAt))+'.' : '')+'</p>';
-
-  var fileByKey = {};
-  (r.files||[]).forEach(function(f){ if(f.key) fileByKey[f.key] = f; });
-  if(ai.documents && ai.documents.length){
-    var reqText = {missing:'Not uploaded', uploaded_valid_format:'Uploaded', uploaded_invalid_format:'Uploaded, unusual file type'};
-    var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
-    // The model's judgement, never a verified fact: always labelled as an unverified AI suggestion.
-    var typeText = {yes:'AI suggestion (unverified): yes', no:'AI suggestion (unverified): no', unclear:'AI suggestion (unverified): unclear'};
-    html += '<div class="rd-wrap"><table class="rd-table" aria-label="AI document checklist"><thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th><th scope="col">Text reading</th><th scope="col">Looks like this document? (AI suggestion, unverified)</th><th scope="col">Original</th></tr></thead><tbody>'
-      + ai.documents.map(function(d){
-          var f = fileByKey[d.key];
-          var open = f && f.name && f.available===false ? '<span class="badge red">Cannot be opened</span>' : f && f.name ? '<a class="btn btn-outline btn-sm" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener">Open</a>' : '<span class="cell-sub">—</span>';
-          return '<tr><th scope="row" data-label="Document">'+esc(d.label)+'</th><td data-label="Uploaded">'+esc(reqText[d.requirement]||'—')+'</td>'
-            + '<td data-label="Text reading">'+esc(d.ocr_status==='failed' ? 'Could not be read' : (readText[d.readability]||'—'))+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</td>'
-            + '<td data-label="Looks like this document? (AI suggestion, unverified)">'+esc(typeText[d.expected_type_match]||'—')+(d.note ? '<div class="cell-sub">'+esc(d.note)+'</div>' : '')+'</td>'
-            + '<td data-label="Original">'+open+'</td></tr>';
-        }).join('') + '</tbody></table></div>';
-  }
-  var meta = [];
-  if(ai.model) meta.push('Model: '+ai.model);
-  if(ai.ocrEngine) meta.push('OCR: '+ai.ocrEngine);
-  if(ai.completedAt) meta.push('Checked: '+fmtDateTime(ai.completedAt));
-  meta.push('Attempts: '+ai.attempts+' of '+ai.maxAttempts);
-  html += '<p class="ai-note">'+esc(meta.join(' · '))+'</p>';
-  var finished = ai.status==='completed' || ai.status==='needs_manual_review';
-  html += '<div class="ai-actions">'
-    + (ai.status!=='processing' ? runBtn(ai.status==='pending' ? 'Queued, run again' : 'Run check again') : '')
-    + (finished && !ai.reviewed ? '<button type="button" class="btn btn-primary btn-sm" data-action="ai-mark-reviewed" data-ref="'+esc(r.id)+'">Mark as reviewed</button><span class="cell-sub">Open every original that can be opened first; the server checks that you have. Opening is recorded, not proof of inspection: look at each document yourself.</span>' : '')
-    + (ai.reviewed ? '<span class="cell-sub">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>' : '')
-    + '</div>' + blocked + disclaimer + '</section>';
-  return html;
-}
-
 /* "What to check" and "What to ask the client": written here from the server's validated
    finding codes (category, field, source) and the server's document labels only, never from
    text the AI wrote. Suggestions for Staff, not decisions. */
@@ -4284,6 +4284,7 @@ function bindEvents(){
 
   app.querySelectorAll('[data-form="send-notif"]').forEach(function(form){
     var msg = form.querySelector('textarea[name="message"]');
+    if(state.notifDraft && state.notifDraft.release && !form._notifAuto){ form._notifAuto = { message: state.notifDraft.message }; form._pickupLabel = pickupLabel(state.notifDraft.pickupDate); }
     var counter = form.querySelector('[data-char-count]');
     function updateCount(){ if(msg && counter) counter.textContent = msg.value.length+'/'+(msg.maxLength>0?msg.maxLength:2000); }
     if(msg) msg.addEventListener('input', updateCount);
@@ -4763,6 +4764,7 @@ function bindEvents(){
     var el = ev.target;
     if(el.matches && el.matches('form[data-form="send-notif"] select[name="requestRef"]')){ onNotifReferenceChange(el); return; }
     if(el.matches && el.matches('form[data-form="send-notif"] select[name="category"]')){ applyNotifTemplate(el.form, true); return; }
+    if(el.matches && el.matches('form[data-form="send-notif"] input[name="pickupDate"]')){ onPickupDateChange(el); return; }
     if(el.matches && el.matches('[data-ann-audience]')){ el.form.elements.postTo.value = annAudienceValue(el.form); return; }
     var key = el.getAttribute && el.getAttribute('data-input');
     if(!key) return;
@@ -4889,12 +4891,12 @@ function bindEvents(){
       var req = kind==='doc' ? findDocReq(rid) : findLandReq(rid);
       if(req){
         req.status = fd.get('status');
-        if(req.status==='Rejected'){
-          try { sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({ref:rid})); } catch(e){}
+        if(req.status==='Rejected' || req.status==='Out for Release'){
+          try { sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({ref:rid, kind:req.status==='Rejected'?'rejected':'release'})); } catch(e){}
           state.view = 'notifications';
         }
         if(kind==='land'){ req.history = req.history||[]; req.history.push({status:req.status, when:new Date().toISOString()}); }
-        if(req.status!=='Rejected') pushToast(rid+' status updated to "'+req.status+'".', 'check');
+        if(req.status!=='Rejected' && req.status!=='Out for Release') pushToast(rid+' status updated to "'+req.status+'".', 'check');
       }
       state.modal = null; render();
 
