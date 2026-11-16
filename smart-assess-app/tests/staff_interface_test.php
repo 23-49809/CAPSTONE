@@ -108,18 +108,50 @@ $check('sign-in password field has the eye toggle icon', str_contains($html, 'da
 $check('the eye toggle switches to the eye-off icon', str_contains($html, "el.innerHTML = ic(showPassword?'eyeOff':'eye','19px');"));
 $check('popups have the close X icon', substr_count($html, "data-action=\"close-modal\">'+ic('x','15px')") >= 4);
 $check('the announcement Send button has its send icon', str_contains($html, "data-send-main data-publish-label=") && str_contains($html, "ic('send','16px')+'<span data-send-label>"));
-$check('sidebar links show their icons', str_contains($html, "'<span class=\"icon\">'+ICONS[item.icon]+'</span><span>'+esc(item.label)+'</span></button>'"));
+$check('sidebar navigation is text only for every role', str_contains($html, "      + '<span>'+esc(item.label)+'</span></button>';") && !str_contains($html, "ICONS[item.icon]"));
+$check('Logout keeps its icon', str_contains($html, "data-action=\"logout\">'+ic('logout','18px')+'<span>Logout</span></button>"));
 
 // ---- AI writing features removed; request popup trimmed ----
 $check('Write with AI is gone from the announcement composer', !str_contains($html, 'Write with AI') && !str_contains($html, 'composer-ai"><summary>'));
 $check('Generate with AI is gone from the internal interface', !str_contains($html, 'Generate with AI') && !str_contains($html, 'data-action="generate-ai-message"'));
 $check('the AI-only Topic and Details fields are gone from the notification form', !str_contains($html, 'name="aiTopic"') && !str_contains($html, 'name="aiDetails"'));
 $popup = $between($html, 'function modalReqDetail(id, kind){', "\n}\n");
-$aiPopup = $between($html, 'function reqAiHtml(r){', "\n}\n");
 $check('request popup no longer shows Notification History', $popup !== '' && !str_contains($popup, 'reqNotifHistoryHtml') && !str_contains($html, 'function reqNotifHistoryHtml'));
-$check('request popup AI section no longer shows Findings or What to check', $aiPopup !== '' && !str_contains($aiPopup, '>Findings<') && !str_contains($aiPopup, 'aiGuidance'));
-$check('the AI check outcome and document table stay in the popup', str_contains($aiPopup, 'Automatic checks and AI suggestions (unverified), not a decision') && str_contains($aiPopup, 'Looks like this document? (AI suggestion, unverified)'));
+$check('request popup has no AI Document Check section at all', $popup !== '' && !str_contains($popup, 'reqAiHtml') && !str_contains($html, 'function reqAiHtml'));
+$detail = $between($html, 'function renderDocCheckDetail(x){', "\n}\n");
+$check('Document Check carries the unverified-AI labels', str_contains($detail, 'Automatic checks and AI suggestions (unverified), not a decision')
+    && str_contains($detail, 'Looks like this document? (AI suggestion, unverified)') && str_contains($detail, "yes:'AI suggestion (unverified): yes'"));
 $check('Document Check keeps its findings and recommendations', str_contains($dc, 'Issues found') && str_contains($dc, 'Recommendation') && str_contains($dc, 'aiGuidance(r)'));
+$check('Document Check rows: whole document row opens the original, labelled View', str_contains($detail, '<a class="dc-doc-row" href="/request-file.php?doc=') && str_contains($detail, '<span class="dc-view">View</span></a>')
+    && !str_contains($dc, 'Open original') && !str_contains($dc, 'Open check'));
+$check('Document Check: back-arrow icon and View Requirements', str_contains($detail, 'class="dc-back" data-action="dc-back" aria-label="Back to Document Check list"') && str_contains($detail, "ic('chevLeft','20px')")
+    && str_contains($detail, '>View Requirements</button>') && !str_contains($dc, 'Open full request'));
+$check('Document Check uses no colour-coded badges', !str_contains($dc, 'class="badge ') && !str_contains($dc, "<span class=\"badge '"));
+$check('Document Check list rows open the check (keyboard too)', str_contains($dc, '<tr class="dash-row dc-row" data-action="dc-open"'));
+
+// ---- Out for Release opens a pickup notification that Staff review and send ----
+$bridge = (string) file_get_contents(dirname(__DIR__) . '/web/assets/php-bridge.js');
+$check('Out for Release opens the Notifications page with a pickup draft (after the server confirms)', str_contains($bridge, "if (data.status === 'Rejected' || data.status === 'Out for Release') {")
+    && str_contains($bridge, "if (!result.data || result.data.status !== wanted) {") && str_contains($bridge, "kind: wanted === 'Rejected' ? 'rejected' : 'release'"));
+$check('the pickup draft is prepared for that request and editable', str_contains($html, "if(raw.kind==='release'){") && str_contains($html, "category: 'Completion / Approval'")
+    && str_contains($html, 'message: releaseMessage(name, r.id, pickup)'));
+$check('the pickup date field is on the notification form', str_contains($html, '<label for="notification-pickup">Available for pickup on</label><input id="notification-pickup" name="pickupDate" type="date"'));
+$check('a pickup notification needs a date before it can be sent', str_contains($bridge, "notice('Choose the date the document will be available for pickup. Nothing was sent.');"));
+$check('nothing is sent automatically: the redirect only stores a draft', !preg_match("/kind: wanted[^;]*;\\s*jsonRequest\\('send_notification'/", $bridge));
+
+// ---- Notification page: no draft explanation, no service diagnostics ----
+$notif = $between($html, 'function renderNotifications(acct){', "\n}\n");
+$check('no automatic draft explanation on the Notifications page', !str_contains($notif, 'Draft prepared for the rejected request') && !str_contains($notif, 'nf-draft'));
+$check('no service status diagnostics on the Notifications page', !str_contains($notif, 'Service status') && !str_contains($notif, 'notification-services'));
+$check('an unavailable channel is still locked without the status box', str_contains($bridge, "if (!channelStatus) return;") && str_contains($bridge, "label.title = pair[2] + ' is unavailable right now.';"));
+
+// ---- Property owner and requester are separate fields ----
+$check('request details show Requester Name and Property Owner Name separately', str_contains($html, "['Requester Name', val(fullName)],")
+    && str_contains($html, "['Property Owner Name', d.isOwner ? val(fullName) : '<span class=\"cell-sub\">Not recorded on this request (filed by a representative for the registered owner)</span>'],"));
+
+// ---- Hover feedback (all internal roles) ----
+$check('internal hover lifts apply only to real pointers and stop for reduced motion', str_contains($html, 'Hover feedback (Staff, Admin, Head)')
+    && str_contains($html, '.btn:hover, .icon-btn:hover, .action-btn:hover, .sidebar .side-link:hover, .dash-stat:hover, .modal-close:hover, .dc-back:hover{ transform:none; }'));
 
 // ---- Announcements for Admin; audience choices; password toggle on the account form ----
 $check('Admin navigation has Announcements', str_contains($adminNav, "view:'announcements'"));

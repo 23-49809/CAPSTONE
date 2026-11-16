@@ -343,19 +343,20 @@
   // cannot work is unticked and locked, so it never blocks the other one.
   var channelStatus = null;
   var channelStatusLoading = false;
+  // The technical service details (provider replies, credits, authorisation) are no longer
+  // shown on the Staff form; an unavailable channel is still unticked and locked, with a plain
+  // explanation on its label.
   function applyChannelStatus(form) {
-    var panel = document.getElementById('notification-services');
-    if (!panel || !channelStatus) return;
-    [['sms', 'send_sms'], ['email', 'send_email']].forEach(function (pair) {
+    if (!channelStatus) return;
+    [['sms', 'send_sms', 'SMS'], ['email', 'send_email', 'Email']].forEach(function (pair) {
       var status = channelStatus[pair[0]];
       var box = form.querySelector('input[name="' + pair[1] + '"]');
       if (box && !status.ready) {
         box.checked = false;
         box.disabled = true;
+        var label = box.closest('label');
+        if (label) label.title = pair[2] + ' is unavailable right now.';
       }
-      var line = panel.querySelector('[data-service="' + pair[0] + '"]');
-      if (line && line.textContent !== status.message) line.textContent = status.message;
-      if (line) line.classList.toggle('is-down', !status.ready || !!status.warning);
     });
   }
   // A request opened from its details or a rejection draft arrives already
@@ -381,10 +382,8 @@
       var current = document.querySelector('form[data-form="send-notif"]');
       if (current) applyChannelStatus(current);
     }).catch(function () {
-      var current = document.querySelector('#notification-services [data-service="sms"]');
-      if (current) current.textContent = 'Could not check the SMS and email services. You can still try to send.';
-      var email = document.querySelector('#notification-services [data-service="email"]');
-      if (email) email.textContent = '';
+      // Status unknown: both channels stay available and sending reports any failure.
+      channelStatusLoading = false;
     });
   }
 
@@ -864,6 +863,8 @@
     if (type === 'send-notif') {
       delete data.aiTopic;
       delete data.aiDetails;
+      // The pickup date is written into the message itself; it is not a separate field on the server.
+      delete data.pickupDate;
     } else if (type === 'save-ann') {
       delete data.aiDetails;
     }
@@ -891,14 +892,17 @@
     }
     if (type === 'update-status') {
       data.kind = form.getAttribute('data-kind') || '';
-      if (data.status === 'Rejected') {
+      // Rejected and Out for Release open the Notifications page with a draft for this request;
+      // Staff review and edit it, choose SMS and/or email, and send it themselves.
+      if (data.status === 'Rejected' || data.status === 'Out for Release') {
+        var wanted = data.status;
         jsonRequest('update_request_status', data).then(function (result) {
-          if (!result.data || result.data.status !== 'Rejected') {
-            notice('The request status was not updated to Rejected. Please try again.');
+          if (!result.data || result.data.status !== wanted) {
+            notice('The request status was not updated to ' + wanted + '. Please try again.');
             return;
           }
           try {
-            sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({ ref: data.id }));
+            sessionStorage.setItem('smartAssessNotifDraft', JSON.stringify({ ref: data.id, kind: wanted === 'Rejected' ? 'rejected' : 'release' }));
             var saved = JSON.parse(localStorage.getItem('smartAssessMAOSystemV1') || '{}');
             saved.view = 'notifications';
             localStorage.setItem('smartAssessMAOSystemV1', JSON.stringify(saved));
@@ -931,6 +935,12 @@
         var refSelect = form.querySelector('select[name="requestRef"]');
         if (form.getAttribute('data-recipient-failed') === data.requestRef && refSelect) updateNotificationOwner(refSelect);
         notice('This request\'s contact details have not loaded yet. Nothing was sent. Check the recipient, then send again.');
+        return;
+      }
+      var pickupField = form.querySelector('[data-pickup-field]');
+      if (pickupField && !pickupField.hidden && form.elements.pickupDate && !form.elements.pickupDate.value) {
+        notice('Choose the date the document will be available for pickup. Nothing was sent.');
+        form.elements.pickupDate.focus();
         return;
       }
       var sendButton = form.querySelector('button[type="submit"]');
