@@ -1337,6 +1337,24 @@
   @media (min-width:761px){
     html.staff-ui .modal.req-detail{ padding:0 24px 22px; min-height:0; width:94vw; max-width:1240px; }
     html.staff-ui .modal.req-detail .rd-head{ top:0; margin:0 -24px 16px; padding:14px 24px; }
+    /* Portrait request details (Staff): a narrow column, one label/value pair per row. */
+    html.staff-ui .modal.req-detail:has(.rd-portrait){ width:min(780px, 94vw); max-width:780px; }
+    html.staff-ui .rd-table.rd-portrait tbody th{ width:34%; }
+    /* Files: name and review on one line, the file below, then the actions. */
+    html.staff-ui .rd-files.rd-portrait thead{ display:none; }
+    html.staff-ui .rd-files.rd-portrait tbody{ display:block; }
+    html.staff-ui .rd-files.rd-portrait tbody tr{ display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"doc review" "file file" "actions actions"; column-gap:12px; border-bottom:1px solid var(--line); }
+    html.staff-ui .rd-files.rd-portrait tbody tr:last-child{ border-bottom:none; }
+    html.staff-ui .rd-files.rd-portrait tbody tr[hidden]{ display:none; }
+    html.staff-ui .rd-files.rd-portrait tbody th, html.staff-ui .rd-files.rd-portrait tbody td{ width:auto; border:0; background:none; padding:3px 14px; }
+    html.staff-ui .rd-files.rd-portrait tbody th{ grid-area:doc; padding-top:10px; color:var(--ink); font-weight:600; }
+    html.staff-ui .rd-files.rd-portrait td[data-label="Review"]{ grid-area:review; padding-top:10px; justify-self:end; }
+    html.staff-ui .rd-files.rd-portrait td[data-label="File"]{ grid-area:file; }
+    html.staff-ui .rd-files.rd-portrait td[data-label="Actions"]{ grid-area:actions; padding-bottom:10px; }
+    html.staff-ui .rd-files.rd-portrait tr.rf-missing td[data-label="File"]{ padding-bottom:10px; }
+    html.staff-ui .rd-files.rd-portrait tr.rf-preview-row{ display:block; }
+    html.staff-ui .rd-files.rd-portrait tr.rf-preview-row[hidden]{ display:none; }
+    html.staff-ui .rd-files.rd-portrait tr.rf-preview-row td{ display:block; padding:10px 14px; background:var(--surface-2); }
   }
   html.staff-ui .ai-outcome{ border-radius:10px; padding:12px 14px; }
   html.staff-ui .ai-outcome.tone-green{ background:#eef6f0; border-color:#cfe5d6; }
@@ -3726,9 +3744,16 @@ function checklistHtml(checklist){
 }
 
 /* Label/value rows for a full-width table: two pairs per row on wide screens.
-   items: [label, html, wide] — wide items take a whole row. */
+   items: [label, html, wide] — wide items take a whole row.
+   Staff see a portrait layout instead: one label/value pair per row. */
+function rdPortrait(){ var a = currentAccount(); return !!(a && a.role==='staff'); }
 function rdTable(caption, items){
   var rows = [], pending = null;
+  if(rdPortrait()){
+    items.forEach(function(it){ if(it) rows.push('<th scope="row">'+it[0]+'</th><td>'+it[1]+'</td>'); });
+    return '<section class="rd-block"><h4 class="rd-caption">'+caption+'</h4><div class="rd-wrap"><table class="rd-table rd-portrait" aria-label="'+caption+'"><tbody>'
+      + rows.map(function(r){ return '<tr>'+r+'</tr>'; }).join('') + '</tbody></table></div></section>';
+  }
   items.forEach(function(it){
     if(!it) return;
     var cell = '<th scope="row">'+it[0]+'</th><td'+(it[2]?' colspan="3"':'')+'>'+it[1]+'</td>';
@@ -3788,7 +3813,6 @@ function modalReqDetail(id, kind){
   var showDetails = !!(detailsHtml && state.modal && state.modal.showDetails);
   return '<div class="modal-head rd-head"><div class="rd-title"><h3>'+esc(r.id)+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div>'
       + '<div class="rd-head-actions">'
-        + (canProcess ? '<button type="button" class="btn btn-primary btn-sm rd-notify" data-action="nav-notify" data-ref="'+esc(r.id)+'">'+ic('send','15px')+' Send Notification</button>' : '')
         + (detailsHtml ? '<button type="button" class="btn btn-outline btn-sm rd-toggle" data-action="toggle-req-details" aria-expanded="'+showDetails+'" aria-controls="rd-client">'+(showDetails?'Hide Details':'View Details')+'</button>' : '')
         + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','16px')+'</button>'
       + '</div></div>'
@@ -3881,7 +3905,7 @@ function aiGuidance(r){
 }
 function reqSubmittedFilesHtml(r){
   if(!r.files) return '';
-  var head = '<section class="rd-block"><h4 class="rd-caption">Submitted IDs and Documents</h4><div class="rd-wrap"><table class="rd-table rd-files" aria-label="Submitted IDs and Documents">';
+  var head = '<section class="rd-block"><h4 class="rd-caption">Submitted IDs and Documents</h4><div class="rd-wrap"><table class="rd-table rd-files'+(rdPortrait()?' rd-portrait':'')+'" aria-label="Submitted IDs and Documents">';
   if(!r.files.length) return head + '<tbody><tr><td>No documents were recorded for this request.</td></tr></tbody></table></div></section>';
   var kinds = {'image/jpeg':'JPG image','image/png':'PNG image','image/webp':'WEBP image','application/pdf':'PDF document'};
   return head + '<thead><tr><th scope="col">Document</th><th scope="col">File</th><th scope="col">Review</th><th scope="col">Actions</th></tr></thead><tbody>'

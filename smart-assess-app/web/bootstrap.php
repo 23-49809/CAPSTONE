@@ -368,7 +368,8 @@ function sa_public_bootstrap(): array
 
 function sa_track_request(string $ref): ?array
 {
-    $ref = trim($ref);
+    // Reference numbers are stored in upper case; "dr-2026-..." finds the same request.
+    $ref = strtoupper(trim($ref));
     if ($ref === '' || strlen($ref) > 20) {
         return null;
     }
