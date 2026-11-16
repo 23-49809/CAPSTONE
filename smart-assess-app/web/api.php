@@ -2730,7 +2730,7 @@ function sa_internal_update_profile(array $data): array
 
 function sa_announcement_change(array $data, string $action): array
 {
-    $actor = sa_internal_or_fail(['DEPARTMENT_HEAD']);
+    $actor = sa_internal_or_fail(['DEPARTMENT_HEAD', 'ADMIN']);
     $pdo = sa_db();
     $id = filter_var($data['announcement_id'] ?? null, FILTER_VALIDATE_INT);
     $needsContent = in_array($action, ['create', 'edit'], true);
@@ -2890,7 +2890,7 @@ function sa_announcement_save_steps(array $data): array
 
 function sa_announcement_transition(array $data): array
 {
-    $actor = sa_internal_or_fail(['DEPARTMENT_HEAD']);
+    $actor = sa_internal_or_fail(['DEPARTMENT_HEAD', 'ADMIN']);
     $id = filter_var($data['announcement_id'] ?? null, FILTER_VALIDATE_INT);
     $transition = (string) ($data['transition'] ?? '');
     $statuses = ['publish' => 'Published', 'unpublish' => 'Draft', 'cancel' => 'Cancelled'];

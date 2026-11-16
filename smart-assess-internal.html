@@ -716,7 +716,6 @@
   .nf-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0 20px; }
   @container notifpage (max-width:560px){ .nf-grid{ grid-template-columns:minmax(0,1fr); } }
   .notif-form select, .notif-form input[type="text"], .notif-form textarea, .notif-form .owner-name-display{ min-height:46px; border-radius:9px; border:1px solid var(--line-strong); font-size:14px; }
-  .notif-form textarea[name="aiDetails"]{ min-height:48px; resize:vertical; line-height:1.45; }
   .notif-form .ai-privacy-hint{ margin:6px 0 0; }
   .notif-form .nf-hint{ margin:-8px 0 18px; }
   .notif-form .owner-name-display.is-empty{ color:var(--ink-faint); }
@@ -799,6 +798,11 @@
   .composer-ai summary{ display:flex; align-items:center; gap:8px; padding:9px 12px; font-size:13.5px; font-weight:600; color:var(--brand-700); cursor:pointer; list-style:none; }
   .composer-ai summary::-webkit-details-marker{ display:none; }
   .composer-ai summary .icon{ width:15px; height:15px; }
+  /* Announcement audience: two checkboxes in the composer's To row. */
+  .composer-row .composer-label{ flex:0 0 64px; font-size:13.5px; font-weight:600; color:var(--ink-soft); }
+  .ann-audience{ flex:1; min-width:0; display:flex; flex-wrap:wrap; gap:4px 22px; padding:8px 4px; }
+  .composer-row .ann-audience label{ flex:0 0 auto; font-weight:500; color:var(--ink); }
+  .composer-row .ann-audience input[type="checkbox"]{ flex:0 0 auto; width:18px; height:18px; min-height:0; padding:0; margin:0; accent-color:var(--brand-600); }
   .composer-ai-body{ padding:0 12px 12px; }
   .composer-ai-body label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:6px; }
   .composer-ai-body textarea{ width:100%; min-height:64px; resize:vertical; border:1px solid var(--line-strong); border-radius:8px; padding:10px 12px; font-family:inherit; font-size:13.5px; background:var(--surface); color:var(--ink); }
@@ -1189,15 +1193,6 @@
     .modal{ padding:16px 12px; }
   }
 
-  /* ============ Text-only controls (icons removed from the internal interface) ============ */
-  .icon{ display:none !important; }
-  .pager button, .cal-nav, .modal-close, .sb-close, .hd-bell, .hd-menu-btn, .sent-arrow, .send-more, .password-toggle,
-  .composer-discard, .sched-chip-x, .sched-cal-head button{ width:auto !important; min-width:0; height:auto; min-height:30px; padding:4px 10px;
-    border-radius:8px; font-size:13px; font-weight:600; line-height:1.2; white-space:nowrap; }
-  .hd-bell, .hd-menu-btn{ min-height:38px; }
-  .modal.req-detail .rd-close{ height:auto; font-size:13px; font-weight:600; line-height:1.2; }
-  .sidebar .side-link{ gap:0; }
-
   /* ============ Document Check ============ */
   .dc-stats{ display:flex; flex-wrap:wrap; gap:10px; margin:0 0 16px; }
   .dc-stat{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
@@ -1302,7 +1297,7 @@
   html.staff-ui .field label{ color:var(--ink-soft); }
   html.staff-ui .field input, html.staff-ui .field select, html.staff-ui .field textarea, html.staff-ui .contact-prefix, html.staff-ui .dt-trigger{
     padding:9px 12px; border-width:1px; border-radius:8px; }
-  html.staff-ui .search-box input{ padding:9px 12px; border-radius:8px; border-width:1px; }
+  html.staff-ui .search-box input{ padding:9px 12px 9px 34px; border-radius:8px; border-width:1px; }
   html.staff-ui .toolbar{ gap:8px; margin-bottom:12px; }
   html.staff-ui .toolbar select{ padding:9px 12px; border-radius:8px; border-width:1px; }
   html.staff-ui .seg{ border-radius:8px; padding:3px; }
@@ -1339,7 +1334,6 @@
   html.staff-ui .rd-table thead th{ color:var(--ink-faint); background:var(--head-green); }
   html.staff-ui .rd-table tbody th{ background:var(--head-green); color:var(--ink-faint); }
   html.staff-ui .rd-table thead th{ white-space:normal; line-height:1.35; }
-  html.staff-ui .checklist .dot{ width:10px; height:10px; margin-top:6px; }
   @media (min-width:761px){
     html.staff-ui .modal.req-detail{ padding:0 24px 22px; min-height:0; width:94vw; max-width:1240px; }
     html.staff-ui .modal.req-detail .rd-head{ top:0; margin:0 -24px 16px; padding:14px 24px; }
@@ -1468,7 +1462,6 @@
   .main-content.sa-enter > :nth-child(4){ animation-delay:.08s; }
   .main-content.sa-enter > :nth-child(n+5){ animation-delay:.11s; }
   .sidebar.sa-nav .side-link.active{ animation:saNavIn .3s ease both; }
-  .login-shell.sa-enter .login-card{ animation:saRise .4s cubic-bezier(.2,.7,.2,1) both; }
   /* New page of results or a new filter: the list fades in. */
   .main-content.sa-refresh :is(.table-wrap tbody, .dash-table tbody, .sent-list, .dc-stats){ animation:saFade .2s ease both; }
 
@@ -1490,7 +1483,7 @@
   [aria-busy="true"], #notification-services .sa-loading{ animation:saPulse 1.2s ease-in-out infinite; }
 
   @media (prefers-reduced-motion: reduce){
-    .main-content.sa-enter > *, .sidebar.sa-nav .side-link.active, .login-shell.sa-enter .login-card, .main-content.sa-refresh *,
+    .main-content.sa-enter > *, .sidebar.sa-nav .side-link.active, .main-content.sa-refresh *,
     .modal-overlay, .modal-overlay > .modal, .dt-popover, .send-menu, .toast, [aria-busy="true"], #notification-services .sa-loading{ animation:none !important; }
     :where(.btn, .icon-btn, .action-btn, .seg button, .pager button, .modal-close, .sent-arrow, .dash-stat, .tp-chip, .cal-nav):active{ transform:none; }
   }
@@ -1554,9 +1547,7 @@ var ICONS = {
   building: svg('<rect x="5" y="2" width="14" height="20" rx="1"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><line x1="10" y1="22" x2="10" y2="18"/><line x1="14" y1="22" x2="14" y2="18"/>'),
   printIcon: svg('<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>')
 };
-/* Icons were removed from the internal interface (text labels only). ic() is kept so existing
-   call sites stay valid; it renders nothing. Icon-only controls carry a text label instead. */
-function ic(name, size){ return ''; }
+function ic(name, size){ return '<span class="icon" style="width:'+(size||'17px')+';height:'+(size||'17px')+'">'+ICONS[name]+'</span>'; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}); }catch(e){ return iso; } }
 function fmtDateTime(iso){ try{ return new Date(iso).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return iso; } }
@@ -1804,8 +1795,8 @@ function pagerHtml(key, pageInfo){
   if(pageInfo.total===0) return '';
   return '<div class="pager"><span>Showing '+((pageInfo.page-1)*8+1)+'–'+Math.min(pageInfo.page*8,pageInfo.total)+' of '+pageInfo.total+'</span>'
     + '<div class="pbtns">'
-    + '<button data-action="page" data-key="'+key+'" data-dir="prev" aria-label="Previous page" '+(pageInfo.page<=1?'disabled':'')+'>Previous</button>'
-    + '<button data-action="page" data-key="'+key+'" data-dir="next" aria-label="Next page" '+(pageInfo.page>=pageInfo.totalPages?'disabled':'')+'>Next</button>'
+    + '<button data-action="page" data-key="'+key+'" data-dir="prev" aria-label="Previous page" '+(pageInfo.page<=1?'disabled':'')+'>'+ic('chevLeft','15px')+'</button>'
+    + '<button data-action="page" data-key="'+key+'" data-dir="next" aria-label="Next page" '+(pageInfo.page>=pageInfo.totalPages?'disabled':'')+'>'+ic('chevRight','15px')+'</button>'
     + '</div></div>';
 }
 
@@ -1817,6 +1808,7 @@ var NAV = {
     {view:'archived-accounts', label:'Archived Accounts', icon:'archive'},
     {view:'create-account', label:'Create Account', icon:'userPlus'},
     {view:'staff-info', label:'Staff Information', icon:'idCard'},
+    {view:'announcements', label:'Announcements', icon:'megaphone'},
     {view:'profile', label:'Profile', icon:'user'}
   ],
   head:[
@@ -1848,7 +1840,12 @@ var POSITION_OPTIONS = POSITION_GROUPS.reduce(function(options, group){ return o
 var REPORT_TYPE_LABEL = {document:'Document Requests', 'land-transfer':'Land Transfer', requirement:'Requirement Checker', summary:'Summary'};
 
 /* Announcements > "Post To" — who the announcement is shown to. */
-var ANNOUNCEMENT_AUDIENCES = {client:'Client Interface', staff:'Staff Interface', both:'Both'};
+var ANNOUNCEMENT_AUDIENCES = {client:'Client Interface', staff:'Internal Interface (Staff and Admin)', both:'Client and Internal Interfaces'};
+/* The two audience checkboxes map onto the stored values client, staff (internal) or both. */
+function annAudienceValue(form){
+  var picked = Array.prototype.slice.call(form.querySelectorAll('[data-ann-audience]:checked')).map(function(b){ return b.value; });
+  return picked.length===2 ? 'both' : (picked[0] || '');
+}
 function audienceLabel(code){ return ANNOUNCEMENT_AUDIENCES[code] || code; }
 function annBadgeClass(status){
   if(status==='Expired') return 'slate';
@@ -1982,7 +1979,8 @@ function saMotionAfterRender(app){
   var modalKey = state.modal ? state.modal.type+'|'+(state.modal.id||state.modal.ref||'') : '';
   var confirmKey = state.confirm ? String(state.confirm.title||'confirm') : '';
   var contentKey = JSON.stringify([state.pages||{}, state.filters||{}]);
-  var main = app.querySelector('.main-content'), login = app.querySelector('.login-shell');
+  // The sign-in card keeps its own fade-in (adding a second entrance made it replay).
+  var main = app.querySelector('.main-content');
   if(main){
     if(viewKey!==SA_MOTION.view){
       saFlash(main, 'sa-enter', 700);
@@ -1992,7 +1990,6 @@ function saMotionAfterRender(app){
       saFlash(main, 'sa-refresh', 400);
     }
   }
-  if(login && viewKey!==SA_MOTION.view) saFlash(login, 'sa-enter', 700);
   app.querySelectorAll('.modal-overlay').forEach(function(overlay){
     var isConfirm = overlay.getAttribute('data-action')==='close-confirm';
     if((isConfirm ? confirmKey===SA_MOTION.confirm : modalKey===SA_MOTION.modal)) overlay.classList.add('sa-keep');
@@ -2094,7 +2091,7 @@ function renderLogin(){
     + (err ? '<div class="login-error">'+ic('alert','16px')+'<span>'+esc(err)+'</span></div>' : '')
     + '<form data-form="login">'
       + '<div class="field"><label for="li-user">Username</label><input id="li-user" name="username" type="text" placeholder="e.g. jessica.staff" autocomplete="username" required></div>'
-      + '<div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">Show</button></div></div>'
+      + '<div class="field"><label for="li-pass">Password</label><div class="password-input-wrap"><input id="li-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">'+ic('eye','19px')+'</button></div></div>'
       + '<button type="submit" class="btn btn-primary btn-block">Sign In</button>'
     + '</form>'
     + '<div class="login-note">Sign-in is restricted to authorized Assessor’s Office personnel.</div>'
@@ -2108,24 +2105,24 @@ function shellChrome(acct, innerHtml){
   var navHtml = nav.map(function(item){
     var active = state.view===item.view;
     return '<button class="side-link'+(active?' active':'')+'" data-action="nav" data-view="'+item.view+'"'+(active?' aria-current="page"':'')+'>'
-      + '<span>'+esc(item.label)+'</span></button>';
+      + '<span class="icon">'+ICONS[item.icon]+'</span><span>'+esc(item.label)+'</span></button>';
   }).join('');
   return ''
   + '<div class="app-body">'
     + '<aside class="sidebar'+(state.sidebarOpen?' open':'')+'" id="app-sidebar" aria-label="Main navigation">'
       + SIDEBAR_ART
       + '<div class="sb-brand"><img src="data:image/png;base64,'+LOGO_B64+'" alt="Bayan ng Mabini seal"><div><div class="hb-name">Smart Assess</div><div class="hb-tag">Assessor’s Office System</div></div>'
-        + '<button type="button" class="sb-close" data-action="close-sidebar" aria-label="Close menu">Close</button></div>'
+        + '<button type="button" class="sb-close" data-action="close-sidebar" aria-label="Close menu">'+ic('x','20px')+'</button></div>'
       + '<div class="sidebar-label">Menu</div><nav>'+navHtml+'</nav>'
       + '<div class="sidebar-foot"><button class="side-link" data-action="logout">'+ic('logout','18px')+'<span>Logout</span></button></div>'
     + '</aside>'
     + '<div class="sidebar-backdrop'+(state.sidebarOpen?' open':'')+'" data-action="close-sidebar" aria-hidden="true"></div>'
     + '<main class="main-content role-'+esc(acct.role)+'">'
       + '<header class="app-header"><div class="hd-inner">'
-        + '<button type="button" class="hd-menu-btn" data-action="toggle-sidebar" aria-controls="app-sidebar" aria-expanded="'+(state.sidebarOpen?'true':'false')+'" aria-label="Open menu">Menu</button>'
+        + '<button type="button" class="hd-menu-btn" data-action="toggle-sidebar" aria-controls="app-sidebar" aria-expanded="'+(state.sidebarOpen?'true':'false')+'" aria-label="Open menu">'+ic('menu','22px')+'</button>'
         + '<div class="hd-mobile-brand" aria-hidden="true"><img src="data:image/png;base64,'+LOGO_B64+'" alt=""><span>Smart Assess</span></div>'
         + '<div class="hd-right">'
-          + (acct.role==='staff' ? '<button class="hd-bell" data-action="nav" data-view="notifications" aria-label="Notifications" title="Notifications">Notifications</button><span class="hd-divider" aria-hidden="true"></span>' : '')
+          + (acct.role==='staff' ? '<button class="hd-bell" data-action="nav" data-view="notifications" aria-label="Notifications" title="Notifications">'+ic('bell')+'</button><span class="hd-divider" aria-hidden="true"></span>' : '')
           + '<button class="hd-avatar" data-action="nav" data-view="profile"><span class="avatar-circle">'+esc(initials(acct.fullName))+'</span><span><span class="hd-name">'+esc(acct.fullName)+'</span>'+(acct.role==='admin'?'':'<br><span class="hd-role">'+esc(acct.position)+'</span>')+'</span></button>'
         + '</div>'
       + '</div></header>'
@@ -2144,6 +2141,7 @@ function renderShell(acct){
     else if(view==='archived-accounts') body = renderArchivedAccounts();
     else if(view==='create-account') body = renderCreateAccount(acct);
     else if(view==='staff-info') body = renderStaffAccounts(acct, true);
+    else if(view==='announcements') body = renderAnnouncements(acct);
     else if(view==='profile') body = renderProfile(acct);
     else body = renderAdminDashboard(acct);
   } else if(acct.role==='head'){
@@ -2176,7 +2174,7 @@ function renderConfirm(){
   if(!state.confirm) return '';
   var c = state.confirm;
   return '<div class="modal-overlay" data-action="close-confirm"><div class="modal narrow fade-in">'
-    + '<div class="modal-head"><div><h3>'+esc(c.title)+'</h3></div><button class="modal-close" data-action="close-confirm">Close</button></div>'
+    + '<div class="modal-head"><div><h3>'+esc(c.title)+'</h3></div><button class="modal-close" data-action="close-confirm">'+ic('x','15px')+'</button></div>'
     + '<p style="font-size:13.5px;color:var(--ink-soft);">'+esc(c.message)+'</p>'
     + '<div class="modal-foot"><button class="btn btn-outline" data-action="close-confirm">Cancel</button>'
     + '<button class="btn btn-primary" style="'+(c.danger?'background:var(--danger);':'')+'" data-action="confirm-yes">'+esc(c.confirmLabel||'Confirm')+'</button></div>'
@@ -2251,7 +2249,7 @@ function renderStaffAccounts(acct, jumpToInfo){
           + '<button class="icon-btn action-button staff-action-view" data-action="view-staff" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>'
           + '<button class="icon-btn action-button staff-action-edit" data-action="edit-staff" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>'
           + '<button class="icon-btn action-button staff-action-status" data-action="toggle-staff-status" data-id="'+a.id+'">'+ic('power','13px')+(a.status==='active'?'Deactivate':'Activate')+'</button>'
-          + '<button class="icon-btn action-button archive-button" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">Archive</button>'
+          + '<button class="icon-btn action-button archive-button" data-action="archive-staff" data-id="'+a.id+'" aria-label="Archive account" title="Archive account">'+ic('archive','13px')+'</button>'
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="6"><div class="empty-state">'+ic('users','30px')+'No staff accounts match your search.</div></td></tr>')
   + '</tbody></table>'+pagerHtml('staffAccounts', pg)+'</div>';
@@ -2278,7 +2276,7 @@ function accountFormFields(a){
   + '<div class="field"><label>Full Name</label><input name="fullName" type="text" value="'+esc(a.fullName)+'" placeholder="e.g. Juan D. Dela Cruz" required></div>'
   + '<div class="field-row">'
     + '<div class="field"><label>Username</label><input name="username" type="text" value="'+esc(a.username)+'" placeholder="e.g. juan.staff" autocomplete="off" required></div>'
-    + '<div class="field"><label>Password</label><input name="password" type="password" value="'+esc(a.password)+'" placeholder="'+(isEdit?'Leave blank to keep current':'Temporary password')+'" minlength="10" '+(isEdit?'':'required')+' autocomplete="new-password"></div>'
+    + '<div class="field"><label for="acct-pass">Password</label><div class="password-input-wrap"><input id="acct-pass" name="password" type="password" value="'+esc(a.password)+'" placeholder="'+(isEdit?'Leave blank to keep current':'Temporary password')+'" minlength="10" '+(isEdit?'':'required')+' autocomplete="new-password"><button class="password-toggle" type="button" data-action="toggle-login-password" data-target="acct-pass" aria-label="Show password" aria-pressed="false">'+ic('eye','19px')+'</button></div></div>'
   + '</div>'
   + '<div class="field-row">'
     + '<div class="field"><label>Email Address <span class="cell-sub">(optional)</span></label><input name="email" type="email" value="'+esc(a.email)+'" placeholder="name@mabini.gov.ph" autocomplete="off"></div>'
@@ -2377,7 +2375,7 @@ function renderAnnouncements(acct){
   });
   var STATUS_TABS = ['all','Draft','Scheduled','Published','Cancelled'];
   return ''
-  + '<div class="page-head"><div><h1>Announcements</h1><p>Post updates to the Client Interface, the Staff Interface, or both.</p></div>'
+  + '<div class="page-head"><div><h1>Announcements</h1><p>Post updates to the Client Interface, the Internal Interface (Staff and Admin), or both.</p></div>'
     + '<button class="btn btn-primary" data-action="open-ann-modal">Create Announcement</button></div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search announcements" value="'+esc(state.search.announcements)+'" data-input="search-announcements"></div>'
@@ -2507,7 +2505,7 @@ function srStatCard(label, value, prev, tone, worseIsUp){
   if(prev>0){
     var pct = Math.round((value-prev)/prev*100);
     var up = pct>0, bad = worseIsUp ? up : (pct<0);
-    delta = '<span class="sr-delta '+(pct===0?'flat':(bad?'bad':'good'))+'">'+(pct===0?'No change':(up?'Up ':'Down ')+Math.abs(pct)+'%')+'</span>';
+    delta = '<span class="sr-delta '+(pct===0?'flat':(bad?'bad':'good'))+'">'+(pct===0?'→':(up?'↗':'↘'))+' '+Math.abs(pct)+'%</span>';
   } else if(value>0){
     delta = '<span class="sr-delta flat">new</span>';
   }
@@ -3057,7 +3055,7 @@ function renderDocumentCheck(acct){
   + '<div class="page-head"><div><h1>Document Check</h1><p>OCR reads the uploaded documents and the AI compares them with the request. Results are advice only; Staff open the originals and decide.</p></div></div>'
   + '<div class="dc-stats" aria-label="Document Check summary">'+stat('attention')+stat('waiting')+stat('running')+stat('failed')+stat('reviewed')+stat('clear')+'</div>'
   + '<div class="toolbar">'
-    + '<div class="search-box"><input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docCheck||'')+'" data-input="search-doc-check" aria-label="Search Document Check"></div>'
+    + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search by applicant or reference no." value="'+esc(state.search.docCheck||'')+'" data-input="search-doc-check" aria-label="Search Document Check"></div>'
     + '<select data-input="filter-doc-check" aria-label="Show">'+AI_CHECK_FILTERS.map(function(o){ return '<option value="'+o[0]+'"'+(filterF===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions dc-table"><colgroup><col class="dc-c-ref"><col class="dc-c-app"><col class="dc-c-date"><col class="dc-c-ai"><col class="dc-c-found"><col class="dc-c-rev"><col class="dc-c-act"></colgroup>'
@@ -3283,24 +3281,16 @@ function setNotifOutput(el, text){
    each field is refreshed only if staff have not edited it since it was filled. */
 function applyNotifTemplate(form, force){
   var category = form.elements.category.value;
-  var topic = form.elements.aiTopic, details = form.elements.aiDetails;
-  var auto = form._notifAuto || { topic:'', details:'' };
+  var auto = form._notifAuto || { message:'' };
   if(!category) return;
   var tpl = notifTemplate(category, notifRequestInfo(form.elements.requestRef.value));
-  if(force || topic.value===auto.topic) topic.value = tpl.topic;
-  if(force || details.value===auto.details) details.value = tpl.details;
   // Message starts from the template with the client's name and reference.
   // Staff text is never overwritten, and nothing is sent until they click Send.
   var ref = form.elements.requestRef.value, info = ref ? notifRequestInfo(ref) : null, msg = form.elements.message;
   var autoMsg = info && tpl.details ? 'Good day, '+(info.owner||'Client').replace(/\s+/g,' ').trim()+'. Regarding your request '+ref+': '+tpl.details : '';
   if(msg && (msg.value==='' || msg.value===auto.message) && msg.value!==autoMsg){ msg.value = autoMsg; msg.dispatchEvent(new Event('input',{bubbles:true})); }
-  form._notifAuto = { topic:tpl.topic, details:tpl.details, message:autoMsg };
-  var custom = category==='Other Instruction';
-  topic.placeholder = custom ? 'Enter a custom topic' : 'e.g. Additional documents needed';
-  details.placeholder = custom ? 'Enter custom instructions (general, non-sensitive)' : 'Add only general, non-sensitive details';
-  details.style.height = '';
-  if(details.value) details.style.height = Math.min(details.scrollHeight + 2, 160) + 'px';
-  if(custom && force) topic.focus();
+  form._notifAuto = { message:autoMsg };
+  if(category==='Other Instruction' && force && msg) msg.focus();
 }
 
 function onNotifReferenceChange(select){
@@ -3315,10 +3305,7 @@ function onNotifReferenceChange(select){
   var ltBlocked = !!info && info.kind==='Document Request';
   if(ltOption) ltOption.disabled = ltBlocked;
   if(ltBlocked && form.elements.category.value==='Land Transfer Status'){
-    var auto = form._notifAuto || { topic:'', details:'' };
     form.elements.category.value = '';
-    if(form.elements.aiTopic.value===auto.topic) form.elements.aiTopic.value = '';
-    if(form.elements.aiDetails.value===auto.details){ form.elements.aiDetails.value = ''; form.elements.aiDetails.style.height = ''; }
     form._notifAuto = null;
     return;
   }
@@ -3419,12 +3406,12 @@ function renderNotifications(acct){
         + '<div class="si-msg">'+esc(n.message)+'</div>'
         + '<div class="si-extra">Sent by '+esc(n.sentBy||'system')+'</div>'+notifProviderHtml(n, 'si-extra')+'</div>'
       + '<div class="si-side"><span class="si-pill si-'+pillTone+'" title="'+esc(pillTitle)+'">'+esc(pillText)+'</span><time>'+esc(fmtDateTime(n.sentAt))+'</time></div>'
-      + '</div>';
+      + '<span class="si-chev" aria-hidden="true">'+ic('chevRight','16px')+'</span></div>';
   }).join('');
   var pager = pg.totalPages > 1
     ? '<div class="sent-pager">'
-      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="prev" aria-label="Previous page"'+(pg.page<=1?' disabled':'')+'>Previous</button>'
-      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="next" aria-label="Next page"'+(pg.page>=pg.totalPages?' disabled':'')+'>Next</button></div>'
+      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="prev" aria-label="Previous page"'+(pg.page<=1?' disabled':'')+'>'+ic('chevLeft','18px')+'</button>'
+      + '<button type="button" class="sent-arrow" data-action="page" data-key="sentNotifs" data-dir="next" aria-label="Next page"'+(pg.page>=pg.totalPages?' disabled':'')+'>'+ic('chevRight','18px')+'</button></div>'
     : '';
   return ''
   + '<div class="page-head"><div><h1>Notifications</h1><p>Send an SMS or email update to one client and review sent messages. Status changes never send SMS or email; clients see them in request tracking.</p></div></div>'
@@ -3443,11 +3430,8 @@ function renderNotifications(acct){
           + '<div class="field"><label for="notification-email">Email Address</label><output id="notification-email" class="owner-name-display'+(rcpt.email?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.email||(draft?'No email address on file':'Select a reference number'))+'</output></div>'
           + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required><option value="">Select a category…</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'"'+(draft&&draft.category===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select></div>'
           + '<div class="field"><label for="notification-request-type">Type of Request</label><select id="notification-request-type" disabled aria-describedby="notification-request-type-hint"><option value="">Select a reference number</option><option value="Document Request"'+(draft&&findDocReq(draft.ref)?' selected':'')+'>Document Request</option><option value="Land Transfer"'+(draft&&findLandReq(draft.ref)?' selected':'')+'>Land Transfer</option></select><span id="notification-request-type-hint" class="sr-only">Set automatically from the selected reference number.</span></div>'
-          + '<div class="field"><label for="notification-topic">Topic</label><input id="notification-topic" name="aiTopic" type="text" maxlength="200" placeholder="e.g. Additional documents needed" required value="'+esc(draft?draft.topic:'')+'"></div>'
-          + '<div class="field"><label for="notification-details">Relevant Details (optional)</label><textarea id="notification-details" name="aiDetails" maxlength="1000" rows="1" placeholder="Add only general, non-sensitive details"></textarea></div>'
         + '</div>'
-        + '<p class="field-hint ai-privacy-hint nf-hint">Do not include client names, property details, reference numbers, uploaded documents, or other identifying information.</p>'
-        + '<div class="field"><div class="ai-message-heading"><label for="notification-message">Message</label><button type="button" class="btn btn-outline btn-sm nf-ai" data-action="generate-ai-message" data-ai-type="notification">'+ic('sparkles','15px')+' Generate with AI</button></div>'
+        + '<div class="field"><label for="notification-message">Message</label>'
           + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="Type the message for the applicant…" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
         + '<fieldset class="nf-channels"><legend>Send by</legend><input type="hidden" name="channel_choice" value="1">'
           + '<label class="nf-channel"><input type="checkbox" name="send_sms" value="1"'+(draft&&!rcpt.phone?' disabled':' checked')+'> SMS to the phone number</label>'
@@ -3517,8 +3501,8 @@ function renderModal(){
 
 function modalViewStaff(id){
   var a = findAccount(id);
-  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
-  return '<div class="modal-head"><div><h3>'+esc(a.fullName)+'</h3><p>Staff Information</p></div><button class="modal-close" data-action="close-modal">Close</button></div>'
+  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
+  return '<div class="modal-head"><div><h3>'+esc(a.fullName)+'</h3><p>Staff Information</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
     + '<div class="review-card">'
       + '<div class="review-row"><span class="k">Username</span><span class="v mono">'+esc(a.username)+'</span></div>'
       + '<div class="review-row"><span class="k">Email Address</span><span class="v">'+esc(a.email)+'</span></div>'
@@ -3533,8 +3517,8 @@ function modalViewStaff(id){
 
 function modalEditStaff(id){
   var a = findAccount(id);
-  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
-  return '<div class="modal-head"><div><h3>Edit Staff Account</h3><p>'+esc(a.fullName)+'</p></div><button class="modal-close" data-action="close-modal">Close</button></div>'
+  if(!a) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
+  return '<div class="modal-head"><div><h3>Edit Staff Account</h3><p>'+esc(a.fullName)+'</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
     + '<form data-form="edit-staff" data-id="'+a.id+'">'
       + accountFormFields(Object.assign({}, a, {position:a.position}))
       + '<div class="modal-foot"><button type="button" class="btn btn-outline" data-action="close-modal">Cancel</button><button type="submit" class="btn btn-primary">'+ic('check','16px')+' Save Changes</button></div>'
@@ -3587,25 +3571,21 @@ function modalAnnEdit(id){
   var schedDate = ph.date, schedTime = ph.time;
   var primaryLabel = id && a.status==='Published' ? 'Save Changes' : 'Publish Now';
   return '<div class="composer-head"><h3>'+(id?'Edit Announcement':'New Announcement')+'</h3>'
-      + '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">Close</button></div>'
+      + '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','16px')+'</button></div>'
     + '<form data-form="save-ann" data-id="'+(id||'')+'" class="composer" novalidate>'
-      + '<div class="composer-row"><label for="ann-audience">To</label><select id="ann-audience" name="postTo" required>'
-        + '<option value=""'+(a.postTo?'':' selected')+'>Select audience…</option>'
-        + Object.keys(ANNOUNCEMENT_AUDIENCES).map(function(k){ return '<option value="'+k+'"'+(a.postTo===k?' selected':'')+'>'+ANNOUNCEMENT_AUDIENCES[k]+'</option>'; }).join('')
-      + '</select></div>'
+      + '<div class="composer-row ann-audience-row"><span class="composer-label" id="ann-audience-label">To</span>'
+        + '<div class="ann-audience" role="group" aria-labelledby="ann-audience-label">'
+          + '<label class="nf-channel"><input type="checkbox" data-ann-audience value="client"'+(a.postTo==='client'||a.postTo==='both'?' checked':'')+'> Client Interface</label>'
+          + '<label class="nf-channel"><input type="checkbox" data-ann-audience value="staff"'+(a.postTo==='staff'||a.postTo==='both'?' checked':'')+'> Internal Interface (Staff and Admin)</label>'
+        + '</div><input type="hidden" name="postTo" value="'+esc(a.postTo||'')+'"></div>'
       + '<div class="composer-row"><label for="ann-subject">Subject</label><input id="ann-subject" name="title" type="text" maxlength="200" value="'+esc(a.title)+'" placeholder="Announcement title" required></div>'
       + '<div class="composer-body"><textarea id="announcement-message" name="content" aria-label="Message" placeholder="Write your announcement…" required>'+esc(a.content)+'</textarea>'
-        + '<details class="composer-ai"><summary>'+ic('sparkles','15px')+'<span>Write with AI</span></summary>'
-          + '<div class="composer-ai-body"><label for="ann-ai-details">Context details (optional)</label><textarea id="ann-ai-details" name="aiDetails" maxlength="1000" placeholder="General details to include in the announcement"></textarea>'
-          + '<p class="field-hint ai-privacy-hint">Do not include client names, property details, reference numbers, uploaded documents, or other identifying information.</p>'
-          + '<div class="ai-message-heading"><span></span><button type="button" class="btn btn-outline btn-sm" data-action="generate-ai-message" data-ai-type="announcement">'+ic('sparkles','15px')+' Generate with AI</button></div></div>'
-        + '</details>'
       + '</div>'
       + '<input type="hidden" name="scheduleDate" value="'+esc(schedDate)+'"><input type="hidden" name="scheduleTime" value="'+esc(schedTime)+'">'
       + '<div class="sched-picker" data-schedule-picker role="dialog" aria-modal="true" aria-labelledby="sched-picker-title" hidden><div class="sched-card">'
         + '<h4 id="sched-picker-title">Pick date &amp; time</h4>'
         + '<div class="sched-cols">'
-          + '<div class="sched-cal"><div class="sched-cal-head"><span data-cal-title></span><div><button type="button" data-cal-prev aria-label="Previous month">Previous</button><button type="button" data-cal-next aria-label="Next month">Next</button></div></div>'
+          + '<div class="sched-cal"><div class="sched-cal-head"><span data-cal-title></span><div><button type="button" data-cal-prev aria-label="Previous month">'+ic('chevLeft','18px')+'</button><button type="button" data-cal-next aria-label="Next month">'+ic('chevRight','18px')+'</button></div></div>'
             + '<div class="sched-dow" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>'
             + '<div class="sched-grid" data-cal-grid></div></div>'
           + '<div class="sched-fields"><label><span>Date</span><input type="text" data-pick-date autocomplete="off"></label>'
@@ -3619,19 +3599,19 @@ function modalAnnEdit(id){
       + '<div class="modal-foot composer-actions">'
         + '<div class="send-split">'
           + '<button type="submit" name="saveMode" value="'+(scheduled?'schedule':'publish')+'" class="send-main" data-send-main data-publish-label="'+esc(primaryLabel==='Publish Now'?'Send':primaryLabel)+'">'+ic('send','16px')+'<span data-send-label>'+(scheduled?'Schedule send':(primaryLabel==='Publish Now'?'Send':esc(primaryLabel)))+'</span></button>'
-          + '<button type="button" class="send-more" data-send-more aria-haspopup="menu" aria-expanded="false" aria-label="More send options" title="More send options">More</button>'
+          + '<button type="button" class="send-more" data-send-more aria-haspopup="menu" aria-expanded="false" aria-label="More send options" title="More send options">'+ic('chevDown','16px')+'</button>'
           + '<div class="send-menu" role="menu" aria-label="Schedule send" data-send-menu hidden></div>'
         + '</div>'
-        + '<span class="sched-chip" data-schedule-chip hidden><button type="button" class="sched-chip-text" data-chip-edit title="Change schedule">'+ic('clock','15px')+'<span data-chip-text></span></button><button type="button" class="sched-chip-x" data-chip-clear aria-label="Remove schedule" title="Remove schedule">Remove</button></span>'
+        + '<span class="sched-chip" data-schedule-chip hidden><button type="button" class="sched-chip-text" data-chip-edit title="Change schedule">'+ic('clock','15px')+'<span data-chip-text></span></button><button type="button" class="sched-chip-x" data-chip-clear aria-label="Remove schedule" title="Remove schedule">'+ic('x','14px')+'</button></span>'
         + '<button type="submit" name="saveMode" value="draft" class="btn btn-outline composer-draft">'+ic('doc','16px')+' Save Draft</button>'
-        + '<button type="button" class="composer-discard" data-action="close-modal" aria-label="Discard" title="Discard">Discard</button>'
+        + '<button type="button" class="composer-discard" data-action="close-modal" aria-label="Discard" title="Discard">'+ic('trash','18px')+'</button>'
       + '</div>'
     + '</form>';
 }
 
 function modalReportDetail(id){
   var r = findReport(id);
-  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
+  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
   var s = r.stats;
   var rows = [];
   var requestDetails = [];
@@ -3650,7 +3630,7 @@ function modalReportDetail(id){
     ['Date Generated', fmtDate(r.dateGenerated)],
     ['Prepared By', preparedBy]
   ];
-  return '<div class="modal-head"><div><h3>'+esc(r.title)+'</h3><p>Generated '+fmtDate(r.dateGenerated)+'</p></div><button class="modal-close no-print" data-action="close-modal">Close</button></div>'
+  return '<div class="modal-head"><div><h3>'+esc(r.title)+'</h3><p>Generated '+fmtDate(r.dateGenerated)+'</p></div><button class="modal-close no-print" data-action="close-modal">'+ic('x','15px')+'</button></div>'
     + '<div id="report-printable">'
       + '<div class="report-print-head">'+esc(r.title)+'</div>'
       + '<div class="review-card">'
@@ -3676,7 +3656,7 @@ function checklistHtml(checklist){
   return '<ul class="checklist">'+checklist.map(function(c){
     var dotCls = c.validation==='Invalid' ? 'flag' : (c.submitted==='Missing' ? 'no' : 'yes');
     var dotIcon = c.validation==='Invalid' ? 'alert' : (c.submitted==='Missing' ? 'x' : 'check');
-    return '<li><span class="dot '+dotCls+'" aria-hidden="true"></span>'
+    return '<li><span class="dot '+dotCls+'"><span class="icon">'+ICONS[dotIcon]+'</span></span>'
       + '<div><div class="ci-name">'+esc(c.name)+' <span class="badge '+(c.submitted==='Missing'?'amber':'slate')+'" style="margin-left:6px;">'+c.submitted+'</span> <span class="badge '+(c.validation==='Invalid'?'red':(c.validation==='Valid'?'green':'slate'))+'">'+c.validation+'</span></div>'
       + '<div class="ci-remark">'+esc(c.remarks)+'</div></div></li>';
   }).join('')+'</ul>';
@@ -3699,7 +3679,7 @@ function rdTable(caption, items){
 
 function modalReqDetail(id, kind){
   var r = kind==='doc' ? findDocReq(id) : findLandReq(id);
-  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal" aria-label="Close">Close</button></div>';
+  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal" aria-label="Close">'+ic('x','15px')+'</button></div>';
   var account = currentAccount();
   var canProcess = account && account.role==='staff';
   var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
@@ -3747,26 +3727,11 @@ function modalReqDetail(id, kind){
       + '<div class="rd-head-actions">'
         + (canProcess ? '<button type="button" class="btn btn-primary btn-sm rd-notify" data-action="nav-notify" data-ref="'+esc(r.id)+'">'+ic('send','15px')+' Send Notification</button>' : '')
         + (detailsHtml ? '<button type="button" class="btn btn-outline btn-sm rd-toggle" data-action="toggle-req-details" aria-expanded="'+showDetails+'" aria-controls="rd-client">'+(showDetails?'Hide Details':'View Details')+'</button>' : '')
-        + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">Close</button>'
+        + '<button type="button" class="modal-close rd-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','16px')+'</button>'
       + '</div></div>'
     + summary
     + (canProcess && ('ai' in r) ? reqAiHtml(r) : '')
-    + (canProcess ? reqNotifHistoryHtml(r) : '')
     + (detailsHtml ? '<div class="rd-client" id="rd-client"'+(showDetails?'':' hidden')+' aria-label="Client details">'+detailsHtml+'</div>' : '');
-}
-
-/* SMS and email already sent for this one request, so staff can check before sending again. */
-function reqNotifHistoryHtml(r){
-  var sent = (state.notifs||[]).filter(function(n){ return n.requestRef===r.id && n.deliveryStatus && n.deliveryStatus!=='Recorded'; })
-    .sort(function(a,b){ return sentTime(b.sentAt) - sentTime(a.sentAt); });
-  if(!sent.length) return '';
-  return '<section class="rd-block"><h4 class="rd-caption">Notification History</h4><div class="rd-wrap"><table class="rd-table" aria-label="Notification History"><tbody>'
-    + sent.map(function(n){
-        var tone = {Sent:'sent', Accepted:'sent', Failed:'failed', Pending:'pending'}[n.deliveryStatus] || 'recorded';
-        return '<tr><th scope="row">'+esc(fmtDateTime(n.sentAt))+'</th><td><span class="si-pill si-'+tone+'">'+esc(n.channel+' · '+n.deliveryStatus)+'</span> '+esc(n.destination||'')
-          + '<div class="cell-sub">'+esc(n.message)+'</div><div class="cell-sub">Sent by '+esc(n.sentBy||'system')+'</div>'+notifProviderHtml(n, 'cell-sub')+'</td></tr>';
-      }).join('')
-    + '</tbody></table></div></section>';
 }
 
 /* IPROG's message ID (to look the SMS up with IPROG) and the status it reported
@@ -3857,23 +3822,11 @@ function reqAiHtml(r){
             + '<td data-label="Original">'+open+'</td></tr>';
         }).join('') + '</tbody></table></div>';
   }
-  if(ai.findings && ai.findings.length){
-    var catText = AI_FINDING_CAT, srcText = AI_FINDING_SRC;
-    html += '<h5 class="rd-caption" style="margin-top:14px">Findings</h5><ul class="ai-findings">'
-      + ai.findings.map(function(f){
-          var c = (f.category==='missing_information' && f.source!=='requirements') ? ['Possibly missing (not confirmed)','amber'] : (catText[f.category] || [f.category,'slate']);
-          return '<li><div class="ai-f-head"><span class="badge '+c[1]+'">'+esc(c[0])+'</span>'+(f.documents && f.documents.length ? '<span>'+esc(f.documents.join(', '))+'</span>' : '')
-            + '<span class="cell-sub">'+esc(srcText[f.source]||f.source)+'</span></div><p>'+esc(f.explanation)+'</p>'+(f.evidence ? '<q><span class="cell-sub">Text read from the document (OCR, may contain reading errors):</span> '+esc(f.evidence)+'</q>' : '')+'</li>';
-        }).join('') + '</ul>';
-  } else if(ai.status==='completed'){
-    html += '<p class="ai-note">No findings.</p>';
-  }
   var meta = [];
   if(ai.model) meta.push('Model: '+ai.model);
   if(ai.ocrEngine) meta.push('OCR: '+ai.ocrEngine);
   if(ai.completedAt) meta.push('Checked: '+fmtDateTime(ai.completedAt));
   meta.push('Attempts: '+ai.attempts+' of '+ai.maxAttempts);
-  html += aiGuidanceHtml(r);
   html += '<p class="ai-note">'+esc(meta.join(' · '))+'</p>';
   var finished = ai.status==='completed' || ai.status==='needs_manual_review';
   html += '<div class="ai-actions">'
@@ -3926,15 +3879,6 @@ function aiGuidance(r){
   });
   return {check:check, ask:ask};
 }
-function aiGuidanceHtml(r){
-  var g = aiGuidance(r), check = g.check, ask = g.ask;
-  if(!check.length && !ask.length) return '';
-  var li = function(items){ return '<ul class="ai-guide-list">'+items.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>'; };
-  return '<div class="ai-guide"><h5 class="rd-caption" style="margin-top:14px">What to check</h5>'+li(check)
-    + (ask.length ? '<h5 class="rd-caption" style="margin-top:10px">What to ask the client (if needed)</h5>'+li(ask) : '')
-    + '<p class="ai-note">Suggestions to help your review, based on the automatic checks. You decide what to ask the client; nothing is sent automatically.</p></div>';
-}
-
 function reqSubmittedFilesHtml(r){
   if(!r.files) return '';
   var head = '<section class="rd-block"><h4 class="rd-caption">Submitted IDs and Documents</h4><div class="rd-wrap"><table class="rd-table rd-files" aria-label="Submitted IDs and Documents">';
@@ -3967,10 +3911,10 @@ function reqSubmittedFilesHtml(r){
 
 function modalReqResultDetail(ref){
   var r = findDocReq(ref) || findLandReq(ref);
-  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">Close</button></div>';
+  if(!r) return '<div class="modal-head"><h3>Not Found</h3><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>';
   var res = overallResult(r.checklist);
   var bannerCls = res==='Complete'?'ok':(res==='Incomplete'?'bad':'invalid');
-  return '<div class="modal-head"><div><h3>'+r.id+'</h3><p>'+esc(r.applicant)+' — Requirement Checking Result</p></div><button class="modal-close" data-action="close-modal">Close</button></div>'
+  return '<div class="modal-head"><div><h3>'+r.id+'</h3><p>'+esc(r.applicant)+' — Requirement Checking Result</p></div><button class="modal-close" data-action="close-modal">'+ic('x','15px')+'</button></div>'
     + '<div class="check-banner '+bannerCls+'">'+ic(res==='Complete'?'check':(res==='Incomplete'?'alert':'x'),'18px')+'<span>Overall Result: <b>'+res+'</b></span></div>'
     + checklistHtml(r.checklist)
     + '<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Close</button></div>';
@@ -4090,9 +4034,9 @@ function buildCalendarGrid(viewYear, viewMonth, selectedISO, minISO){
   }
   var monthLabel = first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
   return '<div class="cal-head">'
-      + '<button type="button" class="cal-nav" data-cal-prev '+(atMin?'disabled':'')+' aria-label="Previous month">Previous</button>'
+      + '<button type="button" class="cal-nav" data-cal-prev '+(atMin?'disabled':'')+' aria-label="Previous month">'+ic('chevLeft','14px')+'</button>'
       + '<span class="cal-title">'+esc(monthLabel)+'</span>'
-      + '<button type="button" class="cal-nav" data-cal-next aria-label="Next month">Next</button>'
+      + '<button type="button" class="cal-nav" data-cal-next aria-label="Next month">'+ic('chevRight','14px')+'</button>'
     + '</div>'
     + '<div class="cal-grid">'
       + WEEKDAY_LABELS.map(function(w){ return '<span class="cal-weekday">'+w+'</span>'; }).join('')
@@ -4353,9 +4297,6 @@ function bindEvents(){
         var typeSel = form.querySelector('#notification-request-type'); if(typeSel) typeSel.value = '';
         form._notifAuto = null;
         var lt = form.elements.category.querySelector('option[value="Land Transfer Status"]'); if(lt) lt.disabled = false;
-        form.elements.aiTopic.placeholder = 'e.g. Additional documents needed';
-        form.elements.aiDetails.placeholder = 'Add only general, non-sensitive details';
-        var det = form.querySelector('textarea[name="aiDetails"]'); if(det) det.style.height = '';
       }, 0);
     });
     updateCount();
@@ -4559,7 +4500,8 @@ function bindEvents(){
     form.querySelectorAll('button[type="submit"]').forEach(function(btn){
       btn.addEventListener('click', function(e){
         composerErr.hidden = true;
-        if(!form.elements.postTo.value){ e.preventDefault(); fail('Choose who should receive this announcement.', form.elements.postTo); return; }
+        form.elements.postTo.value = annAudienceValue(form);
+        if(!form.elements.postTo.value){ e.preventDefault(); fail('Choose who should receive this announcement.', form.querySelector('[data-ann-audience]')); return; }
         if(!form.elements.title.value.trim()){ e.preventDefault(); fail('Add a subject.', form.elements.title); return; }
         if(!form.elements.content.value.trim()){ e.preventDefault(); fail('Write a message.', form.elements.content); return; }
         if(btn.value==='schedule' && !(scheduled() && phIsFuture(dateIn.value, timeIn.value))){
@@ -4590,11 +4532,11 @@ function bindEvents(){
     var action = el.getAttribute('data-action');
 
     if(action==='toggle-login-password'){
-      var passwordInput = document.getElementById('li-pass');
+      var passwordInput = document.getElementById(el.getAttribute('data-target') || 'li-pass');
       if(!passwordInput) return;
       var showPassword = passwordInput.type==='password';
       passwordInput.type = showPassword ? 'text' : 'password';
-      el.textContent = showPassword ? 'Hide' : 'Show';
+      el.innerHTML = ic(showPassword?'eyeOff':'eye','19px');
       el.setAttribute('aria-label', showPassword?'Hide password':'Show password');
       el.setAttribute('aria-pressed', String(showPassword));
       passwordInput.focus();
@@ -4821,6 +4763,7 @@ function bindEvents(){
     var el = ev.target;
     if(el.matches && el.matches('form[data-form="send-notif"] select[name="requestRef"]')){ onNotifReferenceChange(el); return; }
     if(el.matches && el.matches('form[data-form="send-notif"] select[name="category"]')){ applyNotifTemplate(el.form, true); return; }
+    if(el.matches && el.matches('[data-ann-audience]')){ el.form.elements.postTo.value = annAudienceValue(el.form); return; }
     var key = el.getAttribute && el.getAttribute('data-input');
     if(!key) return;
     if(key==='filter-staff-status') state.filters.staffAccountsStatus = el.value;

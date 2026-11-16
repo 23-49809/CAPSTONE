@@ -11,7 +11,10 @@ declare(strict_types=1);
  *    and the request popup keeps its Poppins font;
  *  - the Document Check page stays advisory: no approve, reject or status
  *    actions, no progress percentage, originals open only through request-file.php;
- *  - no icons are rendered in the internal interface.
+ *  - the original interface icons are rendered again (password eye, close X, send, ...);
+ *  - Write with AI / Generate with AI are gone; the request popup no longer shows
+ *    Notification History, Findings or What to check;
+ *  - Admin has the Announcements page; the account form has a password eye toggle.
  *
  * Reads the source files only (no database, no network).
  *
@@ -94,10 +97,37 @@ $check('Document Check says the AI never approves or rejects', str_contains($dc,
 $check('Document Check says it cannot authenticate documents, signatures or seals', str_contains($dc, 'cannot tell whether a document, signature or seal is genuine'));
 $check('Mark as reviewed and Run check again reuse the existing actions', str_contains($dc, 'data-action="ai-mark-reviewed"') && str_contains($dc, 'data-action="ai-requeue"'));
 
-// ---- No icons ----
-$check('no icon lookups remain', !str_contains($html, 'ICONS['));
-$check('ic() renders nothing', str_contains($html, "function ic(name, size){ return ''; }"));
-$check('no × close glyphs remain', !str_contains($html, '&times;') && !str_contains($html, '×'));
+// ---- Original icons restored ----
+preg_match('/var ICONS = \{(.*?)\n\};/s', $html, $iconSet);
+preg_match_all('/^\s*([A-Za-z0-9_]+)\s*:/m', $iconSet[1] ?? '', $iconNames);
+preg_match_all("/ic\\('([A-Za-z0-9_]+)'/", $html, $used);
+$check('ic() renders the icon set again', str_contains($html, "function ic(name, size){ return '<span class=\"icon\" style=\"width:'+(size||'17px')+';height:'+(size||'17px')+'\">'+ICONS[name]+'</span>'; }"));
+$check('icons are not hidden by CSS', !str_contains($html, '.icon{ display:none !important; }'));
+$check('every icon used exists in the icon set', array_diff(array_unique($used[1]), $iconNames[1]) === [], array_values(array_diff(array_unique($used[1]), $iconNames[1])));
+$check('sign-in password field has the eye toggle icon', str_contains($html, 'data-action="toggle-login-password" aria-label="Show password" aria-pressed="false">\'+ic(\'eye\',\'19px\')'));
+$check('the eye toggle switches to the eye-off icon', str_contains($html, "el.innerHTML = ic(showPassword?'eyeOff':'eye','19px');"));
+$check('popups have the close X icon', substr_count($html, "data-action=\"close-modal\">'+ic('x','15px')") >= 4);
+$check('the announcement Send button has its send icon', str_contains($html, "data-send-main data-publish-label=") && str_contains($html, "ic('send','16px')+'<span data-send-label>"));
+$check('sidebar links show their icons', str_contains($html, "'<span class=\"icon\">'+ICONS[item.icon]+'</span><span>'+esc(item.label)+'</span></button>'"));
+
+// ---- AI writing features removed; request popup trimmed ----
+$check('Write with AI is gone from the announcement composer', !str_contains($html, 'Write with AI') && !str_contains($html, 'composer-ai"><summary>'));
+$check('Generate with AI is gone from the internal interface', !str_contains($html, 'Generate with AI') && !str_contains($html, 'data-action="generate-ai-message"'));
+$check('the AI-only Topic and Details fields are gone from the notification form', !str_contains($html, 'name="aiTopic"') && !str_contains($html, 'name="aiDetails"'));
+$popup = $between($html, 'function modalReqDetail(id, kind){', "\n}\n");
+$aiPopup = $between($html, 'function reqAiHtml(r){', "\n}\n");
+$check('request popup no longer shows Notification History', $popup !== '' && !str_contains($popup, 'reqNotifHistoryHtml') && !str_contains($html, 'function reqNotifHistoryHtml'));
+$check('request popup AI section no longer shows Findings or What to check', $aiPopup !== '' && !str_contains($aiPopup, '>Findings<') && !str_contains($aiPopup, 'aiGuidance'));
+$check('the AI check outcome and document table stay in the popup', str_contains($aiPopup, 'Automatic checks and AI suggestions (unverified), not a decision') && str_contains($aiPopup, 'Looks like this document? (AI suggestion, unverified)'));
+$check('Document Check keeps its findings and recommendations', str_contains($dc, 'Issues found') && str_contains($dc, 'Recommendation') && str_contains($dc, 'aiGuidance(r)'));
+
+// ---- Announcements for Admin; audience choices; password toggle on the account form ----
+$check('Admin navigation has Announcements', str_contains($adminNav, "view:'announcements'"));
+$check('Admin page routing renders Announcements', str_contains($adminRoutes, "view==='announcements') body = renderAnnouncements(acct);"));
+$check('announcement audience offers Client Interface and Internal Interface (Staff and Admin)', str_contains($html, 'value="client"') && str_contains($html, '> Client Interface</label>')
+    && str_contains($html, '> Internal Interface (Staff and Admin)</label>') && str_contains($html, "return picked.length===2 ? 'both' : (picked[0] || '');"));
+$check('Create Account password field has the eye toggle', str_contains($html, 'data-action="toggle-login-password" data-target="acct-pass"'));
+$check('the toggle works for whichever field it targets', str_contains($html, "document.getElementById(el.getAttribute('data-target') || 'li-pass')"));
 
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {
