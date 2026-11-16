@@ -806,6 +806,14 @@
   .trk-grid dd{ margin:2px 0 0; font-size:16.5px; font-weight:600; color:var(--ink); overflow-wrap:anywhere; }
   .trk-note{ margin-top:18px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--warn-bg); color:var(--warn); font-size:14.5px; line-height:1.5; }
   .trk-note strong{ display:block; }
+  .trk-updated{ margin-top:6px; font-size:13.5px; color:var(--ink-faint); }
+  .trk-guide{ margin-top:18px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--neutral-bg); color:var(--ink); font-size:14.5px; line-height:1.5; }
+  .trk-guide strong{ display:block; }
+  .trk-guide.is-info{ background:var(--info-bg); }
+  .trk-guide.is-ok{ background:var(--success-bg); }
+  .trk-guide.is-ok strong{ color:var(--success); }
+  .trk-guide.is-bad{ background:var(--danger-bg); }
+  .trk-guide.is-bad strong{ color:var(--danger); }
   .trk-card h3{ font-family:var(--font-body); font-size:17px; font-weight:700; color:var(--ink); margin-bottom:18px; }
   /* Progress tracker: horizontal on wide screens, vertical on phones. */
   .trk-steps{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(var(--n,4), minmax(0,1fr)); }
@@ -1955,6 +1963,8 @@ function saveTrackingNumber(){
 function viewSubmittedStatus(){
   const submission = state.lastSubmission;
   if(!submission || !submission.id) return;
+  // Live site: load the status saved in the database now, never the copy kept since submission.
+  if(draftServer()){ window.location.assign('/index.php?track='+encodeURIComponent(submission.id)); return; }
   const current = loadRequests().find(function(record){ return record.id === submission.id; }) || submission;
   state.track.query = current.id;
   state.track.searched = true;
@@ -2064,6 +2074,21 @@ function trackRefError(q){
   return '';
 }
 const TRACK_STATUS_TONE = {'Received':'s-ok','Processing':'s-warn','Approved':'s-ok','Out for Release':'s-ok','Rejected':'s-bad','Timed Out':'s-neutral'};
+/* What the applicant should do next, for each saved status. */
+const TRACK_STATUS_GUIDE = {
+  'Received': ['Waiting for review', 'The Municipal Assessor’s Office has received your request. Staff will review it soon.'],
+  'Processing': ['Being processed', 'Staff are reviewing your request and documents. Check this page again for updates.'],
+  'Approved': ['Approved', 'Your request has been approved. This page will show when your document is ready for release.'],
+  'Out for Release': ['Ready for pickup', 'Your document is ready. Claim it at the Municipal Assessor’s Office of Mabini during office hours, Monday to Friday, 8:00 AM to 5:00 PM. Bring a valid ID and your reference number.'],
+  'Rejected': ['Request not approved', 'Your request could not be approved. Call 0998-9695-966 or visit the Municipal Assessor’s Office during office hours to learn the reason and what to do next. You may submit a new request once the issue is resolved.'],
+  'Timed Out': ['Request timed out', 'Your request was not completed within the expected processing time. Call 0998-9695-966 or visit the Municipal Assessor’s Office during office hours to follow up, or submit a new request.']
+};
+function trackGuideHtml(status){
+  const g = TRACK_STATUS_GUIDE[status];
+  if(!g) return '';
+  const tone = status==='Rejected' ? ' is-bad' : (status==='Out for Release' || status==='Approved' ? ' is-ok' : (status==='Timed Out' ? '' : ' is-info'));
+  return '<div class="trk-guide'+tone+'" role="note"><strong>'+esc(g[0])+'</strong>'+esc(g[1])+'</div>';
+}
 /* Steps from submission to completion. A request ends either at "Ready for
    Release" (Out for Release) or at Rejected / Timed Out after processing. */
 function trackSteps(r){
@@ -2108,13 +2133,15 @@ function renderTrack(){
       const missing = (r.missing || []).filter(Boolean);
       resultBlock = '<section class="trk-card" aria-labelledby="trk-sum-title">'
           + '<div class="trk-sum"><div><div class="trk-sum-k" id="trk-sum-title">Reference Number</div><div class="trk-ref">'+esc(r.id)+'</div></div>'
-            + '<div><div class="trk-sum-k" style="margin-bottom:6px">Current Status</div><span class="trk-pill '+(TRACK_STATUS_TONE[status]||'s-neutral')+'">'+esc(status)+'</span></div></div>'
+            + '<div><div class="trk-sum-k" style="margin-bottom:6px">Current Status</div><span class="trk-pill '+(TRACK_STATUS_TONE[status]||'s-neutral')+'">'+esc(status)+'</span>'
+              + (r.timestamps && r.timestamps[status] ? '<div class="trk-updated">Updated '+esc(receiptDate(r.timestamps[status]))+'</div>' : '')+'</div></div>'
           + '<dl class="trk-grid">'
             + '<div><dt>Request Type</dt><dd>'+(r.flow==='docreq'?'Document Request':'Land Transfer')+'</dd></div>'
             + '<div><dt>Service</dt><dd>'+esc(r.docType || '—')+'</dd></div>'
             + '<div><dt>Applicant</dt><dd>'+esc(r.applicant || '—')+(r.applicantInitialsOnly ? '<small class="trk-dd-note">Initials only, to protect the applicant’s privacy</small>' : '')+'</dd></div>'
             + '<div><dt>Date Submitted</dt><dd>'+esc(receiptDate(r.submittedAt))+'</dd></div>'
           + '</dl>'
+          + trackGuideHtml(status)
           + (!r.requirementComplete && missing.length ? '<div class="trk-note"><strong>Requirements need attention</strong>'+esc(missing.join(', '))+'</div>' : '')
         + '</section>'
         + '<section class="trk-card" aria-label="Request progress"><h3>Request Progress</h3>'+trackStepsHtml(r)+'</section>';
@@ -2153,6 +2180,11 @@ function trackPrepare(){
   return true;
 }
 window.SMART_ASSESS_TRACK = { prepare: function(){ return trackPrepare(); } };
+/* Back/forward cache: a tracking result restored from memory may be older than the
+   status Staff saved since. Reload it from the server instead. */
+window.addEventListener('pageshow', function(e){
+  if(e.persisted && draftServer() && state.view==='track' && state.track && state.track.searched && state.track.query) window.location.reload();
+});
 
 /* Shared computers: when the applicant leaves the receipt (anything except
    saving it, copying the number or viewing its status), the server is told to
