@@ -486,6 +486,34 @@ password, because PHP's built-in server drops empty environment variables.
   which may contain reading errors. A longer real quote can still contain such
   words if the document says them ("APPROVED BY THE REGISTRAR"); it is shown as
   the document's text, not as the AI's judgement.
+* **Document identification and exact names (result version 3).** For each
+  document the model also gives `document_kind` (a code from the fixed lists in
+  `DocumentAnalysis::ID_KINDS`, `PROPERTY_KINDS` and `OTHER_KINDS`, so an ID is
+  never confused with a title, clearance or deed), `holder_name`,
+  `holder_name_clear` and `property_number`; it no longer writes a `note`. The
+  worker keeps the name and the number only if they occur in that document's own
+  OCR text (`DocumentAnalysis::keepQuotedDetails()`). It then replaces them with
+  the text's own characters, so Staff never see a spelling the model corrected,
+  completed or took from the form. Matching is by whole words, without letter
+  case or accents, and the worker reports how the name was found (`name_match`):
+  `exact` (all its words in one block, with only spaces, commas, periods or
+  hyphens between; a hyphen at a line break is joined), `parts` (labelled parts
+  such as "Last Name … Given Names …" with only name-field labels between them,
+  shown in the document's order), `incomplete` (a single word, or more name-like
+  text right next to it, e.g. a middle name or suffix the model left out; shown,
+  with a finding asking Staff to read the full name), or `none`. Words scattered
+  across a document (an address, another person's name) are never put together.
+  A property number is kept only as a whole number (`018-0004` is not found in
+  `018-00045`; spacing around its hyphen may differ). A type that contradicts the
+  requirement slot (a clearance in an ID slot, an ID where a title is required)
+  becomes an unverified AI finding. The application shows a name only when
+  `name_match` is not `none`, and never from a version 1 or 2 result. Words with
+  digits or stray symbols are marked as possibly misread
+  (`DocumentAnalysis::uncertainNameParts()`), and the name is never corrected.
+  ID card numbers are not requested. The document kind is shown as an unverified
+  AI suggestion; the name and number are shown as text read by OCR. Release
+  order: deploy the application first (it accepts versions 1, 2 and 3), then
+  refresh the worker; `bin/ai-worker-compat-check.php` refuses the reverse.
 * **Missing details only from a fixed list.** The model may name missing details
   only as codes from `DocumentAnalysis::MISSING_FIELD_LABELS` (for example
   `date_of_birth`, `arp_number`); Staff see the application's labels. Any other

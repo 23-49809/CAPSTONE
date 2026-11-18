@@ -1256,8 +1256,8 @@ $check('after the review, the cheaper hint still flags the missing file but no l
     && $fileStatus($staff8, (int) $docRows['ctcTdOrTitle']['id'], $refFiles) === 415, $hintFlags);
 // Step 10 (R4): every model judgement in the Staff panel is labelled as an unverified AI suggestion.
 $panel = (string) file_get_contents($work . '/smart-assess-internal.html');
-$check('Staff panel: the type column, its values, the model\'s findings and the outcome banner say "AI suggestion (unverified)"',
-    str_contains($panel, 'Looks like this document? (AI suggestion, unverified)') && str_contains($panel, "yes:'AI suggestion (unverified): yes'")
+$check('Staff panel: the document type, the older type-match values, the model\'s findings and the outcome banner say "AI suggestion (unverified)"',
+    str_contains($panel, "esc(d.document_kind_label||'—')+' <span class=\"cell-sub\">AI suggestion (unverified)</span>'") && str_contains($panel, "yes:'AI suggestion (unverified): yes'")
     && str_contains($panel, "model:'AI suggestion (unverified)'") && str_contains($panel, 'Automatic checks and AI suggestions (unverified), not a decision')
     && !str_contains($panel, "model:'AI model'"));
 

@@ -76,10 +76,17 @@ foreach ($variants as $label => $output) {
 $check('the model schema has no field that could approve, reject or change a request',
     !preg_match('/approv|reject|status|decision|action/i', (string) json_encode(DocumentAnalysis::modelSchema($keys))));
 $modelProps = DocumentAnalysis::modelSchema($keys)['properties'];
-$check('Step 12: the model is asked for short free text (note <= 60, explanation <= 100 characters), never shown anyway',
-    $modelProps['documents']['items']['properties']['note']['maxLength'] === 60
+$docProps = $modelProps['documents']['items']['properties'];
+$check('version 3: the model gives no free-text note, but the document kind, holder name, name clarity and property number (short limits)',
+    !isset($docProps['note']) && array_keys($docProps) === ['key', 'document_kind', 'holder_name', 'holder_name_clear', 'property_number', 'expected_type_match', 'missing_fields']
+    && $docProps['holder_name']['maxLength'] === 100 && $docProps['property_number']['maxLength'] === 40 && $docProps['holder_name_clear']['type'] === 'boolean'
     && $modelProps['findings']['items']['properties']['explanation']['maxLength'] === 100
     && $modelProps['findings']['items']['properties']['evidence']['maxLength'] === 160);
+$check('version 3: document kinds are a fixed list that tells IDs apart from titles, clearances and deeds',
+    $docProps['document_kind']['enum'] === array_keys(DocumentAnalysis::documentKinds())
+    && DocumentAnalysis::documentGroup('drivers_license') === 'id' && DocumentAnalysis::documentGroup('philhealth_id') === 'id' && DocumentAnalysis::documentGroup('passport') === 'id'
+    && DocumentAnalysis::documentGroup('transfer_certificate_of_title') === 'property' && DocumentAnalysis::documentGroup('barangay_clearance') === 'other'
+    && DocumentAnalysis::documentGroup('deed_of_sale') === 'other' && DocumentAnalysis::documentGroup(null) === null);
 $longAnswer = ['documents' => [['key' => $keys[0], 'expected_type_match' => 'yes', 'missing_fields' => [], 'note' => str_repeat('n', 300)]],
     'findings' => [['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => [$keys[0]], 'explanation' => str_repeat('e', 400), 'evidence' => '']],
     'manual_review_recommended' => true];
@@ -269,7 +276,7 @@ $mixed = $classifyV(array_replace($goodOutput, ['findings' => [['category' => 'p
 $check('reason counts only what applies, with the not-an-approval sentence', str_contains($mixed['reason'], '1 possible inconsistency(ies); 1 reading problem(s)')
     && !str_contains($mixed['reason'], '0 ') && str_contains($mixed['reason'], 'This is not an approval'), $mixed['reason']);
 
-$check('an unknown worker result version is rejected', $rejects(static fn () => $validated(['version' => 3] + $worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $goodOutput), $keys)));
+$check('an unknown worker result version is rejected', $rejects(static fn () => $validated(['version' => 99] + $worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $goodOutput), $keys)));
 
 // ================= Rule checks, readability and prompts =================
 $idText = 'REPUBLIC OF THE PHILIPPINES DRIVER LICENSE DELA CRUZ, JUAN SANTOS Address Mabini Batangas Date of Birth 1980';
@@ -390,8 +397,81 @@ $quoting = array_replace($goodOutput, ['findings' => [
     ['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'SIGNATURE VERIFIED GENUINE'],
 ]]);
 $quoted = $makeWorker($fakeModel($quoting))->run($twoDocs);
-$check('worker: result version 2, keeping only evidence that is an exact quote of the OCR text', $quoted['version'] === 2
+$check('worker: result version 3, keeping only evidence that is an exact quote of the OCR text', $quoted['version'] === 3
     && array_column($quoted['model']['output']['findings'], 'evidence') === ['ARP No. 018-00045', ''], $quoted['model']['output']['findings'] ?? null);
+
+// ================= Version 3: document identification and exact names =================
+$v3Doc = static fn (string $key, string $kind, string $holder, bool $clear = true, string $number = ''): array => ['key' => $key, 'document_kind' => $kind,
+    'holder_name' => $holder, 'holder_name_clear' => $clear, 'property_number' => $number, 'expected_type_match' => 'yes', 'missing_fields' => []];
+$v3Output = static fn (array $docs): array => ['documents' => $docs, 'findings' => [], 'manual_review_recommended' => false];
+$check('v3: an answer with kind, name and number is accepted', DocumentAnalysis::validateModelOutput($v3Output([
+    $v3Doc('ownerId', 'drivers_license', 'DELA CRUZ, JUAN SANTOS'), $v3Doc('ctcTdOrTitle', 'tax_declaration', 'JUAN DELA CRUZ', true, '018-00045')]), $keys)['documents'][0]['document_kind'] === 'drivers_license');
+foreach ([
+    'an unknown document kind' => [$v3Doc('ownerId', 'approved_document', ''), $v3Doc('ctcTdOrTitle', 'tax_declaration', '')],
+    'a name clarity that is not a boolean' => [array_replace($v3Doc('ownerId', 'drivers_license', 'X'), ['holder_name_clear' => 'yes']), $v3Doc('ctcTdOrTitle', 'tax_declaration', '')],
+    'a v3 document that also has a note' => [$v3Doc('ownerId', 'drivers_license', '') + ['note' => 'x'], $v3Doc('ctcTdOrTitle', 'tax_declaration', '')],
+    'an over-long name' => [$v3Doc('ownerId', 'drivers_license', str_repeat('A', 101)), $v3Doc('ctcTdOrTitle', 'tax_declaration', '')],
+] as $label => $docs) {
+    $check('v3 answer rejected: ' . $label, $rejects(static fn () => DocumentAnalysis::validateModelOutput($v3Output($docs), $keys)));
+}
+$v3Run = static fn (array $docs): array => $makeWorker($fakeModel($v3Output($docs)))->run($twoDocs);
+$exact = $v3Run([$v3Doc('ownerId', 'drivers_license', 'dela cruz,  juan santos'), $v3Doc('ctcTdOrTitle', 'tax_declaration', 'JUAN DELA CRUZ', true, '018-00045')]);
+$check('v3 worker: a name found in the OCR text is kept with the text\'s own characters, and its match is reported', $exact['version'] === 3
+    && $exact['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS' && array_column($exact['documents'], 'name_match') === ['exact', 'exact']
+    && $exact['model']['output']['documents'][1]['property_number'] === '018-00045', $exact);
+$changed = $v3Run([$v3Doc('ownerId', 'drivers_license', 'DELA CRUZ, JUAN SANTOZ'), $v3Doc('ctcTdOrTitle', 'tax_declaration', 'Juana Dela Cruz', true, '018-00046')]);
+$check('v3 worker: a corrected spelling, a name from elsewhere and a number not in the text are all dropped (never shown)',
+    $changed['model']['output']['documents'][0]['holder_name'] === '' && $changed['model']['output']['documents'][1]['holder_name'] === ''
+    && $changed['model']['output']['documents'][1]['property_number'] === '' && array_column($changed['documents'], 'name_match') === ['none', 'none'], $changed);
+$assembled = $v3Run([$v3Doc('ownerId', 'drivers_license', 'JUAN SANTOS DELA CRUZ'), $v3Doc('ctcTdOrTitle', 'tax_declaration', '')]);
+$check('v3 worker: a full name given in another order is shown as the document prints it (one block, exact)', $assembled['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS'
+    && $assembled['documents'][0]['name_match'] === 'exact', $assembled['documents']);
+$check('v3 worker: matching is by whole words (no partial words)', DocumentAnalysis::nameMatch('JUA SANTO', $idText) === 'none' && DocumentAnalysis::nameMatch('', $idText) === 'none');
+
+$v3Validated = DocumentAnalysis::validateWorkerResult($exact, $keys);
+$tampered = $exact;
+$tampered['documents'][0]['name_match'] = 'none';
+$check('v3 app: a name the worker did not find in the text is never shown', DocumentAnalysis::validateWorkerResult($tampered, $keys)['model']['output']['documents'][0]['holder_name'] === ''
+    && $v3Validated['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS');
+$olderWithName = array_replace($exact, ['version' => 2, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['name_match' => 1]), $exact['documents'])]);
+$check('v3 app: a version 2 result never shows a name or number (that worker did not check them)', (static function () use ($olderWithName, $keys): bool {
+    $docs = DocumentAnalysis::validateWorkerResult($olderWithName, $keys)['model']['output']['documents'];
+    return $docs[0]['holder_name'] === '' && $docs[1]['property_number'] === '';
+})());
+$check('v3 app: a version 3 document check without name_match is rejected', $rejects(static fn () => DocumentAnalysis::validateWorkerResult(array_replace($exact, ['documents' => $olderWithName['documents']]), $keys)));
+
+$both = ['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format'];
+$v3Classified = DocumentAnalysis::classify($requirements($both), $v3Validated, $labels);
+$idDoc = $v3Classified['documents'][0];
+$check('v3 classify: Staff get the document kind, ID type group, the exact name and how it was found', $idDoc['document_kind'] === 'drivers_license'
+    && $idDoc['document_kind_label'] === 'Philippine Driver\'s License' && $idDoc['document_group'] === 'id' && $idDoc['holder_name'] === 'DELA CRUZ, JUAN SANTOS'
+    && $idDoc['holder_name_match'] === 'exact' && $idDoc['holder_name_uncertain'] === [] && $v3Classified['documents'][1]['document_group'] === 'property'
+    && $v3Classified['documents'][1]['property_number'] === '018-00045', $idDoc);
+$check('v3 classify: a clean, clearly read result adds no name finding and can still be "passed" (never an approval)', $v3Classified['outcome'] === 'passed'
+    && !in_array('name', array_column($v3Classified['findings'], 'field'), true) && str_contains($v3Classified['reason'], 'not an approval'), $v3Classified['findings']);
+$check('uncertain name parts: digits and stray symbols are flagged, normal names are not',
+    DocumentAnalysis::uncertainNameParts('JU4N |DELA CRUZ') === ['JU4N', '|DELA'] && DocumentAnalysis::uncertainNameParts("MARÍA O'NEIL-SANTOS JR., Ñ.") === []);
+$v3Classify = static function (array $idDoc, string $idReadability = 'good') use ($requirements, $both, $labels, $keys, $v3Output, $v3Doc, $worker): array {
+    $raw = array_replace($worker(['ownerId' => $idReadability, 'ctcTdOrTitle' => 'good'], 'ok', $v3Output([$idDoc, $v3Doc('ctcTdOrTitle', 'tax_declaration', '')])), ['version' => 3]);
+    $raw['documents'] = array_map(static fn (array $d): array => $d + ['name_match' => $d['key'] === 'ownerId' && $idDoc['holder_name'] !== '' ? 'exact' : 'none'], $raw['documents']);
+    return DocumentAnalysis::classify($requirements($both), DocumentAnalysis::validateWorkerResult($raw, $keys), $labels);
+};
+$misread = $v3Classify($v3Doc('ownerId', 'philhealth_id', 'DELA CRU2, JUAN'));
+$nameFindings = array_values(array_filter($misread['findings'], static fn (array $f): bool => $f['field'] === 'name'));
+$check('v3 classify: a misread-looking name gives ONE reading finding naming the unclear part, and needs review', count($nameFindings) === 1
+    && $nameFindings[0]['category'] === 'ocr_uncertainty' && $nameFindings[0]['evidence'] === 'CRU2,' && $misread['outcome'] === 'needs_review'
+    && $misread['documents'][0]['holder_name_uncertain'] === ['CRU2,'] && $misread['documents'][0]['document_kind_label'] === 'PhilHealth ID', $misread['findings']);
+$unclearFlag = $v3Classify($v3Doc('ownerId', 'passport', 'JUAN DELA CRUZ', false));
+$check('v3 classify: a name the model marks unclear is flagged for Staff', in_array('The name read from Valid ID of Property Owner may contain reading errors. Check the full name and its spelling on the original.',
+    array_column($unclearFlag['findings'], 'explanation'), true));
+$noName = $v3Classify($v3Doc('ownerId', 'umid', ''));
+$check('v3 classify: no name read from a clearly read ID is flagged; a title without a holder name is not', in_array('name', array_column($noName['findings'], 'field'), true)
+    && count(array_filter($noName['findings'], static fn (array $f): bool => $f['field'] === 'name')) === 1);
+$check('v3 classify: outcomes stay advisory (passed / needs_review / missing_information only)', array_diff(array_column([$v3Classified, $misread, $unclearFlag, $noName], 'outcome'),
+    [DocumentAnalysis::OUTCOME_PASSED, DocumentAnalysis::OUTCOME_NEEDS_REVIEW, DocumentAnalysis::OUTCOME_MISSING]) === []);
+$check('v3 prompt: the model is told to copy names exactly and never use the form\'s name or ID card numbers', str_contains(DocumentAnalysis::systemPrompt(), 'copied character for character')
+    && str_contains(DocumentAnalysis::systemPrompt(), 'never use the name from the online form') && str_contains(DocumentAnalysis::systemPrompt(), 'Never copy ID card numbers')
+    && str_contains(DocumentAnalysis::systemPrompt(), 'Report each problem once'));
 
 $calls = 0;
 $result = $makeWorker($fakeModel(static function () use (&$calls): mixed { $calls++; return ['documents' => [], 'approve' => true]; }))->run($twoDocs);
@@ -446,6 +526,94 @@ foreach ([
     $check('worker: a job with ' . $label . ' is refused', $rejects(static fn () => AiDocumentWorker::validateJob($badJob)));
 }
 file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idText, md5($tdPng) => $tdText]]));
+
+// ================= Regression (19 Nov 2026 review): names and numbers are matched whole =================
+$idLine = 'REPUBLIC OF THE PHILIPPINES DRIVER LICENSE DELA CRUZ, JUAN SANTOS Address Brgy. San Juan, Sta. Cruz Mabini Batangas';
+$tdTwo = 'TAX DECLARATION ARP No. 018-00045 Owner PEDRO REYES Administrator JUAN DELA CRUZ';
+$philsys = "REPUBLIKA NG PILIPINAS\nApelyido/Last Name\nDELA CRUZ\nMga Pangalan/Given Names\nJUAN\nGitnang Apelyido/Middle Name\nSANTOS\nPetsa ng Kapanganakan/Date of Birth";
+$found = static function (string $name, string $text): array {
+    [$out, $matches] = DocumentAnalysis::keepQuotedDetails(['documents' => [['key' => 'ownerId', 'document_kind' => 'drivers_license', 'holder_name' => $name,
+        'holder_name_clear' => true, 'property_number' => '', 'expected_type_match' => 'yes', 'missing_fields' => []]]], ['ownerId' => ['text' => $text]]);
+    return [$matches['ownerId'], $out['documents'][0]['holder_name']];
+};
+$number = static fn (string $n, string $text): string => DocumentAnalysis::keepQuotedDetails(['documents' => [['key' => 'ctcTdOrTitle', 'document_kind' => 'tax_declaration',
+    'holder_name' => '', 'holder_name_clear' => true, 'property_number' => $n, 'expected_type_match' => 'yes', 'missing_fields' => []]]], ['ctcTdOrTitle' => ['text' => $text]])[0]['documents'][0]['property_number'];
+foreach ([
+    'the full name is exact, as printed' => ['DELA CRUZ, JUAN SANTOS', $idLine, ['exact', 'DELA CRUZ, JUAN SANTOS']],
+    'a truncated surname (DELA CRU) is not found' => ['DELA CRU', $idLine, ['none', '']],
+    'a first name alone is never exact (incomplete)' => ['JUAN', $idLine, ['incomplete', 'JUAN']],
+    'a dropped middle name is incomplete, not exact' => ['JUAN DELA CRUZ', $idLine, ['incomplete', 'DELA CRUZ, JUAN']],
+    'a dropped suffix is incomplete' => ['JUAN DELA CRUZ', 'JUAN DELA CRUZ JR Address Mabini', ['incomplete', 'JUAN DELA CRUZ']],
+    'words from an address are never assembled into a name' => ['JUAN CRUZ', 'ID of MARIA REYES Brgy. San Juan, Sta. Cruz', ['none', '']],
+    'the applicant\'s name is not "found" from scattered words' => ['JUAN DELA CRUZ', 'MARIA DELA PAZ Brgy. San Juan, Sta. Cruz', ['none', '']],
+    'words from two people on one document are never combined' => ['PEDRO CRUZ', $tdTwo, ['none', '']],
+    'each person on a multi-person document is found as printed' => ['PEDRO REYES', $tdTwo, ['exact', 'PEDRO REYES']],
+    'labelled parts (Last Name / Given Names / Middle Name) are kept in the document\'s order' => ['JUAN SANTOS DELA CRUZ', $philsys, ['parts', 'DELA CRUZ JUAN SANTOS']],
+    'a labelled middle name left out makes the name incomplete' => ['JUAN DELA CRUZ', $philsys, ['incomplete', 'DELA CRUZ JUAN']],
+    'a hyphenated surname split by an OCR line break is found and joined' => ['MARIA SANTOS-REYES', "MARIA SANTOS-\nREYES\nAddress", ['exact', 'MARIA SANTOS-REYES']],
+    'half of a hyphenated surname is incomplete' => ['MARIA SANTOS', 'MARIA SANTOS-REYES Address', ['incomplete', 'MARIA SANTOS']],
+    'a name in title case keeps its case' => ['Juan Dela Cruz', 'Name: Juan Dela Cruz, Address: Mabini', ['exact', 'Juan Dela Cruz']],
+    'a corrected spelling is not found (never autocorrected)' => ['DELA CRUZ, JUAN SANTOZ', $idLine, ['none', '']],
+] as $label => [$name, $text, $expected]) {
+    $check('match: ' . $label, $found($name, $text) === $expected, $found($name, $text));
+}
+$accent = $found('MARÍA LUZ REYES', "MARI\u{0301}A LUZ REYES");
+$check('match: accents written differently by OCR and the model still match, shown as OCR wrote them', $accent[0] === 'exact'
+    && $accent[1] === "MARI\u{0301}A LUZ REYES" || !class_exists('Normalizer'), $accent);
+foreach ([
+    'the exact number' => ['018-00045', $tdTwo, '018-00045'],
+    'a partial number (018-0004 of 018-00045) is not kept' => ['018-0004', $tdTwo, ''],
+    'a number missing its leading digit is not kept' => ['18-00045', $tdTwo, ''],
+    'a number that continues (018-00045-B) is not kept' => ['018-00045', 'ARP 018-00045-B', ''],
+    'OCR spacing around the hyphen is allowed, shown as read' => ['018-00045', 'ARP No. 018 - 00045', '018 - 00045'],
+    'a number right after "No." is found' => ['018-00045', 'ARP No.018-00045', '018-00045'],
+    'text without digits is never a number' => ['ARP', $tdTwo, ''],
+] as $label => [$n, $text, $expected]) {
+    $check('number: ' . $label, $number($n, $text) === $expected, $number($n, $text));
+}
+
+// Incomplete names and type/slot contradictions in classify(); version 3 checks with name_match none.
+$v3With = static function (array $idDoc, string $match) use ($requirements, $labels, $keys, $v3Output, $v3Doc, $worker): array {
+    $raw = array_replace($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $v3Output([$idDoc, $v3Doc('ctcTdOrTitle', 'tax_declaration', '')])), ['version' => 3]);
+    $raw['documents'] = array_map(static fn (array $d): array => $d + ['name_match' => $d['key'] === 'ownerId' ? $match : 'none'], $raw['documents']);
+    return DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']), DocumentAnalysis::validateWorkerResult($raw, $keys), $labels);
+};
+$partial = $v3With($v3Doc('ownerId', 'drivers_license', 'DELA CRUZ, JUAN'), 'incomplete');
+$check('classify: an incomplete name is shown, marked incomplete, and gives ONE automatic-check finding (needs review)', $partial['documents'][0]['holder_name_match'] === 'incomplete'
+    && count(array_filter($partial['findings'], static fn (array $f): bool => $f['field'] === 'name')) === 1 && $partial['outcome'] === 'needs_review'
+    && in_array('The name read from Valid ID of Property Owner may be incomplete (more of a name appears next to it on the document). Check the full name and its spelling on the original.', array_column($partial['findings'], 'explanation'), true), $partial['findings']);
+$noneShown = $v3With($v3Doc('ownerId', 'drivers_license', 'DELA CRUZ, JUAN SANTOS'), 'none');
+$check('classify: with name_match none, a version 3 result shows no name and asks Staff to read it', $noneShown['documents'][0]['holder_name'] === ''
+    && in_array('No name could be read reliably from Valid ID of Property Owner. Check the name on the original.', array_column($noneShown['findings'], 'explanation'), true));
+$clearanceInIdSlot = $v3With($v3Doc('ownerId', 'barangay_clearance', ''), 'none');
+$check('classify: a Barangay Clearance in the ID slot with expected_type_match "yes" is flagged as possibly not an ID (AI, unverified)', (static function () use ($clearanceInIdSlot): bool {
+    $f = array_values(array_filter($clearanceInIdSlot['findings'], static fn (array $f): bool => $f['field'] === 'document_type'));
+    return count($f) === 1 && $f[0]['category'] === 'possible_inconsistency' && $f[0]['source'] === 'model'
+        && str_contains($f[0]['explanation'], 'looks like Barangay Clearance, not an ID') && $clearanceInIdSlot['outcome'] === 'needs_review';
+})(), $clearanceInIdSlot['findings']);
+$idInTitleSlot = DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']), (static function () use ($worker, $v3Output, $v3Doc, $keys): array {
+    $raw = array_replace($worker(['ownerId' => 'good', 'ctcTdOrTitle' => 'good'], 'ok', $v3Output([$v3Doc('ownerId', 'drivers_license', ''), $v3Doc('ctcTdOrTitle', 'umid', '')])), ['version' => 3]);
+    $raw['documents'] = array_map(static fn (array $d): array => $d + ['name_match' => 'none'], $raw['documents']);
+    return DocumentAnalysis::validateWorkerResult($raw, $keys);
+})(), $labels);
+$check('classify: an ID uploaded where a title or tax declaration is required is flagged', in_array('ctcTdOrTitle', array_merge(...array_column(array_filter($idInTitleSlot['findings'],
+    static fn (array $f): bool => $f['field'] === 'document_type'), 'document_keys')), true));
+$unknownKind = $v3With($v3Doc('ownerId', 'unclear', ''), 'none');
+$check('classify: an unknown document ("Cannot tell") is not forced into a category and gets no contradiction finding', $unknownKind['documents'][0]['document_kind_label'] === 'Cannot tell from the text'
+    && !in_array('document_type', array_column($unknownKind['findings'], 'field'), true));
+$saidNo = $v3With(array_replace($v3Doc('ownerId', 'barangay_clearance', ''), ['expected_type_match' => 'no']), 'none');
+$check('classify: when the AI already says "not the expected document", the contradiction is not reported twice', count(array_filter($saidNo['findings'], static fn (array $f): bool => $f['field'] === 'document_type')) === 1);
+$check('version 3: name_match only takes the documented values', DocumentAnalysis::NAME_MATCH === ['exact', 'parts', 'incomplete', 'none']
+    && $rejects(static fn () => DocumentAnalysis::validateWorkerResult(array_replace($exact, ['documents' => array_map(static fn (array $d): array => array_replace($d, ['name_match' => 'words']), $exact['documents'])]), $keys)));
+$mixedShapes = $v3Output([$v3Doc('ownerId', 'drivers_license', 'DELA CRUZ, JUAN SANTOS'), ['key' => 'ctcTdOrTitle', 'expected_type_match' => 'yes', 'missing_fields' => [], 'note' => '']]);
+$mixedRaw = array_replace($exact, ['model' => array_replace($exact['model'], ['output' => $mixedShapes])]);
+$mixedValidated = DocumentAnalysis::validateWorkerResult($mixedRaw, $keys);
+$check('version 3: an answer mixing the new and the earlier document shape is accepted; the earlier-shape document has no details',
+    $mixedValidated['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS' && $mixedValidated['model']['output']['documents'][1]['document_kind'] === null
+    && $mixedValidated['model']['output']['documents'][1]['holder_name'] === '');
+$skippedRun = $makeWorker(null)->run($twoDocs);
+$check('version 3 worker without a model: every document check has name_match none and the app accepts it', $skippedRun['version'] === 3
+    && array_column($skippedRun['documents'], 'name_match') === ['none', 'none'] && DocumentAnalysis::validateWorkerResult($skippedRun, $keys)['model']['status'] === 'skipped');
 
 // ================= Worker HTTP =================
 $http = new AiWorkerHttp($signer, static fn (): AiDocumentWorker => $makeWorker($fakeModel($goodOutput)), $work . '/state', 10 * 1024 * 1024);

@@ -673,7 +673,9 @@
   .rf-preview img{ display:block; max-width:100%; max-height:460px; margin:0 auto; object-fit:contain; border-radius:var(--radius-sm); }
   .rf-preview iframe{ display:block; width:100%; height:520px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
   .rf-preview .rf-broken-msg{ color:var(--danger); font-size:13px; }
-  .rd-proc{ display:flex; align-items:center; justify-content:space-between; gap:16px 24px; flex-wrap:wrap; }
+  .rd-timeline{ display:flex; flex-wrap:wrap; gap:4px 32px; }
+  .rd-timeline .rd-tl-v{ white-space:nowrap; }
+  .rd-timeline .rd-tl-k{ margin-right:8px; font-weight:400; color:var(--ink-soft); }
   .rd-status-form .rd-form-row{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
   .rd-status-form .field{ flex:1 1 220px; margin-bottom:0; }
   .rd-reject{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 2fr); gap:12px 16px; margin-top:14px; }
@@ -1370,7 +1372,7 @@
   .dc-stat{ display:flex; align-items:baseline; gap:10px; padding:7px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink-soft); font-size:13px; }
   .dc-stat strong{ font-size:16px; color:var(--ink); }
   .dc-state{ font-weight:500; }
-  .dc-state.is-flag, .dc-doc-row .is-flag{ font-weight:600; color:var(--ink); }
+  .dc-state.is-flag{ font-weight:600; color:var(--ink); }
   .dc-table tbody tr.dc-row{ cursor:pointer; }
   .dc-view{ font-size:13px; font-weight:600; color:var(--brand-700); white-space:nowrap; }
   .dc-view.is-off{ color:var(--ink-faint); font-weight:500; }
@@ -1397,18 +1399,26 @@
   .dc-meta{ text-align:right; }
   .dc-section{ padding-top:14px; min-width:0; }
   .dc-section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:6px 16px; flex-wrap:wrap; margin-bottom:8px; }
-  .dc-docs{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  .dc-doc-row{ display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr) 90px; gap:12px; align-items:start; padding:10px 14px;
-    border-top:1px solid var(--line); color:var(--ink); text-decoration:none; font-size:13.5px; }
-  .dc-doc-row:first-child{ border-top:0; }
-  .dc-doc-headrow{ background:var(--surface-2); font-size:12px; font-weight:600; color:var(--ink-faint); }
-  a.dc-doc-row{ cursor:pointer; }
-  a.dc-doc-row:hover, a.dc-doc-row:focus-visible{ background:var(--surface-2); }
-  .dc-doc-row > .dc-view{ text-align:right; }
+  .dc-docs{ display:grid; gap:10px; }
+  .dc-doc-card{ border:1px solid var(--line); border-radius:10px; padding:10px 14px 12px; color:var(--ink); font-size:13.5px; }
+  .dc-doc-top{ display:flex; align-items:baseline; justify-content:space-between; gap:4px 16px; flex-wrap:wrap; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid var(--line); }
+  .dc-doc-title{ display:flex; align-items:baseline; gap:4px 12px; flex-wrap:wrap; min-width:0; }
+  .dc-doc-card .is-flag{ font-weight:600; color:var(--ink); }
   .dc-doc-name{ font-weight:600; overflow-wrap:anywhere; }
-  .dc-note{ display:block; margin-top:2px; }
-  .dc-cell-label{ display:none; }
-  .dc-split{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0 28px; }
+  a.dc-doc-card{ display:block; text-decoration:none; cursor:pointer; }
+  a.dc-doc-card:hover, a.dc-doc-card:focus-visible{ background:var(--surface-2); }
+  .dc-facts{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px 24px; margin:0; }
+  .dc-facts dt{ color:var(--ink-faint); }
+  .dc-facts dd{ margin:1px 0 0; font-weight:500; overflow-wrap:anywhere; }
+  .dc-facts dd .cell-sub{ display:block; font-weight:400; }
+  .dc-name{ font-weight:600; }
+  .dc-unsure{ background:var(--warn-bg); color:var(--warn); border-radius:3px; padding:0 2px; }
+  .dc-compare{ display:block; margin-top:3px; }
+  .dc-facts dd .dc-compare .cell-sub{ display:inline; }
+  .dc-compare strong{ color:var(--warn); }
+  .dc-extra{ margin-top:8px; }
+  .dc-ask{ margin-top:12px; }
+  .dc-ask summary{ cursor:pointer; font-weight:600; color:var(--ink-soft); }
   .dc-issues{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
   .dc-issues li{ padding-bottom:10px; border-bottom:1px solid var(--line); }
   .dc-issues li:last-child{ border-bottom:0; padding-bottom:0; }
@@ -1421,13 +1431,7 @@
   .dc-review-note{ max-width:560px; }
   .dc-disclaimer{ margin-top:4px; }
   @media (max-width:900px){
-    .dc-split{ grid-template-columns:minmax(0,1fr); }
     .dc-meta{ text-align:left; }
-    .dc-doc-headrow{ display:none !important; }
-    .dc-doc-row{ grid-template-columns:minmax(0,1fr) auto; gap:2px 12px; }
-    .dc-doc-row > span:not(.dc-doc-name):not(.dc-view){ grid-column:1; font-size:13px; color:var(--ink-soft); }
-    .dc-doc-row > .dc-view{ grid-column:2; grid-row:1; }
-    .dc-cell-label{ display:inline; color:var(--ink-faint); }
   }
 
   /* Laptop widths (1101–1340px): Staff tables stay tables instead of stacked cards. */
@@ -3057,14 +3061,17 @@ function aiCheckState(r){
   if(ai.reviewed) return 'reviewed';
   return ai.outcome==='passed' ? 'clear' : 'attention';
 }
-/* Counts by kind, from the server's validated finding codes only. */
+/* Counts by kind, from the server's validated finding codes only, each problem once as on the
+   detail page (dcImportantIssues), so the list and the detail agree. */
 function aiFindingCounts(ai){
-  var c = {missing:0, maybeMissing:0, inconsistent:0, unreadable:0, staffOnly:0};
-  ((ai && ai.findings) || []).forEach(function(f){
+  var c = {missing:0, maybeMissing:0, inconsistent:0, unreadable:0, staffOnly:0, vague:0};
+  var sorted = dcImportantIssues(ai);
+  c.staffOnly = sorted.staffOnly.length;
+  c.vague = sorted.vague;
+  sorted.issues.forEach(function(f){
     if(f.category==='missing_information') c[f.source==='requirements' ? 'missing' : 'maybeMissing']++;
     else if(f.category==='possible_inconsistency') c.inconsistent++;
     else if(f.category==='ocr_uncertainty') c.unreadable++;
-    else if(f.category==='cannot_verify') c.staffOnly++;
   });
   return c;
 }
@@ -3075,6 +3082,7 @@ function aiFindingSummary(ai){
   if(c.inconsistent) parts.push(c.inconsistent+' possible inconsistenc'+(c.inconsistent===1?'y':'ies'));
   if(c.unreadable) parts.push(c.unreadable+' reading problem'+(c.unreadable===1?'':'s'));
   if(c.staffOnly) parts.push(c.staffOnly+' for Staff to verify');
+  if(c.vague) parts.push(c.vague+' unspecific AI note'+(c.vague===1?'':'s'));
   return parts;
 }
 function renderDocumentCheck(acct){
@@ -3113,7 +3121,7 @@ function renderDocumentCheck(acct){
   + (pg.items.length ? pg.items.map(function(x){
       var r = x.r, ai = r.ai, m = AI_CHECK_STATES[x.state];
       var finished = ai && (ai.status==='completed' || ai.status==='needs_manual_review');
-      var found = finished ? (aiFindingSummary(ai).join(', ') || 'No findings') : (ai && ai.error ? ai.error : '—');
+      var found = finished ? (aiFindingSummary(ai).join(', ') || (ai.outcome==='passed' ? 'No findings' : 'No specific issues; see notes')) : (ai && ai.error ? ai.error : '—');
       var review = ai && ai.reviewed ? 'Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.reviewedAt))+'</div>' : '')
         : (finished ? 'Not reviewed' : '—');
       // The whole row opens the check (Enter/Space too, like the dashboard rows).
@@ -3186,56 +3194,89 @@ function renderDocCheckDetail(x){
   var docs = ai.documents || [];
   var reqText = {missing:'Not uploaded', uploaded_valid_format:'Uploaded', uploaded_invalid_format:'Uploaded, unusual file type'};
   var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
-  // The model's judgement, never a verified fact: always labelled as an unverified AI suggestion.
+  // Results from before version 3 only say whether the text looked like the required document.
   var typeText = {yes:'AI suggestion (unverified): yes', no:'AI suggestion (unverified): no', unclear:'AI suggestion (unverified): unclear'};
-  var cells = function(d){
+  var det = r.details || null;
+  // The applicant's own ID (as the server's surname rule): compared with the application's name.
+  var ownIdKey = det ? (det.isOwner ? 'ownerId' : 'requesterId') : null;
+  var appName = det ? [det.firstName, det.middleName, det.lastName].filter(function(x){ return String(x||'').trim(); }).join(' ') : '';
+  var docCard = function(d){
+    var f = fileByKey[d.key];
     var reading = d.requirement==='missing' ? '—' : (d.ocr_status==='failed' ? 'Could not be read' : (readText[d.readability]||'—'));
-    var flag = d.requirement!=='uploaded_valid_format' || d.ocr_status==='failed' || d.readability==='poor' || d.readability==='unreadable';
-    return '<span class="dc-doc-name">'+esc(d.label)+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</span>'
-      + '<span class="'+(flag?'is-flag':'')+'"><span class="dc-cell-label">Uploaded: </span>'+esc(reqText[d.requirement]||'—')+'</span>'
-      + '<span><span class="dc-cell-label">Text reading: </span>'+esc(reading)+'</span>'
-      + '<span><span class="dc-cell-label">Looks like this document? </span>'+esc(typeText[d.expected_type_match]||'—')+(d.note ? '<span class="cell-sub dc-note">'+esc(d.note)+'</span>' : '')+'</span>';
-  };
-  var docsHtml = docs.length ? docs.map(function(d){
-      var f = fileByKey[d.key];
-      if(f && f.name && f.available!==false){
-        return '<a class="dc-doc-row" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener" aria-label="View '+esc(d.label)+' (opens in a new tab)">'
-          + cells(d)+'<span class="dc-view">View</span></a>';
+    var weakRead = d.ocr_status==='failed' || d.readability==='poor' || d.readability==='unreadable';
+    var facts = [];
+    if(d.requirement!=='missing' && d.document_kind){
+      var isId = d.document_group==='id';
+      facts.push([isId ? 'ID type' : 'Document', esc(d.document_kind_label||'—')+' <span class="cell-sub">AI suggestion (unverified)</span>']);
+      var nameLabel = isId ? 'Name on ID' : (d.document_group==='property' ? 'Registered owner' : 'Name on document');
+      if(d.holder_name){
+        var unsure = d.holder_name_uncertain || [];
+        var how = {parts:'Read by OCR from labelled parts (such as Last Name, Given Names), in the document\'s order',
+          incomplete:'Read by OCR, possibly incomplete: more of a name appears next to it on the document'}[d.holder_name_match] || 'Exactly as read by OCR';
+        // Compared with the application only on the applicant's own ID; the shown name is never changed.
+        var cmp = (d.key===ownIdKey && appName) ? dcNameCompare(d.holder_name, det) : '';
+        var cmpText = {match:'Matches', verify:'<strong>Possibly the same name (spelling variant or OCR misread), verify</strong>',
+          differs:'<strong>Differs, verify</strong>', unknown:'<span class="cell-sub">Not enough to compare</span>'}[cmp];
+        facts.push([nameLabel, '<span class="dc-name">'+dcNameHtml(d.holder_name, unsure)+'</span>'
+          + '<span class="cell-sub">'+esc(how)+((unsure.length || d.holder_name_clear===false) ? '. Unclear: check the '+(unsure.length ? 'marked letters' : 'spelling')+' on the original' : '')+'</span>'
+          + (cmpText ? '<span class="dc-compare"><span class="cell-sub">On the application:</span> '+esc(appName)+' &middot; '+cmpText+'</span>' : '')]);
+      } else if(isId || d.key===ownIdKey){
+        facts.push([nameLabel, '<span class="cell-sub">Not read. Check the name on the original.</span>']);
       }
-      return '<div class="dc-doc-row is-static">'+cells(d)+'<span class="dc-view is-off">'+(f && f.name ? 'Cannot be opened' : '—')+'</span></div>';
-    }).join('') : '<div class="dc-doc-row is-static"><span class="cell-sub">No document details were returned.</span></div>';
-  var uploaded = docs.filter(function(d){ return d.requirement!=='missing'; });
-  var read = uploaded.filter(function(d){ return d.ocr_status!=='failed' && (d.readability==='good' || d.readability==='partial'); });
-  var extractText = uploaded.length
-    ? 'Text was read from '+read.length+' of '+uploaded.length+' uploaded file'+(uploaded.length===1?'':'s')+'.'+(read.length<uploaded.length ? ' Files that could not be read reliably must be checked by eye.' : '')
-    : 'No uploaded files to read.';
+      if(d.property_number){
+        var appArp = det && String(det.arpNumber||'').trim();
+        var flat = function(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
+        var numDiffers = appArp && flat(appArp).length>=4 && flat(d.property_number).indexOf(flat(appArp))===-1 && flat(appArp).indexOf(flat(d.property_number))===-1;
+        facts.push(['Property No.', '<span class="mono">'+esc(d.property_number)+'</span><span class="cell-sub">Exactly as read by OCR</span>'
+          + (numDiffers ? '<span class="dc-compare"><span class="cell-sub">On the application:</span> <span class="mono">'+esc(appArp)+'</span> &middot; <strong>Differs, verify</strong></span>' : '')]);
+      }
+    } else if(d.requirement!=='missing' && d.expected_type_match){
+      facts.push(['Looks like this document?', esc(typeText[d.expected_type_match]||'—')]);
+    }
+    facts.push(['Text reading', '<span class="'+(weakRead?'is-flag':'')+'">'+esc(reading)+'</span>']);
+    var top = '<span class="dc-doc-name">'+esc(d.label)+(d.pages ? ' <span class="cell-sub">('+esc(d.pages)+' page'+(d.pages===1?'':'s')+')</span>' : '')+'</span>'
+      + (d.requirement!=='uploaded_valid_format' ? '<span class="is-flag">'+esc(reqText[d.requirement]||'—')+'</span>' : '');
+    var body = '<dl class="dc-facts">'+facts.map(function(x){ return '<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>'; }).join('')+'</dl>';
+    // The whole card opens the original (as the earlier rows did); no aria-label, so the extracted details stay readable.
+    if(f && f.name && f.available!==false){
+      return '<a class="dc-doc-card" role="listitem" href="/request-file.php?doc='+encodeURIComponent(f.docId)+'&amp;ref='+encodeURIComponent(r.id)+'" target="_blank" rel="noopener">'
+        + '<div class="dc-doc-top"><div class="dc-doc-title">'+top+'</div><span class="dc-view">View</span><span class="sr-only"> the original (opens in a new tab)</span></div>'+body+'</a>';
+    }
+    return '<div class="dc-doc-card is-static" role="listitem"><div class="dc-doc-top"><div class="dc-doc-title">'+top+'</div><span class="dc-view is-off">'+(f && f.name ? 'Cannot be opened' : '—')+'</span></div>'+body+'</div>';
+  };
+  var docsHtml = docs.length ? docs.map(docCard).join('') : '<p class="cell-sub">No document details were returned.</p>';
 
-  var findings = ai.findings || [];
-  var issuesHtml = findings.length ? '<ul class="dc-issues">'+findings.map(function(f){
-      var c = (f.category==='missing_information' && f.source!=='requirements') ? 'Possibly missing (not confirmed)' : ((AI_FINDING_CAT[f.category]||[f.category])[0]);
-      return '<li><div class="dc-issue-head"><strong>'+esc(c)+'</strong>'+(f.documents && f.documents.length ? '<span>'+esc(f.documents.join(', '))+'</span>' : '')
-        + '<span class="cell-sub">'+esc(AI_FINDING_SRC[f.source]||f.source)+'</span></div><p>'+esc(f.explanation)+'</p>'
-        + (f.evidence ? '<q><span class="cell-sub">Text read from the document (OCR, may contain reading errors):</span> '+esc(f.evidence)+'</q>' : '')+'</li>';
-    }).join('')+'</ul>' : '<p class="dc-empty">No issues found.</p>';
-  var g = aiGuidance(r);
-  var li = function(items){ return '<ul class="ai-guide-list">'+items.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>'; };
-  var recHtml = (g.check.length ? '<h3>What to check</h3>'+li(g.check) : '<p class="dc-empty">Open the originals to confirm the result.</p>')
-    + (g.ask.length ? '<h3>What to ask the client (if needed)</h3>'+li(g.ask) : '');
-
+  var sorted = dcImportantIssues(ai);
+  var issues = sorted.issues;
+  var issueLi = function(f){
+    var g = aiFindingGuide(f);
+    return '<li><div class="dc-issue-head"><strong>'+esc(dcIssueTitle(f))+'</strong>'+(f.documents && f.documents.length ? '<span>'+esc(f.documents.join(', '))+'</span>' : '')
+      + '<span class="cell-sub">'+esc(AI_FINDING_SRC[f.source]||f.source)+'</span></div>'
+      + (g.check ? '<p>'+esc(g.check)+'</p>' : '')
+      + (f.evidence ? '<q><span class="cell-sub">Read by OCR (may contain reading errors):</span> '+esc(f.evidence)+'</q>' : '')+'</li>';
+  };
+  // The server's reason only when neither the list nor the notes below explain the result (e.g. the
+  // model did not answer); its counts include remarks the notes already describe.
+  var why = (!issues.length && !sorted.vague && !sorted.staffOnly.length && ai.outcome!=='passed' && ai.reason) ? String(ai.reason).replace(/ This is not an approval: Staff must inspect the original documents and make the decision\.$/, '') : '';
+  var extra = why ? [why] : [];
+  if(sorted.vague) extra.push('The AI also noted '+sorted.vague+' other detail'+(sorted.vague===1?'':'s')+' without specifics (unverified). Open the originals if unsure.');
+  if(sorted.staffOnly.length) extra.push('Signatures, seals and notarization can only be judged on the original: '+sorted.staffOnly.join(', ')+'.');
+  var issuesHtml = (issues.length ? '<ul class="dc-issues">'+issues.map(issueLi).join('')+'</ul>'
+      : '<p class="dc-empty">'+(ai.outcome==='passed' ? 'No significant issues detected.' : 'No specific issues detected; see notes below.')+' Please verify the extracted details against the original document.</p>')
+    + extra.map(function(t){ return '<p class="cell-sub dc-extra">'+esc(t)+'</p>'; }).join('');
+  var ask = [];
+  issues.forEach(function(f){ var t = aiFindingGuide(f).ask; if(t && ask.indexOf(t)===-1) ask.push(t); });
+  var askHtml = ask.length ? '<details class="dc-ask"><summary>What to ask the client (if needed)</summary><ul class="ai-guide-list">'
+    + ask.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul></details>' : '';
   html += '<section class="dc-card dc-review" aria-labelledby="dc-results-title">'
     + '<div class="dc-summary"><div><h2 id="dc-results-title" class="dc-h">AI Analysis Results</h2>'
-      + '<p class="dc-outcome"><strong>'+esc(outcome)+'</strong>'+(ai.reason ? ' &middot; '+esc(ai.reason) : '')+'</p>'
+      + '<p class="dc-outcome"><strong>'+esc(outcome)+'</strong> &middot; '+dcIssueCountText(ai, issues.length)+'</p>'
+      + (ai.error ? '<p class="cell-sub">'+esc(ai.error)+'</p>' : '')
       + '<p class="cell-sub">Automatic checks and AI suggestions (unverified), not a decision</p></div>'
       + '<p class="cell-sub dc-meta">'+esc(meta)+'</p></div>'
-    + '<div class="dc-section"><div class="dc-section-head"><h2 class="dc-h">Documents</h2><p class="cell-sub">'+esc(extractText)+'</p></div>'
-      + '<div class="dc-docs" role="list">'
-        + '<div class="dc-doc-row dc-doc-headrow" aria-hidden="true"><span>Document</span><span>Uploaded</span><span>Text reading</span><span>Looks like this document? (AI suggestion, unverified)</span><span></span></div>'
-        + docsHtml
-      + '</div></div>'
-    + '<div class="dc-split">'
-      + '<div class="dc-section"><h2 class="dc-h">Issues found'+(findings.length ? ' ('+findings.length+')' : '')+'</h2>'+issuesHtml+'</div>'
-      + '<div class="dc-section"><h2 class="dc-h">Recommendation</h2>'+recHtml+'</div>'
-    + '</div>'
+    + '<div class="dc-section"><div class="dc-section-head"><h2 class="dc-h">Document Identification and Extracted Information</h2><p class="cell-sub">Names and numbers are shown exactly as OCR read them. OCR can misread letters.</p></div>'
+      + '<div class="dc-docs" role="list">'+docsHtml+'</div></div>'
+    + '<div class="dc-section"><h2 class="dc-h">Important Issues'+(issues.length ? ' ('+issues.length+')' : '')+'</h2>'+issuesHtml+askHtml+'</div>'
     + '<div class="dc-results-foot"><p class="cell-sub dc-review-note">'+(ai.reviewed ? '' : 'Open every original that can be opened before marking as reviewed; the server checks that you have. Opening is recorded, not proof of inspection.')+'</p>'
       + '<div class="dc-actions">'+runBtn('Run check again')
         + (ai.reviewed ? '<span class="cell-sub">Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? ' on '+esc(fmtDateTime(ai.reviewedAt)) : '')+'</span>'
@@ -3243,6 +3284,121 @@ function renderDocCheckDetail(x){
       + '</div></div>'
   + '</section>';
   return html + docCheckDisclaimer();
+}
+
+/* The name as OCR read it, with the parts that look misread marked (never corrected). */
+function dcNameHtml(name, unsure){
+  return String(name).split(/(\s+)/).map(function(part){
+    return unsure.indexOf(part)>-1 ? '<mark class="dc-unsure" title="May be misread">'+esc(part)+'</mark>' : esc(part);
+  }).join('');
+}
+/* The headline count, consistent with the list below it and with the list page. */
+function dcIssueCountText(ai, count){
+  if(count) return count+' important issue'+(count===1?'':'s');
+  return ai && ai.outcome==='passed' ? 'no significant issues' : 'no specific issues detected; see notes below';
+}
+/* A name's words for comparing only (the shown name never changes): no case or accents; OCR
+   digit look-alikes read as letters but marked (CRU2 -> cruz?); "Ma." -> maria, "Sto."/"Sta." ->
+   santo/santa; surname particles joined to the next word (de la cruz = dela cruz = delacruz);
+   Jr, Sr, II-IV kept apart as suffixes. */
+var DC_DIGIT_LETTERS = {'0':'o', '1':'i', '2':'z', '4':'a', '5':'s', '8':'b'};
+var DC_PARTICLES = ['de','del','dela','della','la','las','los','delos','delas','san','santa','santo'];
+var DC_ABBREVIATIONS = {ma:'maria', sto:'santo', sta:'santa'};
+var DC_SUFFIXES = ['jr','sr','ii','iii','iv'];
+function dcNameParts(s){
+  var out = {words:[], suffixes:[]}, pending = null;
+  String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().split(/[^a-z0-9]+/).forEach(function(raw){
+    if(!raw) return;
+    var ocr = /\d/.test(raw), w = raw.replace(/\d/g, function(c){ return DC_DIGIT_LETTERS[c] || ''; });
+    w = DC_ABBREVIATIONS[w] || w;
+    if(!w) return;
+    if(!ocr && DC_SUFFIXES.indexOf(w)>-1){ out.suffixes.push(w); return; }
+    if(DC_PARTICLES.indexOf(w)>-1){ pending = pending ? {w:pending.w+w, ocr:pending.ocr||ocr, particles:true} : {w:w, ocr:ocr, particles:true}; return; }
+    out.words.push(pending ? {w:pending.w+w, ocr:pending.ocr||ocr, lead:pending.w} : {w:w, ocr:ocr, lead:''});
+    pending = null;
+  });
+  if(pending) out.words.push({w:pending.w, ocr:pending.ocr, lead:''});
+  return out;
+}
+function dcEditDistance(a, b){
+  var prev = [], cur, i, j;
+  for(j=0; j<=b.length; j++) prev[j] = j;
+  for(i=1; i<=a.length; i++){
+    cur = [i];
+    for(j=1; j<=b.length; j++) cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+/* The name read from the applicant's own ID against the first and last name on the application:
+   'match'; 'verify' (every application word is there, but some only as a likely OCR misread, a
+   one-letter difference in a word of 4+ letters, an initial, a dropped or added surname particle,
+   or a Jr/Sr that only one side has); 'differs' (an application word has no close counterpart,
+   which a misread elsewhere in the name never excuses); 'unknown' (too little to compare). */
+function dcNameCompare(docName, d){
+  var doc = dcNameParts(docName), app = dcNameParts([d.firstName, d.lastName].join(' '));
+  if(doc.words.length<2 || !app.words.length) return 'unknown';
+  var used = [], verify = false, differs = false;
+  var take = function(test){
+    for(var i=0; i<doc.words.length; i++){ if(used.indexOf(i)===-1 && test(doc.words[i])){ used.push(i); return doc.words[i]; } }
+    return null;
+  };
+  app.words.forEach(function(a){
+    var same = take(function(x){ return x.w===a.w; });
+    if(same){ if(same.ocr) verify = true; return; }
+    var close = take(function(x){
+      var shorter = Math.min(x.w.length, a.w.length);
+      return (shorter===1 && x.w[0]===a.w[0])
+        || (x.lead && x.w.slice(x.lead.length)===a.w) || (a.lead && a.w.slice(a.lead.length)===x.w)
+        || (shorter>=4 && dcEditDistance(x.w, a.w)===1);
+    });
+    if(close) verify = true; else differs = true;
+  });
+  if(differs) return 'differs';
+  if(doc.suffixes.join(' ')!==app.suffixes.join(' ')){
+    if(doc.suffixes.length && app.suffixes.length) return 'differs';
+    verify = true;
+  }
+  return verify ? 'verify' : 'match';
+}
+/* Short headline for a validated finding code. */
+function dcIssueTitle(f){
+  var c = f.category, fld = f.field, s = f.source;
+  if(c==='missing_information') return s==='requirements' ? 'Required document not uploaded' : 'Details may be missing (not confirmed)';
+  if(fld==='file_format') return 'Unusual file type or size';
+  if(fld==='name') return c==='ocr_uncertainty' ? 'Name may be misread' : 'Name may not match the application';
+  if(fld==='property_identifier') return 'Property number may not match the application';
+  if(fld==='date') return s==='rule' ? 'Date does not exist on the calendar' : 'Date may be wrong';
+  if(fld==='document_type') return c==='ocr_uncertainty' ? 'Document type unclear' : 'May not be the required document';
+  if(c==='ocr_uncertainty' && s==='ocr') return /^Only part/.test(String(f.explanation||'')) ? 'Only partly readable' : 'Text could not be read';
+  if(c==='ocr_uncertainty') return 'Text may be unclear';
+  return 'Detail may not match';
+}
+/* Findings Staff need to act on: each problem once (the automatic check's wording wins over the
+   AI's), no AI remark repeating a reading problem already found, and the routine "only Staff can
+   judge signatures/seals" points and vague AI remarks folded into one line each. The outcome
+   itself is the server's and is unchanged. */
+function dcImportantIssues(ai){
+  var rank = {requirements:0, ocr:1, rule:2, model:3};
+  var list = ((ai && ai.findings) || []).map(function(f, i){ return {f:f, i:i}; }).sort(function(a, b){
+    return ((rank[a.f.source]==null?9:rank[a.f.source]) - (rank[b.f.source]==null?9:rank[b.f.source])) || (a.i - b.i);
+  }).map(function(x){ return x.f; });
+  var seen = {}, unread = {}, issues = [], staffOnly = [], vague = 0;
+  list.forEach(function(f){
+    var docs = (f.documents||[]).slice();
+    if(f.category==='cannot_verify'){
+      (docs.length ? docs : ['the documents']).forEach(function(d){ if(staffOnly.indexOf(d)===-1) staffOnly.push(d); });
+      return;
+    }
+    if(f.source==='ocr' && f.category==='ocr_uncertainty') docs.forEach(function(d){ unread[d] = true; });
+    if(f.source==='model' && f.category==='ocr_uncertainty' && f.field!=='name' && docs.length && docs.every(function(d){ return unread[d]; })) return;
+    var key = f.category+'|'+f.field+'|'+docs.sort().join('|');
+    if(seen[key]) return;
+    seen[key] = true;
+    if(f.source==='model' && f.category==='possible_inconsistency' && !f.evidence && (f.field==='other' || f.field==='required_field')){ vague++; return; }
+    issues.push(f);
+  });
+  return {issues:issues, staffOnly:staffOnly, vague:vague};
 }
 
 function docCheckDisclaimer(){
@@ -3826,11 +3982,12 @@ function modalReqDetail(id, kind){
   var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
   var terminalStatus = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
   var canTakeRequest = canProcess && !terminalStatus && (!r.processingStaffId || isAssignedStaff);
-  // The processing time only (no action button beside it). It runs while processing and
-  // stops at the final duration, marked Processing End, once the request is closed.
-  var processing = r.processingStartedAt
-    ? '<div class="rd-proc"><span class="proc-elapsed">'+processingTimerHtml(r, true)+'</span></div>'
-    : (canTakeRequest ? '<div class="rd-proc"><span class="cell-sub">Not started. Choose Processing and click Update Status to start.</span></div>' : '');
+  // One compact row: the stored start and end times side by side (no running timer or
+  // duration here; request lists keep theirs). Before processing, how to start it.
+  var timeline = r.processingStartedAt
+    ? '<div class="rd-timeline"><span><span class="rd-tl-k">Started</span><span class="rd-tl-v">'+fmtDateTime(r.processingStartedAt)+'</span></span>'
+      + '<span><span class="rd-tl-k">Ended</span><span class="rd-tl-v">'+(r.processingCompletedAt ? fmtDateTime(r.processingCompletedAt) : '<span class="cell-sub">In progress</span>')+'</span></span></div>'
+    : (canTakeRequest ? '<span class="cell-sub">Not started. Choose Processing and click Update Status to start.</span>' : '');
   // Processing starts the timer (or keeps the running one). Rejected and Approve close the
   // request: Approve saves the existing Out for Release status, which clients see in tracking,
   // then opens Send Updates with a pickup draft. Both need processing to have started.
@@ -3853,10 +4010,7 @@ function modalReqDetail(id, kind){
     ['Date Submitted', fmtDateTime(r.submitted)],
     ['Current Status', '<span class="badge '+(STATUS_META[r.status]||STATUS_META.Received).cls+'">'+esc(statusLabel(r.status))+'</span>'],
     ['Assigned Processor', r.processingStaffId ? esc(r.processingStaffName||'Staff account #'+r.processingStaffId)+' <span class="cell-sub">(Staff ID: '+esc(r.processingStaffId)+')</span>' : 'Unassigned'],
-    r.processingStartedAt ? ['Processing Started', fmtDateTime(r.processingStartedAt)] : null,
-    r.processingCompletedAt ? ['Processing End', fmtDateTime(r.processingCompletedAt)] : null,
-    r.processingDurationSeconds!=null ? ['Final Processing Duration', '<span class="mono">'+formatDuration(r.processingDurationSeconds)+'</span>'] : null,
-    processing ? ['Processing', processing, true] : null,
+    timeline ? ['Processing Timeline', timeline, true] : null,
     statusForm ? ['Update Status', statusForm, true] : null
   ]);
   // Client details live in their own section, shown only after View Details.
@@ -3914,47 +4068,41 @@ function reqFileSize(bytes){
   if(bytes==null) return '';
   return bytes >= 1048576 ? (bytes/1048576).toFixed(1)+' MB' : Math.max(1, Math.round(bytes/1024))+' KB';
 }
-/* "What to check" and "What to ask the client": written here from the server's validated
-   finding codes (category, field, source) and the server's document labels only, never from
-   text the AI wrote. Suggestions for Staff, not decisions. */
-function aiGuidance(r){
-  var ai = r.ai, check = [], ask = [];
-  if(!ai || !(ai.status==='completed' || ai.status==='needs_manual_review') || !ai.findings || !ai.findings.length) return {check:check, ask:ask};
-  var add = function(list, text){ if(text && list.indexOf(text)===-1) list.push(text); };
-  ai.findings.forEach(function(f){
-    var docs = f.documents && f.documents.length ? f.documents.join(', ') : 'the documents';
-    if(f.category==='missing_information' && f.source==='requirements'){
-      add(check, 'Confirm that '+docs+' was not uploaded.');
-      add(ask, 'Ask the client to upload '+docs+'.');
-    } else if(f.category==='missing_information'){
-      add(check, 'Open '+docs+' and check whether these details are really missing: '+String(f.explanation||'').replace(/^AI suggestion \(unverified\): /,''));
-      add(ask, 'If the details are missing, ask the client for a complete, readable copy of '+docs+'.');
-    } else if(f.category==='possible_inconsistency' && f.field==='file_format'){
-      add(check, 'Open '+docs+' and confirm it is the right document and can be read.');
-      add(ask, 'If it cannot be used, ask the client to upload '+docs+' again as a clear JPG, PNG or PDF.');
-    } else if(f.category==='possible_inconsistency' && f.field==='name'){
-      add(check, 'Compare the name in '+docs+' with the name on the request form.');
-      add(ask, 'If the names differ, ask the client to explain the difference or provide a matching document (for example proof of a name change, or an authorization letter if someone else is applying).');
-    } else if(f.category==='possible_inconsistency' && f.field==='property_identifier'){
-      add(check, 'Compare the ARP, TCT, OCT or lot number in '+docs+' with the request form.');
-      add(ask, 'If the numbers differ, ask the client to confirm the correct property number or submit the document for the right property.');
-    } else if(f.category==='possible_inconsistency' && f.field==='date'){
-      add(check, 'Check the dates in '+docs+'.');
-      add(ask, 'If a date is wrong or impossible, ask the client for a corrected or updated copy.');
-    } else if(f.category==='possible_inconsistency' && f.field==='document_type'){
-      add(check, 'Confirm that '+docs+' is the document that was required.');
-      add(ask, 'If it is a different document, ask the client to upload the correct one.');
-    } else if(f.category==='possible_inconsistency'){
-      add(check, 'Open '+docs+' and look at the detail the check pointed out.');
-      add(ask, 'If something does not match the request, ask the client to clarify it.');
-    } else if(f.category==='ocr_uncertainty'){
-      add(check, 'Open '+docs+': its text could not be read reliably, so compare it with the request yourself.');
-      add(ask, 'If the file is blurry, cut off or rotated, ask the client for a clearer photo or scan of '+docs+'.');
-    } else if(f.category==='cannot_verify'){
-      add(check, 'Inspect '+docs+' yourself: signatures, seals and notarization can only be judged from the original document.');
-    }
-  });
-  return {check:check, ask:ask};
+/* "What to check" and "What to ask the client" for one finding: written here from the server's
+   validated finding codes (category, field, source) and the server's document labels only, never
+   from text the AI wrote. Suggestions for Staff, not decisions. */
+function aiFindingGuide(f){
+  var docs = f.documents && f.documents.length ? f.documents.join(', ') : 'the documents';
+  if(f.category==='missing_information' && f.source==='requirements')
+    return {check:'Confirm that '+docs+' was not uploaded.', ask:'Ask the client to upload '+docs+'.'};
+  if(f.category==='missing_information'){
+    // The server lists the detail names after the last colon ("...: Date of birth, Address.").
+    var listed = (String(f.explanation||'').match(/: ([^:]+)\.$/) || [])[1];
+    return {check:'Open '+docs+' and check whether '+(listed ? 'these are really missing: '+listed+'.' : 'the details are really missing.'),
+      ask:'If the details are missing, ask the client for a complete, readable copy of '+docs+'.'};
+  }
+  if(f.category==='possible_inconsistency' && f.field==='file_format')
+    return {check:'Open '+docs+' and confirm it is the right document and can be read.', ask:'If it cannot be used, ask the client to upload '+docs+' again as a clear JPG, PNG or PDF.'};
+  if(f.category==='possible_inconsistency' && f.field==='name')
+    return {check:'Compare the name in '+docs+' with the name on the request form.',
+      ask:'If the names differ, ask the client to explain the difference or provide a matching document (for example proof of a name change, or an authorization letter if someone else is applying).'};
+  if(f.category==='possible_inconsistency' && f.field==='property_identifier')
+    return {check:'Compare the ARP, TCT, OCT or lot number in '+docs+' with the request form.',
+      ask:'If the numbers differ, ask the client to confirm the correct property number or submit the document for the right property.'};
+  if(f.category==='possible_inconsistency' && f.field==='date')
+    return {check:'Check the dates in '+docs+'.', ask:'If a date is wrong or impossible, ask the client for a corrected or updated copy.'};
+  if(f.category==='possible_inconsistency' && f.field==='document_type')
+    return {check:'Confirm that '+docs+' is the document that was required.', ask:'If it is a different document, ask the client to upload the correct one.'};
+  if(f.category==='possible_inconsistency')
+    return {check:'Open '+docs+' and look at the detail the check pointed out.', ask:'If something does not match the request, ask the client to clarify it.'};
+  if(f.category==='ocr_uncertainty' && f.field==='name')
+    return {check:'Read the name on the original '+docs+' and check its spelling letter by letter.', ask:'If the name cannot be read, ask the client for a clearer photo or scan of '+docs+'.'};
+  if(f.category==='ocr_uncertainty')
+    return {check:'Open '+docs+': its text could not be read reliably, so compare it with the request yourself.',
+      ask:'If the file is blurry, cut off or rotated, ask the client for a clearer photo or scan of '+docs+'.'};
+  if(f.category==='cannot_verify')
+    return {check:'Inspect '+docs+' yourself: signatures, seals and notarization can only be judged from the original document.', ask:''};
+  return {check:'', ask:''};
 }
 function reqSubmittedFilesHtml(r){
   if(!r.files) return '';

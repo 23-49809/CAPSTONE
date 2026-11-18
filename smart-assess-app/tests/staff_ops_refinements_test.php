@@ -88,7 +88,11 @@ $check('Approve still opens Send Updates with a pickup draft after the server co
 $check('Update Status > Processing uses the existing start_processing timer', str_contains($bridge, "if (data.status === 'Processing') {\n        internalSuccess('start_processing', { id: data.id });"));
 $check('no "Elapsed" label on the processing time', !str_contains($html, "'Elapsed: '"));
 $check('no Complete Request or Process Request button beside the time in the details', !str_contains($detail, 'Complete Request') && !str_contains($detail, 'btn-process'));
-$check('the details label the end time Processing End', str_contains($detail, "['Processing End', fmtDateTime(r.processingCompletedAt)]"));
+$check('the details combine the stored start and end times in one Processing Timeline row', str_contains($detail, "timeline ? ['Processing Timeline', timeline, true] : null")
+    && str_contains($detail, "<span class=\"rd-tl-k\">Started</span><span class=\"rd-tl-v\">'+fmtDateTime(r.processingStartedAt)") && str_contains($detail, "<span class=\"rd-tl-k\">Ended</span><span class=\"rd-tl-v\">'+(r.processingCompletedAt ? fmtDateTime(r.processingCompletedAt)"));
+$check('the details have no separate Processing Started / End rows and no duration or running timer', !str_contains($detail, "['Processing Started'") && !str_contains($detail, "['Processing End'")
+    && !str_contains($detail, 'Final Processing Duration') && !str_contains($detail, 'processingTimerHtml(') && !str_contains($detail, 'formatDuration(') && !str_contains($detail, "['Processing', "));
+$check('request lists keep their processing timer', str_contains($html, 'processingTimerHtml(r)') || str_contains($html, 'processingTimerHtml(r, false)'));
 
 // ---- 10. The old visible Send by choice (restored 17 Nov 2026) ----
 $notif = $between($html, 'function renderNotifications(acct){', "\n}\n");
@@ -126,6 +130,7 @@ $check('the original sidebar image is in the repository and served', is_file($pr
 // ---- 14. Typography: no new font families or sizes in the new rules ----
 $newCss = implode("\n", array_filter([
     $between($html, '.dash-stat.dash-stat-info{', "\n"), $between($html, '.proc-end{', "\n"), $between($html, '.modal.ann-inbox{', '.ann-inbox-list .dash-ann p'),
+    $between($html, '.rd-timeline{', '.rd-status-form .rd-form-row'),
     $between($html, '.nf-channels[hidden]', "\n  .nf-channels legend"),
 ]));
 $check('the new styles set no font family or size', $newCss !== '' && !preg_match('/font-(family|size)\s*:|font\s*:/', $newCss), $newCss);
@@ -137,6 +142,10 @@ $script = 'var state = {docRequests:[], landRequests:[]};'
     . 'function findLandReq(id){ return state.landRequests.find(function(r){return r.id===id;}); }'
     . $between($html, 'var NOTIF_CATEGORIES = [', "\n/* The selected request's own record") . "\n"
     . $fn('padTimer') . $fn('formatDuration') . $fn('processingTimerHtml') . $fn('dashStatCard')
+    . 'var STATUS_META = {Received:{cls:"slate"}, Processing:{cls:"blue"}, Approved:{cls:"green"}}; function statusLabel(s){ return s; } function ic(){ return ""; }'
+    . 'var demoAccount = {role:"staff", id:5}; function currentAccount(){ return demoAccount; } function fmtDateTime(s){ return "FMT[" + s + "]"; }'
+    . 'function reqSubmittedDetailsHtml(){ return ""; } function reqSubmittedFilesHtml(){ return ""; }'
+    . $fn('rdPortrait') . $fn('rdTable') . $fn('modalReqDetail')
     . <<<'JS'
 var out = {};
 out.phone = ['+639989695966', '639989695966', '+63 998 969 5966', '09989695966', '+6328765432', ''].map(phLocalMobile);
@@ -148,6 +157,15 @@ out.timerRunning = processingTimerHtml({processingStartedEpoch: Math.floor(Date.
 out.timerEnded = processingTimerHtml({processingStartedEpoch: 1, processingDurationSeconds: 3725}, true);
 out.timerListEnded = processingTimerHtml({processingStartedEpoch: 1, processingDurationSeconds: 60});
 out.cardInfo = dashStatCard('amber', 4, 'Requirements Incomplete', 'Needs applicant follow-up', null);
+// Demo requests only: one ended, one running, one not started.
+state.docRequests.push({id:'DR-9', status:'Approved', applicant:'Demo Ended', barangay:'Poblacion', docType:'Certified True Copy', purpose:'Demo', submitted:'2026-11-16 21:50:00',
+  processingStaffId:5, processingStaffName:'Demo Staff', processingStartedAt:'2026-11-16 21:56:00', processingStartedEpoch:1, processingCompletedAt:'2026-11-16 21:57:00', processingDurationSeconds:42});
+state.docRequests.push({id:'DR-10', status:'Processing', applicant:'Demo Running', barangay:'Poblacion', docType:'Certified True Copy', purpose:'Demo', submitted:'2026-11-16 21:50:00',
+  processingStaffId:5, processingStaffName:'Demo Staff', processingStartedAt:'2026-11-16 22:00:00', processingStartedEpoch:Math.floor(Date.now()/1000)-30, processingCompletedAt:null, processingDurationSeconds:null});
+state.docRequests.push({id:'DR-11', status:'Received', applicant:'Demo New', barangay:'Poblacion', docType:'Certified True Copy', purpose:'Demo', submitted:'2026-11-16 21:50:00'});
+out.detailEnded = modalReqDetail('DR-9', 'doc');
+out.detailRunning = modalReqDetail('DR-10', 'doc');
+out.detailNew = modalReqDetail('DR-11', 'doc');
 out.cardNav = dashStatCard('', 9, 'Total Accounts', 'All internal roles', 'staff-accounts');
 process.stdout.write(JSON.stringify(out));
 JS;
@@ -168,6 +186,16 @@ $check('a running timer shows only the time (no "Elapsed", no Processing End)', 
 $check('an ended timer is frozen at the final duration and marked Processing End', str_contains((string) ($out['timerEnded'] ?? ''), '>01:02:05</span>')
     && str_contains((string) ($out['timerEnded'] ?? ''), '<span class="proc-end">Processing End</span>'), $out['timerEnded'] ?? '');
 $check('request lists also show Processing End', str_contains((string) ($out['timerListEnded'] ?? ''), 'Processing time: ') && str_contains((string) ($out['timerListEnded'] ?? ''), 'Processing End'), $out['timerListEnded'] ?? '');
+$ended = (string) ($out['detailEnded'] ?? '');
+$check('an ended request shows one Processing Timeline row with both stored times and nothing else about time',
+    substr_count($ended, 'Processing Timeline') === 1 && str_contains($ended, '<span class="rd-tl-k">Started</span><span class="rd-tl-v">FMT[2026-11-16 21:56:00]</span>')
+    && str_contains($ended, '<span class="rd-tl-k">Ended</span><span class="rd-tl-v">FMT[2026-11-16 21:57:00]</span>') && !str_contains($ended, '00:00:42') && !str_contains($ended, 'Processing End')
+    && !str_contains($ended, 'data-processing-timer') && !str_contains($ended, 'Duration'), $ended);
+$running = (string) ($out['detailRunning'] ?? '');
+$check('a request in processing shows its start time and "In progress", without a running timer', str_contains($running, 'FMT[2026-11-16 22:00:00]')
+    && str_contains($running, '<span class="rd-tl-k">Ended</span><span class="rd-tl-v"><span class="cell-sub">In progress</span></span>') && !str_contains($running, 'data-processing-timer'), $running);
+$check('a request not yet started keeps the how-to-start hint in the same row', str_contains((string) ($out['detailNew'] ?? ''), 'Not started. Choose Processing and click Update Status to start.')
+    && substr_count((string) ($out['detailNew'] ?? ''), 'Processing Timeline') === 1, $out['detailNew'] ?? '');
 $card = (string) ($out['cardInfo'] ?? '');
 $check('an information card has the same parts but no button or navigation', str_starts_with($card, '<div class="dash-stat dash-stat-info amber"') && !str_contains($card, 'data-action')
     && !str_contains($card, '<button') && str_contains($card, 'dash-stat-num">4<') && str_contains($card, 'Needs applicant follow-up'), $card);
