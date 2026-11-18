@@ -641,8 +641,6 @@
   .nf-services{ display:flex; flex-direction:column; gap:4px; margin:0 0 16px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2); font-size:13px; line-height:1.45; }
   .nf-services .is-down{ color:var(--danger); font-weight:600; }
   .nf-channels{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:4px 0 16px; padding:0; border:0; }
-  .nf-channels[hidden]{ display:none; }
-  .nf-route{ margin:0 0 14px; }
   .nf-channels legend{ width:100%; margin-bottom:6px; font-size:13px; font-weight:600; }
   .nf-channel{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; cursor:pointer; min-height:32px; }
   .nf-channel input{ width:18px; height:18px; margin:0; }
@@ -3283,40 +3281,6 @@ function renderRequirementResults(acct){
 }
 
 var NOTIF_CATEGORIES = ['Missing Document','Additional Requirements','Request Status Update','Land Transfer Status','Completion / Approval','Other Instruction'];
-/* Rejection reasons for a rejected request, by request type (the server accepts each only for its
-   own type). Each maps to the requirement it concerns: [reason in the message, what to provide]. */
-var REJECTION_CATEGORIES = {
-  doc: {
-    'Invalid or Missing Government ID': ['a valid government-issued ID was missing or could not be accepted', 'Please prepare a clear copy of a valid government-issued ID'],
-    'Incomplete Request Details': ['some required request details were incomplete', 'Please complete all the required request details'],
-    'Missing Property Information': ['the property or tax declaration information was missing', 'Please provide the property’s tax declaration (ARP) number and property details'],
-    'Missing Authorization Documents': ['the authorization letter and the representative’s valid ID were missing', 'If you are filing for the property owner, please prepare the owner’s signed authorization letter and your valid government-issued ID']
-  },
-  land: {
-    'Missing or Invalid Tax Declaration / Title': ['the Certified True Copy of the Tax Declaration or Title was missing or could not be accepted', 'Please prepare a Certified True Copy of the Tax Declaration or Title'],
-    'Missing Deed of Sale / Donation': ['the Notarial Deed of Sale or Donation was missing', 'Please prepare the Notarial Deed of Sale or Donation'],
-    'Missing Vicinity Map': ['the Vicinity Map was missing', 'Please prepare the Vicinity Map of the property'],
-    'Missing Certification of No Improvement': ['the Certification of No Improvement was missing', 'Please prepare the Certification of No Improvement'],
-    'Missing Tax Clearance': ['the Tax Clearance was missing', 'Please prepare the Tax Clearance'],
-    'Invalid or Missing Government ID': ['a valid government-issued ID was missing or could not be accepted', 'Please prepare a clear copy of a valid government-issued ID']
-  }
-};
-function notifRequestKind(ref){ return ref ? (findDocReq(ref) ? 'doc' : (findLandReq(ref) ? 'land' : '')) : ''; }
-/* A rejected request offers only its own type's rejection reasons (plus Other Instruction). */
-function notifCategoriesFor(ref){
-  var r = ref ? (findDocReq(ref) || findLandReq(ref)) : null;
-  if(r && r.status==='Rejected') return Object.keys(REJECTION_CATEGORIES[notifRequestKind(ref)]).concat(['Other Instruction']);
-  return NOTIF_CATEGORIES;
-}
-function notifCategoryOptions(ref, selected){
-  return '<option value="">Select a category…</option>' + notifCategoriesFor(ref).map(function(c){ return '<option value="'+esc(c)+'"'+(selected===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
-}
-function rejectionMessage(name, ref, kind, category){
-  var reason = (REJECTION_CATEGORIES[kind]||{})[category];
-  if(!reason) return '';
-  return 'Good day, '+(name||'Client').replace(/\s+/g,' ').trim()+'. Your request '+ref+' at the Municipal Assessor’s Office of Mabini was not approved because '+reason[0]+'. '
-    + reason[1]+' and submit a new request, or visit the office for help, Monday to Friday, 8:00 AM to 5:00 PM. You may also call 0998-9695-966. Thank you.';
-}
 /* Philippine mobile numbers are shown in local form (+639XXXXXXXXX -> 09XXXXXXXXX). Display only:
    the stored number and the SMS format are unchanged. */
 function phLocalMobile(value){
@@ -3396,9 +3360,7 @@ function applyNotifTemplate(form, force){
   var pickupField = form.querySelector('[data-pickup-field]'), pickupIn = form.elements.pickupDate;
   if(pickupField) pickupField.hidden = category!=='Completion / Approval';
   if(category==='Completion / Approval' && pickupIn && !pickupIn.value) pickupIn.value = nextWorkday(phToday());
-  var rejectMsg = info ? rejectionMessage(info.owner, ref, notifRequestKind(ref), category) : '';
-  var autoMsg = rejectMsg ? rejectMsg
-    : info && category==='Completion / Approval' && pickupIn && pickupIn.value ? releaseMessage(info.owner, ref, pickupIn.value)
+  var autoMsg = info && category==='Completion / Approval' && pickupIn && pickupIn.value ? releaseMessage(info.owner, ref, pickupIn.value)
     : info && tpl.details ? 'Good day, '+(info.owner||'Client').replace(/\s+/g,' ').trim()+'. Regarding your request '+ref+': '+tpl.details : '';
   form._pickupLabel = pickupIn ? pickupLabel(pickupIn.value) : '';
   if(msg && (msg.value==='' || msg.value===auto.message) && msg.value!==autoMsg){ msg.value = autoMsg; msg.dispatchEvent(new Event('input',{bubbles:true})); }
@@ -3421,10 +3383,6 @@ function onNotifReferenceChange(select){
   setNotifOutput(form.querySelector('#notification-owner-name'), info && info.owner);
   var type = form.querySelector('#notification-request-type');
   if(type) type.value = info ? info.kind : '';
-  // Rejected requests list their own type's rejection reasons; keep the choice if it still applies.
-  var catSel = form.elements.category, keep = catSel.value;
-  catSel.innerHTML = notifCategoryOptions(select.value, keep);
-  if(catSel.value!==keep){ form._notifAuto = null; }
   // "Land Transfer Status" does not apply to a document request.
   var ltOption = form.elements.category.querySelector('option[value="Land Transfer Status"]');
   var ltBlocked = !!info && info.kind==='Document Request';
@@ -3504,9 +3462,10 @@ function takeNotifDraft(){
       message: releaseMessage(name, r.id, pickup) };
     return;
   }
-  // Rejected: no fixed message. Staff choose the rejection reason for this request type, which
-  // prepares an editable draft with the client's name and reference, or write their own.
-  state.notifDraft = { ref: r.id, rejection: 'Rejected', category: '', topic: '', message: '' };
+  state.notifDraft = {
+    ref: r.id, rejection: 'Rejected', category: 'Request Status Update', topic: 'Request rejected: '+r.id,
+    message: 'Good day, '+name+'. Your request '+r.id+' at the Municipal Assessor\'s Office of Mabini was rejected. Please contact the office for more information. Thank you.'
+  };
 }
 function notifRecipient(ref){
   var r = ref ? (findDocReq(ref) || findLandReq(ref)) : null;
@@ -3571,19 +3530,16 @@ function renderNotifications(acct){
           + '<div class="field"><label for="notification-owner-name">Property Owner / Client Name</label><output id="notification-owner-name" class="owner-name-display'+(rcpt.name?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.name||'Select a reference number')+'</output></div>'
           + '<div class="field"><label for="notification-phone">Phone Number</label><output id="notification-phone" class="owner-name-display'+(rcpt.phone?'':' is-empty')+'" aria-live="polite">'+esc(phLocalMobile(rcpt.phone)||(draft?'No phone number on file':'Select a reference number'))+'</output></div>'
           + '<div class="field"><label for="notification-email">Email Address</label><output id="notification-email" class="owner-name-display'+(rcpt.email?'':' is-empty')+'" aria-live="polite">'+esc(rcpt.email||(draft?'No email address on file':'Select a reference number'))+'</output></div>'
-          + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required>'+notifCategoryOptions(draft&&draft.ref, draft&&draft.category)+'</select></div>'
+          + '<div class="field"><label for="notification-category">Category</label><select id="notification-category" name="category" required><option value="">Select a category…</option>'+NOTIF_CATEGORIES.map(function(c){ return '<option value="'+esc(c)+'"'+(draft&&draft.category===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')+'</select></div>'
           + '<div class="field"><label for="notification-request-type">Type of Request</label><select id="notification-request-type" disabled aria-describedby="notification-request-type-hint"><option value="">Select a reference number</option><option value="Document Request"'+(draft&&findDocReq(draft.ref)?' selected':'')+'>Document Request</option><option value="Land Transfer"'+(draft&&findLandReq(draft.ref)?' selected':'')+'>Land Transfer</option></select><span id="notification-request-type-hint" class="sr-only">Set automatically from the selected reference number.</span></div>'
           + '<div class="field nf-pickup" data-pickup-field'+((draft&&draft.category==='Completion / Approval')?'':' hidden')+'><label for="notification-pickup">Available for pickup on</label><input id="notification-pickup" name="pickupDate" type="date" min="'+esc(phToday())+'" value="'+esc((draft&&draft.pickupDate)||'')+'"></div>'
         + '</div>'
         + '<div class="field"><label for="notification-message">Message</label>'
-          + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="'+(draft&&draft.rejection?'Choose the rejection reason in Category to prepare a draft, or type your message for the client…':'Type the message for the applicant…')+'" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
-        // No Send by choice: the channels follow the client's saved contact details (phone -> SMS,
-        // email -> email, both -> both); php-bridge.js sets these hidden boxes after loading them.
-        + '<fieldset class="nf-channels" hidden><legend>Send by</legend><input type="hidden" name="channel_choice" value="1">'
+          + '<div class="nf-message"><textarea id="notification-message" name="message" maxlength="2000" placeholder="Type the message for the applicant…" required>'+esc(draft?draft.message:'')+'</textarea><span class="nf-count" data-char-count aria-live="polite">'+(draft?draft.message.length:0)+'/2000</span></div></div>'
+        + '<fieldset class="nf-channels"><legend>Send by</legend><input type="hidden" name="channel_choice" value="1">'
           + '<label class="nf-channel"><input type="checkbox" name="send_sms" value="1"'+(draft&&!rcpt.phone?' disabled':' checked')+'> SMS to the phone number</label>'
           + '<label class="nf-channel"><input type="checkbox" name="send_email" value="1"'+(rcpt.email?' checked':' disabled')+'> Email to the email address</label>'
         + '</fieldset>'
-        + '<p class="cell-sub nf-route" data-channel-summary aria-live="polite">'+(draft ? (rcpt.phone&&rcpt.email?'This update will be sent by SMS and email.':rcpt.phone?'This update will be sent by SMS.':rcpt.email?'This update will be sent by email.':'No phone number or email address on this request can be used, so this update cannot be sent.') : 'Select a reference number to see how this update will be sent.')+'</p>'
         + '<div class="nf-actions"><button type="reset" class="btn btn-outline nf-clear" data-action="clear-notif-draft">'+ic('refresh','16px')+' Clear Form</button><button type="submit" class="btn btn-primary nf-send">'+ic('send','16px')+' Send Notification</button></div>'
       + '</form>'
     + '</section>'
@@ -4418,9 +4374,7 @@ function bindEvents(){
         var smsBox = form.querySelector('input[name="send_sms"]'); if(smsBox){ smsBox.checked = true; smsBox.disabled = false; }
         var typeSel = form.querySelector('#notification-request-type'); if(typeSel) typeSel.value = '';
         form._notifAuto = null;
-        form.elements.category.innerHTML = notifCategoryOptions(form.elements.requestRef.value, form.elements.category.value);
         var lt = form.elements.category.querySelector('option[value="Land Transfer Status"]'); if(lt) lt.disabled = false;
-        var route = form.querySelector('[data-channel-summary]'); if(route) route.textContent = 'Select a reference number to see how this update will be sent.';
       }, 0);
     });
     updateCount();

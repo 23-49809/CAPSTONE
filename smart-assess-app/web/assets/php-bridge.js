@@ -318,24 +318,6 @@
     var match = /^\+?63(9\d{9})$/.exec(raw.replace(/[\s()-]/g, ''));
     return match ? '0' + match[1] : raw;
   }
-  function isPhilippineMobile(value) {
-    return /^(?:\+?63|0)9\d{9}$/.test(String(value == null ? '' : value).replace(/[\s()-]/g, ''));
-  }
-  // The channels are chosen from the request's own contact details (no Send by choice on the
-  // form): phone only -> SMS, email only -> email, both -> SMS and email. A channel whose
-  // service is down is left out. Nothing is sent until Staff click Send.
-  function updateChannelSummary(form) {
-    var summary = form.querySelector('[data-channel-summary]');
-    if (!summary) return;
-    var sms = form.querySelector('input[name="send_sms"]');
-    var email = form.querySelector('input[name="send_email"]');
-    var useSms = !!(sms && sms.checked && !sms.disabled);
-    var useEmail = !!(email && email.checked && !email.disabled);
-    summary.textContent = useSms && useEmail ? 'This update will be sent by SMS and email.'
-      : useSms ? 'This update will be sent by SMS.'
-      : useEmail ? 'This update will be sent by email.'
-      : (form.getAttribute('data-recipient-ref') ? 'No phone number or email address on this request can be used, so this update cannot be sent.' : 'Select a reference number to see how this update will be sent.');
-  }
   // Recipient phone/email shown on the notification form; the email box can
   // only be ticked when the request has an email address.
   function setNotificationContact(form, phone, email, placeholder) {
@@ -357,12 +339,11 @@
       emailBox.checked = emailUsable;
     }
     if (smsBox) {
-      var smsUsable = !!phone && isPhilippineMobile(phone) && !(channelStatus && !channelStatus.sms.ready);
+      var smsUsable = !!phone && !(channelStatus && !channelStatus.sms.ready);
       smsBox.disabled = !smsUsable;
       smsBox.checked = smsUsable;
     }
     applyChannelStatus(form);
-    updateChannelSummary(form);
   }
 
   // Live SMS/email service status on the Notifications page: a channel that
@@ -384,7 +365,6 @@
         if (label) label.title = pair[2] + ' is unavailable right now.';
       }
     });
-    updateChannelSummary(form);
   }
   // A request opened from its details or a rejection draft arrives already
   // selected, so ask the server for its recipient as if staff had chosen it.
@@ -925,7 +905,7 @@
         return;
       }
       // Rejected and Out for Release open the Notifications page with a draft for this request;
-      // Staff review and edit it, then send it themselves (channels follow the client's contact details).
+      // Staff review and edit it, choose SMS and/or email, and send it themselves.
       if (data.status === 'Rejected' || data.status === 'Out for Release') {
         var wanted = data.status;
         jsonRequest('update_request_status', data).then(function (result) {
@@ -967,10 +947,6 @@
         var refSelect = form.querySelector('select[name="requestRef"]');
         if (form.getAttribute('data-recipient-failed') === data.requestRef && refSelect) updateNotificationOwner(refSelect);
         notice('This request\'s contact details have not loaded yet. Nothing was sent. Check the recipient, then send again.');
-        return;
-      }
-      if (!data.send_sms && !data.send_email) {
-        notice('This request has no phone number or email address that can be used right now. Nothing was sent.');
         return;
       }
       var pickupField = form.querySelector('[data-pickup-field]');
