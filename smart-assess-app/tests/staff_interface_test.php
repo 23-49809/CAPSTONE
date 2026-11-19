@@ -92,7 +92,11 @@ $dc = $between($html, 'function renderDocumentCheck(acct){', 'function renderReq
 $check('the Document Check code was found', strlen($dc) > 3000);
 $check('Document Check has no approve, reject or status actions', !preg_match('/data-action="(approve|reject|update-status|set-status|start-processing|complete-processing)/', $dc));
 $check('Document Check shows no progress percentage', !preg_match('/\d+\s*%|%\s*</', $dc));
-$check('Document Check opens originals only through request-file.php', str_contains($dc, "/request-file.php?doc=") && !preg_match('#href="(?!/request-file\.php)#', $dc));
+// Every link and preview source is the request-file.php URL (built in one place, then HTML-escaped).
+preg_match_all('#(?:href|src)="\'\+esc\((\w+)\)#', $dc, $escapedUrls);
+$check('Document Review opens and previews originals only through request-file.php', str_contains($dc, "var url = uploaded ? '/request-file.php?doc='+encodeURIComponent(f.docId)+'&ref='+encodeURIComponent(r.id) : '';")
+    && str_contains($dc, "var previewUrl = url ? url+'&preview=1' : '';")
+    && array_diff(array_unique($escapedUrls[1]), ['url', 'previewUrl']) === [] && !preg_match('#(?:href|src)="(?!/request-file\.php|\'\+esc\((?:url|previewUrl)\))#', $dc), $escapedUrls[1]);
 $check('Document Check says the AI never approves or rejects', str_contains($dc, 'never approves or rejects a request'));
 $check('Document Check says it cannot authenticate documents, signatures or seals', str_contains($dc, 'cannot tell whether a document, signature or seal is genuine'));
 $check('Mark as reviewed and Run check again reuse the existing actions', str_contains($dc, 'data-action="ai-mark-reviewed"') && str_contains($dc, 'data-action="ai-requeue"'));
@@ -119,13 +123,13 @@ $popup = $between($html, 'function modalReqDetail(id, kind){', "\n}\n");
 $check('request popup no longer shows Notification History', $popup !== '' && !str_contains($popup, 'reqNotifHistoryHtml') && !str_contains($html, 'function reqNotifHistoryHtml'));
 $check('request popup has no AI Document Check section at all', $popup !== '' && !str_contains($popup, 'reqAiHtml') && !str_contains($html, 'function reqAiHtml'));
 $detail = $between($html, 'function renderDocCheckDetail(x){', "\n}\n");
-$check('Document Check carries the unverified-AI labels', str_contains($detail, 'Automatic checks and AI suggestions (unverified), not a decision')
-    && str_contains($detail, " <span class=\"cell-sub\">AI suggestion (unverified)</span>") && str_contains($detail, "yes:'AI suggestion (unverified): yes'"));
-$check('Document Check keeps its findings and what to check / ask', str_contains($dc, 'Important Issues') && str_contains($dc, 'aiFindingGuide(f)')
-    && str_contains($dc, 'What to ask the client (if needed)'));
-$check('Document Check cards: the whole document card opens the original, labelled View', str_contains($detail, '<a class="dc-doc-card" role="listitem" href="/request-file.php?doc=')
-    && str_contains($detail, '<span class="dc-view">View</span>') && !str_contains($dc, 'Open original') && !str_contains($dc, 'Open check'));
-$check('Document Check: back-arrow icon and View Requirements', str_contains($detail, 'class="dc-back" data-action="dc-back" aria-label="Back to Document Check list"') && str_contains($detail, "ic('chevLeft','20px')")
+$check('Document Review labels model suggestions as not verified (current and older results)', str_contains($detail . $dc, " <span class=\"cell-sub\">Suggested from the text, not verified</span>")
+    && str_contains($dc, "facts.push(['Looks like the required document?', esc({yes:'Yes', no:'No', unclear:'Unclear'}[d.expected_type_match]||'—')+' <span class=\"cell-sub\">Suggested from the text, not verified</span>']);"));
+$check('Document Review gives each problem a short title, what to verify and (when useful) a follow-up', str_contains($dc, 'var DR_ISSUES = {') && str_contains($dc, "'<span class=\"dr-follow\">Follow-up: '")
+    && str_contains($dc, 'function drIssueFor(f, d){'));
+$check('Document Review: the original first in every card, with Open (new tab) instead of a long report', str_contains($dc, "'<div class=\"dr-doc-body\">'+preview")
+    && str_contains($dc, '>Open<span class="sr-only"> ') && !str_contains($dc, 'What to ask the client (if needed)') && !str_contains($dc, 'Open check'));
+$check('Document Review: back-arrow icon and View Requirements', str_contains($detail, 'class="dc-back" data-action="dc-back" aria-label="Back to Document Review list"') && str_contains($detail, "ic('chevLeft','20px')")
     && str_contains($detail, '>View Requirements</button>') && !str_contains($dc, 'Open full request'));
 $check('Document Check uses no colour-coded badges', !str_contains($dc, 'class="badge ') && !str_contains($dc, "<span class=\"badge '"));
 $check('Document Check list rows open the check (keyboard too)', str_contains($dc, '<tr class="dash-row dc-row" data-action="dc-open"'));

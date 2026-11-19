@@ -12,7 +12,8 @@ declare(strict_types=1);
  *   - the worker reports ready;
  *   - the document was read by Tesseract (method image_ocr, OCR ok, enough characters);
  *   - the model ran (status ok, with its name and digest);
- *   - the answer is result version 2 and passes the application's own validation.
+ *   - the answer is the current result version (DocumentAnalysis::WORKER_RESULT_VERSION, the
+ *     version this release's worker answers with) and passes the application's own validation.
  * It takes no file, path or document argument: it cannot send anything but its own
  * synthetic image. It uses no database, changes nothing and sends no SMS or email. It
  * prints statuses, counts and timings only, never the text read from the document.
@@ -168,7 +169,10 @@ function sa_smoke_main(array $argv): int
     $model = $raw['model'] ?? [];
 
     $check('the worker answered the synthetic job', true, sprintf('%.1f s', $seconds));
-    $check('result version 2 (a refreshed worker: exact-quote evidence is kept)', ($raw['version'] ?? null) === 2, 'version ' . json_encode($raw['version'] ?? null));
+    // The worker must answer with this release's version, not merely one the application still
+    // accepts: an older answer means the worker was not refreshed with this release.
+    $check('result version ' . DocumentAnalysis::WORKER_RESULT_VERSION . ' (the worker matches this release)',
+        ($raw['version'] ?? null) === DocumentAnalysis::WORKER_RESULT_VERSION, 'version ' . json_encode($raw['version'] ?? null));
     $check('Tesseract read the image (method image_ocr, OCR ok)', ($document['method'] ?? null) === 'image_ocr' && ($document['ocr_status'] ?? null) === 'ok',
         'method ' . json_encode($document['method'] ?? null) . ', ocr ' . json_encode($document['ocr_status'] ?? null) . ', engine ' . json_encode($raw['ocr_engine'] ?? null));
     $check('enough text was read', (int) ($document['text_characters'] ?? 0) >= SA_SMOKE_MIN_CHARACTERS && ($document['readability'] ?? 'unreadable') !== 'unreadable',

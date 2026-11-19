@@ -76,10 +76,16 @@ $disposition = isset($_GET['download']) ? 'attachment' : 'inline';
 // can only be marked reviewed once this Staff member has opened every original that can be
 // served (AiVerification::markReviewed). A record shows the file was sent, not that it was
 // inspected. A failed record never blocks the file: "Mark as reviewed" then stays refused.
-try {
-    AiVerification::recordOriginalOpened(sa_db(), (int) $user['id'], (int) $documentId);
-} catch (Throwable) {
-    error_log('[SMART_ASSESS] Could not record that a staff member opened a request document.');
+// The inline previews on the Document Review page (&preview=1) are served with the same checks but
+// are not recorded: a document counts as opened only when Staff open it themselves (Open, the
+// preview's full-size link, or the request popup's Preview), as before the previews existed.
+$isInlinePreview = ($_GET['preview'] ?? '') === '1' && !isset($_GET['download']);
+if (!$isInlinePreview) {
+    try {
+        AiVerification::recordOriginalOpened(sa_db(), (int) $user['id'], (int) $documentId);
+    } catch (Throwable) {
+        error_log('[SMART_ASSESS] Could not record that a staff member opened a request document.');
+    }
 }
 
 header('Content-Type: ' . $mime);

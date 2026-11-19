@@ -81,6 +81,16 @@ $cases = [
 
 $cases['modelSilent'] = array_replace($cases['clean'], ['outcome' => 'needs_review', 'findings' => [],
     'reason' => 'Needs review: the AI model did not review the documents, so only the automatic checks ran. This is not an approval: Staff must inspect the original documents and make the decision.']);
+// The number read differs from the application, and no server finding says so (the page's own comparison).
+$cases['numberOnly'] = $cases['clean'];
+$cases['numberOnly']['documents'][1]['property_number'] = '018-00099';
+$cases['unreadableId'] = $view([$doc('ownerId', 'unclear', '', false), $clean[1], $clean[2]], [], ['ownerId' => 'unreadable']);
+// A required document that was not uploaded: the requirement check's own finding.
+$cases['notUploaded'] = $cases['clean'];
+$cases['notUploaded']['documents'][2] = ['key' => 'certNoImprovement', 'label' => $labels['certNoImprovement'], 'requirement' => 'missing', 'ocr_status' => 'skipped', 'readability' => null, 'pages' => 0];
+$cases['notUploaded']['outcome'] = 'missing_information';
+$cases['notUploaded']['findings'][] = ['category' => 'missing_information', 'field' => 'required_field', 'documents' => [$labels['certNoImprovement']],
+    'explanation' => 'Certification of No Improvement was not uploaded.', 'evidence' => '', 'source' => 'requirements'];
 foreach (['parts' => 'partsName', 'incomplete' => 'incompleteName'] as $match => $case) {
     $cases[$case] = $cases['clean'];
     $cases[$case]['documents'][0]['holder_name_match'] = $match;
@@ -92,16 +102,29 @@ $script = 'function esc(s){ return String(s==null?"":s).replace(/[&<>"\']/g,func
     . $between($html, 'var AI_CHECK_STATES = {', 'function aiCheckState(r){')
     . $fn('aiCheckState') . $fn('aiFindingCounts') . $fn('aiFindingSummary') . $fn('aiDurationText') . $fn('renderDocCheckDetail') . $fn('docCheckDisclaimer')
     . $fn('dcNameHtml') . $between($html, 'var DC_DIGIT_LETTERS', 'function dcNameParts(') . $fn('dcNameParts') . $fn('dcEditDistance') . $fn('dcNameCompare')
-    . $fn('dcIssueCountText') . $fn('dcIssueTitle') . $fn('dcImportantIssues') . $fn('aiFindingGuide')
+    . $fn('dcImportantIssues')
+    . $between($html, 'var DR_ISSUES = {', "\n};\n") . "\n};\n" . $fn('drIssueFor') . $fn('drIssueItem') . $fn('drSummaryText') . $fn('drDocCard')
     . 'var cases = ' . json_encode($cases, JSON_UNESCAPED_UNICODE) . ';'
     . <<<'JS'
 var details = {firstName:'Juan', middleName:'Santos', lastName:'Dela Cruz', isOwner:true, arpNumber:'018-00045'};
-var files = ['ownerId','ctcTdOrTitle','certNoImprovement'].map(function(k, i){ return {key:k, name:'demo-'+k+'.png', docId:100+i, available:true}; });
+var labels = {ownerId:'Valid ID of Property Owner', ctcTdOrTitle:'Certified True Copy of Tax Declaration or Title', certNoImprovement:'Certification of No Improvement'};
+var mimes = {ownerId:'image/png', ctcTdOrTitle:'application/pdf', certNoImprovement:'image/jpeg'};
+var mkFiles = function(){ return ['ownerId','ctcTdOrTitle','certNoImprovement'].map(function(k, i){ return {key:k, label:labels[k], name:'demo-'+k+(k==='ctcTdOrTitle'?'.pdf':'.png'), mime:mimes[k], docId:100+i, available:true, status:'uploaded'}; }); };
 var out = {};
 Object.keys(cases).forEach(function(name){
+  var files = mkFiles();
+  if(name==='notUploaded'){ files[2].name = ''; files[2].status = 'missing'; }
+  if(name==='unsure') files[1].available = false;
   var r = {id:'LT-DEMO-1', applicant:'Juan Dela Cruz', ai:cases[name], aiEligibility:{eligible:true}, details:details, files:files};
   out[name] = {html: renderDocCheckDetail({r:r, kind:'land', type:'Land Transfer: Sale', state:aiCheckState(r)}), issues: dcImportantIssues(cases[name]).issues.length,
     summary: aiFindingSummary(cases[name])};
+});
+// No automatic result yet: the originals are still shown for review.
+['none', 'waiting', 'off'].forEach(function(st){
+  var files = mkFiles(); files[2].name = ''; files[2].status = 'missing';
+  var r = {id:'LT-DEMO-1', applicant:'Juan Dela Cruz', ai: st==='waiting' ? {status:'pending', attempts:0, maxAttempts:3} : null,
+    aiEligibility: st==='off' ? {eligible:false, reason:'not_enabled'} : {eligible:true}, details:details, files:files};
+  out['state_'+st] = {html: renderDocCheckDetail({r:r, kind:'land', type:'Land Transfer: Sale', state:aiCheckState(r)})};
 });
 out.compare = [
   ['DELA CRUZ, JUAN SANTOS','Juan','Dela Cruz'], ['MARIA LUISA REYES','Ma. Luisa','Reyes'], ['DELACRUZ, JUAN','Juan','Dela Cruz'], ['DE LA CRUZ, JUAN','Juan','Dela Cruz'],
@@ -123,90 +146,129 @@ $out = is_array($out) ? $out : [];
 $page = static fn (string $name): string => (string) ($out[$name]['html'] ?? '');
 $text = static fn (string $name): string => (string) preg_replace('/\s+/', ' ', strip_tags($page($name)));
 
-// Structure
+// ---- Structure: the original first, then its summary, then its problems ----
 $c = $page('clean');
-$check('result sections: identification + extracted information, then important issues', str_contains($c, 'Document Identification and Extracted Information') && str_contains($c, '>Important Issues<')
-    && strpos($c, 'Document Identification') < strpos($c, 'Important Issues'), $text('clean'));
-// Document type and ID type
-$check('an ID shows its specific ID type, labelled as an unverified AI suggestion', str_contains($c, '<dt>ID type</dt><dd>Philippine Driver&#39;s License <span class="cell-sub">AI suggestion (unverified)</span>'), $c);
-$check('a tax declaration and a certification are shown as documents, not IDs', str_contains($c, '<dt>Document</dt><dd>Tax Declaration ') && str_contains($c, '<dt>Document</dt><dd>Certification of No Improvement ')
-    && substr_count($c, '<dt>ID type</dt>') === 1, $text('clean'));
-$check('a clearance uploaded in place of a certification is named as a Barangay Clearance (not an ID)', str_contains($page('flood'), '<dt>Document</dt><dd>Barangay Clearance '));
-// Exact names
-$check('the ID holder\'s name is shown exactly as read (order, comma, middle name), marked as OCR text', str_contains($c, '<dt>Name on ID</dt><dd><span class="dc-name">DELA CRUZ, JUAN SANTOS</span><span class="cell-sub">Exactly as read by OCR</span>'), $c);
-$check('a title or tax declaration names the registered owner; the property number is shown as read', str_contains($c, '<dt>Registered owner</dt><dd><span class="dc-name">JUAN DELA CRUZ</span>')
-    && str_contains($c, '<dt>Property No.</dt><dd><span class="mono">018-00045</span>'));
-$check('a matching name says Matches and raises no "Differs" note', !str_contains($c, 'Differs') && str_contains($c, '<span class="dc-compare"><span class="cell-sub">On the application:</span> Juan Santos Dela Cruz &middot; Matches</span>'), $text('clean'));
+$card = static function (string $html, int $n): string {
+    $parts = explode('<article class="dr-doc', $html);
+    return (string) ($parts[$n + 1] ?? '');
+};
+$check('the page is titled Document Review and shows one card per uploaded document', str_contains($c, '<h1>Document Review</h1>') && substr_count($c, '<article class="dr-doc') === 3, $text('clean'));
+$check('each card shows the document category (what was required) and the file name and type', str_contains($card($c, 0), '<h3>Valid ID of Property Owner</h3>')
+    && str_contains($card($c, 0), 'demo-ownerId.png · PNG image · 1 page · Text: Readable') && str_contains($card($c, 1), 'demo-ctcTdOrTitle.pdf · PDF document'), $card($c, 0));
+$order = $card($c, 0);
+$check('in each card the preview comes first, then the summary, then problems', strpos($order, 'dr-preview') < strpos($order, '<dt>Document type</dt>')
+    && strpos($order, '<dt>Document type</dt>') < strpos($order, 'class="dr-problems"'), $order);
+// ---- Secure previews ----
+$check('an image is previewed inline from request-file.php (doc ID + reference), lazily, and opens full size in a new tab',
+    str_contains($card($c, 0), '<a class="dr-preview" href="/request-file.php?doc=100&amp;ref=LT-DEMO-1" target="_blank" rel="noopener" title="Open full size in a new tab"><img class="dr-img" src="/request-file.php?doc=100&amp;ref=LT-DEMO-1&amp;preview=1" alt="Valid ID of Property Owner (uploaded file)" loading="lazy"></a>'), $card($c, 0));
+$check('a PDF is previewed in an iframe from request-file.php', str_contains($card($c, 1), '<iframe class="dr-pdf" src="/request-file.php?doc=101&amp;ref=LT-DEMO-1&amp;preview=1" title="Certified True Copy of Tax Declaration or Title (uploaded PDF)" loading="lazy"></iframe>'), $card($c, 1));
+preg_match_all('/(?:href|src)="([^"]*)"/', implode('', array_map($page, array_keys($cases))) . $page('state_none'), $urls);
+$check('every link and preview on the page goes through request-file.php (no public upload URL, no storage path)', $urls[1] !== []
+    && array_filter($urls[1], static fn (string $u): bool => !str_starts_with($u, '/request-file.php?doc=')) === [] && !str_contains(implode('', $urls[1]), 'uploads'), array_unique($urls[1]));
+$check('a file that cannot be served shows why and no preview or link', str_contains($card($page('unsure'), 1), 'Cannot be opened: missing from storage or an unsupported file type.')
+    && !str_contains($card($page('unsure'), 1), 'request-file.php'), $card($page('unsure'), 1));
+// Mark as reviewed: inline previews are not recorded (preview=1); Open and the full-size link are.
+$check('only the inline preview carries preview=1; Open and the full-size link open the original as before (recorded)',
+    substr_count($card($c, 0), 'preview=1') === 1 && str_contains($card($c, 0), '<a class="btn btn-outline btn-sm" href="/request-file.php?doc=100&amp;ref=LT-DEMO-1" target="_blank" rel="noopener">Open')
+    && str_contains($card($c, 0), '<a class="dr-preview" href="/request-file.php?doc=100&amp;ref=LT-DEMO-1" ') && substr_count($card($c, 1), 'preview=1') === 1, $card($c, 0));
+$check('the review note asks Staff to open every original, as before', str_contains($c, 'Open every original that can be opened before marking as reviewed; the server checks that you have. Opening is recorded, not proof of inspection.')
+    && !str_contains($c, 'previewing a file here is recorded'), $text('clean'));
+$nu = $card($page('notUploaded'), 2);
+$check('a document that was not uploaded: "Not uploaded" instead of a preview, listed once with a follow-up', str_contains($nu, '<div class="dr-preview is-off">Not uploaded</div>')
+    && substr_count($nu, '<strong>Not uploaded</strong>') === 1 && str_contains($nu, 'Follow-up: Ask the client to upload it.') && !str_contains($nu, 'request-file.php'), $nu);
+foreach (['none' => 'Not checked yet', 'waiting' => 'Waiting to be checked', 'off' => 'Automatic check not enabled'] as $st => $label) {
+    $sp = (string) ($out['state_' . $st]['html'] ?? '');
+    $check("without an automatic result ({$st}) the originals are still shown for review, with no invented summary", str_contains($sp, $label)
+        && substr_count($sp, 'class="dr-img"') === 1 && substr_count($sp, 'class="dr-pdf"') === 1 && str_contains($sp, 'No automatic summary. Review the original.')
+        && str_contains($sp, 'The client did not upload this document.') && !str_contains($sp, '<dt>'), $sp);
+}
+// ---- Summary: only what was read ----
+$check('an ID: type (suggested, not verified), the name exactly as read, and a one-line summary', str_contains($card($c, 0), '<dt>Document type</dt><dd>Philippine Driver&#39;s License <span class="cell-sub">Suggested from the text, not verified</span>')
+    && str_contains($card($c, 0), '<dt>Name read</dt><dd><span class="dc-name">DELA CRUZ, JUAN SANTOS</span><span class="cell-sub">Exactly as read</span>')
+    && str_contains($card($c, 0), '<dt>Summary</dt><dd>Contains the holder&#39;s name.</dd>'), $card($c, 0));
+$check('a tax declaration: owner name and property number as read, and a summary naming only what was read', str_contains($card($c, 1), '<dt>Document type</dt><dd>Tax Declaration ')
+    && str_contains($card($c, 1), '<dt>Owner name read</dt><dd><span class="dc-name">JUAN DELA CRUZ</span>') && str_contains($card($c, 1), '<dt>Property number</dt><dd><span class="mono">018-00045</span>')
+    && str_contains($card($c, 1), '<dt>Summary</dt><dd>Contains the registered owner&#39;s name and a property number.</dd>'), $card($c, 1));
+$check('a certification and a clearance are documents, not IDs', str_contains($card($c, 2), '<dt>Document type</dt><dd>Certification of No Improvement ')
+    && str_contains($card($page('flood'), 2), '<dt>Document type</dt><dd>Barangay Clearance ') && !str_contains($card($c, 2), 'holder'), $card($c, 2));
+$ur = $card($page('unreadableId'), 0);
+$check('an unreadable ID: no name or type invented, "Not read" said, and flagged once as possibly unreadable', !str_contains($ur, 'dc-name')
+    && str_contains($ur, '<dt>Name read</dt><dd><span class="cell-sub">Not read. Check the name on the original.</span>') && str_contains($ur, 'What this document is could not be told from its text.')
+    && substr_count($ur, '<strong>Possibly unreadable</strong>') === 1 && str_contains($ur, 'Text: Could not be read'), $ur);
+$check('an unknown document type is shown as "Cannot tell from the text", without a forced category', str_contains($card($page('unknownKind'), 0), '<dt>Document type</dt><dd>Cannot tell from the text ')
+    && !str_contains($page('unknownKind'), 'Document may be incorrect'), $text('unknownKind'));
+// ---- Names: never corrected, uncertain parts marked, compared only on the applicant's own ID ----
+$check('a matching name says Matches and raises no problem', str_contains($card($c, 0), '<span class="dc-compare"><span class="cell-sub">Application:</span> Juan Santos Dela Cruz &middot; Matches</span>')
+    && !str_contains($c, 'Differs') && !str_contains($c, 'dr-issue'), $text('clean'));
 $m = $page('mismatch');
-$check('a different name on the applicant\'s own ID: the ID\'s name and the application\'s name are shown apart, marked Differs', str_contains($m, '<span class="dc-name">REYES, MARIA LUZ</span>')
-    && str_contains($m, '<span class="dc-compare"><span class="cell-sub">On the application:</span> Juan Santos Dela Cruz &middot; <strong>Differs, verify</strong>') && substr_count($m, 'Differs, verify') === 1, $text('mismatch'));
-$check('the name issue is listed once although both the rule and the AI reported it, with the automatic check\'s label', substr_count($m, 'Name may not match the application') === 1
-    && str_contains($m, 'Automatic comparison') && (int) ($out['mismatch']['issues'] ?? 0) === 1, $text('mismatch'));
-// Uncertain names
+$check('a different name on the applicant\'s own ID: both names shown apart, marked Differs, one "Name differs" problem with what to verify', str_contains($m, '<span class="dc-name">REYES, MARIA LUZ</span>')
+    && str_contains($m, 'Application:</span> Juan Santos Dela Cruz &middot; <strong>Differs, verify</strong>') && substr_count($m, '<strong>Name differs</strong>') === 1
+    && str_contains($m, 'Compare it with the original.') && str_contains($m, 'Follow-up: If the names really differ'), $text('mismatch'));
+$check('the name problem is shown once although the rule, the AI and the comparison all found it', substr_count($m, 'class="dr-issue"') === 1 && (int) ($out['mismatch']['issues'] ?? 0) === 1, $text('mismatch'));
 $u = $page('unsure');
 $check('an uncertain part of a name is marked for Staff, never corrected', str_contains($u, 'DELA <mark class="dc-unsure" title="May be misread">CRU2,</mark> JUAN SANTOS')
     && str_contains($u, 'Unclear: check the marked letters on the original') && !str_contains($u, 'DELA CRUZ, JUAN'), $u);
-$check('a misread letter alone is not called a name mismatch; another person\'s name with a misread letter still is', !str_contains($u, 'Differs') && str_contains($u, 'Possibly the same name (spelling variant or OCR misread), verify')
+$check('a misread letter alone is not a mismatch ("Name possibly misread"); another person\'s name with a misread letter still differs', !str_contains($u, 'Differs')
+    && str_contains($u, '<strong>Possibly the same name, verify</strong>') && substr_count($u, '<strong>Name possibly misread</strong>') === 1
     && str_contains($page('unsureOther'), 'Differs, verify') && str_contains($page('unsureOther'), '<mark class="dc-unsure" title="May be misread">MAR1A</mark>'), $text('unsure'));
-$check('and is listed once as "Name may be misread" with what to check', substr_count($u, 'Name may be misread') === 1 && str_contains($u, 'check its spelling letter by letter'), $text('unsure'));
-// Concise issues
+$check('the application\'s name is never put in place of the name read', !str_contains($m, '<span class="dc-name">Juan') && !str_contains($u, '<span class="dc-name">Juan'));
+$check('names on other documents are shown but not compared with the application', !str_contains($card($c, 1), 'Application:') && !str_contains($card($c, 2), 'Application:'));
+$check('a name read from labelled parts says so; a possibly incomplete name says so and is flagged', str_contains($page('partsName'), 'Read from labelled parts (such as Last Name, Given Names), in the document&#39;s order')
+    && str_contains($page('incompleteName'), 'Possibly incomplete: more of a name appears next to it') && !str_contains($card($page('incompleteName'), 0), '<span class="cell-sub">Exactly as read</span>'));
+// ---- Property numbers ----
 $f = $page('flood');
-$check('a flood of AI remarks is reduced to the important ones (each once)', (int) ($out['flood']['issues'] ?? 0) === 2
-    && substr_count($f, 'Property number may not match the application') === 1 && substr_count($f, 'Only partly readable') === 1, $text('flood'));
-$check('repeated "only Staff can judge signatures" points become one line naming the documents', substr_count($f, 'Signatures, seals and notarization can only be judged on the original') === 1
-    && str_contains($text('flood'), 'on the original: Valid ID of Property Owner, Certified True Copy of Tax Declaration or Title.'));
-$check('vague AI remarks without specifics are folded into one line, still marked unverified', str_contains($text('flood'), 'The AI also noted 2 other details without specifics (unverified).'));
-$check('evidence quotes are labelled as OCR text', str_contains($f, '<q><span class="cell-sub">Read by OCR (may contain reading errors):</span> ARP No. 018-00099 Owner</q>'));
-$check('the list page counts the same issues as the detail page', ($out['flood']['summary'] ?? null) === ['1 possible inconsistency', '1 reading problem', '2 for Staff to verify', '2 unspecific AI notes'], $out['flood']['summary'] ?? null);
-$check('a name read from labelled parts says so; a possibly incomplete name says so', str_contains($page('partsName'), 'Read by OCR from labelled parts (such as Last Name, Given Names), in the document&#39;s order')
-    && str_contains($page('incompleteName'), 'Read by OCR, possibly incomplete: more of a name appears next to it on the document') && !str_contains($page('incompleteName'), 'Exactly as read by OCR</span><span class="dc-compare">'));
-// Name comparison (page only; the shown name never changes)
-$check('name comparison: Philippine variants match (Ma. = Maria, dela/de la/delacruz, delos, del rosario)', array_slice($out['compare'] ?? [], 0, 6) === ['match', 'match', 'match', 'match', 'match', 'match'], $out['compare'] ?? null);
-$check('name comparison: a Jr only one side has needs verification; Jr vs Sr differs', array_slice($out['compare'] ?? [], 6, 2) === ['verify', 'differs'], $out['compare'] ?? null);
-$check('name comparison: OCR near-misses, a dropped particle and an initial need verification, not "differs"', array_slice($out['compare'] ?? [], 8, 4) === ['verify', 'verify', 'verify', 'verify'], $out['compare'] ?? null);
-$check('name comparison: a misread letter never hides a different surname; short or different surnames differ', array_slice($out['compare'] ?? [], 12, 4) === ['differs', 'differs', 'differs', 'differs'], $out['compare'] ?? null);
-$check('name comparison: too little to compare is said so', array_slice($out['compare'] ?? [], 16, 2) === ['unknown', 'unknown'], $out['compare'] ?? null);
-// Summary states (headline, empty-list text and list page agree)
+$check('a different property number stays visible: "Property number differs", once, with the short OCR quote', substr_count($f, '<strong>Property number differs</strong>') === 1
+    && str_contains($f, 'Text read (may contain reading errors): &ldquo;ARP No. 018-00099 Owner&rdquo;'), $text('flood'));
+$no = $page('numberOnly');
+$check('a property number that differs from the application is flagged by the page even without a server finding', substr_count($no, '<strong>Property number differs</strong>') === 1
+    && str_contains($card($no, 1), '<span class="mono">018-00099</span>') && str_contains($card($no, 1), 'Application:</span> <span class="mono">018-00045</span> &middot; <strong>Differs, verify</strong>')
+    && str_contains($no, '<strong>1 problem to check</strong>.'), $card($no, 1));
+// ---- Concise findings ----
+$check('a flood of model remarks becomes two short problems; vague remarks and signature points move to Technical details', substr_count($f, 'class="dr-issue"') === 2
+    && substr_count($f, '<strong>Possibly unreadable</strong>') === 1 && str_contains($f, '<details class="dr-tech"><summary>Technical details</summary>')
+    && str_contains($text('flood'), 'The model also noted 2 other details without saying what (not shown as problems).')
+    && substr_count($f, 'Signatures, seals and notarization can only be judged on the original') === 1, $text('flood'));
+$check('technical details (OCR engine, model, attempts) are collapsed, not shown by default', (bool) preg_match('#<details class="dr-tech"><summary>Technical details</summary><p class="cell-sub">[^<]*OCR: tesseract \(eng\) · Model: demo-model · Attempts: 1 of 3#', $c)
+    && !str_contains($c, '<details class="dr-tech" open'), $c);
+$check('the full OCR text is never shown', !preg_match('/text_characters|ocr_text|full text/i', implode('', array_map($page, array_keys($cases)))));
+$check('every problem has a title and what to verify; follow-ups only where useful', (bool) preg_match_all('#<li class="dr-issue"><strong>[^<]+</strong><span>[^<]+</span>#', $f . $m . $u, $items) && count($items[0]) === substr_count($f . $m . $u, 'class="dr-issue"'));
+$check('the list page counts the same server issues as before', ($out['flood']['summary'] ?? null) === ['1 possible inconsistency', '1 reading problem', '2 for Staff to verify', '2 unspecific AI notes'], $out['flood']['summary'] ?? null);
+$cl = $page('clearanceInIdSlot');
+$check('a Barangay Clearance in the ID slot: shown as a document and listed once as "Document may be incorrect"', str_contains($cl, '<dt>Document type</dt><dd>Barangay Clearance ')
+    && substr_count($cl, '<strong>Document may be incorrect</strong>') === 1, $text('clearanceInIdSlot'));
+// ---- Headline states ----
+$check('no issues: "No significant issue detected" with the verify-against-the-original sentence, and no authenticity claim',
+    str_contains($c, '<strong>No significant issue detected</strong>. No specific issue was detected in the available text. Please verify the extracted details against the original document.')
+    && substr_count($c, 'No significant issue detected in the available text.') === 3
+    && !preg_match('/\b(authentic|genuine|verified)\b/i', (string) preg_replace('/cannot tell whether a document, signature or seal is genuine|not verified/i', '', $text('clean'))), $text('clean'));
+$check('the headline counts exactly the problems listed', str_contains($m, '<strong>1 problem to check</strong>.') && str_contains($f, '<strong>2 problems to check</strong>.'), $text('flood'));
 $vg = $page('vagueOnly');
-$check('only vague AI notes: "Needs review" with "no specific issues detected; see notes below", never "no significant issues"',
-    str_contains($vg, '<strong>Needs review</strong> &middot; no specific issues detected; see notes below') && str_contains($vg, 'No specific issues detected; see notes below. Please verify')
-    && !str_contains($vg, 'no significant issues') && !str_contains($vg, 'No significant issues') && str_contains($text('vagueOnly'), 'The AI also noted 1 other detail without specifics (unverified).')
-    && ($out['vagueOnly']['summary'] ?? null) === ['1 unspecific AI note'] && !str_contains($vg, 'possible inconsistency(ies)'), $text('vagueOnly'));
-$check('when nothing else explains "Needs review" (the model did not answer), the server\'s reason is the note below, without the repeated not-an-approval sentence',
-    str_contains($page('modelSilent'), 'no specific issues detected; see notes below') && str_contains($text('modelSilent'), 'Needs review: the AI model did not review the documents, so only the automatic checks ran.')
-    && !str_contains($page('modelSilent'), 'This is not an approval') && ($out['modelSilent']['summary'] ?? null) === [], $text('modelSilent'));
-$check('a passed result: "No concerns found · no significant issues"', str_contains($c, '<strong>No concerns found</strong> &middot; no significant issues') && ($out['clean']['summary'] ?? null) === []);
-$check('important issues: the headline counts exactly the listed issues', str_contains($page('mismatch'), '&middot; 1 important issue</p>') && str_contains($page('flood'), '&middot; 2 important issues</p>'));
-// Escaping, classification contradictions, unknown type
+$check('only vague model notes: never "No significant issue"; the note is in Technical details', str_contains($vg, '<strong>No specific issue detected</strong>')
+    && !str_contains($vg, 'No significant issue detected</strong>') && str_contains($text('vagueOnly'), 'The model also noted 1 other detail without saying what'), $text('vagueOnly'));
+$check('when nothing else explains "Needs review" (the model did not answer), the server\'s reason is shown, without the repeated not-an-approval sentence',
+    str_contains($text('modelSilent'), 'Needs review: the AI model did not review the documents, so only the automatic checks ran.') && !str_contains($page('modelSilent'), 'This is not an approval'), $text('modelSilent'));
+$check('the advisory notice is said once at the bottom', substr_count($c, 'It never approves or rejects a request') === 1 && str_contains($c, 'The original document is the source of truth.'));
+// ---- Escaping ----
 $h = $page('htmlName');
-$check('an extracted name is always HTML-escaped (and its symbol-bearing words marked as possibly misread)', !str_contains($h, '<img')
+$check('an extracted name is always HTML-escaped (and its symbol-bearing words marked as possibly misread)', !str_contains($h, '<img src=x')
     && str_contains($h, '<mark class="dc-unsure" title="May be misread">&lt;img</mark>') && str_contains($h, '<mark class="dc-unsure" title="May be misread">onerror=alert(1)&gt;</mark>'), $h);
-$check('a Barangay Clearance in the ID slot: shown as a document, and listed once as "May not be the required document"', str_contains($page('clearanceInIdSlot'), '<dt>Document</dt><dd>Barangay Clearance ')
-    && substr_count($page('clearanceInIdSlot'), 'May not be the required document') === 1, $text('clearanceInIdSlot'));
-$check('an unknown document type is shown as "Cannot tell from the text", without a forced category', str_contains($page('unknownKind'), '<dt>Document</dt><dd>Cannot tell from the text ')
-    && !str_contains($page('unknownKind'), 'May not be the required document'), $text('unknownKind'));
-// No significant issues
-$check('no significant issues: the agreed sentence, which does not claim authenticity', str_contains($c, 'No significant issues detected. Please verify the extracted details against the original document.')
-    && !preg_match('/\b(authentic|genuine|verified)\b/i', (string) preg_replace('/cannot tell whether a document, signature or seal is genuine|unverified|not verified/i', '', $text('clean'))), $text('clean'));
-$check('the disclaimer is said once in the results and once at the bottom, not on every line', substr_count($c, 'not a decision') === 1 && substr_count($c, 'It never approves or rejects a request') === 1
-    && !str_contains($c, 'This is not an approval'), $text('clean'));
-// Advisory only
-foreach ($cases as $name => $_) {
-    $p = $page($name);
-    $check("no automatic approval or rejection control ({$name})", !preg_match('/data-action="(approve|reject|update-status|start-processing|complete-processing)/', $p)
-        && !str_contains($p, 'data-form="update-status"') && str_contains($p, 'data-action="ai-mark-reviewed"'));
+// ---- Advisory only ----
+foreach (array_merge(array_keys($cases), ['state_none', 'state_waiting', 'state_off']) as $name) {
+    $p = (string) ($out[$name]['html'] ?? '');
+    $check("no automatic approval or rejection control ({$name})", $p !== '' && !preg_match('/data-action="(approve|reject|update-status|start-processing|complete-processing)/', $p)
+        && !str_contains($p, 'data-form="update-status"'));
 }
-// Older results
+// ---- Older results ----
 $l = $page('legacy');
-$check('a result from before this change still shows (type match only, no invented name)', str_contains($l, '<dt>Looks like this document?</dt><dd>AI suggestion (unverified): yes</dd>')
-    && !str_contains($l, 'Name on ID') && !str_contains($l, 'dc-name'), $text('legacy'));
-// Cards still open the originals
-$check('every card opens its original through request-file.php', substr_count($c, '<a class="dc-doc-card" role="listitem" href="/request-file.php?doc=') === 3);
+$check('a result from before version 3 still shows (type match only, no invented name or summary)', str_contains($l, '<dt>Looks like the required document?</dt><dd>Yes <span class="cell-sub">Suggested from the text, not verified</span>')
+    && !str_contains($l, 'Name read') && !str_contains($l, 'dc-name') && !str_contains($l, '<dt>Summary</dt>'), $text('legacy'));
 
-// ---- Typography: the new rules set no font family; only the size the rows already had ----
-$css = $between($html, '  .dc-docs{', '  .dc-issues{');
-$check('new Document Check styles add no font family and reuse the existing 13.5px row size only', $css !== '' && !preg_match('/font-family|font\s*:/', $css)
-    && preg_match_all('/font-size:([0-9.]+px)/', $css, $sizes) === 1 && $sizes[1] === ['13.5px'], $css);
+// ---- Typography: no new font family; only sizes the page already uses ----
+$css = $between($html, '  /* Document Review: per document', "\n  }\n  ");
+preg_match_all('/font-family:([^;}]+)/', $css, $families);
+preg_match_all('/font-size:([0-9.]+px)/', $css, $sizes);
+$check('Document Review styles use the existing body font only and existing sizes (14/13.5/13px)', $css !== '' && array_unique($families[1]) === ['var(--font-body)']
+    && array_diff(array_unique($sizes[1]), ['14px', '13.5px', '13px']) === [] && !preg_match('/font\s*:/', $css), [$families[1], $sizes[1]]);
 
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {
