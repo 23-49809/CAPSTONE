@@ -4,7 +4,25 @@ declare(strict_types=1);
 require_once __DIR__ . '/prototype.php';
 
 $publicData = sa_public_bootstrap();
-$toPublicRequest = static function (array $request): array {
+$toPublicRequest = static function (array $request) use (&$toPublicRequest): array {
+    if (!empty($request['is_application'])) {
+        // Several documents in one application: one reference, each document tracked on its own.
+        $items = array_map($toPublicRequest, $request['items']);
+        return [
+            'id' => (string) $request['reference_no'],
+            'flow' => (string) $request['flow'],
+            'isApplication' => true,
+            'applicant' => (string) $request['applicant'],
+            'applicantInitialsOnly' => (bool) $request['applicant_initials_only'],
+            'docType' => implode(', ', array_column($items, 'docType')),
+            'items' => $items,
+            'status' => (string) ($items[0]['status'] ?? 'Received'),
+            'requirementComplete' => !in_array(false, array_column($items, 'requirementComplete'), true),
+            'missing' => [],
+            'timestamps' => [],
+            'submittedAt' => (string) $request['created_at'],
+        ];
+    }
     $documents = sa_db()->prepare(
         'SELECT rd.label, rd.file_status, dv.validation_status
          FROM request_documents rd
@@ -41,6 +59,10 @@ $toPublicRequest = static function (array $request): array {
         'missing' => $missing,
         'timestamps' => $timestamps,
         'submittedAt' => (string) $request['created_at'],
+        // A document of a multi-document application: the application and its place in it.
+        'applicationRef' => $request['application_reference'] ?? null,
+        'itemNo' => $request['item_no'] ?? null,
+        'itemCount' => $request['item_count'] ?? null,
     ];
 };
 $page = [

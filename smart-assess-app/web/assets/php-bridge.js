@@ -174,6 +174,15 @@
       is_owner: document.getElementById('f-isOwner') ?
         document.getElementById('f-isOwner').checked : isOwner
     };
+    // Document Requests: every chosen document (type and purpose). Each becomes its own request on
+    // the server, all under one tracking number; one document is submitted as before.
+    if (flow === 'docreq' && Array.isArray(form.documentRequests) && form.documentRequests.length) {
+      payload.document_requests = form.documentRequests.map(function (item) {
+        return { document_type: String(item.documentType || ''), purpose: String(item.purpose || '') };
+      });
+      payload.document_type = payload.document_requests[0].document_type;
+      payload.purpose = payload.document_requests[0].purpose;
+    }
     var body = new FormData();
     body.append('payload', JSON.stringify(payload));
     body.append('csrf', config.csrf);

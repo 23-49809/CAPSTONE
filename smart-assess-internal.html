@@ -920,7 +920,8 @@
   .sr-filter label .icon{ width:16px; height:16px; color:var(--ink-soft); }
   .sr-filter select{ width:100%; height:42px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; font-size:13.5px; padding:0 12px; }
 
-  .sr-stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .sr-stats{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+  .sr-stat-detail{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
   .sr-stat{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px 16px 22px; position:relative; box-shadow:0 8px 22px -22px rgba(12,33,23,.5); }
   .sr-stat::before{ content:""; position:absolute; left:8px; top:14px; bottom:14px; width:4px; border-radius:2px; background:var(--brand-700); }
   .sr-stat.tone-gray::before{ background:var(--ink-faint); }
@@ -1014,7 +1015,7 @@
     .sr-filters{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     .sr-filter + .sr-filter{ border-left:0; padding-left:0; }
     .sr-status{ grid-column:1 / -1; min-height:0; }
-    .sr-stats{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .sr-stats{ grid-template-columns:repeat(2,minmax(0,1fr)); }
     .sr-mid{ grid-template-columns:minmax(0,1fr); }
     .sr-sums{ grid-template-columns:minmax(0,1fr); }
   }
@@ -2544,7 +2545,12 @@ function srComputeLocal(month, year){
       return x;
     });
   var submittedIn = function(p){ return all.filter(function(x){ return x.day && x.day.slice(0,7)===p; }); };
-  var cards = function(list){ return { documents:list.filter(function(x){return x.kind==='doc';}).length, landTransfers:list.filter(function(x){return x.kind==='land';}).length, total:list.length }; };
+  // Applications vs individual requests (as the server): a multi-document application counts once, by its first document.
+  var cards = function(list){
+    var docs = list.filter(function(x){return x.kind==='doc';}), lands = list.filter(function(x){return x.kind==='land';}).length;
+    var docApps = docs.filter(function(x){ return !x.r.itemNo || Number(x.r.itemNo)===1; }).length;
+    return { documents:docs.length, landTransfers:lands, total:list.length, documentApplications:docApps, applications:docApps+lands };
+  };
   var list = submittedIn(ym), done = all.filter(function(x){ return x.doneDay && x.doneDay.slice(0,7)===ym; });
   var stats = function(g){
     var t = g.filter(function(x){ return x.dur!=null; }).map(function(x){ return x.dur; });
@@ -2600,7 +2606,9 @@ function srLoad(){
     .catch(function(err){ if(seq!==sr.seq) return; sr.loading = false; sr.error = err.message || 'The report could not be loaded.'; if(state.view==='reports') render(); });
 }
 
-function srStatCard(label, value, prev, tone, worseIsUp){
+/* A count the report may lack (data from before applications were counted): the fallback instead. */
+function srNum(value, fallback){ return value==null ? (Number(fallback)||0) : Number(value)||0; }
+function srStatCard(label, value, prev, tone, worseIsUp, detail){
   var delta = '';
   if(prev>0){
     var pct = Math.round((value-prev)/prev*100);
@@ -2611,6 +2619,7 @@ function srStatCard(label, value, prev, tone, worseIsUp){
   }
   return '<div class="sr-stat '+tone+'"><div class="sr-stat-label">'+esc(label)+'</div>'
     + '<div class="sr-stat-row"><span class="sr-stat-num">'+value+'</span>'+delta+'</div>'
+    + (detail ? '<div class="sr-stat-detail">'+esc(detail)+'</div>' : '')
     + '<div class="sr-stat-sub">vs. previous month</div></div>';
 }
 
@@ -2619,7 +2628,7 @@ function srStatCard(label, value, prev, tone, worseIsUp){
 function srChart(d, type){
   var showDoc = type!=='land', showLand = type!=='doc';
   var series = [];
-  if(showDoc) series.push({key:'documents', cls:'sr-doc', name:'Document Requests'});
+  if(showDoc) series.push({key:'documents', cls:'sr-doc', name:'Document Requests (individual documents)'});
   if(showLand) series.push({key:'landTransfers', cls:'sr-land', name:'Land Transfer Requests'});
   var months = d.monthly || [];
   var max = 0;
@@ -2668,7 +2677,7 @@ function srSummaryCard(kind, title, firstCol, summary){
   };
   return '<section class="sr-card sr-sum"><div class="sr-sum-head"><h3>'+esc(title)+'</h3></div>'
     + '<div class="sr-sum-wrap"><table class="sr-sum-table"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"></colgroup>'
-    + '<thead><tr><th>'+esc(firstCol)+'</th><th>Total Requests</th><th>Completed</th><th>Fastest Processing Time</th><th>Slowest Processing Time</th></tr></thead><tbody>'
+    + '<thead><tr><th>'+esc(firstCol)+'</th><th>Total Requests'+(kind==='doc'?' (individual documents)':'')+'</th><th>Completed</th><th>Fastest Processing Time</th><th>Slowest Processing Time</th></tr></thead><tbody>'
     + (summary.rows.length ? summary.rows.map(function(r){ return cell(r,false); }).join('') : '<tr><td colspan="5" class="sr-empty">No records for this category yet.</td></tr>')
     + cell(summary.total, true)
     + '</tbody></table></div></section>';
@@ -2677,7 +2686,7 @@ function srSummaryCard(kind, title, firstCol, summary){
 function srStaffCard(rows){
   var t = function(sec){ return sec==null ? '<span class="sr-na">—</span>' : esc(srHumanDuration(sec)); };
   return '<section class="sr-card sr-sum sr-staff"><div class="sr-sum-head"><h3>'+ic('users','20px')+'Staff Performance</h3><span class="sr-overview-sub">Processing completed in this month</span></div>'
-    + '<div class="sr-sum-wrap"><table class="sr-sum-table sr-staff-table"><thead><tr><th>Staff Name</th><th>Document Requests Processed</th><th>Land Transfers Processed</th><th>Total Requests Completed</th><th>Average Processing Time</th><th>Fastest Processing Time</th><th>Slowest Processing Time</th></tr></thead><tbody>'
+    + '<div class="sr-sum-wrap"><table class="sr-sum-table sr-staff-table"><thead><tr><th>Staff Name</th><th>Document Requests Processed (individual documents)</th><th>Land Transfers Processed</th><th>Total Requests Completed (individual requests)</th><th>Average Processing Time</th><th>Fastest Processing Time</th><th>Slowest Processing Time</th></tr></thead><tbody>'
     + (rows.length ? rows.map(function(r){
         return '<tr><td>'+esc(r.name)+'</td><td>'+r.documents+'</td><td>'+r.landTransfers+'</td><td>'+r.completed+'</td><td>'+t(r.avgProcessingSeconds)+'</td><td>'+t(r.fastestSeconds)+'</td><td>'+t(r.slowestSeconds)+'</td></tr>';
       }).join('') : '<tr><td colspan="7" class="sr-empty">No active staff accounts.</td></tr>')
@@ -2730,7 +2739,7 @@ function srPrintAllRequestsHtml(d, acct){
   var nothing = !cards.total && !Number(docSum.total.completed||0) && !Number(landSum.total.completed||0);
 
   // Same columns as the on-screen summary tables.
-  var summary = function(title, firstCol, sum, submittedCount, emptyText){
+  var summary = function(title, firstCol, sum, submittedCount, emptyText, applications){
     var tot = sum.total || {};
     var row = function(r, isTotal){
       return '<tr'+(isTotal?' class="rp-total"':'')+'><td>'+esc(r.label)+'</td><td class="num">'+(r.total||0)+'</td><td class="num">'+(r.completed||0)+'</td>'
@@ -2738,7 +2747,8 @@ function srPrintAllRequestsHtml(d, acct){
     };
     var rowCount = (sum.rows||[]).length + 1;
     return '<section class="rp-block'+(rowCount<=12?' rp-keep':'')+'"><h2>'+esc(title)+'</h2>'
-      + '<p class="rp-stats">Requests submitted: <b>'+submittedCount+'</b> &nbsp;·&nbsp; Completed: <b>'+(tot.completed||0)+'</b>'
+      + '<p class="rp-stats">'+(applications!=null ? 'Applications: <b>'+applications+'</b> &nbsp;·&nbsp; Individual document requests submitted: <b>'+submittedCount+'</b>' : 'Requests submitted: <b>'+submittedCount+'</b>')
+        + ' &nbsp;·&nbsp; Completed: <b>'+(tot.completed||0)+'</b>'
         + ' &nbsp;·&nbsp; Average processing time: <b>'+esc(t(tot.avgProcessingSeconds))+'</b></p>'
       + '<table class="rp-table rp-sum"><colgroup><col class="c1"><col class="cn"><col class="cn"><col class="ct"><col class="ct"></colgroup>'
       + '<thead><tr><th>'+esc(firstCol)+'</th><th class="num">Total Requests</th><th class="num">Completed</th><th class="num">Fastest Processing Time</th><th class="num">Slowest Processing Time</th></tr></thead>'
@@ -2755,10 +2765,10 @@ function srPrintAllRequestsHtml(d, acct){
     var names = tops.map(function(r){ return esc(r.name); });
     var joined = names.length===1 ? names[0] : names.slice(0,-1).join(', ')+' and '+names[names.length-1];
     staffBlock += '<p class="rp-top-line"><b>'+(tops.length>1 ? 'Top performers (tied): ' : 'Top performer: ')+joined+'</b> — '
-      + tops[0].completed+' completed request'+(tops[0].completed===1?'':'s')
+      + tops[0].completed+' completed individual request'+(tops[0].completed===1?'':'s')
       + (tops[0].avgProcessingSeconds==null ? ', no recorded processing time' : ', average processing time '+esc(srExactDuration(tops[0].avgProcessingSeconds)))+'.</p>'
       + '<table class="rp-table rp-staff"><colgroup><col class="cr"><col class="c1"><col class="cn"><col class="cn"><col class="cn"><col class="ct"></colgroup>'
-      + '<thead><tr><th class="ctr">Rank</th><th>Staff Name</th><th class="num">Document Requests Processed</th><th class="num">Land Transfers Processed</th><th class="num">Total Requests Completed</th><th class="num">Average Processing Time</th></tr></thead><tbody>'
+      + '<thead><tr><th class="ctr">Rank</th><th>Staff Name</th><th class="num">Document Requests Processed (individual documents)</th><th class="num">Land Transfers Processed</th><th class="num">Total Requests Completed (individual requests)</th><th class="num">Average Processing Time</th></tr></thead><tbody>'
       + ranked.map(function(r){
           return '<tr'+(r.rank===1?' class="rp-top"':'')+'><td class="ctr">'+r.rank+'</td><td>'+esc(r.name)+(r.rank===1?'<span class="rp-badge">Top performer</span>':'')+'</td>'
             + '<td class="num">'+(r.documents||0)+'</td><td class="num">'+(r.landTransfers||0)+'</td><td class="num">'+r.completed+'</td>'
@@ -2766,7 +2776,7 @@ function srPrintAllRequestsHtml(d, acct){
         }).join('')
       + '</tbody></table>';
   }
-  staffBlock += '<p class="rp-note">Ranking basis: requests the staff member completed from '+esc(phFormatDate(d.from))+' to '+esc(phFormatDate(d.to))
+  staffBlock += '<p class="rp-note">Ranking basis: individual requests (each document of an application counts once) the staff member completed from '+esc(phFormatDate(d.from))+' to '+esc(phFormatDate(d.to))
     + ', ranked by total completed, then by faster average processing time (valid recorded durations only). Identical results share a rank; staff with no completions are not ranked.</p></section>';
 
   return '<div class="rp">'
@@ -2776,7 +2786,7 @@ function srPrintAllRequestsHtml(d, acct){
     + '<div class="rp-title">MONTHLY REQUEST SUMMARY REPORT</div>'
     + '<div class="rp-period">'+esc(period)+'</div>'
     + (nothing ? '<p class="rp-notice">No requests were recorded during '+esc(d.label)+'.</p>' : '')
-    + summary('Document Request Summary', 'Report Title', docSum, cards.documents||0, 'No document request categories recorded.')
+    + summary('Document Request Summary', 'Report Title', docSum, cards.documents||0, 'No document request categories recorded.', srNum(cards.documentApplications, cards.documents))
     + summary('Land Transfer Summary', 'Report Type', landSum, cards.landTransfers||0, 'No land transfer categories recorded.')
     + staffBlock
     + '<div class="rp-closing"><div class="rp-sign"><div class="rp-sign-label">Prepared by:</div>'
@@ -2876,15 +2886,20 @@ function renderReports(acct){
   + '<div class="sysreport'+(sr.loading?' is-loading':'')+'" id="sysreport" aria-busy="'+(sr.loading?'true':'false')+'">' + filters
   + (sr.error ? '<p class="field-error">'+esc(sr.error)+' <button type="button" class="dash-link" data-action="sr-retry">Try again</button></p>' : '')
   + '<div class="sr-stats">'
-    + srStatCard('Total Document Request', c.documents, p.documents, 'tone-green', false)
-    + srStatCard('Total Land Transfer', c.landTransfers, p.landTransfers, 'tone-gray', false)
-    + srStatCard('Total Requests', c.total, p.total, 'tone-green', false)
+    // Applications and individual requests are shown apart: one Document Request application can ask for
+    // up to 5 documents, each processed as its own request (older requests: one document per application).
+    + srStatCard('Document Request Applications', srNum(c.documentApplications, c.documents), srNum(p.documentApplications, p.documents), 'tone-green', false,
+        c.documents+' individual document request'+(c.documents===1?'':'s'))
+    + srStatCard('Individual Document Requests', c.documents, p.documents, 'tone-green', false, 'Each requested document counts once')
+    + srStatCard('Total Land Transfer', c.landTransfers, p.landTransfers, 'tone-gray', false, 'One request per application')
+    + srStatCard('Total Applications', srNum(c.applications, c.total), srNum(p.applications, p.total), 'tone-green', false,
+        c.total+' individual request'+(c.total===1?'':'s')+' in all')
   + '</div>'
   + '<div class="sr-mid">'
     + '<section class="sr-card sr-overview"><div class="sr-overview-head"><h3>Requests Overview</h3><span class="sr-overview-sub">Per month · '+d.year+'</span></div>'
       + '<div class="sr-chart" data-sr-chart><div class="sr-chart-scroll">'+srChart(d, sr.type)+'</div><div class="sr-tip" data-sr-tip hidden></div></div>'
-      + '<div class="sr-legend" aria-hidden="true">'+(sr.type!=='land'?'<span><i class="sr-key doc"></i>Document Requests</span>':'')+(sr.type!=='doc'?'<span><i class="sr-key land"></i>Land Transfer Requests</span>':'')+'<span class="sr-legend-sel"><i class="sr-key sel"></i>'+esc(SR_MONTHS[d.month-1])+' (selected)</span></div>'
-      + '<p class="sr-chart-note">Requests submitted per month in '+d.year+'. Hover or focus a month for exact counts.</p>'
+      + '<div class="sr-legend" aria-hidden="true">'+(sr.type!=='land'?'<span><i class="sr-key doc"></i>Document Requests (individual documents)</span>':'')+(sr.type!=='doc'?'<span><i class="sr-key land"></i>Land Transfer Requests</span>':'')+'<span class="sr-legend-sel"><i class="sr-key sel"></i>'+esc(SR_MONTHS[d.month-1])+' (selected)</span></div>'
+      + '<p class="sr-chart-note">Each document in a multi-document application is counted as its own request. Requests submitted per month in '+d.year+'. Hover or focus a month for exact counts.</p>'
     + '</section>'
     + '<section class="sr-card sr-summary"><h3>Report Summary</h3>'
       + '<dl>'+summaryRows.map(function(r){ return '<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>'; }).join('')+'</dl>'
@@ -3039,6 +3054,8 @@ function reqProcessingActions(r){
 function reqTableRow(r, kind){
   var m = STATUS_META[r.status] || STATUS_META.Received;
   var sub = kind==='doc' ? esc(r.docType) : esc(r.transferType)+' &middot; '+esc(r.tctNo);
+  // A document of a multi-document application: its place in the application.
+  if(r.applicationRef && r.itemCount) sub += ' &middot; Document '+esc(r.itemNo)+' of '+esc(r.itemCount);
   var applicantLabel = kind==='doc' ? 'Applicant / Document Type' : 'Applicant / Transfer Type';
   return '<tr><td class="mono" data-label="Reference No.">'+esc(r.id)+'</td><td class="cell-name" data-label="'+applicantLabel+'">'+esc(r.applicant)+'<div class="cell-sub">'+sub+'</div>'+processingStaffHtml(r)+processingTimerHtml(r)+'</td>'
     + '<td data-label="Barangay">'+esc(r.barangay)+'</td><td data-label="Date Submitted">'+fmtDate(r.submitted)+'</td>'
@@ -4025,8 +4042,10 @@ function modalReportDetail(id){
   var rows = [];
   var requestDetails = [];
   if(r.type==='document' || r.type==='land-transfer'){
-    rows = [['Total Requests', s.total], ['Assigned to Staff', s.assigned], ['Awaiting Acceptance', s.unassigned], ['Completed', s.completed], ['Pending / In Progress', s.pending], ['Rejected', s.rejected], ['Timed Out', s.timedOut],
-      ['Completed With Recorded Duration', s.completedWithDuration], ['Average Processing Duration', s.averageDurationSeconds==null?'—':formatDuration(s.averageDurationSeconds)]];
+    // Document Requests: applications and individual document requests apart; status rows count individual requests.
+    rows = (r.type==='document' ? [['Applications', s.applications==null ? s.total : s.applications], ['Individual Document Requests', s.total]] : [['Total Requests', s.total]]).concat([['Assigned to Staff', s.assigned], ['Awaiting Acceptance', s.unassigned], ['Completed', s.completed], ['Pending / In Progress', s.pending], ['Rejected', s.rejected], ['Timed Out', s.timedOut],
+      ['Completed With Recorded Duration', s.completedWithDuration], ['Average Processing Duration', s.averageDurationSeconds==null?'—':formatDuration(s.averageDurationSeconds)]]);
+    if(r.type==='document') rows = rows.map(function(x, i){ return i>=2 && i<=8 ? [x[0]+' (individual requests)', x[1]] : x; });
     requestDetails = s.requestDetails || [];
   } else if(r.type==='requirement'){
     rows = [['Total Checked', s.checked], ['Complete', s.complete], ['Incomplete', s.incomplete], ['Invalid', s.invalid]];
@@ -4127,6 +4146,8 @@ function modalReqDetail(id, kind){
     [kind==='doc'?'Document Type':'Transfer Type', esc(kind==='doc'?r.docType:r.transferType)],
     kind==='doc' ? ['Purpose', esc(r.purpose)] : ['TCT / OCT No.', '<span class="mono">'+esc(r.tctNo)+'</span>'],
     ['Date Submitted', fmtDateTime(r.submitted)],
+    // One application can ask for several documents; each is processed as its own request.
+    r.applicationRef ? ['Application', '<span class="mono">'+esc(r.applicationRef)+'</span> <span class="cell-sub">(Document '+esc(r.itemNo)+' of '+esc(r.itemCount)+'; each document is processed separately)</span>'] : null,
     ['Current Status', '<span class="badge '+(STATUS_META[r.status]||STATUS_META.Received).cls+'">'+esc(statusLabel(r.status))+'</span>'],
     ['Assigned Processor', r.processingStaffId ? esc(r.processingStaffName||'Staff account #'+r.processingStaffId)+' <span class="cell-sub">(Staff ID: '+esc(r.processingStaffId)+')</span>' : 'Unassigned'],
     timeline ? ['Processing Timeline', timeline, true] : null,

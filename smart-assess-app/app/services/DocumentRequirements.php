@@ -12,6 +12,8 @@ final class DocumentRequirements
      * limit OCR applies, so an accepted upload can always be read.
      */
     public const MAX_FILE_BYTES = 5 * 1024 * 1024;
+    /** Different documents one Document Request application may ask for (each its own request). */
+    public const MAX_DOCUMENTS_PER_APPLICATION = 5;
     /** IDs and the authorization letter: photos or scans as JPG/PNG only (as the public form says). */
     public const IDENTITY_KEYS = ['ownerId', 'requesterId', 'authLetter'];
     private const IDENTITY_MIME_TYPES = [

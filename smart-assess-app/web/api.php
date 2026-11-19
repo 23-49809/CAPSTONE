@@ -297,7 +297,7 @@ function sa_normalize_bridge_request(array $data): array
         $bridgeId = trim((string) $data['id']);
         if (ctype_digit($bridgeId)) {
             $data['request_id'] = (int) $bridgeId;
-        } elseif (preg_match('/^(?:DR|LT)-\d{4}-[A-Z0-9]{1,12}$/i', $bridgeId)) {
+        } elseif (preg_match('/^(?:DR|LT)-\d{4}-[A-Z0-9]{1,12}(?:-[1-9])?$/i', $bridgeId)) {
             $data['request_ref'] = strtoupper($bridgeId);
         }
     }
@@ -670,6 +670,14 @@ function sa_submit_request(array $data): array
         stripos((string) $values['address_line'], (string) $values['requester_barangay']) === false) {
         $values['address_line'] = mb_substr($values['address_line'] . ', Barangay ' . $values['requester_barangay'], 0, 255);
     }
+    // Document Requests: one application may ask for several different documents (up to
+    // DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION), each with its own purpose. Without
+    // a list, the single document_type and purpose fields are used, as before.
+    $items = null;
+    if ($flow === 'docreq' && array_key_exists('document_requests', $data)) {
+        $items = sa_document_request_items($data['document_requests']);
+        $values['purpose'] = $items[0]['purpose'];
+    }
     if ($values['purpose'] === null) {
         throw new SaHttpException(422);
     }
@@ -691,7 +699,12 @@ function sa_submit_request(array $data): array
     if (!preg_match('/^14-\d{4}-\d{5}$/', (string) $values['arp_number'])) {
         throw new SaHttpException(422, 'Enter the ARP number in 14-XXXX-XXXXX format.');
     }
-    $values['document_type'] = $flow === 'docreq' ? sa_text($data, 'document_type', 120, true) : null;
+    $values['document_type'] = $flow === 'docreq' ? ($items[0]['document_type'] ?? sa_text($data, 'document_type', 120, true)) : null;
+    $items ??= [['document_type' => $values['document_type'], 'purpose' => $values['purpose']]];
+    $isApplication = count($items) > 1;
+    if ($isApplication && !sa_applications_available()) {
+        throw new SaHttpException(422, 'Several documents in one application are not available yet. Submit one document per application.');
+    }
     $values['transfer_type'] = $flow === 'landtransfer' ? sa_text($data, 'transfer_type', 40, true) : null;
     $values['is_owner'] = filter_var($data['is_owner'] ?? true, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
     $client = sa_current_client();
@@ -767,41 +780,42 @@ function sa_submit_request(array $data): array
                 }
             }
         }
+        // Several documents in one application: every required file must be present, newly uploaded
+        // or saved with the draft, or nothing at all is saved (this runs before anything is written).
+        // A single document keeps the earlier rule: a missing file is recorded for Staff to follow up.
+        if ($isApplication) {
+            $missingLabels = [];
+            foreach ($documents as $key => $label) {
+                if (!isset($files[$key]) && !isset($draftFiles[$key])) {
+                    $missingLabels[] = $label;
+                }
+            }
+            if ($missingLabels !== []) {
+                throw new SaHttpException(422, 'Upload every required document before submitting: ' . implode(', ', $missingLabels) . '. Nothing was submitted.');
+            }
+        }
         // Server-side Terms and Conditions check (not just the checkbox).
         $termsAcceptanceId = sa_terms_require($pdo, $data, $flow);
-        $reference = strtoupper($flow === 'docreq' ? 'DR' : 'LT') . '-' . date('Y') . '-' . strtoupper(bin2hex(random_bytes(4)));
+        // One reference for the application. With several documents, each document is its own
+        // request (own status, Staff member, files and document check), linked to the application
+        // and numbered with the application reference plus "-1", "-2", ...
+        $reference = sa_new_reference($pdo, $flow);
+        $applicationId = null;
+        if ($isApplication) {
+            $pdo->prepare('INSERT INTO request_applications (reference_no, flow, client_id, item_count) VALUES (:ref, :flow, :client, :count)')
+                ->execute(['ref' => $reference, 'flow' => $flow, 'client' => $client['id'] ?? null, 'count' => count($items)]);
+            $applicationId = (int) $pdo->lastInsertId();
+        }
         $stmt = $pdo->prepare(
             "INSERT INTO requests
              (client_id, reference_no, flow, first_name, middle_name, last_name, contact_number, email,
               address_line, province, city, zip_code, document_type, transfer_type, purpose, arp_number,
-              property_address, barangay, is_owner, status, requirement_complete)
+              property_address, barangay, is_owner, status, requirement_complete" . ($isApplication ? ', application_id, item_no' : '') . ")
              VALUES
              (:client_id, :reference_no, :flow, :first_name, :middle_name, :last_name, :contact_number, :email,
               :address_line, :province, :city, :zip_code, :document_type, :transfer_type, :purpose, :arp_number,
-              :property_address, :barangay, :is_owner, 'Received', 0)"
+              :property_address, :barangay, :is_owner, 'Received', 0" . ($isApplication ? ', :application_id, :item_no' : '') . ")"
         );
-        $stmt->execute([
-            'client_id' => $client['id'] ?? null,
-            'reference_no' => $reference,
-            'flow' => $flow,
-            'first_name' => $values['first_name'],
-            'middle_name' => $values['middle_name'],
-            'last_name' => $values['last_name'],
-            'contact_number' => $values['contact_number'],
-            'email' => $values['email'],
-            'address_line' => $values['address_line'],
-            'province' => $values['province'],
-            'city' => $values['city'],
-            'zip_code' => $values['zip_code'],
-            'document_type' => $values['document_type'],
-            'transfer_type' => $values['transfer_type'],
-            'purpose' => $values['purpose'],
-            'arp_number' => $values['arp_number'],
-            'property_address' => $values['property_address'],
-            'barangay' => $values['barangay'],
-            'is_owner' => $values['is_owner'],
-        ]);
-        $requestId = (int) $pdo->lastInsertId();
         $privateBase = dirname(__DIR__) . '/private_uploads';
         $uploadDir = $privateBase . '/requests';
         if (!is_dir($uploadDir) && !mkdir($uploadDir, 0750, true) && !is_dir($uploadDir)) {
@@ -821,79 +835,144 @@ function sa_submit_request(array $data): array
             "INSERT INTO document_validation (request_document_id, validation_status)
              VALUES (:document_id, 'pending')"
         );
-        $missing = 0;
-        foreach ($documents as $key => $label) {
-            if (isset($files[$key])) {
-                [$original, $mime, $size, $extension] = $preparedFiles[$key];
-                $storedName = $requestId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
-                $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
-                if (!move_uploaded_file((string) $files[$key]['tmp_name'], $destination)) {
-                    throw new RuntimeException('Unable to store uploaded file.');
-                }
-                chmod($destination, 0640);
-                $storedFiles[] = $destination;
-                $documentInsert->execute([
-                    'request_id' => $requestId,
-                    'doc_key' => $key,
-                    'label' => $label,
-                    'original_name' => $original,
-                    'stored_path' => 'private_uploads/requests/' . $storedName,
-                    'mime_type' => $mime,
-                    'file_size' => $size,
-                    'file_status' => 'ok',
-                ]);
-            } elseif (isset($draftFiles[$key])) {
-                // Saved with the draft earlier: COPIED into the request folder, not renamed. A new file
-                // gets the folder's default access entries (the AI dispatcher's read group, when that
-                // is installed), and the draft keeps its own file until this request is committed, so
-                // a failed or uncertain submission never takes the draft's documents away.
-                $draftFile = $draftFiles[$key];
-                $extension = strtolower(pathinfo((string) $draftFile['path'], PATHINFO_EXTENSION));
-                $storedName = $requestId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
-                $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
-                if (!@copy((string) $draftFile['path'], $destination) || filesize($destination) !== filesize((string) $draftFile['path'])) {
-                    @unlink($destination);
-                    throw new RuntimeException('Unable to store a saved draft file.');
-                }
-                chmod($destination, 0640);
-                $storedFiles[] = $destination;   // the copy: removed if the submission is not saved
-                $draftOriginals[] = (string) $draftFile['path'];
-                $documentInsert->execute([
-                    'request_id' => $requestId,
-                    'doc_key' => $key,
-                    'label' => $label,
-                    'original_name' => $draftFile['original_name'],
-                    'stored_path' => 'private_uploads/requests/' . $storedName,
-                    'mime_type' => $draftFile['mime_type'],
-                    'file_size' => (int) $draftFile['file_size'],
-                    'file_status' => 'ok',
-                ]);
-            } else {
-                $missing++;
-                $documentInsert->execute([
-                    'request_id' => $requestId,
-                    'doc_key' => $key,
-                    'label' => $label,
-                    'original_name' => null,
-                    'stored_path' => null,
-                    'mime_type' => null,
-                    'file_size' => null,
-                    'file_status' => 'missing',
-                ]);
+        $requestIds = [];
+        // The uploaded files are shared by every document of the application: stored once for the
+        // first document, then copied, so each document request keeps its own files for Staff.
+        $sharedFiles = [];
+        foreach ($items as $index => $item) {
+            $itemReference = $isApplication ? $reference . '-' . ($index + 1) : $reference;
+            $stmt->execute([
+                'client_id' => $client['id'] ?? null,
+                'reference_no' => $itemReference,
+                'flow' => $flow,
+                'first_name' => $values['first_name'],
+                'middle_name' => $values['middle_name'],
+                'last_name' => $values['last_name'],
+                'contact_number' => $values['contact_number'],
+                'email' => $values['email'],
+                'address_line' => $values['address_line'],
+                'province' => $values['province'],
+                'city' => $values['city'],
+                'zip_code' => $values['zip_code'],
+                'document_type' => $item['document_type'],
+                'transfer_type' => $values['transfer_type'],
+                'purpose' => $item['purpose'],
+                'arp_number' => $values['arp_number'],
+                'property_address' => $values['property_address'],
+                'barangay' => $values['barangay'],
+                'is_owner' => $values['is_owner'],
+            ] + ($isApplication ? ['application_id' => $applicationId, 'item_no' => $index + 1] : []));
+            $itemId = (int) $pdo->lastInsertId();
+            $requestIds[] = $itemId;
+            if ($index === 0) {
+                $requestId = $itemId;
             }
-            $validationInsert->execute(['document_id' => (int) $pdo->lastInsertId()]);
+            $missing = 0;
+            foreach ($documents as $key => $label) {
+                if ($index > 0) {
+                    if (isset($sharedFiles[$key])) {
+                        $shared = $sharedFiles[$key];
+                        $storedName = $itemId . '_' . bin2hex(random_bytes(16)) . '.' . $shared['extension'];
+                        $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
+                        if (!@copy($shared['path'], $destination) || filesize($destination) !== filesize($shared['path'])) {
+                            @unlink($destination);
+                            throw new RuntimeException('Unable to store a copy of an uploaded file.');
+                        }
+                        chmod($destination, 0640);
+                        $storedFiles[] = $destination;
+                        $documentInsert->execute([
+                            'request_id' => $itemId,
+                            'doc_key' => $key,
+                            'label' => $label,
+                            'original_name' => $shared['original'],
+                            'stored_path' => 'private_uploads/requests/' . $storedName,
+                            'mime_type' => $shared['mime'],
+                            'file_size' => $shared['size'],
+                            'file_status' => 'ok',
+                        ]);
+                    } else {
+                        $missing++;
+                        $documentInsert->execute([
+                            'request_id' => $itemId, 'doc_key' => $key, 'label' => $label, 'original_name' => null,
+                            'stored_path' => null, 'mime_type' => null, 'file_size' => null, 'file_status' => 'missing',
+                        ]);
+                    }
+                } elseif (isset($files[$key])) {
+                    [$original, $mime, $size, $extension] = $preparedFiles[$key];
+                    $storedName = $itemId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                    $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
+                    if (!move_uploaded_file((string) $files[$key]['tmp_name'], $destination)) {
+                        throw new RuntimeException('Unable to store uploaded file.');
+                    }
+                    chmod($destination, 0640);
+                    $storedFiles[] = $destination;
+                    $sharedFiles[$key] = ['path' => $destination, 'original' => $original, 'mime' => $mime, 'size' => $size, 'extension' => $extension];
+                    $documentInsert->execute([
+                        'request_id' => $itemId,
+                        'doc_key' => $key,
+                        'label' => $label,
+                        'original_name' => $original,
+                        'stored_path' => 'private_uploads/requests/' . $storedName,
+                        'mime_type' => $mime,
+                        'file_size' => $size,
+                        'file_status' => 'ok',
+                    ]);
+                } elseif (isset($draftFiles[$key])) {
+                    // Saved with the draft earlier: COPIED into the request folder, not renamed. A new file
+                    // gets the folder's default access entries (the AI dispatcher's read group, when that
+                    // is installed), and the draft keeps its own file until this request is committed, so
+                    // a failed or uncertain submission never takes the draft's documents away.
+                    $draftFile = $draftFiles[$key];
+                    $extension = strtolower(pathinfo((string) $draftFile['path'], PATHINFO_EXTENSION));
+                    $storedName = $itemId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                    $destination = $realUploadDir . DIRECTORY_SEPARATOR . $storedName;
+                    if (!@copy((string) $draftFile['path'], $destination) || filesize($destination) !== filesize((string) $draftFile['path'])) {
+                        @unlink($destination);
+                        throw new RuntimeException('Unable to store a saved draft file.');
+                    }
+                    chmod($destination, 0640);
+                    $storedFiles[] = $destination;   // the copy: removed if the submission is not saved
+                    $draftOriginals[] = (string) $draftFile['path'];
+                    $sharedFiles[$key] = ['path' => $destination, 'original' => $draftFile['original_name'], 'mime' => $draftFile['mime_type'],
+                        'size' => (int) $draftFile['file_size'], 'extension' => $extension];
+                    $documentInsert->execute([
+                        'request_id' => $itemId,
+                        'doc_key' => $key,
+                        'label' => $label,
+                        'original_name' => $draftFile['original_name'],
+                        'stored_path' => 'private_uploads/requests/' . $storedName,
+                        'mime_type' => $draftFile['mime_type'],
+                        'file_size' => (int) $draftFile['file_size'],
+                        'file_status' => 'ok',
+                    ]);
+                } else {
+                    $missing++;
+                    $documentInsert->execute([
+                        'request_id' => $itemId,
+                        'doc_key' => $key,
+                        'label' => $label,
+                        'original_name' => null,
+                        'stored_path' => null,
+                        'mime_type' => null,
+                        'file_size' => null,
+                        'file_status' => 'missing',
+                    ]);
+                }
+                $validationInsert->execute(['document_id' => (int) $pdo->lastInsertId()]);
+            }
+            if (count($documents) > 0 && $missing === 0) {
+                $pdo->prepare('UPDATE requests SET requirement_complete = 1 WHERE id = :id')->execute(['id' => $itemId]);
+            }
+            $pdo->prepare(
+                "INSERT INTO request_status_log (request_id, status, actor, sms_body)
+                 VALUES (:id, 'Received', 'client', :body)"
+            )->execute([
+                'id' => $itemId,
+                'body' => $isApplication
+                    ? 'Your application ' . $reference . ' has been received (document ' . ($index + 1) . ' of ' . count($items) . ': ' . $item['document_type'] . ').'
+                    : 'Your request ' . $reference . ' has been received.',
+            ]);
         }
-        if (count($documents) > 0 && $missing === 0) {
-            $pdo->prepare('UPDATE requests SET requirement_complete = 1 WHERE id = :id')->execute(['id' => $requestId]);
-        }
-        $initial = $pdo->prepare(
-            "INSERT INTO request_status_log (request_id, status, actor, sms_body)
-             VALUES (:id, 'Received', 'client', :body)"
-        );
-        $initial->execute([
-            'id' => $requestId,
-            'body' => 'Your request ' . $reference . ' has been received.',
-        ]);
         if ($client) {
             $notification = $pdo->prepare(
                 "INSERT INTO notifications (client_id, request_id, type, message, channel, delivery_status)
@@ -902,7 +981,9 @@ function sa_submit_request(array $data): array
             $notification->execute([
                 'client_id' => $client['id'],
                 'request_id' => $requestId,
-                'message' => 'Your request ' . $reference . ' has been received.',
+                'message' => $isApplication
+                    ? 'Your application ' . $reference . ' with ' . count($items) . ' document requests has been received.'
+                    : 'Your request ' . $reference . ' has been received.',
             ]);
         }
         sa_terms_link($pdo, $termsAcceptanceId, $requestId);
@@ -922,9 +1003,13 @@ function sa_submit_request(array $data): array
         // If queueing fails, the submission still succeeds: the queue insert runs behind
         // a savepoint, so a failed insert is undone without touching the request.
         if (AiVerification::available($pdo)) {
+            $queueing = $requestId;   // the document request being queued, for the log below
             try {
                 $pdo->exec('SAVEPOINT sa_ai_queue');
-                AiVerification::enqueueIfEligible($pdo, $requestId);
+                foreach ($requestIds as $queuedId) {
+                    $queueing = $queuedId;
+                    AiVerification::enqueueIfEligible($pdo, $queuedId);
+                }
             } catch (Throwable) {
                 try {
                     $pdo->exec('ROLLBACK TO SAVEPOINT sa_ai_queue');
@@ -934,7 +1019,10 @@ function sa_submit_request(array $data): array
                     // submission must fail instead of returning a reference that was never saved.
                     sa_submission_still_saved($pdo, $requestId, 'queueing the AI check');
                 }
-                error_log('[SMART_ASSESS_AI] Could not queue the AI check for request ID ' . $requestId . '.');
+                // One savepoint covers every document of the application, so a failure leaves none of them
+                // queued (Staff can run each check from Document Review); the log names the one that failed.
+                error_log('[SMART_ASSESS_AI] Could not queue the AI check for request ID ' . $queueing
+                    . ($isApplication ? ' (application ' . $reference . ', ' . count($requestIds) . ' documents; none of them were queued)' : '') . '.');
             }
         }
         // Automatic confirmation (SMS, and email when given): queued with the request,
@@ -991,7 +1079,9 @@ function sa_submit_request(array $data): array
         // This browser session submitted it, so its receipt and tracking show the
         // full applicant name (the duplicate return above records nothing).
         sa_remember_submitted_reference($reference);
-        return ['reference_no' => $reference, 'status' => 'Received'];
+        return ['reference_no' => $reference, 'status' => 'Received']
+            + ($isApplication ? ['documents' => array_map(static fn (int $i): array => ['reference_no' => $reference . '-' . ($i + 1),
+                'document_type' => $items[$i]['document_type']], array_keys($items))] : []);
     } catch (Throwable $exception) {
         // A lost connection makes rollBack() itself fail; the database then discards the
         // uncommitted transaction on its own. Either way the clean-up below must still run.
@@ -1015,6 +1105,41 @@ function sa_submit_request(array $data): array
         }
         throw $exception;
     }
+}
+
+/**
+ * The document requests of one application: 1 to DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION
+ * items, each a document type and its purpose; the same document type cannot be chosen twice.
+ *
+ * @return list<array{document_type: string, purpose: string}>
+ */
+function sa_document_request_items(mixed $raw): array
+{
+    if (is_string($raw)) {
+        $raw = json_decode($raw, true);
+    }
+    if (!is_array($raw) || !array_is_list($raw) || $raw === []) {
+        throw new SaHttpException(422, 'Choose at least one document to request.');
+    }
+    if (count($raw) > DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION) {
+        throw new SaHttpException(422, 'One application can include up to ' . DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION . ' documents.');
+    }
+    $items = [];
+    $seen = [];
+    foreach ($raw as $item) {
+        if (!is_array($item)) {
+            throw new SaHttpException(422, 'Choose at least one document to request.');
+        }
+        $type = (string) sa_text($item, 'document_type', 120, true);
+        $purpose = (string) sa_text($item, 'purpose', 80, true);
+        $key = mb_strtolower((string) preg_replace('/\s+/u', ' ', $type), 'UTF-8');
+        if (isset($seen[$key])) {
+            throw new SaHttpException(422, 'Each document can be chosen only once in an application. Remove the repeated "' . $type . '".');
+        }
+        $seen[$key] = true;
+        $items[] = ['document_type' => $type, 'purpose' => $purpose];
+    }
+    return $items;
 }
 
 function sa_update_request_status(array $data): array
@@ -2012,7 +2137,7 @@ function sa_send_notification(array $data): array
 function sa_ai_request(PDO $pdo, array $data): array
 {
     $reference = strtoupper(trim((string) ($data['reference'] ?? '')));
-    if (!preg_match('/^(?:DR|LT)-\d{4}-[A-Z0-9]{1,12}$/', $reference)) {
+    if (!preg_match('/^(?:DR|LT)-\d{4}-[A-Z0-9]{1,12}(?:-[1-9])?$/', $reference)) {
         throw new SaHttpException(422, 'Select a valid request.');
     }
     $stmt = $pdo->prepare('SELECT id, reference_no FROM requests WHERE reference_no = :ref');
@@ -2994,17 +3119,37 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
     $prevStart = $start->modify('first day of previous month');
     $pdo = sa_db();
 
-    $counts = static function (DateTimeImmutable $from, DateTimeImmutable $to) use ($pdo): array {
+    // Applications and individual requests. One Document Request application may ask for several
+    // documents, each its own request. `documents` counts individual document requests by each
+    // request's own saved time. `documentApplications` counts applications: every request_applications
+    // record by its own creation time, plus every Document Request without an application record (an
+    // older or single-document request, one application each). It never depends on any particular
+    // document of an application still existing. Before migration 20261119 every Document Request is
+    // its own application. A land transfer is always one request and one application.
+    $applicationsAvailable = sa_applications_available();
+    $counts = static function (DateTimeImmutable $from, DateTimeImmutable $to) use ($pdo, $applicationsAvailable): array {
+        $window = ['start' => $from->format('Y-m-d H:i:s'), 'end' => $to->format('Y-m-d H:i:s')];
         $stmt = $pdo->prepare(
-            "SELECT SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers, COUNT(*) AS total
+            "SELECT SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers, COUNT(*) AS total"
+            . ($applicationsAvailable ? ", SUM(flow = 'docreq' AND application_id IS NULL) AS single_documents" : '') . "
              FROM requests WHERE created_at >= :start AND created_at < :end"
         );
-        $stmt->execute(['start' => $from->format('Y-m-d H:i:s'), 'end' => $to->format('Y-m-d H:i:s')]);
+        $stmt->execute($window);
         $row = $stmt->fetch() ?: [];
+        $documentApplications = (int) ($row['documents'] ?? 0);
+        if ($applicationsAvailable) {
+            $grouped = $pdo->prepare(
+                "SELECT COUNT(*) FROM request_applications WHERE flow = 'docreq' AND created_at >= :start AND created_at < :end"
+            );
+            $grouped->execute($window);
+            $documentApplications = (int) ($row['single_documents'] ?? 0) + (int) $grouped->fetchColumn();
+        }
         return [
             'documents' => (int) ($row['documents'] ?? 0),
             'landTransfers' => (int) ($row['land_transfers'] ?? 0),
             'total' => (int) ($row['total'] ?? 0),
+            'documentApplications' => $documentApplications,
+            'applications' => $documentApplications + (int) ($row['land_transfers'] ?? 0),
         ];
     };
     $range = ['start' => $start->format('Y-m-d H:i:s'), 'end' => $end->format('Y-m-d H:i:s')];

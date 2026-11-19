@@ -35,7 +35,7 @@ if ((int) $user['role_id'] !== 2) {
 
 $documentId = filter_var($_GET['doc'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 $reference = strtoupper(trim((string) ($_GET['ref'] ?? '')));
-if (!$documentId || !preg_match('/^(?:DR|LT)-\d{4}-[A-Z0-9]{1,12}$/', $reference)) {
+if (!$documentId || !preg_match('/^(?:DR|LT)-\d{4}-[A-Z0-9]{1,12}(?:-[1-9])?$/', $reference)) {
     $fail(404, 'Document not found.');
 }
 
