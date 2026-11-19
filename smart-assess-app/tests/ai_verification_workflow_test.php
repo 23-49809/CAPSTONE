@@ -1256,9 +1256,9 @@ $check('after the review, the cheaper hint still flags the missing file but no l
     && $fileStatus($staff8, (int) $docRows['ctcTdOrTitle']['id'], $refFiles) === 415, $hintFlags);
 // Step 10 (R4): every model judgement in Document Review is labelled as a suggestion that is not verified.
 $panel = (string) file_get_contents($work . '/smart-assess-internal.html');
-$check('Document Review: the suggested document type and the older type-match values say "Suggested from the text, not verified"; the original is the source of truth',
-    str_contains($panel, "esc(d.document_kind_label||'—')+' <span class=\"cell-sub\">Suggested from the text, not verified</span>'")
-    && str_contains($panel, "esc({yes:'Yes', no:'No', unclear:'Unclear'}[d.expected_type_match]||'—')+' <span class=\"cell-sub\">Suggested from the text, not verified</span>'")
+$check('Document Review: a document or ID type counts as confirmed only from its printed title in the file\'s text; otherwise it is labelled a suggestion; the original is the source of truth',
+    str_contains($panel, "'Its printed title or issuer ('+lab(k)+') appears in the file\\'s text.'")
+    && str_contains($panel, "d.document_kind_label+' (suggested, not confirmed)'") && str_contains($panel, "d.document_kind_label+' (suggested)'")
     && str_contains($panel, 'The original document is the source of truth.') && !str_contains($panel, "model:'AI model'"));
 
 // ================= Step 8: simultaneous openings keep one row =================

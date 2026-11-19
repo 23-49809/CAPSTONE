@@ -123,10 +123,11 @@ $popup = $between($html, 'function modalReqDetail(id, kind){', "\n}\n");
 $check('request popup no longer shows Notification History', $popup !== '' && !str_contains($popup, 'reqNotifHistoryHtml') && !str_contains($html, 'function reqNotifHistoryHtml'));
 $check('request popup has no AI Document Check section at all', $popup !== '' && !str_contains($popup, 'reqAiHtml') && !str_contains($html, 'function reqAiHtml'));
 $detail = $between($html, 'function renderDocCheckDetail(x){', "\n}\n");
-$check('Document Review labels model suggestions as not verified (current and older results)', str_contains($detail . $dc, " <span class=\"cell-sub\">Suggested from the text, not verified</span>")
-    && str_contains($dc, "facts.push(['Looks like the required document?', esc({yes:'Yes', no:'No', unclear:'Unclear'}[d.expected_type_match]||'—')+' <span class=\"cell-sub\">Suggested from the text, not verified</span>']);"));
-$check('Document Review gives each problem a short title, what to verify and (when useful) a follow-up', str_contains($dc, 'var DR_ISSUES = {') && str_contains($dc, "'<span class=\"dr-follow\">Follow-up: '")
-    && str_contains($dc, 'function drIssueFor(f, d){'));
+$check('Document Review confirms a document or ID type only from its printed title in the file\'s text; otherwise it is a suggestion or unable to verify',
+    str_contains($dc, "'Its printed title or issuer ('+lab(k)+') appears in the file\\'s text.'") && str_contains($dc, "d.document_kind_label+' (suggested, not confirmed)'")
+    && str_contains($dc, "if(d.kind_evidence==null){"));
+$check('Document Review shows each check with a written verdict, the detected value and a reason', str_contains($dc, "var DC_VERDICT = {correct:'Correct', mismatch:'Mismatch', possible:'Possible mismatch', missing:'Missing', unable:'Unable to verify'};")
+    && str_contains($dc, "<span class=\"dc-verdict\">'+esc(DC_VERDICT[c.verdict])+'</span>") && str_contains($dc, "(c.detected ? '<span class=\"dc-detected\">'+esc(c.detected)+'</span>' : '')"));
 $check('Document Review: the original first in every card, with Open (new tab) instead of a long report', str_contains($dc, "'<div class=\"dr-doc-body\">'+preview")
     && str_contains($dc, '>Open<span class="sr-only"> ') && !str_contains($dc, 'What to ask the client (if needed)') && !str_contains($dc, 'Open check'));
 $check('Document Review: back-arrow icon and View Requirements', str_contains($detail, 'class="dc-back" data-action="dc-back" aria-label="Back to Document Review list"') && str_contains($detail, "ic('chevLeft','20px')")

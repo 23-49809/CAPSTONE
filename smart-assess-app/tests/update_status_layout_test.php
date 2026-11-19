@@ -51,9 +51,11 @@ $render = static function (string $name, int $width, string $prep) use ($html, $
         . '<script>setTimeout(function(){var out={};try{' . $measure . '}catch(e){out.error=String(e)}var p=document.createElement("pre");p.id="__out";p.style.display="none";p.textContent=JSON.stringify(out);document.body.appendChild(p);},400);</script>';
     file_put_contents("{$work}/{$name}.html", $page);
     // Chrome's window cannot be narrower than 500px, so phone widths are measured inside an iframe.
+    // The frame reads the result after 5 s (1.5 s was too short on a busy machine); Chrome's virtual-time
+    // budget must be longer than that wait, or the page is captured before the read.
     file_put_contents("{$work}/{$name}-frame.html", '<html><body style="margin:0"><iframe id="f" src="' . $name . '.html" style="border:0;width:' . $width . 'px;height:900px"></iframe>'
-        . '<script>setTimeout(function(){var p=document.getElementById("f").contentDocument.getElementById("__out");var o=document.createElement("pre");o.id="__res";o.textContent=p?p.textContent:"{}";document.body.appendChild(o);},1500)</script></body></html>');
-    $cmd = escapeshellarg($chrome) . ' --headless=new --disable-gpu --hide-scrollbars --allow-file-access-from-files --virtual-time-budget=4000'
+        . '<script>setTimeout(function(){var p=document.getElementById("f").contentDocument.getElementById("__out");var o=document.createElement("pre");o.id="__res";o.textContent=p?p.textContent:"{}";document.body.appendChild(o);},5000)</script></body></html>');
+    $cmd = escapeshellarg($chrome) . ' --headless=new --disable-gpu --hide-scrollbars --allow-file-access-from-files --virtual-time-budget=8000'
         . ' --window-size=' . max($width, 500) . ',900 --dump-dom ' . escapeshellarg("file://{$work}/{$name}-frame.html") . ' 2>/dev/null';
     $dom = (string) shell_exec($cmd);
     return preg_match('#<pre id="__res">(.*?)</pre>#s', $dom, $m) ? (array) json_decode(html_entity_decode($m[1]), true) : ['error' => 'no output'];

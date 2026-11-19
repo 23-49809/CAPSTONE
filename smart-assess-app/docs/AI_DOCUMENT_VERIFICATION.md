@@ -716,6 +716,29 @@ and would fail every job as an invalid worker result. Therefore:
 The check reads source files only. A new application with the worker installed
 in Step 4 (version 1) is compatible: model quotes are then simply dropped.
 
+**Version 4 (printed titles; request-type checks).** The worker now also reports, per file,
+which document titles or issuers appear in that file's own OCR text (`kind_evidence`,
+`DocumentAnalysis::KIND_EVIDENCE`; never the file name). The application accepts versions
+1 to 4; the release before it accepts 1 to 3 and would fail version 4 answers, so the same
+order applies: application first, then the worker (the compatibility check enforces it).
+The Staff page then runs only the checks of the request type:
+
+* Document Request: on each ID, **Name Match** (the name read from the ID against the
+  submitted name; a representative's own ID is the one compared, the owner's ID name is not
+  compared when the owner's name was not submitted) and **ID Type** (a government-issued ID,
+  confirmed only when its title or issuer appears in the text).
+* Land Transfer: **Document identification** of the five required documents only (Tax
+  Declaration or Title; Deed of Sale or Donation). The ID is still required with the
+  application but is not part of its Document Check; "all checks passed" needs all five.
+  Evidence is the document's own heading (a line starting with the title, with only a short
+  tail); a document merely mentioned inside another ("covered by Transfer Certificate of Title
+  No. ...", "Tax Declaration No. ...") does not count, a title also needs its Registry of Deeds,
+  and a file showing the headings of two different documents is never Correct.
+
+Verdicts are Correct, Mismatch, Possible mismatch, Missing or Unable to verify. A type the
+model suggests without its title in the text, an unreadable file and any result from an
+earlier worker are "Unable to verify", never Correct. Everything stays advisory.
+
 ### Production worker as installed (Steps 4 and 5, 13–14 Nov 2026)
 
 The production worker differs from the separate-server plan below: it runs on
