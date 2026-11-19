@@ -158,7 +158,10 @@ final class AiDocumentWorker
                         // An OCR setting is invalid: not this job's fault, and no attempt should count.
                         throw new RuntimeException('worker_not_configured');
                     }
-                    $ocr = $ocrService->extract($path);
+                    // An ID read confidently but without its name fields gets further OCR passes.
+                    $key = $document['key'];
+                    $ocr = $ocrService->extract($path, (DocumentAnalysis::SLOT_CHECKS[$key] ?? 'none') === 'id'
+                        ? static fn (string $text): ?float => DocumentAnalysis::ocrCompleteness($key, $text) : null);
                     @unlink($path);
                 }
                 $text = $ocr['success'] ? DocumentAnalysis::normalizeText($ocr['text']) : '';
