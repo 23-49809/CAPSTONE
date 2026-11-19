@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 $root = dirname(__DIR__);
+require_once $root . '/app/services/DocumentAnalysis.php';
 $results = [];
 $check = static function (string $name, bool $passed, mixed $detail = '') use (&$results): void {
     $results[] = [$passed, $name, $passed ? '' : substr(is_string($detail) ? $detail : (string) json_encode($detail), 0, 500)];
@@ -50,6 +51,16 @@ $check('application still on versions 1-2 + version 3 worker: NOT compatible (ex
 $check('new application + version 2 worker (application deployed first): compatible (exit 0)', $code === 0 && str_contains($out, 'answers with version 2'), $out);
 [$code, $out] = $run($work . '/missing', $newWorker);
 $check('an unreadable application folder: exit 2, nothing decided', $code === 2, $out);
+
+// The operator smoke test (bin/ai-worker-smoke-test.php) expects the version this release's worker
+// answers with, from the same constant, and still runs the application's full validation.
+$smokeTest = (string) file_get_contents($root . '/bin/ai-worker-smoke-test.php');
+$check('smoke test: expects DocumentAnalysis::WORKER_RESULT_VERSION exactly (no hard-coded version number)',
+    str_contains($smokeTest, "(\$raw['version'] ?? null) === DocumentAnalysis::WORKER_RESULT_VERSION")
+    && !preg_match("/\\\$raw\\['version'\\] \\?\\? null\\) === \\d/", $smokeTest), 'version check');
+$check('smoke test: still requires the application\'s own validation of the answer', str_contains($smokeTest, "DocumentAnalysis::validateWorkerResult(\$raw, ['ownerId']);")
+    && str_contains($smokeTest, "\$check('the application accepts the answer (its own validation)', false, 'rejected');"));
+$check('smoke test: the version it expects is one the application accepts', in_array(DocumentAnalysis::WORKER_RESULT_VERSION, DocumentAnalysis::WORKER_RESULT_VERSIONS, true));
 
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {

@@ -329,8 +329,8 @@ $check('Step 17: the smoke test sends only its own synthetic image (no argument 
     && str_contains($smokeCode, "'content_base64' => base64_encode(\$png)") && str_contains($smokeCode, 'SYNTHETIC TEST DOCUMENT - NOT A REAL ID'));
 $check('Step 17: the smoke test uses no database and nothing that sends (no bootstrap, PDO, mailer or SMS)',
     !preg_match('/bootstrap\.php|new PDO|sa_db\(|gmail-mailer|iprog|IprogSms|mail\(/i', $smokeCode));
-$check('Step 17: the smoke test passes only when Tesseract read the image and the model ran (version 2, image_ocr, model ok with digest)',
-    str_contains($smokeCode, "(\$raw['version'] ?? null) === 2") && str_contains($smokeCode, "(\$document['method'] ?? null) === 'image_ocr'")
+$check('Step 17: the smoke test passes only when Tesseract read the image and the model ran (the current result version, image_ocr, model ok with digest)',
+    str_contains($smokeCode, "(\$raw['version'] ?? null) === DocumentAnalysis::WORKER_RESULT_VERSION") && str_contains($smokeCode, "(\$document['method'] ?? null) === 'image_ocr'")
     && str_contains($smokeCode, "(\$model['status'] ?? null) === 'ok'") && str_contains($smokeCode, "is_string(\$model['digest'] ?? null)")
     && str_contains($smokeCode, 'DocumentAnalysis::validateWorkerResult($raw'));
 $check('Step 17: the dispatcher account may read the smoke test (permissions script), nothing else new',

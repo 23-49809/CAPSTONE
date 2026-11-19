@@ -1254,12 +1254,12 @@ foreach (array_merge($pageData($html)['docRequests'] ?? [], $pageData($html)['la
 $check('after the review, the cheaper hint still flags the missing file but no longer reads file types; opening the bad file still answers 415',
     $hintFlags === ['ctcTdOrTitle' => true, 'notarialDeed' => false, 'ownerId' => true]
     && $fileStatus($staff8, (int) $docRows['ctcTdOrTitle']['id'], $refFiles) === 415, $hintFlags);
-// Step 10 (R4): every model judgement in the Staff panel is labelled as an unverified AI suggestion.
+// Step 10 (R4): every model judgement in Document Review is labelled as a suggestion that is not verified.
 $panel = (string) file_get_contents($work . '/smart-assess-internal.html');
-$check('Staff panel: the document type, the older type-match values, the model\'s findings and the outcome banner say "AI suggestion (unverified)"',
-    str_contains($panel, "esc(d.document_kind_label||'—')+' <span class=\"cell-sub\">AI suggestion (unverified)</span>'") && str_contains($panel, "yes:'AI suggestion (unverified): yes'")
-    && str_contains($panel, "model:'AI suggestion (unverified)'") && str_contains($panel, 'Automatic checks and AI suggestions (unverified), not a decision')
-    && !str_contains($panel, "model:'AI model'"));
+$check('Document Review: the suggested document type and the older type-match values say "Suggested from the text, not verified"; the original is the source of truth',
+    str_contains($panel, "esc(d.document_kind_label||'—')+' <span class=\"cell-sub\">Suggested from the text, not verified</span>'")
+    && str_contains($panel, "esc({yes:'Yes', no:'No', unclear:'Unclear'}[d.expected_type_match]||'—')+' <span class=\"cell-sub\">Suggested from the text, not verified</span>'")
+    && str_contains($panel, 'The original document is the source of truth.') && !str_contains($panel, "model:'AI model'"));
 
 // ================= Step 8: simultaneous openings keep one row =================
 $concurrentDoc = (int) $docRows['ownerId']['id'];
@@ -1538,8 +1538,8 @@ $jobsBefore = $allJobs();
 $requestsBefore = $allRequests();
 $attemptsBefore = (string) @file_get_contents($sendAttempts);
 $out = $smoke();
-$check('smoke test: every check passes against the real worker code (OCR through Tesseract, model ok, version 2, accepted)', $exitCode($out) === 0
-    && str_contains($out, '7 / 7 passed') && str_contains($out, 'method "image_ocr"') && str_contains($out, 'model "fake-model:1"'), $out);
+$check('smoke test: every check passes against the real worker code (OCR through Tesseract, model ok, the current result version, accepted)', $exitCode($out) === 0
+    && str_contains($out, '7 / 7 passed') && str_contains($out, 'PASS  result version ' . DocumentAnalysis::WORKER_RESULT_VERSION . ' (the worker matches this release)') && str_contains($out, 'method "image_ocr"') && str_contains($out, 'model "fake-model:1"'), $out);
 $check('smoke test: it prints no text read from the document', !str_contains($out, 'SAMPLE IDENTIFICATION') && !str_contains($out, 'TESTER') && !str_contains($out, '1990-01-01'), $out);
 $check('smoke test: it uses no database and sends nothing (jobs, requests and send attempts unchanged)', $allJobs() === $jobsBefore && $allRequests() === $requestsBefore
     && (string) @file_get_contents($sendAttempts) === $attemptsBefore);
