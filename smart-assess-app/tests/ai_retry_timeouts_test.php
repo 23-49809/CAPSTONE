@@ -673,6 +673,30 @@ $check('a document skipped for time makes the result Needs review, never Passed 
     && str_contains((string) json_encode($classified['findings']), 'time budget exceeded'), $classified['outcome']);
 $check('job files are removed afterwards', glob($work . '/state/job-*') === []);
 
+// OCR completeness: the worker asks for further OCR passes on an ID read without its name fields only.
+$completenessSeen = [];
+$recordingFactory = static function (string $directory, int $seconds) use (&$completenessSeen): object {
+    return new class ($completenessSeen) {
+        public function __construct(private array &$seen)
+        {
+        }
+        public function extract(string $path, ?callable $completeness = null): array
+        {
+            $this->seen[] = $completeness === null ? null : [$completeness("Philippine Identification Card\nApelyido/Last Name\nDELA CRUZ\nMga Pangalan/Given Names\nJU"),
+                $completeness("Philippine Identification Card\nApelyido/Last Name\nDELA CRUZ\nMga Pangalan/Given Names\nJUAN")];
+            return ['success' => true, 'text' => 'Synthetic text', 'error_code' => null, 'pages_processed' => 1, 'extraction_method' => 'image_ocr'];
+        }
+    };
+};
+$now = 0.0;
+$modelAnswer = $goodAnswer;
+(new AiDocumentWorker($work . '/state', $recordingFactory, $chat, 'fake-model:1', null, 'tesseract (eng)', 16_000, 900, 40, $clock))->run(AiDocumentWorker::validateJob(array_merge($job, [
+    'documents' => [['key' => 'requesterId', 'label' => 'Valid ID', 'mime' => 'image/png', 'content_base64' => base64_encode('id')],
+        ['key' => 'taxDeclaration', 'label' => 'Tax Declaration', 'mime' => 'image/png', 'content_base64' => base64_encode('td')]],
+], ['time_budget_seconds' => 300])));
+$check('worker: an ID slot gets the completeness check (a cut-off given name is incomplete, the full card complete); other documents get none',
+    $completenessSeen === [[0.5, 1.0], null], $completenessSeen);
+
 $now = 0.0;
 $ocrGiven = [];
 $modelTimeouts = [];

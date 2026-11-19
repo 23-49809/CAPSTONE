@@ -67,6 +67,7 @@ Client ──submit──▶ PHP app (web/api.php) ──same DB transaction─�
 | `app/services/AiWorkerHttp.php` | Worker HTTP handling: auth, replay, size limit, one job at a time. |
 | `app/services/OllamaClient.php` | Ollama `/api/chat` with JSON-schema output, bounded. |
 | `app/services/OcrService.php` | Existing OCR service (now with configurable languages). |
+| `app/services/OcrImagePreparer.php` | GD-only greyscale / straightened / cleaned copies of an image, made only when the first OCR pass reads poorly. |
 | `worker/index.php` | The worker's only web entry point. |
 | `bin/ai-verification-dispatch.php` | Dispatcher (CLI). |
 | `bin/ai-model-evaluation.php` | Compares local models on synthetic documents. |
@@ -367,6 +368,75 @@ Worker:
 | `SMART_ASSESS_WORKER_OCR_TOTAL_TIMEOUT` | 90 | per document |
 | `SMART_ASSESS_WORKER_TESSERACT_PATH`, `..._PDFINFO_PATH`, `..._PDFTOTEXT_PATH`, `..._PDFTOPPM_PATH` | `/usr/bin` or `/usr/local/bin` | PATH is never searched |
 
+### OCR passes and image preparation
+
+`OcrService` reads each image (and each rendered PDF page) in one Tesseract pass first, as
+uploaded, asking for word confidences (TSV). It retries only when that pass reads poorly
+(fewer than 150 letters/digits read with confidence 70 or more, or a mean word confidence
+under 80) **or is incomplete**: for an ID slot the worker passes a completeness check
+(`DocumentAnalysis::ocrCompleteness()`): a PhilSys card counts as complete only when its title,
+field labels and name fields were read (a cut-off "JU" is not a name), another accepted ID when
+its printed title was read. A confident but incomplete reading is therefore not accepted while
+a retry may read more. Other documents get no completeness check.
+
+At most seven retries run: Tesseract's orientation detection (PSM 1, for photos taken sideways
+or upside down; needs `osd.traineddata`, skipped without it), a single-block layout (PSM 6, for
+cards held at an angle), and greyscale, straightened, sharpened and cleaned copies made with
+PHP's GD extension (`OcrImagePreparer`). The most complete pass wins, then the most confidently
+read one, so no transformation is applied blindly; a clear, complete image still takes one pass.
+Nothing is invented: when no pass reads a field, the field stays unverified.
+
+Straightening crops a light card from a darker background and measures the text angle on the
+central part of the card only (dark table corners would otherwise decide the angle).
+Brightness stretching was evaluated and is not used (it helped only cards already read).
+
+Limits: retries stop at the document's OCR deadline; a copy is prepared only with at least 2 s
+left (GD work cannot be interrupted); on a PDF, retries leave 4 s for each page still to read.
+GD decodes only JPEG and PNG (WebP is left to Tesseract) of at most 12 MP, and works on at most
+2400 px. Measured on a 12 MP photo: PHP resident memory +150 MB, Tesseract about 170 MB in its
+own process, so about 350 MB at the peak in the 1 GiB worker slice (one job at a time). GD memory
+is not counted by PHP's `memory_limit`; these size limits bound it. The original upload is never
+changed; copies are 0600 files in the private temporary folder, removed with it (and with the
+job folder by `WorkerStateCleaner` if the process is killed).
+
+Without GD on the worker the retries use Tesseract's modes only: on the synthetic set, 13 of 16
+names instead of 16 (noisy and dark-table photos are lost), never a wrong name.
+
+A PDF page whose text layer has fewer than 200 letters/digits (for example a typed header over
+a scanned card) is also OCR'd; the OCR text replaces the layer only when it reads at least 20
+more letters/digits, and a failed or late OCR keeps the layer (the page never fails because of it).
+
+#### Checking the worker's OCR dependencies (read-only)
+
+Run on the server as an administrator; none of these change anything. The worker pool may run
+with its own runtime configuration, so check GD with the pool's own binary and flags, not the
+command-line PHP:
+
+1. `systemctl cat smart-assess-ai-worker-fpm.service`: note the `ExecStart` binary and its
+   `-c`/`-n`/`-y` options (the runtime files are in `/etc/smart-assess-ai-worker-runtime/`).
+2. GD in that runtime: `<that php-fpm binary> <same -c/-n options> -m | grep -ix gd`, and
+   `<binary> <options> -i | grep -E 'GD Support|JPEG Support|PNG Support|disable_functions'`
+   (JPEG and PNG support must be enabled; `imagecreatefromjpeg`/`imagecreatefrompng` must not be
+   in `disable_functions`). Also `dpkg -l | grep -E 'php8\.5-gd'`.
+3. Tesseract, as the pool's account (the `user =` line of the runtime pool file):
+   `sudo -u <that user> /usr/bin/tesseract --version` and
+   `sudo -u <that user> /usr/bin/tesseract --list-langs` (must list `eng` and `osd`; the
+   folder it prints must hold `osd.traineddata`). Also `dpkg -l | grep -E 'tesseract-ocr-(eng|osd)'`.
+4. Missing GD or `osd` does not stop the worker or fail any document; it only means fewer
+   retries. Installing either is a production change and needs its own approval.
+
+OpenCV was evaluated (perspective warp, CLAHE, denoising, adaptive thresholds) and is not
+used: on the synthetic cards GD plus Tesseract's own layout modes read every case OpenCV did,
+while OpenCV would add a Python runtime and about 110 MB per call on the worker. CLAHE,
+denoising and adaptive thresholds often made reading worse.
+
+**PhilSys names.** When the model gives no name that is found in an ID's text and the text
+carries the PhilSys card titles, `DocumentAnalysis::philsysName()` reads the labelled fields
+(Apelyido/Last Name, Mga Pangalan/Given Names, Gitnang Apelyido/Middle Name; labels may be
+misread by one letter): each value is the next line, in capitals. Both the last and the given
+name are required, so a card whose last name cannot be read keeps its name unverified; nothing
+is guessed. The name found still goes through the same check against the card's text.
+
 ### Tagalog OCR
 
 Only English (`eng`) language data is installed locally. Filipino documents and
@@ -399,6 +469,7 @@ SMART_ASSESS_DB_PASS='<password>' \
 SMART_ASSESS_TEST_DB_ADMIN_USER=<scratch admin> SMART_ASSESS_TEST_DB_ADMIN_PASS='<password>' \
 php tests/ai_verification_workflow_test.php
 php tests/ocr_service_test.php
+php tests/ocr_scenarios_test.php   # real Tesseract on generated fictional cards; exits 2 without the tools
 ```
 
 The workflow test also forces real InnoDB deadlocks (it needs the TRIGGER privilege

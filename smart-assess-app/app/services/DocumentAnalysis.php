@@ -486,7 +486,11 @@ final class DocumentAnalysis
             $shown = trim((string) preg_replace('/\s+/u', ' ', (string) preg_replace('/-\s+/u', '-', $shown)));
             return [self::completeName($tokens, range($i, $i + $count - 1)) ? 'exact' : 'incomplete', $shown];
         }
-        // 2. Labelled parts: each word of the name, with only name-field labels between them.
+        // 2. Labelled parts: each word of the name, with only name-field labels between them (at most
+        //    MAX_LABEL_WORDS_BETWEEN between two parts). OCR misreads labels ("Pahgalan", "Middie"),
+        //    so a label may be one letter off, and when the name parts are in capitals (as on ID cards)
+        //    a word that is not in capitals on a line that has a label counts as part of the label.
+        $labelLines = self::labelLines($tokens);
         foreach ($tokens as $start => $first) {
             if (!in_array($first['fold'], $want, true)) {
                 continue;
@@ -494,12 +498,15 @@ final class DocumentAnalysis
             $left = $want;
             $found = [];
             $labels = 0;
+            $upper = true;
             for ($j = $start; $j < count($tokens) && $left !== []; $j++) {
                 $at = array_search($tokens[$j]['fold'], $left, true);
                 if ($at !== false) {
                     unset($left[$at]);
                     $found[] = $j;
-                } elseif (in_array($tokens[$j]['fold'], self::NAME_FIELD_LABELS, true) && ++$labels <= self::MAX_LABEL_WORDS_BETWEEN) {
+                    $labels = 0;
+                    $upper = $upper && mb_strtoupper($tokens[$j]['word']) === $tokens[$j]['word'];
+                } elseif (self::isLabel($tokens[$j], $labelLines, $upper) && ++$labels <= self::MAX_LABEL_WORDS_BETWEEN) {
                     continue;
                 } else {
                     break;
@@ -539,6 +546,7 @@ final class DocumentAnalysis
         $sameLine = static fn (string $gap): bool => preg_match('/^(?:[ \t,]*|[ \t]*-\s*)\z/u', $gap) === 1;
         $first = $found[0];
         $last = $found[count($found) - 1];
+        $labelLines = self::labelLines($tokens);
         if (($first > 0 && $sameLine($tokens[$first]['gap']) && $nameLike($tokens[$first - 1]))
             || (isset($tokens[$last + 1]) && $sameLine($tokens[$last + 1]['gap']) && $nameLike($tokens[$last + 1]))) {
             return false;
@@ -547,7 +555,7 @@ final class DocumentAnalysis
         foreach ([-1, 1] as $step) {
             $k = ($step < 0 ? $first : $last) + $step;
             $labels = 0;
-            while (isset($tokens[$k]) && in_array($tokens[$k]['fold'], self::NAME_FIELD_LABELS, true) && $labels < self::MAX_LABEL_WORDS_BETWEEN) {
+            while (isset($tokens[$k]) && self::isLabel($tokens[$k], $labelLines, $upper) && $labels < self::MAX_LABEL_WORDS_BETWEEN) {
                 $labels++;
                 $k += $step;
             }
@@ -558,20 +566,74 @@ final class DocumentAnalysis
         return true;
     }
 
+    /** A name-field label, or (for labels of 6+ letters) one letter off one, as OCR misreads them. */
+    private static function looksLikeLabel(string $fold): bool
+    {
+        if (in_array($fold, self::NAME_FIELD_LABELS, true)) {
+            return true;
+        }
+        if (strlen($fold) < 5 || preg_match('/[^a-z]/', $fold)) {
+            return false;
+        }
+        foreach (self::NAME_FIELD_LABELS as $label) {
+            if (strlen($label) >= 6 && abs(strlen($label) - strlen($fold)) <= 1 && levenshtein($label, $fold) <= 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
-     * Words of a text with their byte offsets and the text before each (hyphens and other
-     * punctuation separate words; apostrophes inside a word do not).
+     * Line numbers that hold a name-field label word.
      *
-     * @return list<array{word:string, fold:string, start:int, end:int, gap:string}>
+     * @return array<int, true>
+     */
+    private static function labelLines(array $tokens): array
+    {
+        $lines = [];
+        foreach ($tokens as $token) {
+            if (self::looksLikeLabel($token['fold'])) {
+                $lines[$token['line']] = true;
+            }
+        }
+        return $lines;
+    }
+
+    /**
+     * True when $token may be skipped as part of a field label between name parts. $upper: the
+     * name parts found so far are in capitals, so a word not in capitals on a label line is
+     * label text (e.g. a misread "Gren Nemes" next to "Mga"), never a name; so is a stray mark
+     * of one or two digits there ("Micd 6 Name").
+     *
+     * @param array<int, true> $labelLines
+     */
+    private static function isLabel(array $token, array $labelLines, bool $upper): bool
+    {
+        if (self::looksLikeLabel($token['fold'])) {
+            return true;
+        }
+        $word = $token['word'];
+        return $upper && isset($labelLines[$token['line']])
+            && (mb_strtoupper($word) !== $word || (mb_strlen($word) <= 2 && preg_match('/\\p{L}/u', $word) !== 1));
+    }
+
+    /**
+     * Words of a text with their byte offsets, the text before each and their line number
+     * (hyphens and other punctuation separate words; apostrophes inside a word do not).
+     *
+     * @return list<array{word:string, fold:string, start:int, end:int, gap:string, line:int}>
      */
     private static function tokens(string $text): array
     {
         preg_match_all("/[\\p{L}\\p{M}\\p{N}]+(?:['’][\\p{L}\\p{M}\\p{N}]+)*/u", $text, $m, PREG_OFFSET_CAPTURE);
         $tokens = [];
         $previous = 0;
+        $line = 0;
         foreach ($m[0] as [$word, $start]) {
+            $gap = substr($text, $previous, $start - $previous);
+            $line += substr_count($gap, "\n");
             $tokens[] = ['word' => $word, 'fold' => self::foldWord($word), 'start' => $start, 'end' => $start + strlen($word),
-                'gap' => substr($text, $previous, $start - $previous)];
+                'gap' => $gap, 'line' => $line];
             $previous = $start + strlen($word);
         }
         return $tokens;
@@ -627,12 +689,104 @@ final class DocumentAnalysis
             }
             $text = (string) ($texts[$document['key']]['text'] ?? '');
             [$match, $name] = self::locateName((string) $document['holder_name'], $text);
+            if ($match === 'none' && in_array('philsys_national_id', self::kindEvidence($text), true)) {
+                // The model gave no name found in this card's text: read the card's own labelled fields.
+                $printed = self::philsysName($text);
+                if ($printed !== null) {
+                    [$match, $name] = self::locateName($printed, $text);
+                }
+            }
             $document['holder_name'] = $name;
             $matches[$document['key']] = $match;
             $document['property_number'] = self::locateNumber((string) $document['property_number'], $text);
         }
         unset($document);
         return [$output, $matches];
+    }
+
+    /** Which PhilSys name field a label line names ('last', 'given', 'middle'), or null for any other line. */
+    private static function philsysField(string $line): ?string
+    {
+        $folds = array_column(self::tokens($line), 'fold');
+        $near = static function (string $word) use ($folds): bool {
+            foreach ($folds as $fold) {
+                if ($fold === $word || (strlen($word) >= 6 && preg_match('/^[a-z]+$/', $fold) && abs(strlen($fold) - strlen($word)) <= 1 && levenshtein($fold, $word) <= 1)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (mb_strtoupper($line) === $line && !preg_match('/\/|\bname/i', $line)) {
+            return null;   // a line in capitals is a value, not a label (PhilSys labels are not in capitals)
+        }
+        return match (true) {
+            $near('gitnang') || $near('panggitnang') || $near('middle') => 'middle',
+            $near('pangalan') || $near('mga') || $near('given') || $near('first') => 'given',
+            $near('apelyido') || $near('surname') || ($near('last') && $near('name')) => 'last',
+            default => null,
+        };
+    }
+
+    /**
+     * How completely an ID's OCR text was read, for OCR retries (OcrService::extract()): null for a
+     * slot that is not an ID. 1.0: a PhilSys card with its name fields read (philsysName()), or
+     * another accepted ID's printed title. For a PhilSys card (title or field labels seen):
+     * 0.25 for the title, 0.25 for at least two field labels, 0.5 for the name fields. 0.0: no
+     * accepted ID title and no PhilSys labels. Never used for a verdict: only to decide whether
+     * another OCR pass may read more, and which pass read most.
+     */
+    public static function ocrCompleteness(string $key, string $text): ?float
+    {
+        if ((self::SLOT_CHECKS[$key] ?? 'none') !== 'id') {
+            return null;
+        }
+        $text = self::normalizeText($text);
+        $evidence = array_values(array_intersect(self::kindEvidence($text), self::acceptedKinds($key)));
+        $fields = [];
+        foreach (preg_split('/\R/u', $text) ?: [] as $line) {
+            $field = self::philsysField(trim($line));
+            if ($field !== null) {
+                $fields[$field] = true;
+            }
+        }
+        $philsys = in_array('philsys_national_id', $evidence, true);
+        if (!$philsys && count($fields) < 2) {
+            return $evidence === [] ? 0.0 : 1.0;
+        }
+        return ($philsys ? 0.25 : 0.0) + (count($fields) >= 2 ? 0.25 : 0.0) + (self::philsysName($text) !== null ? 0.5 : 0.0);
+    }
+
+    /**
+     * The holder's name as a PhilSys card's labelled fields print it, "LAST, GIVEN MIDDLE", or null.
+     * Each value is the first non-empty line after its label line ("Apelyido/Last Name",
+     * "Mga Pangalan/Given Names", "Gitnang Apelyido/Middle Name"; labels may be misread by one
+     * letter), and must be a line of capital letters only (spaces, ".", "-", "'" allowed) that is
+     * not itself a label line, with a word of 3+ letters (so "MA. CLARA" is read, a cut-off "JU" is
+     * not). Both the last name and the given name are required: a field that
+     * cannot be read leaves the name unread, nothing is guessed. The middle name is optional.
+     */
+    public static function philsysName(string $text): ?string
+    {
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\R/u', self::normalizeText($text)) ?: []), static fn (string $line): bool => $line !== ''));
+        $fieldOf = static fn (string $line): ?string => self::philsysField($line);
+        $values = [];
+        foreach ($lines as $index => $line) {
+            $field = $fieldOf($line);
+            if ($field === null || isset($values[$field]) || !isset($lines[$index + 1])) {
+                continue;
+            }
+            $value = $lines[$index + 1];
+            $words = array_column(self::tokens($value), 'fold');
+            if ($fieldOf($value) === null && preg_match("/^[\p{Lu}][\p{Lu}\p{M} .'’-]*\p{Lu}\.?$/u", $value) === 1
+                && array_intersect($words, self::NOT_NAME_WORDS) === [] && mb_strlen($value) <= 40
+                && max(array_map('mb_strlen', $words ?: [''])) >= 3) {
+                $values[$field] = (string) preg_replace('/\s+/u', ' ', $value);
+            }
+        }
+        if (!isset($values['last'], $values['given'])) {
+            return null;
+        }
+        return $values['last'] . ', ' . $values['given'] . (isset($values['middle']) ? ' ' . $values['middle'] : '');
     }
 
     /**

@@ -427,6 +427,55 @@ $assembled = $v3Run([$v3Doc('ownerId', 'drivers_license', 'JUAN SANTOS DELA CRUZ
 $check('v3 worker: a full name given in another order is shown as the document prints it (one block, exact)', $assembled['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS'
     && $assembled['documents'][0]['name_match'] === 'exact', $assembled['documents']);
 $check('v3 worker: matching is by whole words (no partial words)', DocumentAnalysis::nameMatch('JUA SANTO', $idText) === 'none' && DocumentAnalysis::nameMatch('', $idText) === 'none');
+// OCR misreads the small printed labels of a PhilSys card; the capitalised values are still the name.
+$misreadLabels = "REPUBLIKA NG PILIPINAS\nApelydo/Last Name\nDELA CRUZ\nMga Pahgalan/Gren Nemes\nJUAN\nGithang Apety do/Middie Narne\nSANTOS\nPetsa ng Kapanganakan";
+$m = static fn (string $name, string $text): string => DocumentAnalysis::nameMatch($name, $text);
+$check('OCR labels: labelled parts are found through misread labels ("Pahgalan", "Gren Nemes", "Githang", "Middie Narne")',
+    $m('DELA CRUZ, JUAN SANTOS', $misreadLabels) === 'parts' && $m('JUAN SANTOS DELA CRUZ', $misreadLabels) === 'parts', $m('DELA CRUZ, JUAN SANTOS', $misreadLabels));
+$check('OCR labels: a stray digit on a label line is skipped ("ApelyKioMicd 6 Name")',
+    $m('DELA CRUZ, JUAN SANTOS', "Apelyido/Last Name\nDELA CRUZ\nMga Pangalan'Grven Names\nJUAN\nGinang ApelyKioMicd 6 Name\nSANTOS") === 'parts');
+$check('OCR labels: another person\'s given name is never matched through the labels',
+    $m('DELA CRUZ, JUAN SANTOS', str_replace('JUAN', 'PEDRO', $misreadLabels)) === 'none');
+$check('OCR labels: a card without the last name does not match the full name (the field stays unverified)',
+    $m('DELA CRUZ, JUAN SANTOS', "Apelyido/Last Name\nMga Pangalan/Given Names\nJUAN\nGitnang Apelyido/Middle Name\nSANTOS") === 'none');
+$check('OCR labels: a word in capitals on a label line is a value, never skipped as label text',
+    $m('DELA CRUZ, JUAN SANTOS', "Last Name DELA CRUZ\nGiven Names PEDRO\nJUAN SANTOS") === 'none');
+$check('OCR labels: mixed-case names get no label leniency (a middle word is not skipped)',
+    $m('Juan Santos', "Name: Juan Pedro Santos") === 'none' && $m('Juan Santos', "Name: Juan Pedrito Santos\nGiven name") === 'none');
+$check('OCR labels: only labels of 6+ letters are matched one letter off (a short value word is not a label)',
+    $m('DELA CRUZ, JUAN SANTOS', "DELA CRUZ\nNAMO\nJUAN\nSANTOS") === 'none' && $m('DELA CRUZ, JUAN SANTOS', "DELA CRUZ\nMIDDLX\nJUAN SANTOS") !== 'none');
+// Deterministic PhilSys field reader: used only when the model's name is not in the card's own text.
+$card = "REPUBLIKA NG PILIPINAS\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine Identification Card\nApelyido/Last Name\nDELA CRUZ\nMga Pangalan/Given Names\nJUAN\n"
+    . "Gitnang Apelyido/Middle Name\nSANTOS\nPetsa ng Kapanganakan/Date of Birth\nJANUARY 01, 1990\n1234-5678-9012-3456";
+$check('PhilSys reader: reads LAST, GIVEN MIDDLE from the labelled fields (labels may be misread)',
+    DocumentAnalysis::philsysName($card) === 'DELA CRUZ, JUAN SANTOS' && DocumentAnalysis::philsysName($misreadLabels) === 'DELA CRUZ, JUAN SANTOS'
+    && DocumentAnalysis::philsysName(str_replace('JUAN', 'MA. CLARA', $card)) === 'DELA CRUZ, MA. CLARA SANTOS', DocumentAnalysis::philsysName($misreadLabels));
+$check('PhilSys reader: a missing or unreadable last or given name gives no name (nothing is guessed)',
+    DocumentAnalysis::philsysName(str_replace("DELA CRUZ\n", '', $card)) === null && DocumentAnalysis::philsysName(str_replace("JUAN\n", "JU\n", $card)) === null
+    && DocumentAnalysis::philsysName(str_replace("JUAN\n", "Juan\n", $card)) === null && DocumentAnalysis::philsysName(str_replace("JUAN\n", "J4AN\n", $card)) === null);
+$check('PhilSys reader: the middle name is optional; a label line or a document word is never taken as a value',
+    DocumentAnalysis::philsysName(str_replace("SANTOS\n", '', $card)) === 'DELA CRUZ, JUAN'
+    && DocumentAnalysis::philsysName(str_replace("DELA CRUZ\n", "REPUBLIKA NG PILIPINAS\n", $card)) === null);
+$kept = static fn (string $holder, string $text): array => DocumentAnalysis::keepQuotedDetails(
+    ['documents' => [['key' => 'requesterId', 'holder_name' => $holder, 'property_number' => '']]], ['requesterId' => ['text' => $text]]);
+[$out, $matches] = $kept('', $card);
+$check('PhilSys reader: when the model gave no name, the card\'s printed name is kept, as its own characters', $out['documents'][0]['holder_name'] === 'DELA CRUZ JUAN SANTOS' && $matches['requesterId'] === 'parts', [$out, $matches]);
+[$out, $matches] = $kept('PEDRO REYES', $card);
+$check('PhilSys reader: a model name not on the card is replaced by the card\'s printed name (so a mismatch is visible)', $out['documents'][0]['holder_name'] === 'DELA CRUZ JUAN SANTOS' && $matches['requesterId'] === 'parts');
+[$out, $matches] = $kept('', str_replace(['Philippine Identification Card', 'PAMBANSANG PAGKAKAKILANLAN'], ['Identification Card', 'KARD'], $card));
+$check('PhilSys reader: not used without PhilSys title evidence in the text', $out['documents'][0]['holder_name'] === '' && $matches['requesterId'] === 'none');
+[$out, $matches] = $kept('', str_replace("DELA CRUZ\n", '', $card));
+$check('PhilSys reader: a card without the last name stays unverified', $out['documents'][0]['holder_name'] === '' && $matches['requesterId'] === 'none');
+// OCR completeness (decides only whether another OCR pass may read more; never a verdict).
+$c = static fn (string $key, string $text): ?float => DocumentAnalysis::ocrCompleteness($key, $text);
+$check('OCR completeness: only ID slots are checked (other documents: null, no extra passes)', $c('taxDeclaration', $card) === null && $c('authLetter', $card) === null);
+$check('OCR completeness: a PhilSys card with title, labels and name fields read is complete', $c('requesterId', $card) === 1.0 && $c('ownerId', $misreadLabels . "\nPhilippine Identification Card") === 1.0);
+$check('OCR completeness: confident but incomplete - name fields not read ("JU" too short, a field missing) - is not complete',
+    $c('requesterId', str_replace("JUAN\n", "JU\n", $card)) === 0.5 && $c('requesterId', str_replace("DELA CRUZ\n", '', $card)) === 0.5);
+$check('OCR completeness: printed labels missing (title and values only) scores lower; nothing ID-like at all is 0',
+    $c('requesterId', "REPUBLIKA NG PILIPINAS\nPhilippine Identification Card\nDELA CRUZ\nJUAN\nSANTOS") === 0.25 && $c('requesterId', "Barangay Certification\nThis certifies") === 0.0);
+$check('OCR completeness: another accepted ID with its printed title is complete (its fields are not checked)',
+    $c('requesterId', "REPUBLIC OF THE PHILIPPINES\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nDELA CRUZ, JUAN SANTOS") === 1.0);
 
 $v3Validated = DocumentAnalysis::validateWorkerResult($exact, $keys);
 $tampered = $exact;

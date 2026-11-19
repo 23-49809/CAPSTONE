@@ -89,6 +89,11 @@ $fakeSources = [
     'tesseract' => '$image = $argv[1] ?? ""; $page = preg_match("/page-(\d+)\.png$/", $image, $m) ? (int) $m[1] : 0;'
         . 'if (!empty($config["marker"])) { file_put_contents($config["marker"], "ran"); }'
         . 'if (in_array($page, $config["ocr_fail"] ?? [], true)) { exit(1); }'
+        // TSV mode (only when the test sets "tsv"): words with a confidence chosen per variant and layout.
+        . 'if (isset($config["tsv"]) && in_array("tsv", $argv, true)) { $at = array_search("--psm", $argv, true); $psm = $at === false ? "default" : $argv[$at + 1];'
+        . ' $variant = preg_match("/prepared-([a-z]+)\\.png$/", $image, $v) ? $v[1] : "original"; $spec = $config["tsv"][$variant . ":" . $psm] ?? $config["tsv"]["*"] ?? [0, ""];'
+        . ' fwrite(STDOUT, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n");'
+        . ' foreach (explode("\n", $spec[1]) as $ln => $line) { foreach (preg_split("/ +/", trim($line)) ?: [] as $wn => $w) { if ($w !== "") { fwrite(STDOUT, "5\t1\t1\t1\t" . ($ln + 1) . "\t" . ($wn + 1) . "\t0\t0\t9\t9\t" . $spec[0] . "\t" . $w . "\n"); } } } exit(0); }'
         . 'if ($page > 0 && array_key_exists((string) $page, $config["ocr_text"] ?? [])) { fwrite(STDOUT, $config["ocr_text"][(string) $page] . "\n"); exit(0); }'
         . 'fwrite(STDOUT, $page > 0 ? "OCR page " . $page . "\n" : ($config["image_text"] ?? "Synthetic image OCR text") . "\n");',
 ];
@@ -114,6 +119,8 @@ $calls = static function (?string $tool = null) use ($callsPath): array {
 };
 $service = static fn (int $processTimeout = 30, int $totalTimeout = 60, ?array $tools = null): OcrService =>
     new OcrService($uploadDirectory, $processTimeout, $totalTimeout, $tools ?? $fakeTools);
+/** A text layer long enough (MIN_COMPLETE_PAGE_CHARACTERS) to be taken as the whole page. */
+$full = static fn (string $text): string => $text . ' ' . trim(str_repeat('with a complete text layer ', 10));
 $pageMethods = static fn (array $result): array => array_map(static fn (array $page): string => $page['page'] . ':' . $page['method'] . ($page['error'] !== null ? ':' . $page['error'] : ''), $result['pages']);
 $temporaryDirectories = static function (): array {
     return glob(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'smart-assess-ocr-*') ?: [];
@@ -204,11 +211,11 @@ try {
         $temporaryDirectories() === $temporaryBefore && hash_file('sha256', $imagePath) === $imageHashBefore);
     $check('programs run inside a private 0700 temporary folder', ($calls('tesseract')[0]['cwd_mode'] ?? '') === '0700');
 
-    $configure(['pages' => ['Synthetic embedded PDF text, page one', 'Synthetic embedded PDF text, page two']]);
+    $configure(['pages' => [$full('Synthetic embedded PDF text, page one'), $full('Synthetic embedded PDF text, page two')]]);
     $result = $service()->extract($pdfPath);
     $check('PDF embedded text is used and no page is OCR\'d', $result['success'] && $result['extraction_method'] === 'embedded_text'
         && $result['engine'] === 'poppler' && $result['pages_processed'] === 2
-        && $result['text'] === "Synthetic embedded PDF text, page one\nSynthetic embedded PDF text, page two"
+        && $result['text'] === $full('Synthetic embedded PDF text, page one') . "\n" . $full('Synthetic embedded PDF text, page two')
         && $calls('pdftoppm') === [] && $calls('tesseract') === []);
 
     $configure(['pages' => [' ', "\n"]]);
@@ -273,7 +280,7 @@ try {
     $result = $service()->extract($noSizePath);
     $check('an image whose size cannot be read is refused without running Tesseract', $result['success'] === false
         && in_array($result['error_code'], ['unreadable_document', 'unsupported_mime_type'], true) && $calls() === []);
-    $configure(['pages' => ['', 'Embedded text long enough to count as a real page'], 'render_huge' => [1]]);
+    $configure(['pages' => ['', $full('Embedded text long enough to count as a real page')], 'render_huge' => [1]]);
     $result = $service()->extract($pdfPath);
     $check('an oversized rendered page is reported and not OCR\'d', $result['success'] && $pageMethods($result) === ['1:not_processed:image_too_large', '2:embedded_text']
         && $calls('tesseract') === [] && in_array('Page 1 could not be processed (image_too_large).', $result['warnings'], true));
@@ -362,11 +369,11 @@ try {
         && glob($testRoot . '/{,*/}PWNED*', GLOB_BRACE) === [] && glob(sys_get_temp_dir() . '/smart-assess-ocr-*/PWNED*') === []);
 
     // ================= 4. Mixed-content PDFs =================
-    $configure(['pages' => ['Page one has a full embedded text layer.', '', 'Page 3']]);
+    $configure(['pages' => [$full('Page one has a full embedded text layer.'), '', 'Page 3']]);
     $result = $service()->extract($pdfPath);
     $check('a mixed PDF keeps embedded text and OCRs only the scanned pages', $result['success'] && $result['extraction_method'] === 'mixed'
         && $result['engine'] === 'poppler+tesseract' && $pageMethods($result) === ['1:embedded_text', '2:ocr', '3:ocr']
-        && $result['text'] === "Page one has a full embedded text layer.\nOCR page 2\nOCR page 3"
+        && $result['text'] === $full('Page one has a full embedded text layer.') . "\nOCR page 2\nOCR page 3"
         && array_map(static fn (array $call): string => $call['args'][1], $calls('pdftoppm')) === ['2', '3']);
     $check('a page with only a short text layer (a page number) is treated as scanned', in_array('3:ocr', $pageMethods($result), true));
 
@@ -391,6 +398,148 @@ try {
     $result = $service()->extract($pdfPath);
     $check('if no page can be processed, the extraction fails and lists every page', $result['success'] === false
         && $result['error_code'] === 'unreadable_document' && count($result['pages']) === 2);
+    // ---- Short text layers (a typed header over a scanned picture of the card) ----
+    $cardText = "APELYIDO / LAST NAME\nDELA CRUZ\nMGA PANGALAN / GIVEN NAMES\nJUAN\nGITNANG APELYIDO / MIDDLE NAME\nSANTOS";
+    $configure(['pages' => ['REPUBLIKA NG PILIPINAS PHILIPPINE IDENTIFICATION CARD', ''], 'ocr_text' => ['1' => "REPUBLIKA NG PILIPINAS\n" . $cardText, '2' => 'OCR page 2']]);
+    $result = $service()->extract($pdfPath);
+    $check('a page whose short text layer is only a header is also OCR\'d, and the fuller OCR text is used', $result['success']
+        && $pageMethods($result) === ['1:ocr', '2:ocr'] && str_contains($result['text'], 'DELA CRUZ') && str_contains($result['text'], 'SANTOS')
+        && array_map(static fn (array $call): string => $call['args'][1], $calls('pdftoppm')) === ['2', '1'], [$pageMethods($result), $result['text']]);
+    $configure(['pages' => ['REPUBLIKA NG PILIPINAS PHILIPPINE IDENTIFICATION CARD'], 'ocr_text' => ['1' => 'REPUBLIKA NG PILIPINAS']]);
+    $result = $service()->extract($pdfPath);
+    $check('a short text layer is kept when OCR reads no more', $result['success'] && $pageMethods($result) === ['1:embedded_text']
+        && $result['extraction_method'] === 'embedded_text' && $result['text'] === 'REPUBLIKA NG PILIPINAS PHILIPPINE IDENTIFICATION CARD');
+    $configure(['pages' => ['REPUBLIKA NG PILIPINAS PHILIPPINE IDENTIFICATION CARD', ''], 'ocr_fail' => [1]]);
+    $result = $service()->extract($pdfPath);
+    $check('a short text layer is kept, without a page error, when its extra OCR fails', $result['success']
+        && $pageMethods($result) === ['1:embedded_text', '2:ocr'] && str_starts_with($result['text'], 'REPUBLIKA NG PILIPINAS PHILIPPINE')
+        && !preg_grep('/^Page 1 /', $result['warnings']));
+    $configure(['pages' => ['REPUBLIKA NG PILIPINAS PHILIPPINE IDENTIFICATION CARD', ''], 'sleep' => ['tesseract' => 1.2]]);
+    $started = microtime(true);
+    $result = $service(5, 2)->extract($pdfPath);
+    $check('the extra OCR of a short text layer never makes the document fail at the deadline', $result['success']
+        && $pageMethods($result) === ['1:embedded_text', '2:ocr'] && microtime(true) - $started < 2.6, [$pageMethods($result), $result['error_code']]);
+
+    // ---- OCR passes: confidence, bounded retries, the best-read pass wins ----
+    $wellRead = "REPUBLIKA NG PILIPINAS\nPhilippine Identification Card\n" . $cardText . "\nPetsa ng Kapanganakan / Date of Birth\nJANUARY 01, 1990\n"
+        . "123 RIZAL ST., POBLACION, MABINI, BATANGAS\nSYNTHETIC TEST CARD - NOT A REAL ID";
+    $imageHash = hash_file('sha256', $imagePath);
+    $configure(['tsv' => ['*' => [95, $wellRead]]]);
+    $result = $service()->extract($imagePath);
+    $tess = $calls('tesseract');
+    $check('a clearly read image takes one Tesseract pass (TSV, default layout) and the words are rebuilt as lines', $result['success']
+        && count($tess) === 1 && end($tess[0]['args']) === 'tsv' && !in_array('--psm', $tess[0]['args'], true)
+        && $result['text'] === $wellRead && !preg_grep('/confidence/i', $result['warnings']), [$result['text'], $result['warnings']]);
+    $configure(['tsv' => ['original:default' => [35, 'RFPUBL1KA NG PIL'], 'original:1' => [94, $wellRead], '*' => [30, 'x']]]);
+    $result = $service()->extract($imagePath);
+    $tess = $calls('tesseract');
+    $check('a poorly read first pass is retried, the best-read pass wins and retrying stops once one reads well', $result['success']
+        && count($tess) === 2 && array_slice($tess[1]['args'], -3) === ['--psm', '1', 'tsv'] && $result['text'] === $wellRead
+        && $tess[1]['args'][0] === $imagePath, count($tess));
+    $configure(['tsv' => ['original:default' => [35, 'RFPUBL1KA'], 'gray:11' => [72, 'REPUBLIKA NG PILIPINAS DELA CRUZ JUAN'], '*' => [40, 'R3PUBL1KA NG']]]);
+    $result = $service()->extract($imagePath);
+    $tess = $calls('tesseract');
+    $prepared = array_values(array_filter(array_map(static fn (array $call): string => basename($call['args'][0]), $tess), static fn (string $name): bool => str_starts_with($name, 'prepared-')));
+    $check('retries are bounded (at most 7), use only prepared copies in the private folder, and the best one is kept even if still weak', $result['success']
+        && count($tess) >= 3 && count($tess) <= 8 && $result['text'] === 'REPUBLIKA NG PILIPINAS DELA CRUZ JUAN'
+        && in_array('OCR confidence was low, so some text may be missing or misread.', $result['warnings'], true)
+        && array_diff($prepared, ['prepared-gray.png', 'prepared-deskew.png', 'prepared-sharp.png', 'prepared-clean.png']) === [], [count($tess), $prepared, $result['text']]);
+    $check('the uploaded image is never modified by preparing copies', hash_file('sha256', $imagePath) === $imageHash);
+    $prepDirectory = $testRoot . DIRECTORY_SEPARATOR . 'prep';
+    @mkdir($prepDirectory, 0700);
+    $hugeHeader = $uploadDirectory . DIRECTORY_SEPARATOR . 'huge-header.png';
+    file_put_contents($hugeHeader, $pngHeader(4000, 3001));
+    $webp = null;
+    if (function_exists('imagewebp')) {
+        $webp = $uploadDirectory . DIRECTORY_SEPARATOR . 'card.webp';
+        $small = imagecreatetruecolor(200, 100);
+        imagewebp($small, $webp);
+    }
+    $grayPath = (new OcrImagePreparer($imagePath))->variant('gray', $prepDirectory);
+    $check('image preparation: a PNG gets a private 0600 copy; images over 12 MP and WebP files are never decoded by PHP',
+        is_string($grayPath) && (fileperms($grayPath) & 0777) === 0600
+        && (new OcrImagePreparer($hugeHeader))->variant('gray', $prepDirectory) === null
+        && ($webp === null || (new OcrImagePreparer($webp))->variant('gray', $prepDirectory) === null)
+        && (new OcrImagePreparer($imagePath))->variant('sharpen', $prepDirectory) === null);
+    array_map('unlink', glob($prepDirectory . DIRECTORY_SEPARATOR . '*') ?: []);
+    @rmdir($prepDirectory);
+    @unlink($hugeHeader);
+    if ($webp !== null) {
+        @unlink($webp);
+    }
+    $configure(['tsv' => ['*' => [30, 'R3PUBL1KA']], 'sleep' => ['tesseract' => 0.6]]);
+    $started = microtime(true);
+    $result = $service(5, 2)->extract($imagePath);
+    $check('retries stop at the overall deadline and the first pass is still returned', $result['success'] && $result['text'] === 'R3PUBL1KA'
+        && microtime(true) - $started < 2.6, [$result['error_code'], microtime(true) - $started]);
+    // ---- Retries also for a confident but incomplete reading (caller's completeness check) ----
+    $complete = static fn (string $text): ?float => str_contains($text, 'SANTOS') ? 1.0 : (str_contains($text, 'JUAN') ? 0.5 : 0.0);
+    $configure(['tsv' => ['original:default' => [96, $wellRead]]]);
+    $result = $service()->extract($imagePath, $complete);
+    $check('completeness: a confident and complete first pass is the only pass', $result['success'] && count($calls('tesseract')) === 1);
+    $confidentButShort = str_replace("JUAN\n", "JU\n", str_replace('SANTOS', 'SANT', $wellRead));
+    $configure(['tsv' => ['original:default' => [97, $confidentButShort], 'original:1' => [97, $confidentButShort], 'original:6' => [88, $wellRead], '*' => [99, $confidentButShort]]]);
+    $result = $service()->extract($imagePath, $complete);
+    $tess = $calls('tesseract');
+    $check('completeness: a confident but incomplete first pass is retried; a complete pass wins over a more confident incomplete one, and retrying stops there',
+        $result['success'] && $result['text'] === $wellRead && count($tess) === 3 && array_slice($tess[2]['args'], -3) === ['--psm', '6', 'tsv'], count($tess));
+    $configure(['tsv' => ['original:default' => [97, $confidentButShort], 'gray:11' => [75, 'JUAN only'], '*' => [99, 'nothing useful here at all']]]);
+    $result = $service()->extract($imagePath, $complete);
+    $tess = $calls('tesseract');
+    $check('completeness: when no pass is complete, the most complete one is kept after at most 7 retries (nothing is invented)',
+        $result['success'] && count($tess) <= 8 && count($tess) >= 3 && in_array($result['text'], [$confidentButShort, 'JUAN only'], true)
+        && !str_contains($result['text'], 'SANTOS'), [count($tess), $result['text']]);
+    $configure(['tsv' => ['*' => [96, $confidentButShort]]]);
+    $result = $service()->extract($imagePath, static function (string $text): float {
+        throw new RuntimeException('broken check');
+    });
+    $check('completeness: a failing completeness check never fails the extraction (treated as complete: one pass)', $result['success'] && count($calls('tesseract')) === 1);
+    $configure(['tsv' => ['*' => [96, $confidentButShort]]]);
+    $result = $service()->extract($imagePath);
+    $check('completeness: without a check (non-ID documents), a confident pass is accepted as before', $result['success'] && count($calls('tesseract')) === 1);
+    $configure(['tsv' => ['*' => [30, 'R3PUBL1KA']], 'sleep' => ['tesseract' => 0.3]]);
+    $started = microtime(true);
+    $result = $service(5, 2)->extract($imagePath, $complete);
+    $tess = $calls('tesseract');
+    $check('deadline: prepared copies are not made with under 2 s left (GD work cannot be interrupted); the first pass is returned in time',
+        $result['success'] && microtime(true) - $started < 2.6 && preg_grep('/prepared-/', array_map(static fn (array $call): string => $call['args'][0], $tess)) === [], [count($tess), microtime(true) - $started]);
+
+    // ---- Malformed images never reach a decoder error ----
+    $prepDirectory = $testRoot . DIRECTORY_SEPARATOR . 'prep-bad';
+    @mkdir($prepDirectory, 0700);
+    $bad = [
+        'truncated.jpg' => "\xFF\xD8\xFF\xE0",
+        'header-only.png' => $pngHeader(800, 600),
+        'garbage.png' => "\x89PNG\r\n\x1a\n" . random_bytes(300),
+        'empty.jpg' => '',
+    ];
+    if (is_string($jpegBytes) && $jpegBytes !== '') {
+        $bad['truncated.jpg'] = substr($jpegBytes, 0, (int) (strlen($jpegBytes) / 3));
+    }
+    $outcomes = [];
+    foreach ($bad as $badName => $bytes) {
+        $badPath = $uploadDirectory . DIRECTORY_SEPARATOR . $badName;
+        file_put_contents($badPath, $bytes);
+        $hash = hash_file('sha256', $badPath);
+        ob_start();
+        try {
+            $variant = (new OcrImagePreparer($badPath))->variant('clean', $prepDirectory);
+            $outcomes[$badName] = ($variant === null || is_file($variant)) && hash_file('sha256', $badPath) === $hash ? 'ok' : 'changed';
+        } catch (Throwable $error) {
+            $outcomes[$badName] = 'threw ' . get_class($error);
+        }
+        $outcomes[$badName] .= ob_get_clean() === '' ? '' : ' printed';
+        @unlink($badPath);
+    }
+    array_map('unlink', glob($prepDirectory . DIRECTORY_SEPARATOR . '*') ?: []);
+    @rmdir($prepDirectory);
+    $check('malformed images (truncated JPEG, header without data, garbage after a PNG signature, empty file) are refused or partly decoded without an exception, output or change',
+        array_unique(array_values($outcomes)) === ['ok'], $outcomes);
+
+    $configure(['pages' => ['', ''], 'tsv' => ['*' => [30, 'R3PUBL1KA']], 'sleep' => ['tesseract' => 0.25]]);
+    $result = $service(5, 9)->extract($pdfPath);
+    $check('retries on one PDF page leave time for the next page', $result['success'] && $pageMethods($result) === ['1:ocr', '2:ocr'], [$pageMethods($result), $result['error_code']]);
+
     $configure(['pages' => ['First page has a full embedded text layer.', 'Second page has a full embedded text layer.'], 'formfeed' => false]);
     $result = $service()->extract($pdfPath);
     $check('without page breaks in the output, each page is read on its own so text stays on its page', $result['success']

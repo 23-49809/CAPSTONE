@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/OcrImagePreparer.php';
+
 /**
  * Text extraction from an uploaded image or PDF in the private upload folder.
  *
@@ -21,7 +23,18 @@ declare(strict_types=1);
  * PDFs: each of the first 10 pages is judged separately. A page whose embedded
  * text layer has at least MIN_EMBEDDED_PAGE_CHARACTERS letters or digits keeps
  * that text; any other page is rendered and OCR'd. Every page is reported with
- * how it was handled, and a page that could not be processed says why.
+ * how it was handled, and a page that could not be processed says why. A page
+ * whose text layer is short (under MIN_COMPLETE_PAGE_CHARACTERS) is also OCR'd,
+ * and the OCR text replaces the layer only when it reads clearly more.
+ *
+ * OCR passes: the first pass is the file as uploaded (Tesseract's default layout
+ * analysis) with word confidences. Only when that pass reads poorly, or the caller's
+ * completeness check (extract()'s $completeness, e.g. "the ID's name fields were
+ * read") says it is incomplete, are a bounded number of retries run (RETRY_PASSES:
+ * orientation detection, other layouts, and greyscale / straightened / sharpened /
+ * cleaned copies made in the private temporary folder). The most complete pass wins,
+ * then the most confidently read one, so a confident but incomplete reading is not
+ * accepted while a retry reads more. Retries respect the deadline.
  */
 final class OcrService
 {
@@ -32,6 +45,37 @@ final class OcrService
     public const MAX_IMAGE_PIXELS = 25_000_000;
     /** A page with fewer letters/digits than this in its text layer is treated as scanned. */
     public const MIN_EMBEDDED_PAGE_CHARACTERS = 20;
+    /**
+     * A text layer shorter than this (letters/digits) may be only part of the page, such as a
+     * typed header over a scanned picture of the document: the page is also OCR'd and the OCR
+     * text is used when it reads clearly more. If that OCR fails, the text layer is kept.
+     */
+    public const MIN_COMPLETE_PAGE_CHARACTERS = 200;
+    private const SUPPLEMENT_MARGIN_CHARACTERS = 20;
+    /** First OCR pass is "weak" when fewer letters/digits than this were read with confidence >= CONFIDENT_WORD. */
+    public const MIN_CONFIDENT_CHARACTERS = 150;
+    private const MIN_MEAN_CONFIDENCE = 80.0;
+    private const CONFIDENT_WORD = 70.0;
+    /** A retry using a prepared copy starts only with at least this many seconds left (GD work is not interruptible). */
+    private const PREPARE_RESERVE_SECONDS = 2.0;
+    /**
+     * Retries for a weak or incomplete first pass, in order: [image variant, Tesseract page segmentation mode].
+     * 'original' is the upload (or rendered page) unchanged; other variants come from OcrImagePreparer.
+     * PSM 1 adds orientation detection (turned photos), 6 reads one uniform block (skewed, tilted or
+     * small cards), 11 finds scattered text (noisy photos). The most complete, then best-read pass
+     * wins; the original file is never changed.
+     */
+    private const RETRY_PASSES = [
+        ['original', '1'],
+        ['original', '6'],
+        ['deskew', '6'],
+        ['sharp', '6'],
+        ['gray', '11'],
+        ['clean', '6'],
+        ['gray', '6'],
+    ];
+    /** Seconds kept back for each later PDF page, so retries on one page cannot starve the rest. */
+    private const PAGE_RESERVE_SECONDS = 4.0;
     private const ALLOWED_MIME_TYPES = [
         'image/jpeg',
         'image/png',
@@ -53,6 +97,8 @@ final class OcrService
     /** @var array<string, string> */
     private readonly array $executablePaths;
     private readonly ?string $temporaryParent;
+    /** @var (callable(string): ?float)|null for the extract() call in progress */
+    private $completeness = null;
 
     /**
      * @param array<string, string> $executablePaths Server configuration only: tool name => absolute path.
@@ -162,8 +208,13 @@ final class OcrService
      *     error_code: ?string
      * }
      */
-    public function extract(string $filePath): array
+    /**
+     * @param (callable(string): ?float)|null $completeness Optional: how complete an OCR text is for
+     *        the document expected, 0.0 to 1.0 (null or 1.0 = nothing missing). Never sees the file.
+     */
+    public function extract(string $filePath, ?callable $completeness = null): array
     {
+        $this->completeness = $completeness;
         $deadline = microtime(true) + $this->totalTimeoutSeconds;
         $resolvedPath = realpath($filePath);
         if ($resolvedPath === false) {
@@ -201,6 +252,7 @@ final class OcrService
         } catch (Throwable) {
             return $this->failure('extraction_failed');
         } finally {
+            $this->completeness = null;
             $this->removeTemporaryDirectory($temporaryDirectory);
         }
     }
@@ -218,20 +270,17 @@ final class OcrService
             return $this->failure($executable['error'], 'tesseract', 'image_ocr');
         }
 
-        $process = $this->runProcess([$executable, $filePath, 'stdout', '-l', $this->languages], $temporaryDirectory, $deadline);
-        if ($process['error'] !== null) {
-            return $this->failure($process['error'], 'tesseract', 'image_ocr');
-        }
-        if ($process['exit_code'] !== 0) {
-            return $this->failure('unreadable_document', 'tesseract', 'image_ocr');
+        $ocr = $this->recognise($executable, $filePath, $temporaryDirectory, $deadline);
+        if ($ocr['error'] !== null) {
+            return $this->failure($ocr['error'], 'tesseract', 'image_ocr');
         }
 
-        $text = trim($process['stdout']);
-        $warnings = ['OCR confidence was not measured.'];
+        $text = $ocr['text'];
+        $warnings = [$this->confidenceWarning($ocr['weak'])];
         if ($text === '') {
             $warnings[] = 'No text could be extracted from the image.';
         }
-        return $this->success($text, [['page' => 1, 'method' => 'ocr', 'error' => null]], $warnings, 'tesseract', 'image_ocr');
+        return $this->success($text, [['page' => 1, 'method' => 'ocr', 'error' => null]], array_values(array_filter($warnings)), 'tesseract', 'image_ocr');
     }
 
     private function extractPdf(string $filePath, string $temporaryDirectory, float $deadline): array
@@ -271,14 +320,22 @@ final class OcrService
         /** @var array<int, array{page: int, method: string, error: ?string}> $pages */
         $pages = [];
         $needsOcr = [];
+        $supplement = [];
+        /** @var list<?bool> $weakness one entry per OCR'd page: null when confidence was not measured */
+        $weakness = [];
         foreach ($embedded['pages'] as $number => $pageText) {
-            if ($this->letterAndDigitCount($pageText) >= self::MIN_EMBEDDED_PAGE_CHARACTERS) {
+            $characters = $this->letterAndDigitCount($pageText);
+            if ($characters >= self::MIN_EMBEDDED_PAGE_CHARACTERS) {
                 $texts[$number] = $pageText;
                 $pages[$number] = ['page' => $number, 'method' => 'embedded_text', 'error' => null];
+                if ($characters < self::MIN_COMPLETE_PAGE_CHARACTERS) {
+                    $supplement[] = $number;
+                }
             } else {
                 $needsOcr[] = $number;
             }
         }
+        $pagesToOcr = count($needsOcr) + count($supplement);
 
         if ($needsOcr !== []) {
             $pdfToPpm = $this->resolveExecutable('pdftoppm');
@@ -293,7 +350,7 @@ final class OcrService
                 }
             } else {
                 foreach ($needsOcr as $index => $number) {
-                    $page = $this->ocrPage((string) $pdfToPpm, (string) $tesseract, $filePath, $number, $temporaryDirectory, $deadline);
+                    $page = $this->ocrPage((string) $pdfToPpm, (string) $tesseract, $filePath, $number, $temporaryDirectory, $deadline, $pagesToOcr - $index - 1);
                     if ($page['error'] === 'deadline_exceeded') {
                         $remaining = array_slice($needsOcr, $index);
                         $report = $this->sortedPages($pages + $this->notProcessed($remaining, 'deadline_exceeded'));
@@ -306,6 +363,28 @@ final class OcrService
                     // OCR text where it found any; otherwise whatever small text layer the page had.
                     $texts[$number] = $this->letterAndDigitCount($page['text']) > 0 ? $page['text'] : $embedded['pages'][$number];
                     $pages[$number] = ['page' => $number, 'method' => 'ocr', 'error' => null];
+                    $weakness[] = $page['weak'];
+                }
+            }
+        }
+
+        // Short text layers: OCR as well, keep the layer whenever OCR fails or reads no more.
+        if ($supplement !== []) {
+            $pdfToPpm = $this->resolveExecutable('pdftoppm');
+            $tesseract = $this->resolveExecutable('tesseract');
+            if (is_string($pdfToPpm) && is_string($tesseract)) {
+                foreach ($supplement as $index => $number) {
+                    $page = $this->ocrPage($pdfToPpm, $tesseract, $filePath, $number, $temporaryDirectory, $deadline, count($supplement) - $index - 1);
+                    if ($page['error'] === 'deadline_exceeded') {
+                        break;
+                    }
+                    if ($page['error'] !== null
+                        || $this->letterAndDigitCount($page['text']) < $this->letterAndDigitCount($texts[$number]) + self::SUPPLEMENT_MARGIN_CHARACTERS) {
+                        continue;
+                    }
+                    $texts[$number] = $page['text'];
+                    $pages[$number] = ['page' => $number, 'method' => 'ocr', 'error' => null];
+                    $weakness[] = $page['weak'];
                 }
             }
         }
@@ -323,7 +402,10 @@ final class OcrService
         $usedOcr = in_array('ocr', $processed, true);
         $method = count($processed) > 1 ? 'mixed' : ($usedOcr ? 'rasterized_ocr' : 'embedded_text');
         if ($usedOcr) {
-            $warnings[] = 'OCR confidence was not measured.';
+            $warning = $this->confidenceWarning(in_array(null, $weakness, true) ? null : in_array(true, $weakness, true));
+            if ($warning !== null) {
+                $warnings[] = $warning;
+            }
         }
 
         ksort($texts);
@@ -373,11 +455,12 @@ final class OcrService
     }
 
     /**
-     * Renders one page and OCRs it.
+     * Renders one page and OCRs it. $laterPages pages still wait for OCR: retries on this page
+     * stop early enough to leave each of them PAGE_RESERVE_SECONDS.
      *
-     * @return array{text: string, error: ?string}
+     * @return array{text: string, error: ?string, weak: ?bool}
      */
-    private function ocrPage(string $pdfToPpm, string $tesseract, string $filePath, int $number, string $temporaryDirectory, float $deadline): array
+    private function ocrPage(string $pdfToPpm, string $tesseract, string $filePath, int $number, string $temporaryDirectory, float $deadline, int $laterPages = 0): array
     {
         $prefix = $temporaryDirectory . DIRECTORY_SEPARATOR . 'page-' . $number;
         $image = $prefix . '.png';
@@ -397,26 +480,171 @@ final class OcrService
             $prefix,
         ], $temporaryDirectory, $deadline);
         if ($raster['error'] !== null) {
-            return ['text' => '', 'error' => $raster['error']];
+            return ['text' => '', 'error' => $raster['error'], 'weak' => null];
         }
         if ($raster['exit_code'] !== 0 || !is_file($image) || is_link($image)) {
-            return ['text' => '', 'error' => 'render_failed'];
+            return ['text' => '', 'error' => 'render_failed', 'weak' => null];
         }
         $dimensionError = $this->imageDimensionError($image);
         if ($dimensionError !== null) {
             @unlink($image);
-            return ['text' => '', 'error' => $dimensionError];
+            return ['text' => '', 'error' => $dimensionError, 'weak' => null];
         }
 
-        $ocr = $this->runProcess([$tesseract, $image, 'stdout', '-l', $this->languages], $temporaryDirectory, $deadline);
+        $ocr = $this->recognise($tesseract, $image, $temporaryDirectory, $deadline, $deadline - $laterPages * self::PAGE_RESERVE_SECONDS);
         @unlink($image);
-        if ($ocr['error'] !== null) {
-            return ['text' => '', 'error' => $ocr['error']];
+        return $ocr;
+    }
+
+    /**
+     * OCRs one image file: a first pass on the file as it is, then, only when that pass reads
+     * poorly, bounded retries (RETRY_PASSES) until one reads well, the retries run out or
+     * $retryDeadline passes. The most confidently read pass wins. When Tesseract's output carries
+     * no word confidences, the first pass is used as it is and confidence is "not measured".
+     *
+     * @return array{text: string, error: ?string, weak: ?bool}
+     */
+    private function recognise(string $tesseract, string $image, string $temporaryDirectory, float $deadline, ?float $retryDeadline = null): array
+    {
+        $first = $this->tesseractPass($tesseract, $image, null, $temporaryDirectory, $deadline);
+        if ($first['error'] !== null) {
+            return ['text' => '', 'error' => $first['error'], 'weak' => null];
         }
-        if ($ocr['exit_code'] !== 0) {
-            return ['text' => '', 'error' => 'unreadable_document'];
+        if ($first['score'] === null) {
+            return ['text' => $first['text'], 'error' => null, 'weak' => null];
         }
-        return ['text' => trim($ocr['stdout']), 'error' => null];
+        $best = $first + ['complete' => $this->completenessOf($first['text'])];
+        $retryDeadline = min($deadline, $retryDeadline ?? $deadline);
+        if ($this->needsRetry($best) && microtime(true) < $retryDeadline) {
+            $preparer = new OcrImagePreparer($image);
+            foreach (self::RETRY_PASSES as [$variant, $mode]) {
+                $now = microtime(true);
+                if ($now >= $retryDeadline) {
+                    break;
+                }
+                if ($variant !== 'original' && $now + self::PREPARE_RESERVE_SECONDS >= $retryDeadline) {
+                    continue;   // not enough time left to prepare a copy and read it
+                }
+                $source = $variant === 'original' ? $image : $preparer->variant($variant, $temporaryDirectory);
+                if ($source === null) {
+                    continue;
+                }
+                $retry = $this->tesseractPass($tesseract, $source, $mode, $temporaryDirectory, $retryDeadline);
+                if ($retry['error'] === null && $retry['score'] !== null) {
+                    $retry['complete'] = $this->completenessOf($retry['text']);
+                    if ($retry['complete'] > $best['complete'] || ($retry['complete'] === $best['complete'] && $retry['score'] > $best['score'])) {
+                        $best = $retry;
+                    }
+                }
+                if (!$this->needsRetry($best)) {
+                    break;
+                }
+            }
+            unset($preparer);
+            foreach (OcrImagePreparer::VARIANTS as $variant) {
+                @unlink($temporaryDirectory . DIRECTORY_SEPARATOR . 'prepared-' . $variant . '.png');
+            }
+        }
+        return ['text' => $best['text'], 'error' => null, 'weak' => $this->isWeak($best)];
+    }
+
+    /** 0.0 to 1.0 from the caller's completeness check; 1.0 without one (or when it fails). */
+    private function completenessOf(string $text): float
+    {
+        if ($this->completeness === null) {
+            return 1.0;
+        }
+        try {
+            $value = ($this->completeness)($text);
+        } catch (Throwable) {
+            return 1.0;
+        }
+        return $value === null ? 1.0 : max(0.0, min(1.0, (float) $value));
+    }
+
+    /** @param array{score: ?int, mean: float, complete: float} $pass */
+    private function needsRetry(array $pass): bool
+    {
+        return $this->isWeak($pass) || $pass['complete'] < 1.0;
+    }
+
+    /**
+     * One Tesseract run asking for TSV (words with confidences). score is the number of
+     * letters/digits in words read with confidence >= CONFIDENT_WORD, or null when the output
+     * was not TSV (then text is the output as it is).
+     *
+     * @return array{text: string, error: ?string, score: ?int, mean: float}
+     */
+    private function tesseractPass(string $tesseract, string $image, ?string $mode, string $temporaryDirectory, float $deadline): array
+    {
+        $arguments = [$tesseract, $image, 'stdout', '-l', $this->languages];
+        if ($mode !== null) {
+            array_push($arguments, '--psm', $mode);
+        }
+        $arguments[] = 'tsv';
+        $run = $this->runProcess($arguments, $temporaryDirectory, $deadline);
+        if ($run['error'] !== null) {
+            return ['text' => '', 'error' => $run['error'], 'score' => null, 'mean' => 0.0];
+        }
+        if ($run['exit_code'] !== 0) {
+            return ['text' => '', 'error' => 'unreadable_document', 'score' => null, 'mean' => 0.0];
+        }
+        $tsv = $this->parseTsv($run['stdout']);
+        return $tsv === null
+            ? ['text' => trim($run['stdout']), 'error' => null, 'score' => null, 'mean' => 0.0]
+            : ['text' => $tsv['text'], 'error' => null, 'score' => $tsv['score'], 'mean' => $tsv['mean']];
+    }
+
+    /**
+     * Rebuilds the text from Tesseract TSV: words joined by spaces in their lines, a blank line
+     * between paragraphs, as in Tesseract's plain output.
+     *
+     * @return array{text: string, score: int, mean: float}|null null when the output is not TSV
+     */
+    private function parseTsv(string $output): ?array
+    {
+        $rows = preg_split('/\R/', $output) ?: [];
+        if (!str_starts_with((string) ($rows[0] ?? ''), "level\tpage_num\tblock_num")) {
+            return null;
+        }
+        $lines = [];
+        $score = 0;
+        $words = 0;
+        $confidenceTotal = 0.0;
+        foreach (array_slice($rows, 1) as $row) {
+            $columns = explode("\t", $row, 12);
+            if (count($columns) !== 12 || $columns[0] !== '5' || trim($columns[11]) === '') {
+                continue;
+            }
+            $confidence = (float) $columns[10];
+            $words++;
+            $confidenceTotal += max(0.0, $confidence);
+            if ($confidence >= self::CONFIDENT_WORD) {
+                $score += $this->letterAndDigitCount($columns[11]);
+            }
+            $paragraph = $columns[1] . '.' . $columns[2] . '.' . $columns[3];
+            $lines[$paragraph][$columns[4]][] = trim($columns[11]);
+        }
+        $paragraphs = [];
+        foreach ($lines as $paragraphLines) {
+            $paragraphs[] = implode("\n", array_map(static fn (array $line): string => implode(' ', $line), $paragraphLines));
+        }
+        return ['text' => trim(implode("\n\n", $paragraphs)), 'score' => $score, 'mean' => $words > 0 ? $confidenceTotal / $words : 0.0];
+    }
+
+    /** @param array{score: ?int, mean: float} $pass */
+    private function isWeak(array $pass): bool
+    {
+        return ($pass['score'] ?? 0) < self::MIN_CONFIDENT_CHARACTERS || $pass['mean'] < self::MIN_MEAN_CONFIDENCE;
+    }
+
+    private function confidenceWarning(?bool $weak): ?string
+    {
+        return match ($weak) {
+            null => 'OCR confidence was not measured.',
+            true => 'OCR confidence was low, so some text may be missing or misread.',
+            false => null,
+        };
     }
 
     /** 'image_too_large', 'unreadable_document' when no size can be read, or null when the image may be processed. */
