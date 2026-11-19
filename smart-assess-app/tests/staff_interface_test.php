@@ -120,10 +120,11 @@ $check('request popup no longer shows Notification History', $popup !== '' && !s
 $check('request popup has no AI Document Check section at all', $popup !== '' && !str_contains($popup, 'reqAiHtml') && !str_contains($html, 'function reqAiHtml'));
 $detail = $between($html, 'function renderDocCheckDetail(x){', "\n}\n");
 $check('Document Check carries the unverified-AI labels', str_contains($detail, 'Automatic checks and AI suggestions (unverified), not a decision')
-    && str_contains($detail, 'Looks like this document? (AI suggestion, unverified)') && str_contains($detail, "yes:'AI suggestion (unverified): yes'"));
-$check('Document Check keeps its findings and recommendations', str_contains($dc, 'Issues found') && str_contains($dc, 'Recommendation') && str_contains($dc, 'aiGuidance(r)'));
-$check('Document Check rows: whole document row opens the original, labelled View', str_contains($detail, '<a class="dc-doc-row" href="/request-file.php?doc=') && str_contains($detail, '<span class="dc-view">View</span></a>')
-    && !str_contains($dc, 'Open original') && !str_contains($dc, 'Open check'));
+    && str_contains($detail, " <span class=\"cell-sub\">AI suggestion (unverified)</span>") && str_contains($detail, "yes:'AI suggestion (unverified): yes'"));
+$check('Document Check keeps its findings and what to check / ask', str_contains($dc, 'Important Issues') && str_contains($dc, 'aiFindingGuide(f)')
+    && str_contains($dc, 'What to ask the client (if needed)'));
+$check('Document Check cards: the whole document card opens the original, labelled View', str_contains($detail, '<a class="dc-doc-card" role="listitem" href="/request-file.php?doc=')
+    && str_contains($detail, '<span class="dc-view">View</span>') && !str_contains($dc, 'Open original') && !str_contains($dc, 'Open check'));
 $check('Document Check: back-arrow icon and View Requirements', str_contains($detail, 'class="dc-back" data-action="dc-back" aria-label="Back to Document Check list"') && str_contains($detail, "ic('chevLeft','20px')")
     && str_contains($detail, '>View Requirements</button>') && !str_contains($dc, 'Open full request'));
 $check('Document Check uses no colour-coded badges', !str_contains($dc, 'class="badge ') && !str_contains($dc, "<span class=\"badge '"));

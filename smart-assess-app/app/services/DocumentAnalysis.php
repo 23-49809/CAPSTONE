@@ -42,9 +42,9 @@ final class DocumentAnalysis
      * by the server), so long free text only costs generation time: about 4 tokens/s on the
      * production CPU. Step 12 benchmark (9 synthetic jobs): 15% fewer output tokens, about 9% less
      * time, no loss of document-type answers, evidence or manual-review flags. The validator keeps
-     * MAX_NOTE / MAX_EXPLANATION, so answers from any worker version stay accepted.
+     * MAX_NOTE / MAX_EXPLANATION, so answers from any worker version stay accepted. Since version 3
+     * the model is not asked for a "note" at all; it gives the document kind and details instead.
      */
-    private const MODEL_MAX_NOTE = 60;
     private const MODEL_MAX_EXPLANATION = 100;
     private const MAX_FIELD_NAME = 80;
     private const MAX_MISSING_FIELDS = 10;
@@ -81,9 +81,63 @@ final class DocumentAnalysis
      */
     public const MIN_EVIDENCE_CHARACTERS = 12;
     public const MIN_EVIDENCE_WORDS = 3;
-    /** Worker result versions: 2 = model evidence was checked against the OCR text by the worker. */
-    public const WORKER_RESULT_VERSIONS = [1, 2];
-    public const WORKER_RESULT_VERSION = 2;
+    /**
+     * Worker result versions: 2 = model evidence was checked against the OCR text by the worker;
+     * 3 = also the document kind, holder name and property number per document, the name and
+     * number kept only where the worker found them in that document's OCR text (name_match).
+     */
+    public const WORKER_RESULT_VERSIONS = [1, 2, 3];
+    public const WORKER_RESULT_VERSION = 3;
+
+    /**
+     * What a document is, as the model reads it from the text: code => label shown to Staff
+     * (always as an unverified AI suggestion). The groups decide how the name is labelled.
+     */
+    public const ID_KINDS = [
+        'philsys_national_id' => 'Philippine National ID (PhilSys)', 'drivers_license' => 'Philippine Driver\'s License',
+        'passport' => 'Passport', 'umid' => 'UMID', 'sss_id' => 'SSS ID', 'gsis_id' => 'GSIS ID', 'philhealth_id' => 'PhilHealth ID',
+        'prc_id' => 'PRC ID', 'postal_id' => 'Postal ID', 'voters_id' => 'Voter\'s ID', 'tin_id' => 'TIN ID', 'pagibig_id' => 'Pag-IBIG ID',
+        'senior_citizen_id' => 'Senior Citizen ID', 'pwd_id' => 'PWD ID', 'school_or_company_id' => 'School or company ID', 'other_id' => 'Other ID',
+    ];
+    public const PROPERTY_KINDS = [
+        'transfer_certificate_of_title' => 'Transfer Certificate of Title (TCT)', 'original_certificate_of_title' => 'Original Certificate of Title (OCT)',
+        'tax_declaration' => 'Tax Declaration',
+    ];
+    public const OTHER_KINDS = [
+        'deed_of_sale' => 'Deed of Absolute Sale', 'deed_of_donation' => 'Deed of Donation', 'other_deed' => 'Other deed or contract',
+        'extrajudicial_settlement' => 'Extrajudicial Settlement of Estate', 'authorization_letter' => 'Authorization Letter',
+        'special_power_of_attorney' => 'Special Power of Attorney', 'tax_clearance' => 'Real Property Tax Clearance',
+        'tax_receipt' => 'Real Property Tax Receipt', 'certification_no_improvement' => 'Certification of No Improvement',
+        'vicinity_map' => 'Vicinity Map', 'barangay_clearance' => 'Barangay Clearance', 'birth_certificate' => 'Birth Certificate',
+        'marriage_certificate' => 'Marriage Certificate', 'death_certificate' => 'Death Certificate',
+        'community_tax_certificate' => 'Community Tax Certificate (Cedula)', 'affidavit' => 'Affidavit', 'other_document' => 'Other document',
+        'unclear' => 'Cannot tell from the text',
+    ];
+    /**
+     * How the worker found the holder name in the document's OCR text:
+     *  exact      every word, as whole words, in one block (only spaces, commas, periods or hyphens between)
+     *  parts      in labelled parts close together (e.g. "Last Name DELA CRUZ Given Names JUAN"), shown in the document's order
+     *  incomplete found, but more name-like text sits right next to it, or it is a single word: probably not the full name
+     *  none       not found that way: not shown
+     */
+    public const NAME_MATCH = ['exact', 'parts', 'incomplete', 'none'];
+    /** Field labels that may stand between the labelled parts of one name (compared without case or accents). */
+    private const NAME_FIELD_LABELS = ['last', 'first', 'middle', 'given', 'name', 'names', 'surname', 'family', 'apelyido', 'pangalan', 'mga',
+        'gitnang', 'panggitnang', 'suffix', 'ext', 'extension'];
+    /** Document and field words that are not part of a name next to them (for the "incomplete" check only). */
+    private const NOT_NAME_WORDS = ['republic', 'republika', 'philippines', 'pilipinas', 'ng', 'sa', 'of', 'the', 'and', 'to', 'by', 'no', 'number',
+        'driver', "driver's", 'drivers', 'license', 'licence', 'id', 'card', 'national', 'philsys', 'philhealth', 'umid', 'sss', 'gsis', 'passport',
+        'address', 'date', 'birth', 'sex', 'nationality', 'owner', 'owners', 'administrator', 'declared', 'tax', 'declaration', 'signature', 'holder',
+        'issued', 'married', 'spouse', 'attorney', 'vendor', 'vendee', 'seller', 'buyer', 'donor', 'donee', 'witness', 'notary', 'public', 'location',
+        'barangay', 'brgy', 'height', 'weight', 'blood', 'type', 'expiry', 'valid', 'until', 'arp', 'tct', 'oct', 'lot', 'title', 'certificate',
+        'transfer', 'original', 'filipino', 'male', 'female', 'm', 'f'];
+    /** Most words allowed between labelled name parts (labels only), so parts are never collected from across a page. */
+    private const MAX_LABEL_WORDS_BETWEEN = 8;
+    private const MAX_HOLDER_NAME = 100;
+    private const MAX_PROPERTY_NUMBER = 40;
+    private const LEGACY_DOCUMENT_FIELDS = ['key', 'expected_type_match', 'missing_fields', 'note'];
+    private const DOCUMENT_FIELDS = ['key', 'document_kind', 'holder_name', 'holder_name_clear', 'property_number', 'expected_type_match', 'missing_fields'];
+    private const CHECK_FIELDS = ['key', 'ocr_status', 'ocr_error', 'readability', 'pages', 'method', 'text_characters'];
     private const FIELD_NOUNS = [
         'name' => 'a name', 'property_identifier' => 'a property number (ARP, TCT, OCT or lot number)', 'date' => 'a date',
         'document_type' => 'the type of document', 'required_field' => 'a required detail', 'other' => 'a detail',
@@ -105,15 +159,20 @@ final class DocumentAnalysis
             'additionalProperties' => false,
             'required' => ['documents', 'findings', 'manual_review_recommended'],
             'properties' => [
+                // Version 3: no free-text "note" (never shown); instead what the document is and the
+                // details Staff compare, in the order the model should think about them.
                 'documents' => ['type' => 'array', 'minItems' => count($documentKeys), 'maxItems' => count($documentKeys), 'items' => [
                     'type' => 'object',
                     'additionalProperties' => false,
-                    'required' => ['key', 'expected_type_match', 'missing_fields', 'note'],
+                    'required' => self::DOCUMENT_FIELDS,
                     'properties' => [
                         'key' => $key,
+                        'document_kind' => ['type' => 'string', 'enum' => array_keys(self::documentKinds())],
+                        'holder_name' => $string(self::MAX_HOLDER_NAME),
+                        'holder_name_clear' => ['type' => 'boolean'],
+                        'property_number' => $string(self::MAX_PROPERTY_NUMBER),
                         'expected_type_match' => ['type' => 'string', 'enum' => self::TYPE_MATCH],
                         'missing_fields' => ['type' => 'array', 'maxItems' => self::MAX_MISSING_FIELDS, 'items' => ['type' => 'string', 'enum' => array_keys(self::MISSING_FIELD_LABELS)]],
-                        'note' => $string(self::MODEL_MAX_NOTE),
                     ],
                 ]],
                 'findings' => ['type' => 'array', 'maxItems' => self::MAX_FINDINGS, 'items' => [
@@ -151,7 +210,9 @@ final class DocumentAnalysis
         }
         $documents = [];
         foreach ($object['documents'] as $document) {
-            $document = self::exactObject($document, ['key', 'expected_type_match', 'missing_fields', 'note'], 'document');
+            // Either the version 3 shape or the earlier one (with "note"), each exactly.
+            $current = is_array($document) && array_key_exists('document_kind', $document);
+            $document = self::exactObject($document, $current ? self::DOCUMENT_FIELDS : self::LEGACY_DOCUMENT_FIELDS, 'document');
             $key = self::knownKey($document['key'], $documentKeys);
             if (isset($documents[$key])) {
                 throw new UnexpectedValueException('document listed twice');
@@ -160,7 +221,17 @@ final class DocumentAnalysis
             if (!is_array($missing) || !array_is_list($missing) || count($missing) > self::MAX_MISSING_FIELDS) {
                 throw new UnexpectedValueException('missing_fields must be a short list');
             }
-            self::text($document['note'], self::MAX_NOTE, 'note');   // validated, never shown (see above)
+            if ($current) {
+                $kind = self::enum($document['document_kind'], array_keys(self::documentKinds()), 'document_kind');
+                if (!is_bool($document['holder_name_clear'])) {
+                    throw new UnexpectedValueException('holder_name_clear must be a boolean');
+                }
+                $holder = self::detail($document['holder_name'], self::MAX_HOLDER_NAME, '/\p{L}/u', 'holder_name');
+                $number = self::detail($document['property_number'], self::MAX_PROPERTY_NUMBER, '/\d/', 'property_number');
+            } else {
+                self::text($document['note'], self::MAX_NOTE, 'note');   // validated, never shown (see above)
+                [$kind, $holder, $number] = [null, '', ''];
+            }
             $fields = [];
             foreach ($missing as $field) {
                 $code = self::missingFieldCode(self::text($field, self::MAX_FIELD_NAME, 'missing field', false));
@@ -173,6 +244,10 @@ final class DocumentAnalysis
                 'expected_type_match' => self::enum($document['expected_type_match'], self::TYPE_MATCH, 'expected_type_match'),
                 'missing_fields' => $fields,
                 'note' => '',
+                'document_kind' => $kind,
+                'holder_name' => $holder,
+                'holder_name_clear' => $current ? $document['holder_name_clear'] : null,
+                'property_number' => $number,
             ];
         }
         if (count($documents) !== count($documentKeys)) {
@@ -251,6 +326,223 @@ final class DocumentAnalysis
         return $category !== 'cannot_verify' && mb_strlen($evidence) >= self::MIN_EVIDENCE_CHARACTERS && $words >= self::MIN_EVIDENCE_WORDS;
     }
 
+    /** Every document kind code => label. */
+    public static function documentKinds(): array
+    {
+        return self::ID_KINDS + self::PROPERTY_KINDS + self::OTHER_KINDS;
+    }
+
+    /** 'id', 'property' or 'other' (null when no kind was given). */
+    public static function documentGroup(?string $kind): ?string
+    {
+        return $kind === null ? null : (isset(self::ID_KINDS[$kind]) ? 'id' : (isset(self::PROPERTY_KINDS[$kind]) ? 'property' : 'other'));
+    }
+
+    /** How $name occurs in $text: one of NAME_MATCH (see there). */
+    public static function nameMatch(string $name, string $text): string
+    {
+        return self::locateName($name, $text)[0];
+    }
+
+    /**
+     * [match, the name as the document's OCR text writes it ('' for none)]. Words are compared
+     * without letter case or accents, but the name returned is always the text's own characters
+     * (a hyphen at a line break joined, line breaks as spaces), in the document's order.
+     */
+    private static function locateName(string $name, string $text): array
+    {
+        $text = self::normalizeText($text);
+        $want = array_column(self::tokens(self::normalizeText($name)), 'fold');
+        $tokens = self::tokens($text);
+        if ($want === [] || $tokens === [] || !preg_match('/\p{L}/u', $name)) {
+            return ['none', ''];
+        }
+        $count = count($want);
+        $sorted = $want;
+        sort($sorted);
+        // 1. One block: the name's words side by side (in any order), only light punctuation between.
+        for ($i = 0; $i + $count <= count($tokens); $i++) {
+            $block = array_slice($tokens, $i, $count);
+            $folds = array_column($block, 'fold');
+            sort($folds);
+            if ($folds !== $sorted) {
+                continue;
+            }
+            foreach (array_slice($block, 1) as $token) {
+                if (!preg_match('/^[\s,.\-]*$/u', $token['gap'])) {
+                    continue 2;
+                }
+            }
+            $shown = substr($text, $block[0]['start'], $block[$count - 1]['end'] - $block[0]['start']);
+            $shown = trim((string) preg_replace('/\s+/u', ' ', (string) preg_replace('/-\s+/u', '-', $shown)));
+            return [self::completeName($tokens, range($i, $i + $count - 1)) ? 'exact' : 'incomplete', $shown];
+        }
+        // 2. Labelled parts: each word of the name, with only name-field labels between them.
+        foreach ($tokens as $start => $first) {
+            if (!in_array($first['fold'], $want, true)) {
+                continue;
+            }
+            $left = $want;
+            $found = [];
+            $labels = 0;
+            for ($j = $start; $j < count($tokens) && $left !== []; $j++) {
+                $at = array_search($tokens[$j]['fold'], $left, true);
+                if ($at !== false) {
+                    unset($left[$at]);
+                    $found[] = $j;
+                } elseif (in_array($tokens[$j]['fold'], self::NAME_FIELD_LABELS, true) && ++$labels <= self::MAX_LABEL_WORDS_BETWEEN) {
+                    continue;
+                } else {
+                    break;
+                }
+            }
+            if ($left === []) {
+                $shown = implode(' ', array_map(static fn (int $j): string => $tokens[$j]['word'], $found));
+                return [self::completeName($tokens, $found) ? 'parts' : 'incomplete', $shown];
+            }
+        }
+        return ['none', ''];
+    }
+
+    /**
+     * False when the name found at token positions $found is probably not the whole name: a
+     * single word; a name-like word (same letter case, not a known label or document word)
+     * directly next to it on the same line, e.g. "JUAN" in "DELA CRUZ, JUAN SANTOS"; or one
+     * just past name-field labels, e.g. a middle name after "Middle Name" that the name left out.
+     *
+     * @param list<int> $found
+     */
+    private static function completeName(array $tokens, array $found): bool
+    {
+        if (count($found) < 2) {
+            return false;
+        }
+        $upper = true;
+        foreach ($found as $k) {
+            $upper = $upper && mb_strtoupper($tokens[$k]['word']) === $tokens[$k]['word'];
+        }
+        $nameLike = static function (array $token) use ($upper): bool {
+            $word = $token['word'];
+            return preg_match("/^[\\p{L}\\p{M}'’]+$/u", $word) === 1
+                && !in_array($token['fold'], self::NOT_NAME_WORDS, true) && !in_array($token['fold'], self::NAME_FIELD_LABELS, true)
+                && ($upper ? mb_strtoupper($word) === $word : mb_strtoupper(mb_substr($word, 0, 1)) === mb_substr($word, 0, 1));
+        };
+        $sameLine = static fn (string $gap): bool => preg_match('/^(?:[ \t,]*|[ \t]*-\s*)\z/u', $gap) === 1;
+        $first = $found[0];
+        $last = $found[count($found) - 1];
+        if (($first > 0 && $sameLine($tokens[$first]['gap']) && $nameLike($tokens[$first - 1]))
+            || (isset($tokens[$last + 1]) && $sameLine($tokens[$last + 1]['gap']) && $nameLike($tokens[$last + 1]))) {
+            return false;
+        }
+        // Past name-field labels on either side: another labelled part of the same name.
+        foreach ([-1, 1] as $step) {
+            $k = ($step < 0 ? $first : $last) + $step;
+            $labels = 0;
+            while (isset($tokens[$k]) && in_array($tokens[$k]['fold'], self::NAME_FIELD_LABELS, true) && $labels < self::MAX_LABEL_WORDS_BETWEEN) {
+                $labels++;
+                $k += $step;
+            }
+            if ($labels > 0 && isset($tokens[$k]) && $nameLike($tokens[$k])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Words of a text with their byte offsets and the text before each (hyphens and other
+     * punctuation separate words; apostrophes inside a word do not).
+     *
+     * @return list<array{word:string, fold:string, start:int, end:int, gap:string}>
+     */
+    private static function tokens(string $text): array
+    {
+        preg_match_all("/[\\p{L}\\p{M}\\p{N}]+(?:['’][\\p{L}\\p{M}\\p{N}]+)*/u", $text, $m, PREG_OFFSET_CAPTURE);
+        $tokens = [];
+        $previous = 0;
+        foreach ($m[0] as [$word, $start]) {
+            $tokens[] = ['word' => $word, 'fold' => self::foldWord($word), 'start' => $start, 'end' => $start + strlen($word),
+                'gap' => substr($text, $previous, $start - $previous)];
+            $previous = $start + strlen($word);
+        }
+        return $tokens;
+    }
+
+    /** A word without letter case or accents, for comparing only (never shown). */
+    private static function foldWord(string $word): string
+    {
+        if (class_exists('Normalizer')) {
+            $decomposed = Normalizer::normalize($word, Normalizer::FORM_D);
+            $word = is_string($decomposed) ? $decomposed : $word;
+        }
+        return mb_strtolower((string) preg_replace('/\p{M}+/u', '', $word));
+    }
+
+    /**
+     * $number as the text writes it, or '' when it is not there as a whole number: its groups of
+     * letters and digits in order, with at most spaces and one "-", "/" or "." between groups,
+     * and no letter or digit (or "-"/"/" and more digits) directly before or after it. So
+     * "018-0004" is not found in "018-00045", but "018-00045" is found in "018 - 00045".
+     */
+    private static function locateNumber(string $number, string $text): string
+    {
+        $groups = preg_split('/[\s\-\/.]+/u', trim($number), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($groups === [] || !preg_match('/\d/', $number)) {
+            return '';
+        }
+        foreach ($groups as $group) {
+            if (!preg_match('/^[\p{L}\p{N}]+$/u', $group)) {
+                return '';
+            }
+        }
+        $pattern = '/(?<![\p{L}\p{N}])(?<![\p{L}\p{N}][\-\/])' . implode('[ \t]*[\-\/.]?[ \t]*', array_map(static fn (string $g): string => preg_quote($g, '/'), $groups))
+            . '(?![\-\/]?[\p{L}\p{N}])/iu';
+        return preg_match($pattern, self::normalizeText($text), $m) ? trim((string) preg_replace('/\s+/u', ' ', $m[0])) : '';
+    }
+
+    /**
+     * Worker side, where the OCR text is known (version 3): keeps each document's holder_name and
+     * property_number only where they occur in THAT document's text (locateName(), locateNumber()),
+     * and replaces them with the text's own characters, so Staff see what OCR read, never a
+     * spelling the model corrected, completed or took from the form. Returns [output, key => name match].
+     *
+     * @param array<string, array{text:string}> $texts
+     * @return array{0: array, 1: array<string,string>}
+     */
+    public static function keepQuotedDetails(array $output, array $texts): array
+    {
+        $matches = [];
+        foreach ($output['documents'] as &$document) {
+            if (!array_key_exists('holder_name', $document)) {
+                continue;   // an answer in the earlier shape has no details to check
+            }
+            $text = (string) ($texts[$document['key']]['text'] ?? '');
+            [$match, $name] = self::locateName((string) $document['holder_name'], $text);
+            $document['holder_name'] = $name;
+            $matches[$document['key']] = $match;
+            $document['property_number'] = self::locateNumber((string) $document['property_number'], $text);
+        }
+        unset($document);
+        return [$output, $matches];
+    }
+
+    /**
+     * Parts of a name that OCR probably misread: words with digits or symbols a name does not
+     * contain (letters, accents, ".", ",", "'", "-" are fine). Shown to Staff to check by eye.
+     *
+     * @return list<string>
+     */
+    public static function uncertainNameParts(string $name): array
+    {
+        $parts = [];
+        foreach (preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            if (preg_match("/[^\\p{L}\\p{M}.,'’-]/u", $word) && !in_array($word, $parts, true)) {
+                $parts[] = $word;
+            }
+        }
+        return $parts;
+    }
+
     /** Staff-facing wording of a model finding: built only from validated codes, always "unverified". */
     private static function modelFindingText(string $category, string $field, array $keys, Closure $label): string
     {
@@ -281,7 +573,7 @@ final class DocumentAnalysis
         }
         $documents = [];
         foreach ($object['documents'] as $document) {
-            $document = self::exactObject($document, ['key', 'ocr_status', 'ocr_error', 'readability', 'pages', 'method', 'text_characters'], 'document check');
+            $document = self::exactObject($document, $object['version'] >= 3 ? [...self::CHECK_FIELDS, 'name_match'] : self::CHECK_FIELDS, 'document check');
             $key = self::knownKey($document['key'], $documentKeys);
             if (isset($documents[$key])) {
                 throw new UnexpectedValueException('document check listed twice');
@@ -307,6 +599,7 @@ final class DocumentAnalysis
                 'pages' => $document['pages'],
                 'method' => $method,
                 'text_characters' => $document['text_characters'],
+                'name_match' => $object['version'] >= 3 ? self::enum($document['name_match'], self::NAME_MATCH, 'name_match') : 'none',
             ];
         }
         if (!is_array($object['rule_findings']) || !array_is_list($object['rule_findings']) || count($object['rule_findings']) > self::MAX_FINDINGS) {
@@ -337,6 +630,17 @@ final class DocumentAnalysis
         $output = null;
         if ($status === 'ok') {
             $output = self::validateModelOutput($model['output'], $documentKeys);
+            // Only a version 3 worker checked names and numbers against the OCR text, and only the
+            // ones it reports as found; anything else is not shown (this server never sees the text).
+            foreach ($output['documents'] as &$document) {
+                if ($object['version'] < 3 || $documents[$document['key']]['name_match'] === 'none') {
+                    $document['holder_name'] = '';
+                }
+                if ($object['version'] < 3) {
+                    $document['property_number'] = '';
+                }
+            }
+            unset($document);
             if ($object['version'] < 2) {
                 // A worker before version 2 did not check the model's quotes against the OCR
                 // text, and this application cannot (it never receives the text): drop them.
@@ -405,6 +709,7 @@ final class DocumentAnalysis
         $model = $worker['model'];
         $modelDocuments = [];
         $manualReview = false;
+        $nameMatches = array_column($worker['documents'], 'name_match', 'key');
         if ($model['status'] === 'ok' && is_array($model['output'])) {
             $manualReview = $model['output']['manual_review_recommended'];
             foreach ($model['output']['documents'] as $document) {
@@ -416,6 +721,32 @@ final class DocumentAnalysis
                 } elseif ($document['expected_type_match'] === 'unclear') {
                     $findings[] = self::finding('ocr_uncertainty', 'document_type', [$key],
                         'AI suggestion (unverified): it is unclear from the text whether this is the expected document (' . $label($key) . ').', '', 'model');
+                }
+                if ($document['document_kind'] !== null) {
+                    $holder = $document['holder_name'];
+                    $unsure = self::uncertainNameParts($holder);
+                    $incomplete = ($nameMatches[$key] ?? null) === 'incomplete';
+                    if ($holder !== '' && ($unsure !== [] || $incomplete || $document['holder_name_clear'] === false)) {
+                        // One finding per document. Incomplete and misread-looking are the server's own checks.
+                        $what = $incomplete ? ($unsure !== [] || $document['holder_name_clear'] === false ? 'may be incomplete and contain reading errors' : 'may be incomplete (more of a name appears next to it on the document)')
+                            : 'may contain reading errors';
+                        $findings[] = self::finding('ocr_uncertainty', 'name', [$key],
+                            'The name read from ' . $label($key) . ' ' . $what . '. Check the full name and its spelling on the original.',
+                            $unsure === [] ? '' : mb_substr(implode(' ', $unsure), 0, self::MAX_EVIDENCE), ($unsure !== [] || $incomplete) ? 'rule' : 'model');
+                    } elseif ($holder === '' && in_array($key, self::ID_KEYS, true) && ($readability[$key] ?? '') === 'good'
+                        && in_array(self::documentGroup($document['document_kind']), ['id', 'other'], true)) {
+                        $findings[] = self::finding('ocr_uncertainty', 'name', [$key],
+                            'No name could be read reliably from ' . $label($key) . '. Check the name on the original.', '', 'model');
+                    }
+                    // The AI's two answers disagree (its type says ID / not an ID, against the slot, while it
+                    // also says the document looks as expected): never left as a silent "yes".
+                    $group = self::documentGroup($document['document_kind']);
+                    $slotIsId = in_array($key, self::ID_KEYS, true);
+                    if ($document['expected_type_match'] === 'yes' && $document['document_kind'] !== 'unclear' && ($slotIsId ? $group !== 'id' : $group === 'id')) {
+                        $findings[] = self::finding('possible_inconsistency', 'document_type', [$key],
+                            'AI suggestion (unverified): the text looks like ' . self::documentKinds()[$document['document_kind']] . ', '
+                            . ($slotIsId ? 'not an ID' : 'an ID, not the document required here') . '. Check that the right document was uploaded for ' . $label($key) . '.', '', 'model');
+                    }
                 }
                 if ($document['missing_fields'] !== []) {
                     $findings[] = self::reliableOr(
@@ -459,6 +790,9 @@ final class DocumentAnalysis
                     $check = $document;
                 }
             }
+            $read = $modelDocuments[$item['key']] ?? [];
+            $kind = $read['document_kind'] ?? null;
+            $holder = (string) ($read['holder_name'] ?? '');
             $documents[] = [
                 'key' => $item['key'],
                 'label' => $item['label'],
@@ -468,6 +802,16 @@ final class DocumentAnalysis
                 'pages' => $check['pages'] ?? 0,
                 'expected_type_match' => $modelDocuments[$item['key']]['expected_type_match'] ?? null,
                 'note' => '',   // the model's own note is never shown
+                // Version 3 (null/'' for earlier results): the kind is an AI suggestion; the name and
+                // number are text OCR read from this document (found there by the worker).
+                'document_kind' => $kind,
+                'document_kind_label' => $kind === null ? null : self::documentKinds()[$kind],
+                'document_group' => self::documentGroup($kind),
+                'holder_name' => $holder,
+                'holder_name_match' => $holder === '' ? null : ($check['name_match'] ?? null),
+                'holder_name_clear' => $holder === '' ? null : ($read['holder_name_clear'] ?? null),
+                'holder_name_uncertain' => self::uncertainNameParts($holder),
+                'property_number' => (string) ($read['property_number'] ?? ''),
             ];
         }
 
@@ -613,10 +957,17 @@ Strict rules:
    - possible_inconsistency: names, property numbers (ARP, TCT, OCT, lot numbers), dates or other details differ between documents or from the form, or a document does not look like its expected type.
    - ocr_uncertainty: the text is garbled, partial or too short to judge.
    - cannot_verify: something that cannot be checked from text alone.
-5. For each document give: expected_type_match "yes" if the text looks like the expected document type, "no" if it clearly looks like something else, "unclear" if you cannot tell; missing_fields (only codes from the allowed list in the schema, only when the text is clearly readable); and a short neutral note.
-6. "evidence" is an exact, short quote copied from the document text, or an empty string; anything that is not an exact quote is discarded. Keep explanations short, plain and factual.
-7. Set manual_review_recommended to true if anything needs a person to look at it.
-8. Reply with JSON only, matching the required schema exactly.
+5. For each document give:
+   - document_kind: what the text shows the document actually is, from the allowed codes. Use an ID code only for an identity card or passport, never for a title, tax declaration, clearance, certificate, deed or letter. Use "unclear" if you cannot tell.
+   - holder_name: the name of the person the document is about (the ID holder; the registered owner on a title or tax declaration; the person a clearance or certificate is issued to), copied character for character from the text, with the middle name and suffix, in the order printed. Never correct spelling, never add or complete letters, never use the name from the online form. Empty string if there is no such name or you are not sure which name it is.
+   - holder_name_clear: false if any part of that name looks misread, garbled or cut off.
+   - property_number: the TCT, OCT, ARP, Tax Declaration or lot number printed on a title or tax declaration, copied exactly; otherwise an empty string. Never copy ID card numbers.
+   - expected_type_match: "yes" if the text looks like the expected document type, "no" if it clearly looks like something else, "unclear" if you cannot tell.
+   - missing_fields: only codes from the allowed list, only when the text is clearly readable.
+6. Findings: report only what a staff member needs to act on: a real difference in a name, number or date, a clearly missing detail, or text too unclear to judge. Report each problem once. Do not report small OCR spelling noise, formatting, or general reminders. Use "cannot_verify" at most once per document, and only for a document whose use depends on a signature, seal or notarization.
+7. "evidence" is an exact, short quote copied from the document text, or an empty string; anything that is not an exact quote is discarded. Keep explanations short, plain and factual.
+8. Set manual_review_recommended to true if anything needs a person to look at it.
+9. Reply with JSON only, matching the required schema exactly.
 PROMPT;
     }
 
@@ -758,6 +1109,13 @@ PROMPT;
             throw new UnexpectedValueException($what . ' is empty or too long');
         }
         return $value;
+    }
+
+    /** A short detail copied from a document: one line, '' when it lacks what it must contain. */
+    private static function detail(mixed $value, int $max, string $needs, string $what): string
+    {
+        $value = trim((string) preg_replace('/\s+/u', ' ', self::text($value, $max, $what)));
+        return preg_match($needs, $value) ? $value : '';
     }
 
     private static function knownKey(mixed $key, array $documentKeys): string

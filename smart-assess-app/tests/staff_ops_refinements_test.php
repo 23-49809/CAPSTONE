@@ -58,9 +58,14 @@ foreach (['Document Requests' => $docList, 'Land Transfer Requests' => $landList
 $check('Staff sidebar label is Send Updates (same page)', str_contains($html, "{view:'notifications', label:'Send Updates', icon:'sms'},"));
 $check('the Send Updates page heading matches the sidebar', str_contains($html, '<h1>Send Updates</h1>'));
 
-// ---- 5./6. No fixed rejection message; rejection reasons by request type ----
-$check('the fixed "was rejected. Please contact the office" message is gone', !str_contains($html, 'was rejected. Please contact the office for more information'));
-$check('a rejection opens an empty, editable draft for that request', str_contains($html, "state.notifDraft = { ref: r.id, rejection: 'Rejected', category: '', topic: '', message: '' };"));
+// ---- 5./6. The old Send Updates workflow (restored 17 Nov 2026) ----
+// A rejection opens the old pre-filled, editable draft; nothing is sent until Staff click Send.
+$check('a rejection opens the old pre-filled draft with the client\'s name and reference',
+    str_contains($html, "rejection: 'Rejected', category: 'Request Status Update', topic: 'Request rejected: '+r.id,")
+    && str_contains($html, "was rejected. Please contact the office for more information. Thank you."));
+$check('the category list is the fixed one again (no per-type rebuild in the page)',
+    !str_contains($html, 'notifCategoryOptions') && !str_contains($html, 'REJECTION_CATEGORIES')
+    && str_contains($html, "var NOTIF_CATEGORIES = ['Missing Document','Additional Requirements','Request Status Update','Land Transfer Status','Completion / Approval','Other Instruction'];"));
 $docReasons = ['Invalid or Missing Government ID', 'Incomplete Request Details', 'Missing Property Information', 'Missing Authorization Documents'];
 $landReasons = ['Missing or Invalid Tax Declaration / Title', 'Missing Deed of Sale / Donation', 'Missing Vicinity Map',
     'Missing Certification of No Improvement', 'Missing Tax Clearance', 'Invalid or Missing Government ID'];
@@ -71,6 +76,7 @@ foreach ($landReasons as $reason) {
     $check("server accepts Land Transfer reason \"{$reason}\"", (bool) preg_match("/SA_LANDTRANSFER_REJECTION_CATEGORIES = \\[[^\\]]*'" . preg_quote($reason, '/') . "'/s", $api));
 }
 $check('the server refuses a reason from the other request type', str_contains($api, "if (!sa_category_fits_flow(\$category, (string) \$request['flow'])) {"));
+$check('the old static message placeholder is back', str_contains($html, 'placeholder="Type the message for the applicant…" required>'));
 
 // ---- 7. Approve ----
 $detail = $between($html, 'function modalReqDetail(id, kind){', "\nfunction ");
@@ -82,14 +88,21 @@ $check('Approve still opens Send Updates with a pickup draft after the server co
 $check('Update Status > Processing uses the existing start_processing timer', str_contains($bridge, "if (data.status === 'Processing') {\n        internalSuccess('start_processing', { id: data.id });"));
 $check('no "Elapsed" label on the processing time', !str_contains($html, "'Elapsed: '"));
 $check('no Complete Request or Process Request button beside the time in the details', !str_contains($detail, 'Complete Request') && !str_contains($detail, 'btn-process'));
-$check('the details label the end time Processing End', str_contains($detail, "['Processing End', fmtDateTime(r.processingCompletedAt)]"));
+$check('the details combine the stored start and end times in one Processing Timeline row', str_contains($detail, "timeline ? ['Processing Timeline', timeline, true] : null")
+    && str_contains($detail, "<span class=\"rd-tl-k\">Started</span><span class=\"rd-tl-v\">'+fmtDateTime(r.processingStartedAt)") && str_contains($detail, "<span class=\"rd-tl-k\">Ended</span><span class=\"rd-tl-v\">'+(r.processingCompletedAt ? fmtDateTime(r.processingCompletedAt)"));
+$check('the details have no separate Processing Started / End rows and no duration or running timer', !str_contains($detail, "['Processing Started'") && !str_contains($detail, "['Processing End'")
+    && !str_contains($detail, 'Final Processing Duration') && !str_contains($detail, 'processingTimerHtml(') && !str_contains($detail, 'formatDuration(') && !str_contains($detail, "['Processing', "));
+$check('request lists keep their processing timer', str_contains($html, 'processingTimerHtml(r)') || str_contains($html, 'processingTimerHtml(r, false)'));
 
-// ---- 10. Channels from the client's contact details ----
+// ---- 10. The old visible Send by choice (restored 17 Nov 2026) ----
 $notif = $between($html, 'function renderNotifications(acct){', "\n}\n");
-$check('the Send by choice is hidden from Staff', str_contains($notif, '<fieldset class="nf-channels" hidden><legend>Send by</legend>') && str_contains($html, '.nf-channels[hidden]{ display:none; }'));
-$check('Staff see which channels will be used before sending', str_contains($notif, 'data-channel-summary') && str_contains($bridge, 'function updateChannelSummary(form) {'));
-$check('SMS is used only for a valid Philippine mobile number', str_contains($bridge, 'var smsUsable = !!phone && isPhilippineMobile(phone) && !(channelStatus && !channelStatus.sms.ready);'));
-$check('nothing is sent without a usable channel', str_contains($bridge, "if (!data.send_sms && !data.send_email) {"));
+$check('the Send by fieldset is visible again with both channel boxes', str_contains($notif, '<fieldset class="nf-channels"><legend>Send by</legend>')
+    && str_contains($notif, 'SMS to the phone number') && str_contains($notif, 'Email to the email address')
+    && !str_contains($html, '.nf-channels[hidden]') && !str_contains($notif, 'data-channel-summary'));
+$check('channel boxes follow availability but Staff keep the choice (no extra client-side gating)',
+    str_contains($bridge, 'var smsUsable = !!phone && !(channelStatus && !channelStatus.sms.ready);')
+    && !str_contains($bridge, 'isPhilippineMobile') && !str_contains($bridge, 'updateChannelSummary')
+    && !str_contains($bridge, '!data.send_sms && !data.send_email'));
 $check('Staff still click Send, and duplicate prevention is unchanged', str_contains($notif, ' Send Notification</button>') && str_contains($bridge, "if (form.getAttribute('data-sending') === '1') return;")
     && str_contains($bridge, "error.code !== 'sms_unconfirmed'"));
 $check('the recipient shows the submitted name without "contact on this request"', !str_contains($bridge, 'contact on this request') && str_contains($bridge, 'var shownName = result.data.submittedName || ownerName;'));
@@ -117,6 +130,7 @@ $check('the original sidebar image is in the repository and served', is_file($pr
 // ---- 14. Typography: no new font families or sizes in the new rules ----
 $newCss = implode("\n", array_filter([
     $between($html, '.dash-stat.dash-stat-info{', "\n"), $between($html, '.proc-end{', "\n"), $between($html, '.modal.ann-inbox{', '.ann-inbox-list .dash-ann p'),
+    $between($html, '.rd-timeline{', '.rd-status-form .rd-form-row'),
     $between($html, '.nf-channels[hidden]', "\n  .nf-channels legend"),
 ]));
 $check('the new styles set no font family or size', $newCss !== '' && !preg_match('/font-(family|size)\s*:|font\s*:/', $newCss), $newCss);
@@ -128,6 +142,10 @@ $script = 'var state = {docRequests:[], landRequests:[]};'
     . 'function findLandReq(id){ return state.landRequests.find(function(r){return r.id===id;}); }'
     . $between($html, 'var NOTIF_CATEGORIES = [', "\n/* The selected request's own record") . "\n"
     . $fn('padTimer') . $fn('formatDuration') . $fn('processingTimerHtml') . $fn('dashStatCard')
+    . 'var STATUS_META = {Received:{cls:"slate"}, Processing:{cls:"blue"}, Approved:{cls:"green"}}; function statusLabel(s){ return s; } function ic(){ return ""; }'
+    . 'var demoAccount = {role:"staff", id:5}; function currentAccount(){ return demoAccount; } function fmtDateTime(s){ return "FMT[" + s + "]"; }'
+    . 'function reqSubmittedDetailsHtml(){ return ""; } function reqSubmittedFilesHtml(){ return ""; }'
+    . $fn('rdPortrait') . $fn('rdTable') . $fn('modalReqDetail')
     . <<<'JS'
 var out = {};
 out.phone = ['+639989695966', '639989695966', '+63 998 969 5966', '09989695966', '+6328765432', ''].map(phLocalMobile);
@@ -135,14 +153,19 @@ state.docRequests.push({id:'DR-1', status:'Rejected', applicant:'Ana  Reyes Dima
 state.docRequests.push({id:'DR-2', status:'Processing', applicant:'Bo Cruz', details:{firstName:'Bo', middleName:'', lastName:'Cruz'}});
 state.landRequests.push({id:'LT-1', status:'Rejected', applicant:'Cy Ramos', details:{firstName:'Cy', middleName:'D.', lastName:'Ramos'}});
 out.name = [submittedFullName(findDocReq('DR-1')), submittedFullName(findDocReq('DR-2')), submittedFullName({applicant:'Only  Applicant'})];
-out.catsDoc = notifCategoriesFor('DR-1'); out.catsLand = notifCategoriesFor('LT-1'); out.catsOpen = notifCategoriesFor('DR-2');
-out.msgDoc = rejectionMessage(submittedFullName(findDocReq('DR-1')), 'DR-1', 'doc', 'Missing Authorization Documents');
-out.msgLand = rejectionMessage(submittedFullName(findLandReq('LT-1')), 'LT-1', 'land', 'Missing Vicinity Map');
-out.msgWrongType = rejectionMessage('X', 'DR-1', 'doc', 'Missing Vicinity Map');
 out.timerRunning = processingTimerHtml({processingStartedEpoch: Math.floor(Date.now()/1000)-65, processingDurationSeconds:null}, true);
 out.timerEnded = processingTimerHtml({processingStartedEpoch: 1, processingDurationSeconds: 3725}, true);
 out.timerListEnded = processingTimerHtml({processingStartedEpoch: 1, processingDurationSeconds: 60});
 out.cardInfo = dashStatCard('amber', 4, 'Requirements Incomplete', 'Needs applicant follow-up', null);
+// Demo requests only: one ended, one running, one not started.
+state.docRequests.push({id:'DR-9', status:'Approved', applicant:'Demo Ended', barangay:'Poblacion', docType:'Certified True Copy', purpose:'Demo', submitted:'2026-11-16 21:50:00',
+  processingStaffId:5, processingStaffName:'Demo Staff', processingStartedAt:'2026-11-16 21:56:00', processingStartedEpoch:1, processingCompletedAt:'2026-11-16 21:57:00', processingDurationSeconds:42});
+state.docRequests.push({id:'DR-10', status:'Processing', applicant:'Demo Running', barangay:'Poblacion', docType:'Certified True Copy', purpose:'Demo', submitted:'2026-11-16 21:50:00',
+  processingStaffId:5, processingStaffName:'Demo Staff', processingStartedAt:'2026-11-16 22:00:00', processingStartedEpoch:Math.floor(Date.now()/1000)-30, processingCompletedAt:null, processingDurationSeconds:null});
+state.docRequests.push({id:'DR-11', status:'Received', applicant:'Demo New', barangay:'Poblacion', docType:'Certified True Copy', purpose:'Demo', submitted:'2026-11-16 21:50:00'});
+out.detailEnded = modalReqDetail('DR-9', 'doc');
+out.detailRunning = modalReqDetail('DR-10', 'doc');
+out.detailNew = modalReqDetail('DR-11', 'doc');
 out.cardNav = dashStatCard('', 9, 'Total Accounts', 'All internal roles', 'staff-accounts');
 process.stdout.write(JSON.stringify(out));
 JS;
@@ -158,21 +181,21 @@ $out = is_array($out) ? $out : [];
 
 $check('+63 mobile numbers are shown with a leading 0', ($out['phone'] ?? null) === ['09989695966', '09989695966', '09989695966', '09989695966', '+6328765432', ''], $out['phone'] ?? null);
 $check('the client\'s full submitted name is shown as entered', ($out['name'] ?? null) === ['Ana Reyes Dimaculangan', 'Bo Cruz', 'Only Applicant'], $out['name'] ?? null);
-$check('a rejected Document Request offers only Document Request reasons', ($out['catsDoc'] ?? null) === array_merge($docReasons, ['Other Instruction']), $out['catsDoc'] ?? null);
-$check('a rejected Land Transfer Request offers only Land Transfer reasons', ($out['catsLand'] ?? null) === array_merge($landReasons, ['Other Instruction']), $out['catsLand'] ?? null);
-$check('a request that is not rejected keeps the usual categories', ($out['catsOpen'] ?? null) === ['Missing Document', 'Additional Requirements', 'Request Status Update',
-    'Land Transfer Status', 'Completion / Approval', 'Other Instruction'], $out['catsOpen'] ?? null);
-$msgDoc = (string) ($out['msgDoc'] ?? '');
-$check('the rejection draft uses the client\'s name, the reference and the chosen reason', str_starts_with($msgDoc, 'Good day, Ana Reyes Dimaculangan. Your request DR-1 ')
-    && str_contains($msgDoc, 'authorization letter') && str_contains($msgDoc, '0998-9695-966'), $msgDoc);
-$check('the Land Transfer draft names the missing requirement', str_contains((string) ($out['msgLand'] ?? ''), 'Cy D. Ramos') && str_contains((string) ($out['msgLand'] ?? ''), 'Vicinity Map'), $out['msgLand'] ?? '');
-$check('no draft is made from a reason of the other request type', ($out['msgWrongType'] ?? 'x') === '', $out['msgWrongType'] ?? null);
-$check('drafts stay within the SMS/message limit', strlen($msgDoc) < 1000 && strlen((string) ($out['msgLand'] ?? '')) < 1000);
 $check('a running timer shows only the time (no "Elapsed", no Processing End)', !str_contains((string) ($out['timerRunning'] ?? ''), 'Elapsed')
     && !str_contains((string) ($out['timerRunning'] ?? ''), 'Processing End') && str_contains((string) ($out['timerRunning'] ?? ''), 'data-final-seconds=""'), $out['timerRunning'] ?? '');
 $check('an ended timer is frozen at the final duration and marked Processing End', str_contains((string) ($out['timerEnded'] ?? ''), '>01:02:05</span>')
     && str_contains((string) ($out['timerEnded'] ?? ''), '<span class="proc-end">Processing End</span>'), $out['timerEnded'] ?? '');
 $check('request lists also show Processing End', str_contains((string) ($out['timerListEnded'] ?? ''), 'Processing time: ') && str_contains((string) ($out['timerListEnded'] ?? ''), 'Processing End'), $out['timerListEnded'] ?? '');
+$ended = (string) ($out['detailEnded'] ?? '');
+$check('an ended request shows one Processing Timeline row with both stored times and nothing else about time',
+    substr_count($ended, 'Processing Timeline') === 1 && str_contains($ended, '<span class="rd-tl-k">Started</span><span class="rd-tl-v">FMT[2026-11-16 21:56:00]</span>')
+    && str_contains($ended, '<span class="rd-tl-k">Ended</span><span class="rd-tl-v">FMT[2026-11-16 21:57:00]</span>') && !str_contains($ended, '00:00:42') && !str_contains($ended, 'Processing End')
+    && !str_contains($ended, 'data-processing-timer') && !str_contains($ended, 'Duration'), $ended);
+$running = (string) ($out['detailRunning'] ?? '');
+$check('a request in processing shows its start time and "In progress", without a running timer', str_contains($running, 'FMT[2026-11-16 22:00:00]')
+    && str_contains($running, '<span class="rd-tl-k">Ended</span><span class="rd-tl-v"><span class="cell-sub">In progress</span></span>') && !str_contains($running, 'data-processing-timer'), $running);
+$check('a request not yet started keeps the how-to-start hint in the same row', str_contains((string) ($out['detailNew'] ?? ''), 'Not started. Choose Processing and click Update Status to start.')
+    && substr_count((string) ($out['detailNew'] ?? ''), 'Processing Timeline') === 1, $out['detailNew'] ?? '');
 $card = (string) ($out['cardInfo'] ?? '');
 $check('an information card has the same parts but no button or navigation', str_starts_with($card, '<div class="dash-stat dash-stat-info amber"') && !str_contains($card, 'data-action')
     && !str_contains($card, '<button') && str_contains($card, 'dash-stat-num">4<') && str_contains($card, 'Needs applicant follow-up'), $card);

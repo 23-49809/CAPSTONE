@@ -182,12 +182,24 @@ final class AiDocumentWorker
                 'arp_number' => $declared['arp_number'],
             ], $labels);
 
+            $model = $this->askModel($declared, $texts, $deadline);
+            $nameMatches = [];
+            if ($model['status'] === 'ok') {
+                // Version 3: names and property numbers are kept only where they occur in the
+                // document's own OCR text, written with its characters.
+                [$model['output'], $nameMatches] = DocumentAnalysis::keepQuotedDetails($model['output'], $texts);
+            }
+            foreach ($checks as &$check) {
+                $check['name_match'] = $nameMatches[$check['key']] ?? 'none';
+            }
+            unset($check);
+
             return [
                 // Version 2: the model's "evidence" quotes were checked against the OCR text (askModel()).
                 'version' => DocumentAnalysis::WORKER_RESULT_VERSION,
                 'documents' => $checks,
                 'rule_findings' => $ruleFindings,
-                'model' => $this->askModel($declared, $texts, $deadline),
+                'model' => $model,
                 'ocr_engine' => $this->ocrEngine,
             ];
         } finally {
