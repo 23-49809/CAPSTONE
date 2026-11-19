@@ -90,6 +90,10 @@ foreach ($page['requests'] ?? [] as $request) {
             ? null : (int) $request['processing_staff_id'],
         'processingStaffName' => $request['processing_staff_name'] === null
             ? null : (string) $request['processing_staff_name'],
+        // A document of a multi-document application: the application reference and its place in it.
+        'applicationRef' => isset($request['application_reference']) ? (string) $request['application_reference'] : null,
+        'itemNo' => isset($request['item_no']) ? (int) $request['item_no'] : null,
+        'itemCount' => isset($request['item_count']) ? (int) $request['item_count'] : null,
         'checklist' => $documentsByRequest[$requestId] ?? [],
         'history' => [],
     ];
@@ -247,8 +251,21 @@ foreach ($allRequests as $request) {
 }
 arsort($barangayCounts);
 $topBarangay = (string) (array_key_first($barangayCounts) ?? '—');
+// Document Request Summary headline figures come from the whole database, not from the latest 500 requests
+// this page loads: Applications = every request_applications record plus every Document Request without
+// one (an older or single-document request); Individual Document Requests = every Document Request.
+// (The status rows below them still describe the loaded requests, as before.)
+$documentStats = $reportStats($documentRequests);
+if ($user) {
+    $countOf = static fn (string $sql): int => (int) sa_db()->query($sql)->fetchColumn();
+    $documentStats['total'] = $countOf("SELECT COUNT(*) FROM requests WHERE flow = 'docreq'");
+    $documentStats['applications'] = sa_applications_available()
+        ? $countOf("SELECT COUNT(*) FROM requests WHERE flow = 'docreq' AND application_id IS NULL")
+            + $countOf("SELECT COUNT(*) FROM request_applications WHERE flow = 'docreq'")
+        : $documentStats['total'];
+}
 $page['reports'] = [
-    ['id' => 'RPT-DOC', 'title' => 'Document Request Summary', 'type' => 'document', 'dateGenerated' => $reportDate, 'stats' => $reportStats($documentRequests)],
+    ['id' => 'RPT-DOC', 'title' => 'Document Request Summary', 'type' => 'document', 'dateGenerated' => $reportDate, 'stats' => $documentStats],
     ['id' => 'RPT-LAND', 'title' => 'Land Transfer Summary', 'type' => 'land-transfer', 'dateGenerated' => $reportDate, 'stats' => $reportStats($landRequests)],
     ['id' => 'RPT-REQ', 'title' => 'Requirement Checker Results', 'type' => 'requirement', 'dateGenerated' => $reportDate, 'stats' => $requirementCounts],
     ['id' => 'RPT-SUM', 'title' => 'Barangay Request Breakdown', 'type' => 'summary', 'dateGenerated' => $reportDate, 'stats' => [

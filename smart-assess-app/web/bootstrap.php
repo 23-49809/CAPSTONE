@@ -83,6 +83,37 @@ function sa_provider_value(mixed $value, int $max): ?string
 }
 
 /** True when $table.$column accepts NULL (cached per request). */
+/**
+ * Several document requests in one application (migration 20261119_request_applications.sql).
+ * False until that migration is applied: then only single-document applications are accepted.
+ */
+function sa_applications_available(): bool
+{
+    return sa_has_column('requests', 'application_id') && sa_has_column('requests', 'item_no')
+        && sa_has_column('request_applications', 'reference_no');
+}
+
+/** A new reference (DR-/LT-YYYY-XXXXXXXX) used by no request and no application. */
+function sa_new_reference(PDO $pdo, string $flow): string
+{
+    $applications = sa_applications_available();
+    for ($try = 0; $try < 5; $try++) {
+        $reference = ($flow === 'docreq' ? 'DR' : 'LT') . '-' . date('Y') . '-' . strtoupper(bin2hex(random_bytes(4)));
+        $taken = $pdo->prepare('SELECT COUNT(*) FROM requests WHERE reference_no = :ref');
+        $taken->execute(['ref' => $reference]);
+        $used = (int) $taken->fetchColumn() > 0;
+        if (!$used && $applications) {
+            $taken = $pdo->prepare('SELECT COUNT(*) FROM request_applications WHERE reference_no = :ref');
+            $taken->execute(['ref' => $reference]);
+            $used = (int) $taken->fetchColumn() > 0;
+        }
+        if (!$used) {
+            return $reference;
+        }
+    }
+    throw new RuntimeException('Could not create a unique reference number.');
+}
+
 function sa_column_nullable(string $table, string $column): bool
 {
     static $cache = [];
@@ -381,8 +412,22 @@ function sa_track_request(string $ref): ?array
     $stmt->execute(['ref' => $ref]);
     $request = $stmt->fetch();
     if (!$request) {
-        return null;
+        // The reference of an application with several documents: each document's own status.
+        return sa_track_application($ref);
     }
+    // A document of a multi-document application: which application, and its place in it.
+    $application = null;
+    if (sa_applications_available()) {
+        $part = sa_db()->prepare(
+            'SELECT a.reference_no, a.item_count, r.item_no FROM requests r
+             JOIN request_applications a ON a.id = r.application_id WHERE r.id = :id'
+        );
+        $part->execute(['id' => $request['id']]);
+        $application = $part->fetch() ?: null;
+    }
+    $request['application_reference'] = $application ? (string) $application['reference_no'] : null;
+    $request['item_no'] = $application ? (int) $application['item_no'] : null;
+    $request['item_count'] = $application ? (int) $application['item_count'] : null;
     $logs = sa_db()->prepare(
         'SELECT status, actor, created_at FROM request_status_log
          WHERE request_id = :id ORDER BY created_at ASC, id ASC'
@@ -392,13 +437,55 @@ function sa_track_request(string $ref): ?array
     // Only the browser session that submitted the request sees the applicant's full
     // name; anyone else who has the reference number sees initials. The separate
     // name fields are removed so no tracking response can carry the full name.
-    $owned = sa_session_submitted((string) $request['reference_no']);
+    $owned = sa_session_submitted((string) $request['reference_no'])
+        || ($request['application_reference'] !== null && sa_session_submitted($request['application_reference']));
     $request['applicant'] = $owned
         ? trim((string) $request['first_name'] . ' ' . (string) $request['last_name'])
         : sa_name_initials((string) $request['first_name'], (string) $request['last_name']);
     $request['applicant_initials_only'] = !$owned;
     unset($request['first_name'], $request['last_name']);
     return $request;
+}
+
+/**
+ * Tracking for an application with several documents: the application reference, and each
+ * document as its own tracked request (status, history), in order. Null when unknown.
+ */
+function sa_track_application(string $ref): ?array
+{
+    if (!sa_applications_available()) {
+        return null;
+    }
+    $stmt = sa_db()->prepare('SELECT id, reference_no, flow, item_count, created_at FROM request_applications WHERE reference_no = :ref LIMIT 1');
+    $stmt->execute(['ref' => $ref]);
+    $application = $stmt->fetch();
+    if (!$application) {
+        return null;
+    }
+    $refs = sa_db()->prepare('SELECT reference_no FROM requests WHERE application_id = :id ORDER BY item_no');
+    $refs->execute(['id' => $application['id']]);
+    $items = [];
+    foreach ($refs->fetchAll(PDO::FETCH_COLUMN) as $itemReference) {
+        $item = sa_track_request((string) $itemReference);
+        if ($item !== null) {
+            $items[] = $item;
+        }
+    }
+    if ($items === []) {
+        return null;
+    }
+    return [
+        'id' => null,
+        'reference_no' => (string) $application['reference_no'],
+        'flow' => (string) $application['flow'],
+        'is_application' => true,
+        'item_count' => count($items),
+        'items' => $items,
+        // The name rule is the same for every document of the application.
+        'applicant' => $items[0]['applicant'],
+        'applicant_initials_only' => $items[0]['applicant_initials_only'],
+        'created_at' => (string) $application['created_at'],
+    ];
 }
 
 /** How many references one browser session remembers (oldest dropped first). */
@@ -571,6 +658,8 @@ function sa_internal_bootstrap(): array
     // Contact columns are never selected for other roles, so no page or API
     // response built from this data can contain them.
     $withContact = sa_can_view_applicant_contact($user);
+    // Which application a document request belongs to (after migration 20261119 only).
+    $withApplications = sa_applications_available();
 
     $data['requests'] = $pdo->query(
         'SELECT r.id, r.reference_no, r.flow, r.first_name, r.last_name,
@@ -582,8 +671,10 @@ function sa_internal_bootstrap(): array
                 r.processing_completed_at, UNIX_TIMESTAMP(r.processing_completed_at) AS processing_completed_epoch,
                 r.processing_duration_seconds,
                 r.processing_staff_id, r.processing_staff_name
+                ' . ($withApplications ? ', a.reference_no AS application_reference, r.item_no, a.item_count' : '') . '
                 ' . ($withContact ? ', c.first_name AS client_first_name, c.last_name AS client_last_name' : '') . '
          FROM requests r ' . ($withContact ? 'LEFT JOIN clients c ON c.id = r.client_id' : '') . '
+         ' . ($withApplications ? 'LEFT JOIN request_applications a ON a.id = r.application_id' : '') . '
          ORDER BY r.created_at DESC, r.id DESC LIMIT 500'
     )->fetchAll();
     $data['documents'] = $pdo->query(

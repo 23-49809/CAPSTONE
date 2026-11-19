@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__) . '/app/services/DocumentRequirements.php';
+
 /*
  * Guest application drafts: auto-save and resume for Document Request and
  * Land Transfer without an account.
@@ -205,6 +207,29 @@ function sa_draft_clean_fields(mixed $raw): array
         $clean[$key] = $value;
     }
     $clean['isOwner'] = !array_key_exists('isOwner', $raw) || filter_var($raw['isOwner'], FILTER_VALIDATE_BOOLEAN);
+    // Document Requests: the documents chosen so far (type and purpose each), at most as many as
+    // one application may hold. Anything else in the list is refused, like any other field.
+    if (isset($raw['documentRequests'])) {
+        $list = $raw['documentRequests'];
+        if (!is_array($list) || !array_is_list($list) || count($list) > DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION) {
+            throw new SaHttpException(422, 'The application data could not be saved. Reload the page and try again.');
+        }
+        $clean['documentRequests'] = [];
+        foreach ($list as $item) {
+            if (!is_array($item)) {
+                throw new SaHttpException(422, 'The application data could not be saved. Reload the page and try again.');
+            }
+            $entry = [];
+            foreach (['documentType' => 120, 'purpose' => 80] as $key => $max) {
+                $value = is_scalar($item[$key] ?? null) ? trim((string) $item[$key]) : '';
+                if (!mb_check_encoding($value, 'UTF-8') || str_contains($value, "\0") || mb_strlen($value, 'UTF-8') > $max) {
+                    throw new SaHttpException(422, 'One of the fields is too long or contains characters that cannot be saved.');
+                }
+                $entry[$key] = $value;
+            }
+            $clean['documentRequests'][] = $entry;
+        }
+    }
     return $clean;
 }
 

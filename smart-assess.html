@@ -350,6 +350,28 @@
   .section-divider span{ font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
   .section-divider::after{ content:""; flex:1; height:1px; background:var(--line); }
 
+  /* Document Request cards: one per chosen document, in one application. */
+  .req-word{ color:var(--brand-700); }
+  .doc-req-list{ display:grid; grid-template-columns:minmax(0,1fr); gap:14px; margin-bottom:14px; }
+  .doc-req-card{ border:1px solid var(--line); border-left:4px solid var(--brand-700); border-radius:var(--radius-md); padding:16px 18px; background:var(--surface); display:grid; grid-template-columns:minmax(0,1fr); gap:14px; min-width:0; }
+  .doc-req-card select{ width:100%; min-width:0; max-width:100%; text-overflow:ellipsis; }
+  .doc-req-card .advisory{ margin:0; }
+  .doc-req-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .doc-req-head h3{ display:flex; align-items:center; gap:10px; margin:0; font-family:var(--font-body); font-size:16px; font-weight:700; color:var(--ink); }
+  .doc-req-num{ display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:var(--brand-50); color:var(--brand-700); font-size:14px; font-weight:700; flex-shrink:0; }
+  .doc-req-remove{ min-height:40px; padding:8px 14px; border:1.5px solid var(--line-strong); border-radius:999px; background:transparent; color:var(--danger, #b42318); font-family:var(--font-body); font-size:14px; font-weight:700; cursor:pointer; }
+  .doc-req-remove:hover{ background:var(--danger-bg, #fdecea); }
+  .doc-req-needs{ margin:0; font-size:13px; color:var(--ink-soft); }
+  .doc-req-add{ width:100%; margin-bottom:22px; }
+  .doc-req-limit{ margin-bottom:22px; }
+  .doc-req-shared{ margin:0 0 16px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--brand-50); color:var(--ink); font-size:13.5px; }
+  .rv-sub{ display:block; font-size:13px; color:var(--ink-soft); font-weight:400; }
+  .rcpt-docs{ margin:0; padding-left:18px; text-align:left; }
+  .rcpt-docs li + li{ margin-top:6px; }
+  .rcpt-docs small{ display:block; font-size:12px; color:var(--ink-soft); }
+  .trk-doc-title{ margin:2px 0 0; font-family:var(--font-body); font-size:17px; font-weight:700; color:var(--ink); }
+  .trk-doc-ref{ font-size:13px; color:var(--ink-soft); }
+  @media (max-width:600px){ .doc-req-card{ padding:14px; } .doc-req-head h3{ font-size:15px; } }
   .advisory{ display:flex; gap:10px; background:var(--warn-bg); color:var(--warn); border:1px solid rgba(138,90,0,.25); border-radius:var(--radius-sm); padding:12px 14px; font-size:13px; margin:-6px 0 20px; }
   .advisory .icon{ width:17px; height:17px; flex-shrink:0; margin-top:1px; }
 
@@ -1128,6 +1150,7 @@ const ICONS = {
   id: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.5-1.8 1.7-2.7 3-2.7s2.5.9 3 2.7"/><line x1="14" y1="9" x2="18" y2="9"/><line x1="14" y1="12" x2="18" y2="12"/><line x1="14" y1="15" x2="17" y2="15"/>'),
   file: svg('<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="14 3 14 7 18 7"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="15.5" x2="15.5" y2="15.5"/>'),
   check: svg('<polyline points="5 13 10 18 19 6"/>'),
+  plus: svg('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'),
   calendar: svg('<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/><line x1="8" y1="3" x2="8" y2="6.5"/><line x1="16" y1="3" x2="16" y2="6.5"/><line x1="7.5" y1="13" x2="8.5" y2="13"/><line x1="11.5" y1="13" x2="12.5" y2="13"/><line x1="15.5" y1="13" x2="16.5" y2="13"/><line x1="7.5" y1="16.5" x2="8.5" y2="16.5"/><line x1="11.5" y1="16.5" x2="12.5" y2="16.5"/>'),
   copy: svg('<rect x="8.5" y="8.5" width="11" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"/>'),
   service: svg('<rect x="5" y="3" width="14" height="18" rx="1.5"/><line x1="8.5" y1="8" x2="15.5" y2="8"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="16" x2="12.5" y2="16"/>'),
@@ -1284,10 +1307,30 @@ function validateStep1(fd, errors){
   if(!fd.city.trim()) errors.city = 'City/Municipality is required.';
   if(!ZIP_RE.test(fd.zip.trim())) errors.zip = 'Zip code must be 4 digits.';
 }
+/* ---- Several documents in one Document Request application ----
+   fd.documentRequests holds each chosen document (type and purpose). The first one is also kept in
+   fd.documentType / fd.purpose, which single-document applications and older drafts use. Each
+   document becomes its own request on the server, all under one tracking number. */
+const MAX_DOCUMENT_REQUESTS = 5;   // the same limit as the server (DocumentRequirements)
+function docItems(fd){
+  if(Array.isArray(fd.documentRequests) && fd.documentRequests.length) return fd.documentRequests;
+  return [{documentType:fd.documentType||'', purpose:fd.purpose||''}];
+}
+function setDocItems(fd, items){
+  fd.documentRequests = items.map(function(it){ return {documentType:it.documentType||'', purpose:it.purpose||''}; });
+  fd.documentType = fd.documentRequests.length ? fd.documentRequests[0].documentType : '';
+  fd.purpose = fd.documentRequests.length ? fd.documentRequests[0].purpose : '';
+}
 function validateStep2(flow, fd, errors){
   if(flow==='docreq'){
-    if(!fd.documentType) errors.documentType = 'Please select a document type.';
-    if(fd.documentType && !fd.purpose) errors.purpose = 'Please select a purpose.';
+    // Every document needs a type and a purpose; the same document cannot be chosen twice.
+    const seen = {};
+    docItems(fd).forEach(function(it, i){
+      if(!it.documentType) errors['doc-'+i+'-type'] = 'Please select a document type.';
+      else if(seen[it.documentType]) errors['doc-'+i+'-type'] = 'This document is already in your application. Choose a different one, or remove this request.';
+      else if(!it.purpose) errors['doc-'+i+'-purpose'] = 'Please select a purpose.';
+      if(it.documentType) seen[it.documentType] = true;
+    });
   } else if(!fd.transferType) errors.transferType = 'Please select a transfer type.';
   const arpCode = barangayCode(fd.barangay);
   if(!arpCode) errors.arp = 'Select the property barangay to fill in its ARP code.';
@@ -1388,7 +1431,7 @@ function submitRequest(){
   if(Object.keys(errors).length){
     state.errors = errors;
     if(errors.firstName||errors.lastName||errors.contact||errors.email||errors.addressLine||errors.requesterBarangay||errors.province||errors.city||errors.zip) state.step=1;
-    else if(errors.documentType||errors.transferType||errors.purpose||errors.arp||errors.barangay) state.step=2;
+    else if(errors.documentType||errors.transferType||errors.purpose||errors.arp||errors.barangay||Object.keys(errors).some(function(k){ return k.indexOf('doc-')===0; })) state.step=2;
     else state.step=3;
     render(); return;
   }
@@ -1415,6 +1458,19 @@ function confirmSubmitRequest(){
     timestamps:{}, submittedAt:new Date().toISOString()
   };
   pushStatus(record, 'Received');
+  // Several documents (demo): one tracking number, each document tracked on its own.
+  const items = state.flow==='docreq' ? docItems(fd) : [];
+  if(items.length>1){
+    record.isApplication = true;
+    record.docType = items.map(function(it){ return it.documentType; }).join(', ');
+    record.items = items.map(function(it, i){
+      const item = { id:refNo+'-'+(i+1), flow:'docreq', applicant:record.applicant, docType:it.documentType, purpose:it.purpose,
+        requirementComplete:record.requirementComplete, missing:missing.slice(), timestamps:{}, submittedAt:record.submittedAt,
+        applicationRef:refNo, itemNo:i+1, itemCount:items.length };
+      pushStatus(item, 'Received');
+      return item;
+    });
+  }
   const list = loadRequests(); list.unshift(record); saveRequests(list);
   state.lastSubmission = record;
   draftCompleted();
@@ -1629,7 +1685,7 @@ function arpField(fd){
 
 function renderStep1(){
   const fd = state.formData;
-  return '<div class="wizard-card-head"><h2>Enter Personal Information</h2><p>Provide applicant details to proceed with '+(state.flow==='docreq'?'document request and land transfer support':'your land transfer request')+'.</p></div>'
+  return '<div class="wizard-card-head"><h2><span>Enter <span class="req-word">Requester</span> Personal Information</span></h2><p>Provide applicant details to proceed with '+(state.flow==='docreq'?'document request and land transfer support':'your land transfer request')+'.</p></div>'
   + '<div class="wizard-card-body">'
     + '<div class="field-grid">'
       + '<div class="field"><label>First Name<span class="req">*</span></label><input id="f-firstName" class="'+(inv('firstName')?'invalid':'')+'" type="text" value="'+esc(fd.firstName)+'" data-bind="firstName" placeholder="e.g. Juan">' + fieldError('firstName') + '</div>'
@@ -1656,21 +1712,36 @@ function renderStep2(){
   const advisory = getAdvisory(state.flow, fd);
   const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd, 'barangay') + fieldError('barangay') + '</div>';
   if(state.flow==='docreq'){
-    return '<div class="wizard-card-head"><h2>Enter Property Information</h2><p>Fill in document and property details. Additional files are required when filing on behalf of the owner.</p></div>'
-    + '<div class="wizard-card-body">'
-      + '<div class="field" style="margin-bottom:20px"><label>Document Type<span class="req">*</span></label>'
-        + '<select id="f-documentType" class="'+(inv('documentType')?'invalid':'')+'" data-bind-select="documentType">'
-          + '<option value="">Select a document type</option>'
-          + DOC_TYPES.map(function(t){ return '<option value="'+esc(t)+'" '+(fd.documentType===t?'selected':'')+'>'+esc(t)+'</option>'; }).join('')
-        + '</select>' + fieldError('documentType') + '</div>'
-      + (fd.documentType ? (
-          '<div class="field" style="margin-bottom:20px"><label>Purpose of the Requested Document<span class="req">*</span></label>'
-          + '<select id="f-purpose" class="'+(inv('purpose')?'invalid':'')+'" data-bind-select="purpose">'
+    const items = docItems(fd);
+    const needs = requiredIdKeys(fd).map(function(k){ return idLabel(state.flow, k); }).join(', ');
+    const cards = items.map(function(it, i){
+      const others = items.filter(function(_, j){ return j!==i; }).map(function(o){ return o.documentType; });
+      const advisory = getAdvisory('docreq', it);
+      return '<section class="doc-req-card" aria-labelledby="doc-req-title-'+i+'">'
+        + '<div class="doc-req-head"><h3 id="doc-req-title-'+i+'"><span class="doc-req-num" aria-hidden="true">'+(i+1)+'</span>Document Request '+(i+1)+(items.length>1 ? ' of '+items.length : '')+'</h3>'
+          + (items.length>1 ? '<button type="button" class="doc-req-remove" data-action="remove-doc-request" data-index="'+i+'" aria-label="Remove document request '+(i+1)+(it.documentType ? ': '+esc(it.documentType) : '')+'">Remove</button>' : '')
+        + '</div>'
+        + '<div class="field"><label for="f-doc-'+i+'-type">Document Type<span class="req">*</span></label>'
+          + '<select id="f-doc-'+i+'-type" class="'+(inv('doc-'+i+'-type')?'invalid':'')+'" data-doc-item="'+i+'" data-doc-field="documentType">'
+            + '<option value="">Select a document type</option>'
+            + DOC_TYPES.map(function(t){ const taken = others.indexOf(t)!==-1; return '<option value="'+esc(t)+'"'+(it.documentType===t?' selected':'')+(taken?' disabled':'')+'>'+esc(t)+(taken?' (already added)':'')+'</option>'; }).join('')
+          + '</select>' + fieldError('doc-'+i+'-type') + '</div>'
+        + (it.documentType ? '<div class="field"><label for="f-doc-'+i+'-purpose">Purpose of this Document<span class="req">*</span></label>'
+          + '<select id="f-doc-'+i+'-purpose" class="'+(inv('doc-'+i+'-purpose')?'invalid':'')+'" data-doc-item="'+i+'" data-doc-field="purpose">'
             + '<option value="">Select a purpose</option>'
-            + PURPOSES.map(function(p){ return '<option value="'+esc(p)+'" '+(fd.purpose===p?'selected':'')+'>'+esc(p)+'</option>'; }).join('')
-          + '</select>' + fieldError('purpose') + '</div>'
-          + (advisory ? '<div class="advisory">'+ic('alert')+'<span>'+esc(advisory)+'</span></div>' : '')
-        ) : '')
+            + PURPOSES.map(function(p){ return '<option value="'+esc(p)+'"'+(it.purpose===p?' selected':'')+'>'+esc(p)+'</option>'; }).join('')
+          + '</select>' + fieldError('doc-'+i+'-purpose') + '</div>' : '')
+        + (advisory ? '<div class="advisory">'+ic('alert')+'<span>'+esc(advisory)+'</span></div>' : '')
+        + '<p class="doc-req-needs"><strong>Requirements:</strong> '+esc(needs)+(items.length>1 ? ' (uploaded once in Step 3, used for all documents)' : ' (upload in Step 3)')+'</p>'
+      + '</section>';
+    }).join('');
+    const canAdd = items.length < Math.min(MAX_DOCUMENT_REQUESTS, DOC_TYPES.length);
+    return '<div class="wizard-card-head"><h2>Choose Documents and Enter Property Information</h2><p>Choose each document you need. You can request up to '+MAX_DOCUMENT_REQUESTS+' different documents for this property in one application, with one tracking number.</p></div>'
+    + '<div class="wizard-card-body">'
+      + '<div class="doc-req-list">'+cards+'</div>'
+      + (canAdd ? '<button type="button" class="btn btn-ghost doc-req-add" data-action="add-doc-request">'+ic('plus')+'Add Another Document Request</button>'
+        : '<p class="field-hint doc-req-limit">You have added the most documents one application can hold.</p>')
+      + '<div class="section-divider doc-req-divider"><span>Property Information (for all documents)</span></div>'
       + '<div class="field-grid">'
         + barangayField
         + arpField(fd)
@@ -1756,6 +1827,7 @@ function renderStep3(){
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">'+(fd.isOwner ? 'I am the registered property owner' : 'I am not the registered property owner')+'</span></label>'
     + docsBlock
+    + (state.flow==='docreq' && docItems(fd).length>1 ? '<p class="doc-req-shared">These files are used for all '+docItems(fd).length+' documents in your application: '+esc(docItems(fd).map(function(it){ return it.documentType; }).join(', '))+'.</p>' : '')
     + idGuidancePanel(idKeys.map(function(k){ return uploadBox(k, idLabel(state.flow,k), fd, true); }).join(''))
   + '</div>';
 }
@@ -1772,8 +1844,11 @@ function renderStep4(){
       : (c.status==='flagged' ? '<span class="rv-bad">Invalid format</span>' : '<span class="rv-bad">Not uploaded</span>');
     return row(esc(c.label), value);
   }).join('');
+  const items = docItems(fd);
   const details = state.flow==='docreq'
-    ? section('Document Request Details', row('Selected Document Type', esc(fd.documentType||'—')) + row('Purpose', esc(fd.purpose||'—')))
+    ? (items.length>1
+        ? section('Documents Requested ('+items.length+')', items.map(function(it, i){ return row('Document '+(i+1), esc(it.documentType||'—')+'<span class="rv-sub">Purpose: '+esc(it.purpose||'—')+'</span>'); }).join(''))
+        : section('Document Request Details', row('Selected Document Type', esc(fd.documentType||'—')) + row('Purpose', esc(fd.purpose||'—'))))
     : section('Land Transfer Details', row('Type of Transfer', esc(fd.transferType||'—')));
   return '<div class="wizard-card-head"><h2>Review Your Request</h2><p>Confirm the details below before submitting your request to the Municipal Assessor\'s Office.</p></div>'
   + '<div class="wizard-card-body">'
@@ -1789,7 +1864,7 @@ function renderStep4(){
           + row('Barangay', esc(fd.barangay||'—'))
           + row('Ownership Status', fd.isOwner ? 'Registered property owner' : 'Not the registered property owner'))
       + details
-      + section('Uploaded IDs and Documents', uploadedRows)
+      + section(state.flow==='docreq' && items.length>1 ? 'Uploaded IDs and Documents (used for all documents)' : 'Uploaded IDs and Documents', uploadedRows)
     + '</table>'
   + '</div>';
 }
@@ -1999,7 +2074,7 @@ function renderConfirmation(){
     + '<div class="rcpt-brand"><img src="LOGO.png" alt="Bayan ng Mabini seal"><div><div class="rcpt-brand-name">SMART ASSESS</div><div class="rcpt-brand-office">Municipal Assessor’s Office</div><div class="rcpt-brand-place">Mabini, Batangas</div></div></div>'
     + '<h2 id="rcpt-title">Request Submitted</h2>'
     + '<div class="rcpt-check" aria-hidden="true">'+ic('check')+'</div>'
-    + '<p class="rcpt-lead">Your request has been successfully submitted to the Municipal Assessor’s Office. Please keep this receipt for your reference.</p>'
+    + '<p class="rcpt-lead">'+(r.isApplication && r.items ? 'Your application for '+r.items.length+' documents has been successfully submitted to the Municipal Assessor’s Office. One tracking number covers all of them. Please keep this receipt for your reference.' : 'Your request has been successfully submitted to the Municipal Assessor’s Office. Please keep this receipt for your reference.')+'</p>'
     + '<div class="rcpt-rule"></div>'
     + '<div class="rcpt-ref"><div class="rcpt-ref-label" id="rcpt-ref-label">Your Tracking Number</div>'
       + '<div class="rcpt-ref-no" aria-labelledby="rcpt-ref-label" data-ref-no style="--len:'+Math.max(String(r.id).length, 13)+'">'+esc(r.id)+'</div>'
@@ -2009,7 +2084,9 @@ function renderConfirmation(){
       + row('Request Type', esc(requestType))
       + row('Date Submitted', esc(receiptDate(r.submittedAt)))
       + row('Client Name', esc(r.applicant || '—'))
-      + row('Service', esc(r.docType || '—'))
+      + (r.isApplication && r.items
+          ? row('Documents Requested', '<ol class="rcpt-docs">'+r.items.map(function(it){ return '<li>'+esc(it.docType)+'<small>'+esc(it.id)+'</small></li>'; }).join('')+'</ol>')
+          : row('Service', esc(r.docType || '—')))
     + '</ul>'
     + '<div class="rcpt-cut" aria-hidden="true"></div>'
     + '<div class="rcpt-note"><span>You can track the status of your request using your tracking number on the “Track Your Request” page.</span></div>'
@@ -2067,7 +2144,8 @@ function copyTrackingNumber(button){
 
 /* ---------- Track ---------- */
 /* Reference numbers: DR-/LT- + year + serial (demo: 00001, server: hex). */
-const TRACK_REF_RE = /^(DR|LT)-\d{4}-[A-Z0-9]{4,12}$/;
+/* A document of a multi-document application adds its number: DR-2026-AB12CD34-2. */
+const TRACK_REF_RE = /^(DR|LT)-\d{4}-[A-Z0-9]{4,12}(-[1-9])?$/;
 function trackRefError(q){
   if(!q) return 'Enter your reference number to track your request.';
   if(!TRACK_REF_RE.test(q)) return 'That doesn’t look like a reference number. It should look like DR-2026-00001 or LT-2026-00001.';
@@ -2128,7 +2206,31 @@ function renderTrack(){
   const err = t.error || '';
   let resultBlock = '';
   if(t.searched && !err){
-    if(t.result){
+    if(t.result && t.result.isApplication && t.result.items){
+      // One application, several documents: each document has its own status and progress.
+      const r = t.result;
+      resultBlock = '<section class="trk-card" aria-labelledby="trk-sum-title">'
+          + '<div class="trk-sum"><div><div class="trk-sum-k" id="trk-sum-title">Application Reference Number</div><div class="trk-ref">'+esc(r.id)+'</div></div>'
+            + '<div><div class="trk-sum-k" style="margin-bottom:6px">Documents in this application</div><span class="trk-pill s-neutral">'+r.items.length+' documents</span></div></div>'
+          + '<dl class="trk-grid">'
+            + '<div><dt>Request Type</dt><dd>Document Request</dd></div>'
+            + '<div><dt>Applicant</dt><dd>'+esc(r.applicant || '—')+(r.applicantInitialsOnly ? '<small class="trk-dd-note">Initials only, to protect the applicant’s privacy</small>' : '')+'</dd></div>'
+            + '<div><dt>Date Submitted</dt><dd>'+esc(receiptDate(r.submittedAt))+'</dd></div>'
+          + '</dl>'
+          + '<div class="trk-guide is-info" role="note"><strong>Each document is processed separately</strong>Your documents may be ready at different times. The status of each one is shown below.</div>'
+        + '</section>'
+        + r.items.map(function(it, i){
+            const st = receiptStatus(it), miss = (it.missing || []).filter(Boolean);
+            return '<section class="trk-card trk-doc" aria-labelledby="trk-doc-'+i+'">'
+              + '<div class="trk-sum"><div><div class="trk-sum-k">Document '+(i+1)+' of '+r.items.length+'</div><h3 class="trk-doc-title" id="trk-doc-'+i+'">'+esc(it.docType || '—')+'</h3><div class="trk-doc-ref">'+esc(it.id)+'</div></div>'
+                + '<div><div class="trk-sum-k" style="margin-bottom:6px">Current Status</div><span class="trk-pill '+(TRACK_STATUS_TONE[st]||'s-neutral')+'">'+esc(st)+'</span>'
+                  + (it.timestamps && it.timestamps[st] ? '<div class="trk-updated">Updated '+esc(receiptDate(it.timestamps[st]))+'</div>' : '')+'</div></div>'
+              + trackGuideHtml(st)
+              + (!it.requirementComplete && miss.length ? '<div class="trk-note"><strong>Requirements need attention</strong>'+esc(miss.join(', '))+'</div>' : '')
+              + trackStepsHtml(it)
+            + '</section>';
+          }).join('');
+    } else if(t.result){
       const r = t.result, status = receiptStatus(r);
       const missing = (r.missing || []).filter(Boolean);
       resultBlock = '<section class="trk-card" aria-labelledby="trk-sum-title">'
@@ -2140,6 +2242,7 @@ function renderTrack(){
             + '<div><dt>Service</dt><dd>'+esc(r.docType || '—')+'</dd></div>'
             + '<div><dt>Applicant</dt><dd>'+esc(r.applicant || '—')+(r.applicantInitialsOnly ? '<small class="trk-dd-note">Initials only, to protect the applicant’s privacy</small>' : '')+'</dd></div>'
             + '<div><dt>Date Submitted</dt><dd>'+esc(receiptDate(r.submittedAt))+'</dd></div>'
+            + (r.applicationRef ? '<div><dt>Application</dt><dd>'+esc(r.applicationRef)+'<small class="trk-dd-note">Document '+esc(r.itemNo)+' of '+esc(r.itemCount)+'. Track '+esc(r.applicationRef)+' to see every document.</small></dd></div>' : '')
           + '</dl>'
           + trackGuideHtml(status)
           + (!r.requirementComplete && missing.length ? '<div class="trk-note"><strong>Requirements need attention</strong>'+esc(missing.join(', '))+'</div>' : '')
@@ -2697,6 +2800,8 @@ function renderCardDraft(flow){
 function draftApplyFields(flow, step, maxStep, fields, savedFiles){
   state.flow = flow; state.view = 'wizard';
   state.formData = Object.assign(blankFormData(), fields || {}, { files:{} });
+  // A saved list of documents is the source of truth; the first one is mirrored into the single fields.
+  if(flow==='docreq' && Array.isArray(state.formData.documentRequests) && state.formData.documentRequests.length) setDocItems(state.formData, state.formData.documentRequests);
   (savedFiles || []).forEach(function(f){
     state.formData.files[f.doc_key] = { name:f.name, size:f.size, type:f.type, valid:true, preview:null, saved:true };
     draft.files[f.doc_key] = 'saved';
@@ -3046,6 +3151,25 @@ function bindEvents(root){
           sliderRoot._showSlide(target); sliderRoot._restartSlider();
         }
       }
+      else if(a==='add-doc-request'){
+        const items = docItems(state.formData).slice();
+        if(items.length < Math.min(MAX_DOCUMENT_REQUESTS, DOC_TYPES.length)){
+          items.push({documentType:'', purpose:''});
+          setDocItems(state.formData, items);
+          render();
+          const added = document.getElementById('f-doc-'+(items.length-1)+'-type'); if(added) added.focus();
+        }
+      }
+      else if(a==='remove-doc-request'){
+        const items = docItems(state.formData).slice(), i = Number(el.getAttribute('data-index'));
+        if(items.length>1 && items[i]){
+          items.splice(i, 1);
+          setDocItems(state.formData, items);
+          Object.keys(state.errors).forEach(function(k){ if(k.indexOf('doc-')===0) delete state.errors[k]; });
+          render();
+          const next = document.getElementById('f-doc-'+Math.min(i, items.length-1)+'-type'); if(next) next.focus();
+        }
+      }
       else if(a==='next-step') nextStep();
       else if(a==='prev-step') prevStep();
       else if(a==='submit') submitRequest();
@@ -3099,6 +3223,20 @@ function bindEvents(root){
       state.formData.arp = buildArp(state.formData.barangay, digits);
       publishArp();
       clearFieldError('arp');
+    });
+  });
+  // Document Request cards: each card's document type and purpose (changing the type clears its purpose).
+  root.querySelectorAll('[data-doc-item]').forEach(function(el){
+    el.addEventListener('change', function(){
+      const i = Number(el.getAttribute('data-doc-item')), field = el.getAttribute('data-doc-field');
+      const items = docItems(state.formData).map(function(it){ return Object.assign({}, it); });
+      if(!items[i] || (field!=='documentType' && field!=='purpose')) return;
+      items[i][field] = el.value;
+      if(field==='documentType') items[i].purpose = '';
+      setDocItems(state.formData, items);
+      delete state.errors['doc-'+i+'-type']; delete state.errors['doc-'+i+'-purpose'];
+      render();
+      const again = document.getElementById(el.id); if(again) again.focus();
     });
   });
   root.querySelectorAll('[data-bind-select]').forEach(function(el){
