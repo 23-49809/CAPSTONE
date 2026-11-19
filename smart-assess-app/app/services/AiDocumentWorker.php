@@ -172,6 +172,8 @@ final class AiDocumentWorker
                     'pages' => (int) $ocr['pages_processed'],
                     'method' => $ocr['extraction_method'],
                     'text_characters' => mb_strlen($text),
+                    // Version 4: printed titles/issuers found in this file's own text (never its name).
+                    'kind_evidence' => DocumentAnalysis::kindEvidence($text),
                 ];
             }
 

@@ -86,8 +86,8 @@ final class DocumentAnalysis
      * 3 = also the document kind, holder name and property number per document, the name and
      * number kept only where the worker found them in that document's OCR text (name_match).
      */
-    public const WORKER_RESULT_VERSIONS = [1, 2, 3];
-    public const WORKER_RESULT_VERSION = 3;
+    public const WORKER_RESULT_VERSIONS = [1, 2, 3, 4];
+    public const WORKER_RESULT_VERSION = 4;
 
     /**
      * What a document is, as the model reads it from the text: code => label shown to Staff
@@ -138,6 +138,77 @@ final class DocumentAnalysis
     private const LEGACY_DOCUMENT_FIELDS = ['key', 'expected_type_match', 'missing_fields', 'note'];
     private const DOCUMENT_FIELDS = ['key', 'document_kind', 'holder_name', 'holder_name_clear', 'property_number', 'expected_type_match', 'missing_fields'];
     private const CHECK_FIELDS = ['key', 'ocr_status', 'ocr_error', 'readability', 'pages', 'method', 'text_characters'];
+
+    /**
+     * Version 4: what shows which document a file is, matched in the file's own OCR text only (never
+     * its file name, never the model's answer). Evidence, not proof: Staff still inspect the original.
+     * IDs: the issuer or card name printed on the card. Land Transfer documents: the document's own
+     * HEADING, a line that starts with the title and has at most a short tail after it, so a sentence
+     * that only mentions another paper ("covered by Transfer Certificate of Title No. T-123", "Tax
+     * Declaration No. 018-00045") is not evidence. A title (TCT/OCT) also needs the Registry of Deeds
+     * that issues it AND a Torrens title's own certification wording ("It is hereby certified ...",
+     * "Memorandum of Encumbrances"), so a deed whose heading OCR lost, with a stray title-number line
+     * and a Registry of Deeds mention, is not a title. 'other_deed' is the wording of a deed in the
+     * body (the parties, "know all men by these presents", "sells, transfers and conveys"): evidence
+     * that the file reads like a deed, which conflicts with any title or tax declaration heading.
+     * Each kind lists alternatives; a list inside a list means every part must appear.
+     */
+    public const KIND_EVIDENCE = [
+        'philsys_national_id' => ['/PHILIPPINE\s+IDENTIFICATION\s+CARD/', '/PAMBANSANG\s+PAGKAKAKILANLAN/', '/\bPHILSYS\b/'],
+        'drivers_license' => ['/DRIVER\'?S?\s+LICEN[SC]E/', '/LAND\s+TRANSPORTATION\s+OFFICE/'],
+        'passport' => ['/\bPASSPORT\b/', '/\bPASAPORTE\b/'],
+        'umid' => ['/UNIFIED\s+MULTI-?\s*PURPOSE/', '/\bUMID\b/'],
+        'sss_id' => ['/SOCIAL\s+SECURITY\s+SYSTEM/'],
+        'gsis_id' => ['/GOVERNMENT\s+SERVICE\s+INSURANCE/', '/\bGSIS\b/'],
+        'philhealth_id' => ['/PHILHEALTH/', '/PHILIPPINE\s+HEALTH\s+INSURANCE/'],
+        'prc_id' => ['/PROFESSIONAL\s+REGULATION\s+COMMISSION/'],
+        'postal_id' => ['/POSTAL\s+IDENTITY\s+CARD/', '/\bPHLPOST\b/', '/PHILIPPINE\s+POSTAL\s+CORPORATION/'],
+        'voters_id' => ['/COMMISSION\s+ON\s+ELECTIONS/', '/\bCOMELEC\b/', '/VOTER\'?S?\s+(?:ID|IDENTIFICATION)/'],
+        'tin_id' => ['/TAXPAYER\s+IDENTIFICATION/', '/BUREAU\s+OF\s+INTERNAL\s+REVENUE/'],
+        'pagibig_id' => ['/PAG-?\s*IBIG/', '/HOME\s+DEVELOPMENT\s+MUTUAL\s+FUND/'],
+        'senior_citizen_id' => ['/SENIOR\s+CITIZEN/'],
+        'pwd_id' => ['/PERSONS?\s+WITH\s+DISABILIT(?:Y|IES)/', '/\bPWD\s+ID\b/'],
+        // Land Transfer documents and others that may be uploaded instead: headings only.
+        'tax_declaration' => ['/^[ \t]*(?:TAX\s+)?DECLARATION\s+OF\s+REAL\s+PROPERTY[ \t]*(?:\(?[A-Z]{2,5}\)?)?[ \t]*$/m', '/^[ \t]*TAX\s+DECLARATION[ \t]*$/m'],
+        'transfer_certificate_of_title' => [['/^[ \t]*TRANSFER\s+CERTIFICATE\s+OF\s+TITLE(?![ \t]*NO\b[^\n]{31})[^\n]{0,30}$/m', '/REGIST(?:RY|ER)\s+OF\s+DEEDS/',
+            '/IT\s+IS\s+(?:HEREBY\s+|FURTHER\s+)?CERTIFIED|MEMORANDUM\s+OF\s+ENCUMBRANCES/']],
+        'original_certificate_of_title' => [['/^[ \t]*ORIGINAL\s+CERTIFICATE\s+OF\s+TITLE(?![ \t]*NO\b[^\n]{31})[^\n]{0,30}$/m', '/REGIST(?:RY|ER)\s+OF\s+DEEDS/',
+            '/IT\s+IS\s+(?:HEREBY\s+|FURTHER\s+)?CERTIFIED|MEMORANDUM\s+OF\s+ENCUMBRANCES/']],
+        'deed_of_sale' => ['/^[ \t]*DEED\s+OF\s+(?:ABSOLUTE\s+|CONDITIONAL\s+)?SALE\b[^\n]{0,40}$/m'],
+        'deed_of_donation' => ['/^[ \t]*DEED\s+OF\s+DONATION\b[^\n]{0,40}$/m'],
+        // The body of a deed (any deed), even when its heading was not read.
+        'other_deed' => ['/KNOW\s+ALL\s+(?:MEN|PERSONS)\s+BY\s+THESE\s+PRESENTS/', '/IN\s+WITNESS\s+WHEREOF/', ['/\bVENDORS?\b/', '/\bVENDEES?\b/'],
+            ['/\bDONORS?\b/', '/\bDONEES?\b/'], '/\bSELLS?\s*,?\s+TRANSFERS?\s*,?\s+AND\s+CONVEYS?\b/', '/\bHEREBY\s+(?:SELLS?|DONATES?|CONVEYS?|CEDES?)\b/'],
+        'extrajudicial_settlement' => ['/^[ \t]*(?:DEED\s+OF\s+)?EXTRA-?\s*JUDICIAL\s+SETTLEMENT\b[^\n]{0,60}$/m'],
+        'special_power_of_attorney' => ['/^[ \t]*SPECIAL\s+POWER\s+OF\s+ATTORNEY[ \t]*$/m'],
+        'vicinity_map' => ['/^[ \t]*(?:VICINITY|LOCATION)\s+MAP\b[^\n]{0,30}$/m'],
+        'certification_no_improvement' => [['/^[ \t]*CERTIFICATI(?:ON|E)\b[^\n]{0,40}$/m', '/\bNO\s+(?:EXISTING\s+)?IMPROVEMENTS?\b/']],
+        'tax_clearance' => ['/^[ \t]*(?:REAL\s+PROPERTY\s+)?TAX\s+CLEARANCE\b[^\n]{0,30}$/m'],
+        'barangay_clearance' => ['/^[ \t]*BARANGAY\s+CLEARANCE\b[^\n]{0,30}$/m'],
+        'birth_certificate' => ['/^[ \t]*CERTIFICATE\s+OF\s+LIVE\s+BIRTH\b[^\n]{0,30}$/m'],
+        'community_tax_certificate' => ['/^[ \t]*COMMUNITY\s+TAX\s+CERTIFICATE\b[^\n]{0,30}$/m'],
+    ];
+
+    /**
+     * Which check each required upload gets on the Staff page, and the document kinds it accepts.
+     * 'id': an identification document (government-issued IDs only; a school or company ID, or an ID
+     * of an unknown type, is not confirmed). 'document': a Land Transfer document, with its accepted
+     * alternatives. 'none': read and shown, but not checked automatically (the authorization letter).
+     */
+    public const SLOT_CHECKS = [
+        'ownerId' => 'id', 'requesterId' => 'id', 'authLetter' => 'none',
+        'ctcTdOrTitle' => 'document', 'notarialDeed' => 'document', 'vicinityMap' => 'document',
+        'certNoImprovement' => 'document', 'taxClearance' => 'document',
+    ];
+    public const SLOT_ACCEPTED_KINDS = [
+        'ctcTdOrTitle' => ['tax_declaration', 'transfer_certificate_of_title', 'original_certificate_of_title'],
+        'notarialDeed' => ['deed_of_sale', 'deed_of_donation'],
+        'vicinityMap' => ['vicinity_map'],
+        'certNoImprovement' => ['certification_no_improvement'],
+        'taxClearance' => ['tax_clearance'],
+    ];
+    /** ID kinds that are not a specific government-issued ID. */
+    private const ID_KINDS_NOT_ACCEPTED = ['school_or_company_id', 'other_id'];
     private const FIELD_NOUNS = [
         'name' => 'a name', 'property_identifier' => 'a property number (ARP, TCT, OCT or lot number)', 'date' => 'a date',
         'document_type' => 'the type of document', 'required_field' => 'a required detail', 'other' => 'a detail',
@@ -327,6 +398,44 @@ final class DocumentAnalysis
     }
 
     /** Every document kind code => label. */
+    /**
+     * The document kinds whose printed title or issuer appears in $text (OCR text of ONE file), in the
+     * order of KIND_EVIDENCE. Case and line breaks inside a title do not matter.
+     *
+     * @return list<string>
+     */
+    public static function kindEvidence(string $text): array
+    {
+        $upper = mb_strtoupper($text, 'UTF-8');
+        $found = [];
+        foreach (self::KIND_EVIDENCE as $kind => $alternatives) {
+            foreach ($alternatives as $pattern) {
+                $parts = is_array($pattern) ? $pattern : [$pattern];
+                $all = true;
+                foreach ($parts as $part) {
+                    if (!preg_match($part . 'u', $upper)) {
+                        $all = false;
+                        break;
+                    }
+                }
+                if ($all) {
+                    $found[] = $kind;
+                    break;
+                }
+            }
+        }
+        return $found;
+    }
+
+    /** The kinds an upload slot accepts ([] = any or not checked). */
+    public static function acceptedKinds(string $key): array
+    {
+        if ((self::SLOT_CHECKS[$key] ?? 'none') === 'id') {
+            return array_values(array_diff(array_keys(self::ID_KINDS), self::ID_KINDS_NOT_ACCEPTED));
+        }
+        return self::SLOT_ACCEPTED_KINDS[$key] ?? [];
+    }
+
     public static function documentKinds(): array
     {
         return self::ID_KINDS + self::PROPERTY_KINDS + self::OTHER_KINDS;
@@ -573,7 +682,14 @@ final class DocumentAnalysis
         }
         $documents = [];
         foreach ($object['documents'] as $document) {
-            $document = self::exactObject($document, $object['version'] >= 3 ? [...self::CHECK_FIELDS, 'name_match'] : self::CHECK_FIELDS, 'document check');
+            $fields = self::CHECK_FIELDS;
+            if ($object['version'] >= 3) {
+                $fields[] = 'name_match';
+            }
+            if ($object['version'] >= 4) {
+                $fields[] = 'kind_evidence';
+            }
+            $document = self::exactObject($document, $fields, 'document check');
             $key = self::knownKey($document['key'], $documentKeys);
             if (isset($documents[$key])) {
                 throw new UnexpectedValueException('document check listed twice');
@@ -600,6 +716,8 @@ final class DocumentAnalysis
                 'method' => $method,
                 'text_characters' => $document['text_characters'],
                 'name_match' => $object['version'] >= 3 ? self::enum($document['name_match'], self::NAME_MATCH, 'name_match') : 'none',
+                // Version 4: kinds whose printed title or issuer the worker found in this file's text; null = not checked.
+                'kind_evidence' => $object['version'] >= 4 ? self::kindList($document['kind_evidence']) : null,
             ];
         }
         if (!is_array($object['rule_findings']) || !array_is_list($object['rule_findings']) || count($object['rule_findings']) > self::MAX_FINDINGS) {
@@ -673,6 +791,22 @@ final class DocumentAnalysis
      * @param list<array> $applicationFindings findings the application adds (e.g. a stored file it could not read)
      * @return array{outcome:string, reason:string, findings:list<array>, documents:list<array>, manual_review:bool}
      */
+    /** A short list of distinct known document kinds (version 4 kind_evidence). */
+    private static function kindList(mixed $value): array
+    {
+        if (!is_array($value) || !array_is_list($value) || count($value) > count(self::KIND_EVIDENCE)) {
+            throw new UnexpectedValueException('kind_evidence must be a short list');
+        }
+        $kinds = [];
+        foreach ($value as $kind) {
+            if (!is_string($kind) || !isset(self::KIND_EVIDENCE[$kind]) || in_array($kind, $kinds, true)) {
+                throw new UnexpectedValueException('kind_evidence lists an unknown or repeated kind');
+            }
+            $kinds[] = $kind;
+        }
+        return $kinds;
+    }
+
     public static function classify(array $requirements, array $worker, array $labels, array $applicationFindings = []): array
     {
         $findings = $applicationFindings;
@@ -812,6 +946,13 @@ final class DocumentAnalysis
                 'holder_name_clear' => $holder === '' ? null : ($read['holder_name_clear'] ?? null),
                 'holder_name_uncertain' => self::uncertainNameParts($holder),
                 'property_number' => (string) ($read['property_number'] ?? ''),
+                // Version 4: printed titles/issuers found in this file's OCR text (null: not checked, an
+                // earlier worker), and the check this upload gets with the kinds it accepts.
+                'kind_evidence' => $check === null ? null : ($check['kind_evidence'] ?? null),
+                'kind_evidence_labels' => array_map(static fn (string $k): string => self::documentKinds()[$k] ?? $k, $check['kind_evidence'] ?? []),
+                'check' => self::SLOT_CHECKS[$item['key']] ?? 'none',
+                'accepted_kinds' => self::acceptedKinds($item['key']),
+                'accepted_kind_labels' => array_map(static fn (string $k): string => self::documentKinds()[$k], self::acceptedKinds($item['key'])),
             ];
         }
 

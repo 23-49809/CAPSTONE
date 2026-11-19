@@ -365,7 +365,7 @@ $png = static function (int $seed): string {
 $idPng = $png(1);
 $tdPng = $png(2);
 $blankPng = $png(3);
-$tdText = 'REPUBLIC OF THE PHILIPPINES PROVINCE OF BATANGAS MUNICIPALITY OF MABINI TAX DECLARATION OF REAL PROPERTY ARP No. 018-00045 Owner JUAN DELA CRUZ Location Poblacion Mabini Assessed Value 120,000';
+$tdText = "REPUBLIC OF THE PHILIPPINES PROVINCE OF BATANGAS MUNICIPALITY OF MABINI\nTAX DECLARATION OF REAL PROPERTY\nARP No. 018-00045 Owner JUAN DELA CRUZ Location Poblacion Mabini Assessed Value 120,000";
 file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
 $ocrFactory = static fn (string $directory): OcrService => new OcrService($directory, 5, 20, $tools);
 $job = static fn (array $documents): array => AiDocumentWorker::validateJob(['version' => 1, 'job_id' => 7,
@@ -397,7 +397,7 @@ $quoting = array_replace($goodOutput, ['findings' => [
     ['category' => 'cannot_verify', 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'SIGNATURE VERIFIED GENUINE'],
 ]]);
 $quoted = $makeWorker($fakeModel($quoting))->run($twoDocs);
-$check('worker: result version 3, keeping only evidence that is an exact quote of the OCR text', $quoted['version'] === 3
+$check('worker: the current result version, keeping only evidence that is an exact quote of the OCR text', $quoted['version'] === DocumentAnalysis::WORKER_RESULT_VERSION
     && array_column($quoted['model']['output']['findings'], 'evidence') === ['ARP No. 018-00045', ''], $quoted['model']['output']['findings'] ?? null);
 
 // ================= Version 3: document identification and exact names =================
@@ -416,7 +416,7 @@ foreach ([
 }
 $v3Run = static fn (array $docs): array => $makeWorker($fakeModel($v3Output($docs)))->run($twoDocs);
 $exact = $v3Run([$v3Doc('ownerId', 'drivers_license', 'dela cruz,  juan santos'), $v3Doc('ctcTdOrTitle', 'tax_declaration', 'JUAN DELA CRUZ', true, '018-00045')]);
-$check('v3 worker: a name found in the OCR text is kept with the text\'s own characters, and its match is reported', $exact['version'] === 3
+$check('v3 worker: a name found in the OCR text is kept with the text\'s own characters, and its match is reported', $exact['version'] === DocumentAnalysis::WORKER_RESULT_VERSION
     && $exact['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS' && array_column($exact['documents'], 'name_match') === ['exact', 'exact']
     && $exact['model']['output']['documents'][1]['property_number'] === '018-00045', $exact);
 $changed = $v3Run([$v3Doc('ownerId', 'drivers_license', 'DELA CRUZ, JUAN SANTOZ'), $v3Doc('ctcTdOrTitle', 'tax_declaration', 'Juana Dela Cruz', true, '018-00046')]);
@@ -433,7 +433,7 @@ $tampered = $exact;
 $tampered['documents'][0]['name_match'] = 'none';
 $check('v3 app: a name the worker did not find in the text is never shown', DocumentAnalysis::validateWorkerResult($tampered, $keys)['model']['output']['documents'][0]['holder_name'] === ''
     && $v3Validated['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS');
-$olderWithName = array_replace($exact, ['version' => 2, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['name_match' => 1]), $exact['documents'])]);
+$olderWithName = array_replace($exact, ['version' => 2, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['name_match' => 1, 'kind_evidence' => 1]), $exact['documents'])]);
 $check('v3 app: a version 2 result never shows a name or number (that worker did not check them)', (static function () use ($olderWithName, $keys): bool {
     $docs = DocumentAnalysis::validateWorkerResult($olderWithName, $keys)['model']['output']['documents'];
     return $docs[0]['holder_name'] === '' && $docs[1]['property_number'] === '';
@@ -612,8 +612,79 @@ $check('version 3: an answer mixing the new and the earlier document shape is ac
     $mixedValidated['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS' && $mixedValidated['model']['output']['documents'][1]['document_kind'] === null
     && $mixedValidated['model']['output']['documents'][1]['holder_name'] === '');
 $skippedRun = $makeWorker(null)->run($twoDocs);
-$check('version 3 worker without a model: every document check has name_match none and the app accepts it', $skippedRun['version'] === 3
+$check('current worker without a model: every document check has name_match none and the app accepts it', $skippedRun['version'] === DocumentAnalysis::WORKER_RESULT_VERSION
     && array_column($skippedRun['documents'], 'name_match') === ['none', 'none'] && DocumentAnalysis::validateWorkerResult($skippedRun, $keys)['model']['status'] === 'skipped');
+
+// ================= Version 4: document titles found in each file's own text =================
+$ev = static fn (string $text): array => DocumentAnalysis::kindEvidence($text);
+foreach ([
+    'Tax Declaration (printed title)' => ["Republic of the Philippines\nTAX DECLARATION OF REAL PROPERTY\nARP No. 018-00045", 'tax_declaration'],
+    'Tax Declaration (title alone on its line)' => ["Province of Batangas\nTax Declaration\nOwner: JUAN DELA CRUZ", 'tax_declaration'],
+    'Transfer Certificate of Title (heading over two lines, Registry of Deeds, certification)' => ["REPUBLIC OF THE PHILIPPINES\nRegistry of Deeds for the Province of Batangas\nTRANSFER CERTIFICATE\nOF TITLE\nNo. T-12345\nIT IS HEREBY CERTIFIED that certain land situated in Mabini", 'transfer_certificate_of_title'],
+    'Original Certificate of Title' => ["Register of Deeds\nORIGINAL CERTIFICATE OF TITLE No. O-77\nMEMORANDUM OF ENCUMBRANCES", 'original_certificate_of_title'],
+    'Deed of Absolute Sale' => ["DEED OF ABSOLUTE SALE\nKNOW ALL MEN BY THESE PRESENTS:", 'deed_of_sale'],
+    'Deed of Sale (short)' => ['Deed of Sale of a Registered Land', 'deed_of_sale'],
+    'Deed of Donation' => ['DEED OF DONATION inter vivos', 'deed_of_donation'],
+    'Vicinity Map' => ["VICINITY MAP\nLot 12, Poblacion", 'vicinity_map'],
+    'Certification of No Improvement' => ["CERTIFICATION\nThis is to certify that the parcel has NO IMPROVEMENT as of this date.", 'certification_no_improvement'],
+    'Tax Clearance' => ['REAL PROPERTY TAX CLEARANCE issued to', 'tax_clearance'],
+    'Driver\'s License (issuer)' => ['LAND TRANSPORTATION OFFICE Non-Professional', 'drivers_license'],
+    'PhilSys ID' => ['Republika ng Pilipinas PAMBANSANG PAGKAKAKILANLAN Philippine Identification Card', 'philsys_national_id'],
+    'UMID' => ['Unified Multi-Purpose ID CRN-0000', 'umid'],
+] as $what => [$text, $kind]) {
+    $check("v4 evidence: {$what} is recognised from its printed title", in_array($kind, $ev($text), true), $ev($text));
+}
+$check('v4 evidence: lower case and line breaks inside a title do not matter', $ev("deed of\nabsolute sale") === ['deed_of_sale']);
+$deed = "DEED OF ABSOLUTE SALE\nKNOW ALL MEN BY THESE PRESENTS:\nThat the parcel covered by Transfer Certificate of Title No. T-12345 of the Registry of Deeds of Batangas\nand declared under Tax Declaration No. 018-00045 is sold";
+$check('v4 evidence: a deed mentioning a title number and a Tax Declaration number is only a deed (its heading and its wording; not a Title, not a Tax Declaration)', $ev($deed) === ['deed_of_sale', 'other_deed'], $ev($deed));
+// The deed whose heading OCR did not keep, with a standalone title-number line and a Registry of Deeds mention.
+$lostHeading = "KNOW ALL MEN BY THESE PRESENTS:\nThat I, JUAN DELA CRUZ, the VENDOR, hereby sell, transfer and convey to MARIA REYES, the VENDEE,\nthe parcel described as follows:\nTransfer Certificate of Title No. T-12345\nRegistry of Deeds of Batangas\nIN WITNESS WHEREOF";
+$check('v4 evidence: a deed with its heading lost, a standalone "Transfer Certificate of Title No." line and the Registry of Deeds is NOT a title; its wording marks it as a deed',
+    $ev($lostHeading) === ['other_deed'], $ev($lostHeading));
+$check('v4 evidence: the same with "Original Certificate of Title No." is not a title either', $ev(str_replace('Transfer Certificate', 'Original Certificate', $lostHeading)) === ['other_deed']);
+$check('v4 evidence: a donation with its heading lost (donor and donee) is marked as a deed, not a title', $ev("That the DONOR gives to the DONEE\nTransfer Certificate of Title No. T-9\nRegister of Deeds of Batangas") === ['other_deed']);
+$check('v4 evidence: a stray title-number line with the Registry of Deeds but no title certification wording is not a title (no deed wording needed)',
+    $ev("That the parcel is described as follows:\nTransfer Certificate of Title No. T-12345\nRegistry of Deeds for the Province of Batangas\nLot 12, Poblacion") === []);
+$check('v4 evidence: a genuine title is still recognised, even with a sale noted in its encumbrances',
+    $ev("Republic of the Philippines\nRegistry of Deeds for the Province of Batangas\nTRANSFER CERTIFICATE OF TITLE\nNo. T-12345\nIT IS HEREBY CERTIFIED that certain land situated in Mabini\nMEMORANDUM OF ENCUMBRANCES\nEntry 99: Deed of Absolute Sale in favor of the vendee") === ['transfer_certificate_of_title']);
+$check('v4 evidence: one word of a party is not deed wording (vendor and vendee are both needed)', !in_array('other_deed', $ev('Entry 99: sale in favor of the vendee'), true));
+$check('v4 evidence: a line that starts with "Transfer Certificate of Title No." and runs on as a sentence is not a title heading',
+    !in_array('transfer_certificate_of_title', $ev("DEED OF SALE\nTransfer Certificate of Title No. T-12345 issued by the Register of Deeds of Batangas on 1 May 1990"), true));
+$check('v4 evidence: "Tax Declaration No. ..." on its own line is not a Tax Declaration heading', $ev("Tax Declaration No. 018-00045") === [] && $ev("TAX DECLARATION NO.: 018-00045") === []);
+$check('v4 evidence: a title heading without the Registry of Deeds that issues it is not enough', $ev("TRANSFER CERTIFICATE OF TITLE\nNo. T-12345") === []);
+$check('v4 evidence: a title mentioned in the middle of a line is not a heading', $ev('This certifies the land in TRANSFER CERTIFICATE OF TITLE No. T-1 at the Registry of Deeds') === []);
+$check('v4 evidence: a certification needs both "certification" and "no improvement"', !in_array('certification_no_improvement', $ev('This lot has no improvement'), true)
+    && !in_array('certification_no_improvement', $ev('CERTIFICATION of residency'), true));
+$check('v4 evidence: a file name or unrelated text gives no evidence at all', $ev('scan_tax_declaration_FINAL.pdf') === [] && $ev('IMG_2041 deed-of-sale.jpg') === [] && $ev('TCT_title_T-12345.pdf') === []
+    && $ev('Lorem ipsum receipt for groceries') === [] && $ev('') === []);
+$check('v4 evidence: every kind it can report is a known document kind', array_diff(array_keys(DocumentAnalysis::KIND_EVIDENCE), array_keys(DocumentAnalysis::documentKinds())) === []);
+$check('v4 worker: each document check carries the evidence found in that file\'s own OCR text', array_column($exact['documents'], 'kind_evidence') === [$ev($idText), $ev($tdText)]
+    && $exact['documents'][0]['kind_evidence'] === ['drivers_license'] && $exact['documents'][1]['kind_evidence'] === ['tax_declaration'], array_column($exact['documents'], 'kind_evidence'));
+$check('v4 worker: evidence comes from the text even when the model is not available', array_column($skippedRun['documents'], 'kind_evidence') === [['drivers_license'], ['tax_declaration']], $skippedRun['documents']);
+$v4 = DocumentAnalysis::validateWorkerResult($exact, $keys);
+$check('v4 app: the evidence is kept per document', array_column($v4['documents'], 'kind_evidence') === [['drivers_license'], ['tax_declaration']]);
+$withoutEvidence = array_replace($exact, ['documents' => array_map(static fn (array $d): array => array_diff_key($d, ['kind_evidence' => 1]), $exact['documents'])]);
+$check('v4 app: a version 4 document check without kind_evidence is rejected', $rejects(static fn () => DocumentAnalysis::validateWorkerResult($withoutEvidence, $keys)));
+foreach (['an unknown kind' => ['approved_document'], 'a repeated kind' => ['passport', 'passport'], 'not a list' => ['x' => 'passport'], 'a non-string' => [1]] as $what => $bad) {
+    $tamperedEvidence = $exact;
+    $tamperedEvidence['documents'][0]['kind_evidence'] = $bad;
+    $check("v4 app: kind_evidence with {$what} is rejected", $rejects(static fn () => DocumentAnalysis::validateWorkerResult($tamperedEvidence, $keys)));
+}
+$v3Result = array_replace($withoutEvidence, ['version' => 3]);
+$check('v4 app: a version 3 result is still accepted, with its evidence marked as not checked (null)', array_column(DocumentAnalysis::validateWorkerResult($v3Result, $keys)['documents'], 'kind_evidence') === [null, null]);
+$v4Classified = DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']), $v4, $labels)['documents'];
+$check('v4 classify: an ID gets the ID check with only government-issued IDs accepted', $v4Classified[0]['check'] === 'id' && in_array('drivers_license', $v4Classified[0]['accepted_kinds'], true)
+    && !in_array('school_or_company_id', $v4Classified[0]['accepted_kinds'], true) && !in_array('other_id', $v4Classified[0]['accepted_kinds'], true)
+    && $v4Classified[0]['kind_evidence'] === ['drivers_license'] && $v4Classified[0]['kind_evidence_labels'] === ['Philippine Driver\'s License'], $v4Classified[0]);
+$check('v4 classify: the tax declaration slot accepts a Tax Declaration OR a Title (TCT/OCT)', $v4Classified[1]['check'] === 'document'
+    && $v4Classified[1]['accepted_kinds'] === ['tax_declaration', 'transfer_certificate_of_title', 'original_certificate_of_title']
+    && $v4Classified[1]['kind_evidence'] === ['tax_declaration'], $v4Classified[1]);
+$check('v4 classify: the deed slot accepts a Deed of Sale OR Donation; each other Land Transfer slot its own document; the authorization letter is not checked',
+    DocumentAnalysis::acceptedKinds('notarialDeed') === ['deed_of_sale', 'deed_of_donation'] && DocumentAnalysis::acceptedKinds('vicinityMap') === ['vicinity_map']
+    && DocumentAnalysis::acceptedKinds('certNoImprovement') === ['certification_no_improvement'] && DocumentAnalysis::acceptedKinds('taxClearance') === ['tax_clearance']
+    && DocumentAnalysis::SLOT_CHECKS['authLetter'] === 'none' && DocumentAnalysis::acceptedKinds('authLetter') === []);
+$check('v4 classify: a version 3 result marks the evidence as not checked', DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']),
+    DocumentAnalysis::validateWorkerResult($v3Result, $keys), $labels)['documents'][1]['kind_evidence'] === null);
 
 // ================= Worker HTTP =================
 $http = new AiWorkerHttp($signer, static fn (): AiDocumentWorker => $makeWorker($fakeModel($goodOutput)), $work . '/state', 10 * 1024 * 1024);

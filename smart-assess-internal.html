@@ -1471,6 +1471,20 @@
   .dr-facts{ grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); }
   .dr-sub{ font-family:var(--font-body); font-size:13px; font-weight:600; color:var(--ink-soft); margin:0 0 6px; }
   .dr-issues{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  /* Request-type checks: the verdict is written out; the colour only repeats it. */
+  .dc-checks{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  .dc-check{ display:grid; gap:2px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); border-left-width:3px; background:var(--surface); }
+  .dc-check-head{ display:flex; justify-content:space-between; align-items:baseline; gap:4px 12px; flex-wrap:wrap; }
+  .dc-verdict{ font-size:13px; font-weight:700; }
+  .dc-detected{ color:var(--ink); overflow-wrap:anywhere; }
+  .dc-check.v-correct{ border-left-color:var(--success, #1f7a4d); }
+  .dc-check.v-correct .dc-verdict{ color:var(--success, #1f7a4d); }
+  .dc-check.v-mismatch, .dc-check.v-missing{ border-left-color:var(--danger); }
+  .dc-check.v-mismatch .dc-verdict, .dc-check.v-missing .dc-verdict{ color:var(--danger); }
+  .dc-check.v-possible{ border-left-color:var(--warn); }
+  .dc-check.v-possible .dc-verdict{ color:var(--warn); }
+  .dc-check.v-unable{ border-left-color:var(--line-strong); }
+  .dc-check.v-unable .dc-verdict{ color:var(--ink-soft); }
   .dr-issue{ display:grid; gap:2px; padding:8px 10px; border-radius:8px; background:var(--warn-bg); }
   .dr-issue strong{ color:var(--warn); }
   .dr-issue span{ color:var(--ink); }
@@ -3118,38 +3132,17 @@ var AI_CHECK_STATES = {
 var AI_FINDING_CAT = {missing_information:['Missing information','red'], possible_inconsistency:['Possible inconsistency','amber'], ocr_uncertainty:['Reading problem','amber'], cannot_verify:['Cannot be verified from text','slate']};
 var AI_CHECK_FILTERS = [['attention','Needs Staff review'],['all','All requests'],['reviewed','Reviewed'],['clear','No concerns found'],
   ['inprogress','Waiting or checking'],['failed','Could not finish'],['unchecked','Not checked']];
-function aiCheckState(r){
+function aiCheckState(r, kind){
   var ai = r.ai, elig = r.aiEligibility || {eligible:false, reason:'not_enabled'};
   if(!ai) return elig.eligible ? 'none' : (elig.reason==='before_effective_date' ? 'before' : 'off');
   if(ai.status==='pending') return 'waiting';
   if(ai.status==='processing') return 'running';
   if(ai.status==='failed') return 'failed';
   if(ai.reviewed) return 'reviewed';
-  return ai.outcome==='passed' ? 'clear' : 'attention';
-}
-/* Counts by kind, from the server's validated finding codes only, each problem once as on the
-   detail page (dcImportantIssues), so the list and the detail agree. */
-function aiFindingCounts(ai){
-  var c = {missing:0, maybeMissing:0, inconsistent:0, unreadable:0, staffOnly:0, vague:0};
-  var sorted = dcImportantIssues(ai);
-  c.staffOnly = sorted.staffOnly.length;
-  c.vague = sorted.vague;
-  sorted.issues.forEach(function(f){
-    if(f.category==='missing_information') c[f.source==='requirements' ? 'missing' : 'maybeMissing']++;
-    else if(f.category==='possible_inconsistency') c.inconsistent++;
-    else if(f.category==='ocr_uncertainty') c.unreadable++;
-  });
-  return c;
-}
-function aiFindingSummary(ai){
-  var c = aiFindingCounts(ai), parts = [];
-  if(c.missing) parts.push(c.missing+' missing document'+(c.missing===1?'':'s'));
-  if(c.maybeMissing) parts.push(c.maybeMissing+' possibly missing detail'+(c.maybeMissing===1?'':'s'));
-  if(c.inconsistent) parts.push(c.inconsistent+' possible inconsistenc'+(c.inconsistent===1?'y':'ies'));
-  if(c.unreadable) parts.push(c.unreadable+' reading problem'+(c.unreadable===1?'':'s'));
-  if(c.staffOnly) parts.push(c.staffOnly+' for Staff to verify');
-  if(c.vague) parts.push(c.vague+' unspecific AI note'+(c.vague===1?'':'s'));
-  return parts;
+  // "No concerns found" only when every request-type check is Correct; anything else needs Staff review.
+  // (The server's general outcome is kept in Technical details.)
+  var checks = dcRequestChecks(r, kind);
+  return dcAllPassed(checks, kind) ? 'clear' : 'attention';
 }
 function renderDocumentCheck(acct){
   var all = docCheckItems();
@@ -3187,7 +3180,11 @@ function renderDocumentCheck(acct){
   + (pg.items.length ? pg.items.map(function(x){
       var r = x.r, ai = r.ai, m = AI_CHECK_STATES[x.state];
       var finished = ai && (ai.status==='completed' || ai.status==='needs_manual_review');
-      var found = finished ? (aiFindingSummary(ai).join(', ') || (ai.outcome==='passed' ? 'No findings' : 'No specific issues; see notes')) : (ai && ai.error ? ai.error : '—');
+      var checks = finished ? dcRequestChecks(r, x.kind) : [];
+      // Same rule as the detail page's headline and this row's state (dcAllPassed).
+      var notCorrect = checks.filter(function(c){ return c.verdict!=='correct'; }).map(function(c){ return c.name+': '+DC_VERDICT[c.verdict]; }).join(', ');
+      var found = finished ? (!checks.length ? 'No automatic checks apply' : (notCorrect || (dcAllPassed(checks, x.kind) ? 'All checks correct'
+          : 'Only '+checks.length+' of '+DC_LAND_DOCUMENTS+' required documents were checked'))) : (ai && ai.error ? ai.error : '—');
       var review = ai && ai.reviewed ? 'Reviewed by '+esc(ai.reviewedBy||'Staff')+(ai.reviewedAt ? '<div class="cell-sub">'+esc(fmtDateTime(ai.reviewedAt))+'</div>' : '')
         : (finished ? 'Not reviewed' : '—');
       // The whole row opens the check (Enter/Space too, like the dashboard rows).
@@ -3207,7 +3204,7 @@ function renderDocumentCheck(acct){
 function docCheckItems(){
   var all = state.docRequests.map(function(r){ return {r:r, kind:'doc', type:r.docType}; })
     .concat(state.landRequests.map(function(r){ return {r:r, kind:'land', type:r.transferType ? 'Land Transfer: '+r.transferType : 'Land Transfer'}; }));
-  all.forEach(function(x){ x.state = aiCheckState(x.r); });
+  all.forEach(function(x){ x.state = aiCheckState(x.r, x.kind); });
   return all;
 }
 
@@ -3257,40 +3254,38 @@ function renderDocCheckDetail(x){
     return html + docCheckDisclaimer();
   }
 
-  var det = r.details || null;
-  var ctx = {
-    det: det,
-    // The applicant's own ID (as the server's surname rule): the only document compared with the application's name.
-    ownIdKey: det ? (det.isOwner ? 'ownerId' : 'requesterId') : null,
-    appName: det ? [det.firstName, det.middleName, det.lastName].filter(function(v){ return String(v||'').trim(); }).join(' ') : '',
-    sorted: dcImportantIssues(ai),
-    used: [],
-    shown: 0
-  };
+  var ctx = dcContext(r);
+  ctx.kind = x.kind;
   var docs = ai.documents || [];
-  var cards = docs.map(function(d){ return drDocCard(r, d, fileByKey[d.key], ctx); });
-  // Problems the check could not tie to one uploaded document.
-  var general = ctx.sorted.issues.filter(function(f){ return ctx.used.indexOf(f)===-1; }).map(function(f){ return drIssueItem(drIssueFor(f, null), f); });
-  var total = ctx.shown + general.length;
-  // The server's reason only when nothing on the page explains a "needs review" result (e.g. the model did not answer).
-  var why = (!total && ai.outcome!=='passed' && ai.reason) ? String(ai.reason).replace(/ This is not an approval: Staff must inspect the original documents and make the decision\.$/, '') : '';
+  var cardChecks = [];
+  var cards = docs.map(function(d){ var c = dcDocChecks(d, ctx, x.kind); cardChecks = cardChecks.concat(c); return drDocCard(r, d, fileByKey[d.key], ctx, c); });
+  var attention = cardChecks.filter(function(c){ return c.verdict!=='correct'; });
   var outcome = {passed:'No concerns found', needs_review:'Needs review', missing_information:'Missing information'}[ai.outcome] || 'Needs review';
-  var headline = total
-    ? '<strong>'+total+' problem'+(total===1?'':'s')+' to check</strong>'
-    : (ai.outcome==='passed' ? '<strong>No significant issue detected</strong>' : '<strong>No specific issue detected</strong>');
+  // The headline states the request type's own checks; "passed" only when every check is Correct.
+  var headline = !cardChecks.length ? '<strong>No automatic checks apply to these uploads</strong>'
+    : (dcAllPassed(cardChecks, x.kind)
+        ? '<strong>All checks passed: '+(x.kind==='doc' ? 'Name Match and ID Type are correct' : 'all five required documents were identified')+'</strong>'
+        : '<strong>'+(attention.length || DC_LAND_DOCUMENTS-cardChecks.length)+' of '+(x.kind==='land' ? Math.max(cardChecks.length, DC_LAND_DOCUMENTS) : cardChecks.length)+' checks need attention</strong>');
+  var counts = {};
+  cardChecks.forEach(function(c){ counts[c.verdict] = (counts[c.verdict]||0)+1; });
+  var tally = ['correct','mismatch','possible','missing','unable'].filter(function(v){ return counts[v]; }).map(function(v){ return counts[v]+' '+DC_VERDICT[v].toLowerCase(); }).join(' · ');
   var dur = aiDurationText(ai);
   var meta = [dur ? 'Checked in '+dur : (ai.completedAt ? 'Checked '+fmtDateTime(ai.completedAt) : ''), 'Automatic outcome: '+outcome, ai.ocrEngine ? 'OCR: '+ai.ocrEngine : '', ai.model ? 'Model: '+ai.model : '', 'Attempts: '+ai.attempts+' of '+ai.maxAttempts]
     .filter(Boolean).join(' · ');
+  // Everything else the automatic check noted is kept for reference, outside these checks.
+  var sorted = dcImportantIssues(ai);
   var tech = [];
-  if(ctx.sorted.vague) tech.push('The model also noted '+ctx.sorted.vague+' other detail'+(ctx.sorted.vague===1?'':'s')+' without saying what (not shown as problems).');
-  if(ctx.sorted.staffOnly.length) tech.push('Signatures, seals and notarization can only be judged on the original: '+ctx.sorted.staffOnly.join(', ')+'.');
+  if(ai.outcome!=='passed' && ai.reason) tech.push(String(ai.reason).replace(/ This is not an approval: Staff must inspect the original documents and make the decision\.$/, ''));
+  sorted.issues.forEach(function(f){ if(f.explanation) tech.push('Other automatic note (not part of these checks): '+f.explanation); });
+  if(sorted.vague) tech.push('The model also noted '+sorted.vague+' other detail'+(sorted.vague===1?'':'s')+' without saying what.');
+  if(sorted.staffOnly.length) tech.push('Signatures, seals and notarization can only be judged on the original: '+sorted.staffOnly.join(', ')+'.');
   if(ai.error) tech.push(String(ai.error));
   html += '<section class="dc-card dr-review" aria-labelledby="dc-results-title">'
     + '<div class="dr-top"><div><h2 id="dc-results-title" class="dc-h">Overview</h2>'
-      + '<p class="dc-outcome">'+headline+'.'+(total ? '' : ' No specific issue was detected in the available text.')+' Please verify the extracted details against the original document.</p>'
-      + (why ? '<p class="cell-sub dc-extra">'+esc(why)+'</p>' : '')
+      + '<p class="dc-outcome">'+headline+'.'+(tally ? ' <span class="cell-sub">('+esc(tally)+')</span>' : '')+' Please verify the extracted details against the original document.</p>'
+      + '<p class="cell-sub">'+(x.kind==='doc' ? 'Document Request checks: Name Match (the name read from the ID against the submitted name) and ID Type (a government-issued ID).'
+          : 'Land Transfer checks: whether each of the five required documents is the right document, by its own heading in the file\'s text (a document only mentioned inside another does not count).')+'</p>'
       + '<p class="cell-sub">Read automatically from the uploaded files; reading can be wrong. The original document is the source of truth.</p></div></div>'
-    + (general.length ? '<div class="dr-general"><h3 class="dr-sub">Applies to the whole request</h3><ul class="dr-issues">'+general.join('')+'</ul></div>' : '')
     + '<div class="dr-docs">'+(cards.length ? cards.join('') : '<p class="cell-sub">No document details were returned.</p>')+'</div>'
     + '<details class="dr-tech"><summary>Technical details</summary><p class="cell-sub">'+esc(meta)+'</p>'
       + tech.map(function(t){ return '<p class="cell-sub">'+esc(t)+'</p>'; }).join('')+'</details>'
@@ -3303,68 +3298,125 @@ function renderDocCheckDetail(x){
   return html + docCheckDisclaimer();
 }
 
-/* Short problem texts for Staff: [title, what to verify, follow-up (optional)]. */
-var DR_ISSUES = {
-  notUploaded:['Not uploaded', 'This required document was not uploaded.', 'Ask the client to upload it.'],
-  incomplete:['Possibly incomplete', 'A required name or detail appears to be missing. Check the original.', 'If it is missing, ask the client for a complete copy.'],
-  nameIncomplete:['Possibly incomplete', 'The name read may be incomplete: more of a name appears next to it. Read the full name on the original.', ''],
-  nameDiffers:['Name differs', 'The name read from the document does not match the application. Compare it with the original.', 'If the names really differ, ask for proof of a name change, or an authorization letter if someone else is applying.'],
-  nameVerify:['Name possibly misread', 'The name read is close to the application but not the same. Check its spelling letter by letter on the original.', 'If it cannot be read, ask for a clearer photo or scan.'],
-  nameUnread:['Name not read', 'No name could be read reliably. Check the name on the original.', 'If it cannot be read, ask for a clearer photo or scan.'],
-  numberDiffers:['Property number differs', 'The number read from the document differs from the application. Compare it with the original.', 'Ask the client to confirm the correct property number.'],
-  wrongDoc:['Document may be incorrect', 'The upload may not be the requested document type. Check what it is.', 'If it is a different document, ask the client for the correct one.'],
-  typeUnclear:['Document type unclear', 'The text did not show what kind of document this is. Check the original.', ''],
-  unreadable:['Possibly unreadable', 'Some text could not be read clearly. Read the original yourself.', 'If it is blurry, cut off or rotated, ask for a clearer copy.'],
-  fileType:['Unusual file', 'Check that the file opens and is the right document.', 'If it cannot be used, ask for a clear JPG, PNG or PDF.'],
-  date:['Date may be wrong', 'Check the dates on the original.', 'If a date is wrong or impossible, ask for a corrected copy.'],
-  other:['Check this detail', 'The automatic check pointed out a detail here. Look at it on the original.', '']
-};
-/* Which short problem a validated finding is (d: the document it belongs to, when known). */
-function drIssueFor(f, d){
-  var c = f.category, fld = f.field;
-  if(c==='missing_information'){
-    if(f.source==='requirements') return 'notUploaded';
-    return 'incomplete';
-  }
-  if(fld==='file_format') return 'fileType';
-  if(fld==='name'){
-    if(c!=='ocr_uncertainty') return 'nameDiffers';
-    if(d && !d.holder_name) return 'nameUnread';
-    return d && d.holder_name_match==='incomplete' ? 'nameIncomplete' : 'nameVerify';
-  }
-  if(fld==='property_identifier') return 'numberDiffers';
-  if(fld==='document_type') return c==='ocr_uncertainty' ? 'typeUnclear' : 'wrongDoc';
-  if(fld==='date') return 'date';
-  if(c==='ocr_uncertainty') return 'unreadable';
-  return 'other';
+/* ---- Request-type checks (advisory; Staff decide from the originals) ----
+   Document Request: on each ID, Name Match and ID Type. Land Transfer: whether each required upload is
+   that document, plus the same two checks on the ID. Verdicts: correct, mismatch, possible (mismatch),
+   missing, unable (to verify). Grounded only in what was read from each file: the name is OCR text found
+   in that file (worker version 3), and a type counts as confirmed only when its printed title or issuer
+   was found in the file's own text (worker version 4), never from a file name. */
+var DC_VERDICT = {correct:'Correct', mismatch:'Mismatch', possible:'Possible mismatch', missing:'Missing', unable:'Unable to verify'};
+/* Results stored before the check type was recorded: the same slots as DocumentAnalysis::SLOT_CHECKS. */
+var DC_SLOT_CHECK = {ownerId:'id', requesterId:'id', authLetter:'none', ctcTdOrTitle:'document', notarialDeed:'document', vicinityMap:'document', certNoImprovement:'document', taxClearance:'document'};
+var DC_GENERIC_KINDS = ['unclear', 'other_document', 'other_id'];
+function dcContext(r){
+  var det = r.details || null;
+  return {
+    det: det,
+    // The requester's own ID: their ID when they are the owner, the representative's ID otherwise. The
+    // submitted name is the requester's, so only that ID's name is compared with it.
+    ownIdKey: det ? (det.isOwner ? 'ownerId' : 'requesterId') : null,
+    appName: det ? [det.firstName, det.middleName, det.lastName].filter(function(v){ return String(v||'').trim(); }).join(' ') : ''
+  };
 }
-function drIssueItem(kind, f){
-  var t = DR_ISSUES[kind] || DR_ISSUES.other;
-  var verify = t[1];
-  // The server lists missing detail names after the last colon ("...: Date of birth, Address.").
-  if(kind==='incomplete' && f){ var listed = (String(f.explanation||'').match(/: ([^:]+)\.$/) || [])[1]; if(listed) verify = 'May be missing: '+listed+'. Check the original.'; }
-  return '<li class="dr-issue"><strong>'+esc(t[0])+'</strong><span>'+esc(verify)+'</span>'
-    + (t[2] ? '<span class="dr-follow">Follow-up: '+esc(t[2])+'</span>' : '')
-    + (f && f.evidence ? '<span class="cell-sub">Text read (may contain reading errors): &ldquo;'+esc(f.evidence)+'&rdquo;</span>' : '')+'</li>';
-}
-/* One sentence on what the document appears to contain, from the fields actually read (never invented). */
-function drSummaryText(d){
-  if(d.requirement==='missing') return 'Not uploaded.';
-  if(d.ocr_status==='failed') return 'The text could not be read automatically.';
-  if(!d.document_kind) return '';
-  if(d.document_kind==='unclear') return 'What this document is could not be told from its text.';
-  if(d.document_group==='id') return d.holder_name ? 'Contains the holder\'s name.' : 'An ID; the holder\'s name could not be read.';
-  if(d.document_group==='property'){
-    var parts = [];
-    if(d.holder_name) parts.push('the registered owner\'s name');
-    if(d.property_number) parts.push('a property number');
-    return parts.length ? 'Contains '+parts.join(' and ')+'.' : 'No owner name or property number could be read.';
+function dcUnread(d){ return d.ocr_status==='failed' || d.readability==='poor' || d.readability==='unreadable'; }
+function dcCheck(name, verdict, detected, reason){ return {name:name, verdict:verdict, detected:detected||'', reason:reason}; }
+/* ID Type (isId) or Document identification: from the printed titles/issuers found in the file's text. */
+function dcKindCheck(d, isId){
+  var name = isId ? 'ID Type' : 'Document identification';
+  var what = isId ? 'a government-issued ID' : (d.accepted_kind_labels||[]).join(' or ') || 'the required document';
+  if(d.requirement==='missing') return dcCheck(name, 'missing', '', isId ? 'No ID was uploaded.' : 'Not uploaded: '+d.label+'.');
+  if(dcUnread(d)) return dcCheck(name, 'unable', '', 'The file\'s text could not be read clearly, so its type was not confirmed.');
+  var mk = d.document_kind || '', generic = !mk || DC_GENERIC_KINDS.indexOf(mk)>-1;
+  if(d.kind_evidence==null){
+    return dcCheck(name, 'unable', mk && !generic ? d.document_kind_label+' (suggested, not confirmed)' : '',
+      'This check ran before printed titles were read from the text, so the type is not confirmed. Run the check again after the worker update.');
   }
-  return d.holder_name ? 'Contains a person\'s name.' : 'No name could be read.';
+  var acc = d.accepted_kinds || [], ev = d.kind_evidence || [], labels = d.kind_evidence_labels || [];
+  var lab = function(k){ var i = ev.indexOf(k); return i>-1 ? labels[i] : k; };
+  // 'other_deed' is a deed's body wording (no heading): neutral where a deed is required (the heading still
+  // decides), but where a title or other document is required it means the file may be a deed.
+  var deedSlot = acc.indexOf('deed_of_sale')>-1 || acc.indexOf('deed_of_donation')>-1;
+  var evA = ev.filter(function(k){ return acc.indexOf(k)>-1; }), evOther = ev.filter(function(k){ return acc.indexOf(k)===-1 && !(deedSlot && k==='other_deed'); });
+  // Only deed wording, no other heading: say so (a real heading, when found, is named instead).
+  var deedWording = evOther.length>0 && evOther.every(function(k){ return k==='other_deed'; });
+  var found = function(k){ return 'Its printed title or issuer ('+lab(k)+') appears in the file\'s text.'; };
+  // Correct needs the heading/issuer of an accepted kind AND no heading of another document in the same
+  // file: conflicting evidence is never Correct, whatever the suggestion or the file name says.
+  if(evA.length && evOther.length) return dcCheck(name, 'unable', '', deedWording
+    ? 'The text has the heading of '+lab(evA[0])+', but its body reads like a deed (for example the parties\' or "know all men by these presents" wording), so it may be a deed. Check the original.'
+    : 'The text shows the titles of more than one document ('+lab(evA[0])+' and '+lab(evOther[0])+'). Check the original.');
+  if(!generic && acc.indexOf(mk)>-1){
+    if(evA.length){ var k1 = evA.indexOf(mk)>-1 ? mk : evA[0]; return dcCheck(name, 'correct', lab(k1), found(k1)); }
+    if(evOther.length) return dcCheck(name, 'possible', deedWording ? 'A deed (by its wording)' : lab(evOther[0]), deedWording
+      ? 'It was read as '+d.document_kind_label+', but its title was not found and its body reads like a deed, not '+what+'.'
+      : 'It was read as '+d.document_kind_label+', but the text shows the title of '+lab(evOther[0])+', not '+what+'.');
+    return dcCheck(name, 'unable', d.document_kind_label+' (suggested)', 'It was read as '+d.document_kind_label+', but its printed title or issuer was not found in the text.');
+  }
+  if(!generic){
+    if(isId && mk==='school_or_company_id') return dcCheck(name, 'possible', d.document_kind_label, 'A school or company ID is not a government-issued ID.');
+    if(evA.length) return dcCheck(name, 'unable', '', 'The text shows the title of '+lab(evA[0])+', but the document reads as '+d.document_kind_label+'. Check the original.');
+    return dcCheck(name, 'possible', d.document_kind_label, 'Appears to be '+d.document_kind_label+(ev.indexOf(mk)>-1 ? ' (its title appears in the text)' : ' (from the text; its title was not found)')+', not '+what+'.');
+  }
+  if(evA.length) return dcCheck(name, 'correct', lab(evA[0]), found(evA[0]));
+  if(evOther.length) return dcCheck(name, 'possible', deedWording ? 'A deed (by its wording)' : lab(evOther[0]), deedWording
+    ? 'No heading was found and its body reads like a deed, not '+what+'.' : 'The text shows the title of '+lab(evOther[0])+', not '+what+'.');
+  return dcCheck(name, 'unable', '', 'The type of '+(isId ? 'ID' : 'document')+' could not be identified from the text.');
 }
+/* Name Match: the name read from the requester's own ID against the submitted name (never substituted). */
+function dcNameCheck(d, ctx){
+  var name = 'Name Match';
+  if(d.requirement==='missing') return dcCheck(name, 'missing', '', 'No ID was uploaded.');
+  var read = d.holder_name ? 'Read from the ID: '+d.holder_name : '';
+  if(d.key!==ctx.ownIdKey){
+    return dcCheck(name, 'unable', read, d.key==='ownerId' && ctx.det && !ctx.det.isOwner
+      ? 'The property owner\'s name is not recorded on this request (filed by a representative), so this ID\'s name is not compared. The representative\'s ID is compared with the submitted name.'
+      : 'This ID\'s name is not compared with the submitted name.');
+  }
+  if(!d.holder_name) return dcCheck(name, 'unable', '', dcUnread(d) ? 'The ID\'s text could not be read clearly, so no name was read. It is not assumed to match.' : 'No name could be read from the ID. It is not assumed to match.');
+  if(!ctx.appName) return dcCheck(name, 'unable', read, 'There is no submitted name to compare with.');
+  var detected = read+' · Submitted: '+ctx.appName;
+  var cmp = dcNameCompare(d.holder_name, ctx.det);
+  var unclear = d.holder_name_clear===false || (d.holder_name_uncertain||[]).length>0;
+  if(cmp==='differs') return dcCheck(name, 'mismatch', detected, 'The name read from the ID does not match the submitted name.');
+  if(cmp==='verify') return dcCheck(name, 'possible', detected, 'Close to the submitted name but not the same (a spelling variant, an initial or a misread letter). Check the spelling on the original.');
+  if(cmp==='unknown') return dcCheck(name, 'unable', detected, 'Too little of the name was read to compare it.');
+  if(unclear) return dcCheck(name, 'possible', detected, 'It matches, but some letters were not read clearly. Check them on the original.');
+  return dcCheck(name, 'correct', detected, 'The name read from the ID matches the submitted name.');
+}
+/* The checks one uploaded document gets. Document Request: Name Match and ID Type on the ID(s), nothing
+   else. Land Transfer: the five required documents only; the ID is still required with the application
+   but is not part of its Document Check. */
+var DC_LAND_DOCUMENTS = 5;
+function dcDocChecks(d, ctx, kind){
+  var check = d.check || DC_SLOT_CHECK[d.key] || 'none';
+  if(kind==='land') return check==='document' ? [dcKindCheck(d, false)] : [];
+  if(check==='id') return [dcNameCheck(d, ctx), dcKindCheck(d, true)];
+  return [];
+}
+/* All checks passed: every check Correct (a Land Transfer: all five required documents identified). */
+function dcAllPassed(checks, kind){
+  if(!checks.length || !checks.every(function(c){ return c.verdict==='correct'; })) return false;
+  return kind!=='land' || checks.length===DC_LAND_DOCUMENTS;
+}
+/* Every check of a request (finished automatic check only), for the list page and its state. */
+function dcRequestChecks(r, kind){
+  var ai = r.ai;
+  if(!ai || !(ai.status==='completed' || ai.status==='needs_manual_review')) return [];
+  var ctx = dcContext(r), out = [];
+  (ai.documents||[]).forEach(function(d){ out = out.concat(dcDocChecks(d, ctx, kind)); });
+  return out;
+}
+function dcChecksHtml(checks){
+  return '<ul class="dc-checks">'+checks.map(function(c){
+    return '<li class="dc-check v-'+c.verdict+'"><div class="dc-check-head"><strong>'+esc(c.name)+'</strong><span class="dc-verdict">'+esc(DC_VERDICT[c.verdict])+'</span></div>'
+      + (c.detected ? '<span class="dc-detected">'+esc(c.detected)+'</span>' : '')
+      + '<span class="cell-sub">'+esc(c.reason)+'</span></li>';
+  }).join('')+'</ul>';
+}
+
 /* One uploaded document: the original, its summary, then its problems. ctx is null when no
    automatic result exists (the card then shows the original only). */
-function drDocCard(r, d, f, ctx){
+function drDocCard(r, d, f, ctx, checks){
   var kinds = {'image/jpeg':'JPG image','image/png':'PNG image','image/webp':'WEBP image','application/pdf':'PDF document'};
   var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
   var label = d.label || (f && f.label) || 'Document';
@@ -3391,53 +3443,28 @@ function drDocCard(r, d, f, ctx){
   if(!ctx){
     return '<article class="dr-doc">'+head+'<div class="dr-doc-body">'+preview+'<div class="dr-info"><p class="cell-sub">'+(uploaded ? 'No automatic summary. Review the original.' : 'The client did not upload this document.')+'</p></div></div></article>';
   }
-  var facts = [], issues = [], kindsShown = [];
-  var add = function(kind, finding){ if(kindsShown.indexOf(kind)>-1) return; kindsShown.push(kind); issues.push(drIssueItem(kind, finding)); };
+  var facts = [];
   var det = ctx.det;
-  if(uploaded && d.document_kind){
-    facts.push(['Document type', esc(d.document_kind_label||'—')+' <span class="cell-sub">Suggested from the text, not verified</span>']);
-    if(d.holder_name){
-      var unsure = d.holder_name_uncertain || [];
-      var how = {parts:'Read from labelled parts (such as Last Name, Given Names), in the document\'s order', incomplete:'Possibly incomplete: more of a name appears next to it'}[d.holder_name_match] || 'Exactly as read';
-      // Compared with the application only on the applicant's own ID; the name shown is never changed.
-      var cmp = (d.key===ctx.ownIdKey && ctx.appName) ? dcNameCompare(d.holder_name, det) : '';
-      var cmpText = {match:'Matches', verify:'<strong>Possibly the same name, verify</strong>', differs:'<strong>Differs, verify</strong>', unknown:'<span class="cell-sub">Not enough to compare</span>'}[cmp];
-      facts.push([d.document_group==='property' ? 'Owner name read' : 'Name read', '<span class="dc-name">'+dcNameHtml(d.holder_name, unsure)+'</span>'
-        + '<span class="cell-sub">'+esc(how)+((unsure.length || d.holder_name_clear===false) ? '. Unclear: check the '+(unsure.length ? 'marked letters' : 'spelling')+' on the original' : '')+'</span>'
-        + (cmpText ? '<span class="dc-compare"><span class="cell-sub">Application:</span> '+esc(ctx.appName)+' &middot; '+cmpText+'</span>' : '')]);
-      if(cmp==='differs') add('nameDiffers');
-      else if(cmp==='verify') add('nameVerify');
-    } else if(d.document_group==='id' || d.key===ctx.ownIdKey){
-      facts.push(['Name read', '<span class="cell-sub">Not read. Check the name on the original.</span>']);
-    }
-    if(d.property_number){
-      var appArp = det && String(det.arpNumber||'').trim();
-      var flat = function(v){ return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
-      var numDiffers = appArp && flat(appArp).length>=4 && flat(d.property_number).indexOf(flat(appArp))===-1 && flat(appArp).indexOf(flat(d.property_number))===-1;
-      facts.push(['Property number', '<span class="mono">'+esc(d.property_number)+'</span><span class="cell-sub">Exactly as read</span>'
-        + (numDiffers ? '<span class="dc-compare"><span class="cell-sub">Application:</span> <span class="mono">'+esc(appArp)+'</span> &middot; <strong>Differs, verify</strong></span>' : '')]);
-      if(numDiffers) add('numberDiffers');
-    }
-  } else if(uploaded && d.expected_type_match){
-    // Results from before version 3 only say whether the text looked like the required document.
-    facts.push(['Looks like the required document?', esc({yes:'Yes', no:'No', unclear:'Unclear'}[d.expected_type_match]||'—')+' <span class="cell-sub">Suggested from the text, not verified</span>']);
+  if(uploaded && d.holder_name){
+    var unsure = d.holder_name_uncertain || [];
+    var how = {parts:'Read from labelled parts (such as Last Name, Given Names), in the document\'s order', incomplete:'Possibly incomplete: more of a name appears next to it'}[d.holder_name_match] || 'Exactly as read';
+    facts.push([d.document_group==='property' ? 'Owner name read' : 'Name read', '<span class="dc-name">'+dcNameHtml(d.holder_name, unsure)+'</span>'
+      + '<span class="cell-sub">'+esc(how)+((unsure.length || d.holder_name_clear===false) ? '. Unclear: check the '+(unsure.length ? 'marked letters' : 'spelling')+' on the original' : '')+'</span>']);
   }
-  var summary = drSummaryText(d);
-  if(summary) facts.push(['Summary', esc(summary)]);
-  // The server's problems for this document, each once, before the comparisons above.
-  var mine = ctx.sorted.issues.filter(function(f2){ return (f2.documents||[]).indexOf(label)>-1; });
-  mine.forEach(function(f2){ if(ctx.used.indexOf(f2)===-1) ctx.used.push(f2); });
-  var computed = issues.slice(); issues = []; var computedKinds = kindsShown.slice(); kindsShown = [];
-  mine.forEach(function(f2){ add(drIssueFor(f2, d), f2); });
-  computedKinds.forEach(function(k, i){ if(kindsShown.indexOf(k)===-1){ kindsShown.push(k); issues.push(computed[i]); } });
-  if(uploaded && (d.ocr_status==='failed' || d.readability==='poor' || d.readability==='unreadable')) add('unreadable');
-  ctx.shown = (ctx.shown||0) + issues.length;
-  var problems = issues.length ? '<ul class="dr-issues">'+issues.join('')+'</ul>'
-    : '<p class="dr-ok">No significant issue detected in the available text.</p>';
-  return '<article class="dr-doc'+(issues.length ? ' has-issues' : '')+'">'+head
+  if(uploaded && d.property_number){
+    var appArp = det && String(det.arpNumber||'').trim();
+    var flat = function(v){ return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
+    var numDiffers = appArp && flat(appArp).length>=4 && flat(d.property_number).indexOf(flat(appArp))===-1 && flat(appArp).indexOf(flat(d.property_number))===-1;
+    facts.push(['Property number', '<span class="mono">'+esc(d.property_number)+'</span><span class="cell-sub">Exactly as read</span>'
+      + (numDiffers ? '<span class="dc-compare"><span class="cell-sub">Application:</span> <span class="mono">'+esc(appArp)+'</span> &middot; <strong>Differs, verify</strong></span>' : '')]);
+  }
+  var attention = checks.filter(function(c){ return c.verdict!=='correct'; }).length;
+  var body = checks.length ? '<div class="dr-problems"><h4 class="dr-sub">Checks</h4>'+dcChecksHtml(checks)+'</div>'
+    : '<p class="cell-sub">'+(!uploaded ? 'Not uploaded.' : (ctx.kind==='land' && (d.check || DC_SLOT_CHECK[d.key])==='id'
+        ? 'Required with the application, but not part of the Land Transfer Document Check. Inspect the original.' : 'Not checked automatically. Inspect the original.'))+'</p>';
+  return '<article class="dr-doc'+(attention ? ' has-issues' : '')+'">'+head
     + '<div class="dr-doc-body">'+preview
-      + '<div class="dr-info">'+(facts.length ? '<dl class="dc-facts dr-facts">'+facts.map(function(fx){ return '<div><dt>'+fx[0]+'</dt><dd>'+fx[1]+'</dd></div>'; }).join('')+'</dl>' : '')
-        + '<div class="dr-problems"><h4 class="dr-sub">'+(issues.length ? 'Check' : 'Problems')+'</h4>'+problems+'</div></div></div></article>';
+      + '<div class="dr-info">'+body+(facts.length ? '<dl class="dc-facts dr-facts">'+facts.map(function(fx){ return '<div><dt>'+fx[0]+'</dt><dd>'+fx[1]+'</dd></div>'; }).join('')+'</dl>' : '')+'</div></div></article>';
 }
 
 /* The name as OCR read it, with the parts that look misread marked (never corrected). */
