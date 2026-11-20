@@ -126,7 +126,7 @@ $detail = $between($html, 'function renderDocCheckDetail(x){', "\n}\n");
 $check('Document Review confirms a document or ID type only from its printed title in the file\'s text; otherwise it is a suggestion or unable to verify',
     str_contains($dc, "'Its printed title or issuer ('+lab(k)+') appears in the file\\'s text.'") && str_contains($dc, "d.document_kind_label+' (suggested, not confirmed)'")
     && str_contains($dc, "if(d.kind_evidence==null){"));
-$check('Document Review shows each check with a written verdict, the detected value and a reason', str_contains($dc, "var DC_VERDICT = {correct:'Correct', mismatch:'Mismatch', possible:'Possible mismatch', missing:'Missing', unable:'Unable to verify'};")
+$check('Document Review shows each check with a written verdict, the detected value and a reason', str_contains($dc, "var DC_VERDICT = {correct:'Correct', mismatch:'Mismatch', possible:'Possible mismatch', issue:'Possible issue', missing:'Missing', unable:'Unable to verify'};")
     && str_contains($dc, "<span class=\"dc-verdict\">'+esc(DC_VERDICT[c.verdict])+'</span>") && str_contains($dc, "(c.detected ? '<span class=\"dc-detected\">'+esc(c.detected)+'</span>' : '')"));
 $check('Document Review: the original first in every card, with Open (new tab) instead of a long report', str_contains($dc, "'<div class=\"dr-doc-body\">'+preview")
     && str_contains($dc, '>Open<span class="sr-only"> ') && !str_contains($dc, 'What to ask the client (if needed)') && !str_contains($dc, 'Open check'));

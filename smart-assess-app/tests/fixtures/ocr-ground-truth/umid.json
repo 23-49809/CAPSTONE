@@ -1,0 +1,49 @@
+{
+  "card": "umid",
+  "fictional": true,
+  "about": "Hand-written expected reading of the fictional card tests/support/IdCardFixtures.php draws as 'umid'. Field values are normalised (dates YYYY-MM-DD); null means the field is not printed and must stay unverified. Expiry is judged on 2026-11-20 or later.",
+  "type": "umid",
+  "type_state": "confirmed",
+  "required": [
+    "surname",
+    "given_name",
+    "crn"
+  ],
+  "fields": {
+    "surname": "PASCUAL",
+    "given_name": "LORENZO",
+    "middle_name": "AQUINO",
+    "birth_date": "1979-06-30",
+    "crn": "CRN-0111-2345678-9"
+  },
+  "name": "PASCUAL, LORENZO AQUINO",
+  "expiry": "not_applicable",
+  "readability": {
+    "clear": "readable",
+    "pdf_embedded_text": "readable"
+  },
+  "conditions": [
+    "clear",
+    "blurry",
+    "rotated_90",
+    "upside_down",
+    "dark_photo",
+    "glare",
+    "skewed",
+    "low_resolution",
+    "cropped",
+    "missing_field",
+    "pdf_scanned",
+    "pdf_embedded_text",
+    "pdf_incomplete_text"
+  ],
+  "overrides": {
+    "missing_field": {
+      "type_state": "title_only",
+      "fields": {
+        "crn": null
+      },
+      "name": null
+    }
+  }
+}

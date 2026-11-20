@@ -440,10 +440,10 @@ try {
     $result = $service()->extract($imagePath);
     $tess = $calls('tesseract');
     $prepared = array_values(array_filter(array_map(static fn (array $call): string => basename($call['args'][0]), $tess), static fn (string $name): bool => str_starts_with($name, 'prepared-')));
-    $check('retries are bounded (at most 7), use only prepared copies in the private folder, and the best one is kept even if still weak', $result['success']
-        && count($tess) >= 3 && count($tess) <= 8 && $result['text'] === 'REPUBLIKA NG PILIPINAS DELA CRUZ JUAN'
+    $check('retries are bounded (at most 8), use only prepared copies in the private folder, and the best one is kept even if still weak', $result['success']
+        && count($tess) >= 3 && count($tess) <= 9 && $result['text'] === 'REPUBLIKA NG PILIPINAS DELA CRUZ JUAN'
         && in_array('OCR confidence was low, so some text may be missing or misread.', $result['warnings'], true)
-        && array_diff($prepared, ['prepared-gray.png', 'prepared-deskew.png', 'prepared-sharp.png', 'prepared-clean.png']) === [], [count($tess), $prepared, $result['text']]);
+        && array_diff($prepared, ['prepared-gray.png', 'prepared-deskew.png', 'prepared-sharp.png', 'prepared-clean.png', 'prepared-upside.png']) === [], [count($tess), $prepared, $result['text']]);
     $check('the uploaded image is never modified by preparing copies', hash_file('sha256', $imagePath) === $imageHash);
     $prepDirectory = $testRoot . DIRECTORY_SEPARATOR . 'prep';
     @mkdir($prepDirectory, 0700);
@@ -486,8 +486,8 @@ try {
     $configure(['tsv' => ['original:default' => [97, $confidentButShort], 'gray:11' => [75, 'JUAN only'], '*' => [99, 'nothing useful here at all']]]);
     $result = $service()->extract($imagePath, $complete);
     $tess = $calls('tesseract');
-    $check('completeness: when no pass is complete, the most complete one is kept after at most 7 retries (nothing is invented)',
-        $result['success'] && count($tess) <= 8 && count($tess) >= 3 && in_array($result['text'], [$confidentButShort, 'JUAN only'], true)
+    $check('completeness: when no pass is complete, the most complete one is kept after at most 8 retries (nothing is invented)',
+        $result['success'] && count($tess) <= 9 && count($tess) >= 3 && in_array($result['text'], [$confidentButShort, 'JUAN only'], true)
         && !str_contains($result['text'], 'SANTOS'), [count($tess), $result['text']]);
     $configure(['tsv' => ['*' => [96, $confidentButShort]]]);
     $result = $service()->extract($imagePath, static function (string $text): float {

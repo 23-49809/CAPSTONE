@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/IdFieldExtractor.php';
+
 /**
  * Rules for AI-assisted document checks. No I/O: shared by the private AI
  * worker (which runs OCR and Ollama) and the PHP application (which decides
@@ -84,10 +86,12 @@ final class DocumentAnalysis
     /**
      * Worker result versions: 2 = model evidence was checked against the OCR text by the worker;
      * 3 = also the document kind, holder name and property number per document, the name and
-     * number kept only where the worker found them in that document's OCR text (name_match).
+     * number kept only where the worker found them in that document's OCR text (name_match);
+     * 4 = printed titles found per file (kind_evidence); 5 = per ID, the states of its type, OCR,
+     * name and printed fields (id_check: states only, never field values).
      */
-    public const WORKER_RESULT_VERSIONS = [1, 2, 3, 4];
-    public const WORKER_RESULT_VERSION = 4;
+    public const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5];
+    public const WORKER_RESULT_VERSION = 5;
 
     /**
      * What a document is, as the model reads it from the text: code => label shown to Staff
@@ -125,7 +129,7 @@ final class DocumentAnalysis
     private const NAME_FIELD_LABELS = ['last', 'first', 'middle', 'given', 'name', 'names', 'surname', 'family', 'apelyido', 'pangalan', 'mga',
         'gitnang', 'panggitnang', 'suffix', 'ext', 'extension'];
     /** Document and field words that are not part of a name next to them (for the "incomplete" check only). */
-    private const NOT_NAME_WORDS = ['republic', 'republika', 'philippines', 'pilipinas', 'ng', 'sa', 'of', 'the', 'and', 'to', 'by', 'no', 'number',
+    public const NOT_NAME_WORDS = ['republic', 'republika', 'philippines', 'pilipinas', 'ng', 'sa', 'of', 'the', 'and', 'to', 'by', 'no', 'number',
         'driver', "driver's", 'drivers', 'license', 'licence', 'id', 'card', 'national', 'philsys', 'philhealth', 'umid', 'sss', 'gsis', 'passport',
         'address', 'date', 'birth', 'sex', 'nationality', 'owner', 'owners', 'administrator', 'declared', 'tax', 'declaration', 'signature', 'holder',
         'issued', 'married', 'spouse', 'attorney', 'vendor', 'vendee', 'seller', 'buyer', 'donor', 'donee', 'witness', 'notary', 'public', 'location',
@@ -367,6 +371,54 @@ final class DocumentAnalysis
      *
      * @param array<string, array{text:string}> $texts document key => normalized OCR text
      */
+    /**
+     * Stored results, as read for Staff: an ID upload's property number and any quote on a finding
+     * about an ID (matched by its document label) are removed, whatever an earlier release stored.
+     *
+     * @return array{0: array, 1: array}
+     */
+    public static function withoutIdDetails(array $documents, array $findings): array
+    {
+        $idLabels = [];
+        foreach ($documents as &$document) {
+            if (is_array($document) && self::isIdSlot((string) ($document['key'] ?? ''))) {
+                $document['property_number'] = '';
+                $idLabels[] = (string) ($document['label'] ?? '');
+            }
+        }
+        unset($document);
+        foreach ($findings as &$finding) {
+            if (!is_array($finding)) {
+                continue;
+            }
+            $labels = array_map('strval', (array) ($finding['document_labels'] ?? []));
+            if ($labels === [] || array_intersect($labels, $idLabels) !== []) {
+                $finding['evidence'] = '';
+            }
+        }
+        unset($finding);
+        return [$documents, $findings];
+    }
+
+    /** True for an upload slot that holds an identification document. */
+    public static function isIdSlot(string $key): bool
+    {
+        return (self::SLOT_CHECKS[$key] ?? 'none') === 'id';
+    }
+
+    /**
+     * An "evidence" quote may be kept only for a finding about named documents, none of them an ID:
+     * an ID's text holds ID numbers, birth and expiry dates and machine-zone lines, which never
+     * leave the worker. A finding about an ID (or about no document in particular) keeps its
+     * explanation without a quote.
+     *
+     * @param list<string> $keys
+     */
+    public static function evidenceMayQuote(array $keys): bool
+    {
+        return $keys !== [] && array_filter($keys, [self::class, 'isIdSlot']) === [];
+    }
+
     public static function keepQuotedEvidence(array $output, array $texts): array
     {
         // Whitespace (spaces, line breaks) and invisible/control characters are not meaningful
@@ -383,7 +435,7 @@ final class DocumentAnalysis
                     break;
                 }
             }
-            $finding['evidence'] = $quoted && self::evidenceAllowed((string) $finding['category'], $evidence) ? $evidence : '';
+            $finding['evidence'] = $quoted && self::evidenceAllowed((string) $finding['category'], $evidence) && self::evidenceMayQuote($finding['document_keys']) ? $evidence : '';
         }
         unset($finding);
         return $output;
@@ -675,7 +727,10 @@ final class DocumentAnalysis
      * Worker side, where the OCR text is known (version 3): keeps each document's holder_name and
      * property_number only where they occur in THAT document's text (locateName(), locateNumber()),
      * and replaces them with the text's own characters, so Staff see what OCR read, never a
-     * spelling the model corrected, completed or took from the form. Returns [output, key => name match].
+     * spelling the model corrected, completed or took from the form. For an ID whose type is confirmed,
+     * the name its labelled fields print is used when the model's is not in the text, and when the two
+     * name different people neither is kept (key listed in conflicts).
+     * Returns [output, key => name match, key => true for a name conflict].
      *
      * @param array<string, array{text:string}> $texts
      * @return array{0: array, 1: array<string,string>}
@@ -683,110 +738,127 @@ final class DocumentAnalysis
     public static function keepQuotedDetails(array $output, array $texts): array
     {
         $matches = [];
+        $conflicts = [];
         foreach ($output['documents'] as &$document) {
             if (!array_key_exists('holder_name', $document)) {
                 continue;   // an answer in the earlier shape has no details to check
             }
-            $text = (string) ($texts[$document['key']]['text'] ?? '');
+            $key = $document['key'];
+            $text = (string) ($texts[$key]['text'] ?? '');
             [$match, $name] = self::locateName((string) $document['holder_name'], $text);
-            if ($match === 'none' && in_array('philsys_national_id', self::kindEvidence($text), true)) {
-                // The model gave no name found in this card's text: read the card's own labelled fields.
-                $printed = self::philsysName($text);
-                if ($printed !== null) {
+            // The name the ID's own labelled fields print (IdFieldExtractor), for an ID whose type is confirmed.
+            $printed = null;
+            if ((self::SLOT_CHECKS[$key] ?? 'none') === 'id') {
+                if (array_key_exists('id_name', $texts[$key] ?? [])) {
+                    $printed = $texts[$key]['id_name'];
+                } else {
+                    $read = IdFieldExtractor::extract($text);
+                    $printed = $read['type_state'] === 'confirmed' ? $read['name'] : null;
+                }
+            }
+            if ($printed !== null) {
+                if ($match === 'none') {
+                    // The model gave no name found in this card's text: use the card's own labelled fields.
                     [$match, $name] = self::locateName($printed, $text);
+                } elseif (!self::namesAgree($name, $printed)) {
+                    // The model's name and the printed fields read different people: neither is kept.
+                    [$match, $name] = ['none', ''];
+                    $conflicts[$key] = true;
                 }
             }
             $document['holder_name'] = $name;
-            $matches[$document['key']] = $match;
-            $document['property_number'] = self::locateNumber((string) $document['property_number'], $text);
+            $matches[$key] = $match;
+            // A property number belongs to a property document; an ID's numbers never leave the worker.
+            $document['property_number'] = self::isIdSlot($key) ? '' : self::locateNumber((string) $document['property_number'], $text);
         }
         unset($document);
-        return [$output, $matches];
-    }
-
-    /** Which PhilSys name field a label line names ('last', 'given', 'middle'), or null for any other line. */
-    private static function philsysField(string $line): ?string
-    {
-        $folds = array_column(self::tokens($line), 'fold');
-        $near = static function (string $word) use ($folds): bool {
-            foreach ($folds as $fold) {
-                if ($fold === $word || (strlen($word) >= 6 && preg_match('/^[a-z]+$/', $fold) && abs(strlen($fold) - strlen($word)) <= 1 && levenshtein($fold, $word) <= 1)) {
-                    return true;
-                }
-            }
-            return false;
-        };
-        if (mb_strtoupper($line) === $line && !preg_match('/\/|\bname/i', $line)) {
-            return null;   // a line in capitals is a value, not a label (PhilSys labels are not in capitals)
-        }
-        return match (true) {
-            $near('gitnang') || $near('panggitnang') || $near('middle') => 'middle',
-            $near('pangalan') || $near('mga') || $near('given') || $near('first') => 'given',
-            $near('apelyido') || $near('surname') || ($near('last') && $near('name')) => 'last',
-            default => null,
-        };
+        return [$output, $matches, $conflicts];
     }
 
     /**
      * How completely an ID's OCR text was read, for OCR retries (OcrService::extract()): null for a
-     * slot that is not an ID. 1.0: a PhilSys card with its name fields read (philsysName()), or
-     * another accepted ID's printed title. For a PhilSys card (title or field labels seen):
-     * 0.25 for the title, 0.25 for at least two field labels, 0.5 for the name fields. 0.0: no
-     * accepted ID title and no PhilSys labels. Never used for a verdict: only to decide whether
-     * another OCR pass may read more, and which pass read most.
+     * slot that is not an ID. From the ID's type (IdFieldExtractor): 0.0 without a government ID
+     * title; otherwise 0.25 for the title, 0.25 once any of its field labels or identifying details
+     * is seen, and up to 0.5 for its required fields (1.0: all read). Never used for a verdict: only
+     * to decide whether another OCR pass may read more, and which pass read most.
      */
     public static function ocrCompleteness(string $key, string $text): ?float
     {
         if ((self::SLOT_CHECKS[$key] ?? 'none') !== 'id') {
             return null;
         }
-        $text = self::normalizeText($text);
-        $evidence = array_values(array_intersect(self::kindEvidence($text), self::acceptedKinds($key)));
-        $fields = [];
-        foreach (preg_split('/\R/u', $text) ?: [] as $line) {
-            $field = self::philsysField(trim($line));
-            if ($field !== null) {
-                $fields[$field] = true;
-            }
+        $read = IdFieldExtractor::extract($text);
+        if ($read['type'] === null) {
+            return 0.0;
         }
-        $philsys = in_array('philsys_national_id', $evidence, true);
-        if (!$philsys && count($fields) < 2) {
-            return $evidence === [] ? 0.0 : 1.0;
+        $required = IdDocumentTypes::type($read['type'])['required'] ?? [];
+        if ($required === []) {
+            return 1.0;
         }
-        return ($philsys ? 0.25 : 0.0) + (count($fields) >= 2 ? 0.25 : 0.0) + (self::philsysName($text) !== null ? 0.5 : 0.0);
+        $done = count($required) - count($read['missing_required']);
+        $structure = $read['label_fields'] > 0 || $read['type_state'] === 'confirmed';
+        if ($done === count($required) && $read['type_state'] === 'confirmed') {
+            return 1.0;
+        }
+        return min(0.99, 0.25 + ($structure ? 0.25 : 0.0) + 0.5 * $done / count($required));
     }
 
     /**
-     * The holder's name as a PhilSys card's labelled fields print it, "LAST, GIVEN MIDDLE", or null.
-     * Each value is the first non-empty line after its label line ("Apelyido/Last Name",
-     * "Mga Pangalan/Given Names", "Gitnang Apelyido/Middle Name"; labels may be misread by one
-     * letter), and must be a line of capital letters only (spaces, ".", "-", "'" allowed) that is
-     * not itself a label line, with a word of 3+ letters (so "MA. CLARA" is read, a cut-off "JU" is
-     * not). Both the last name and the given name are required: a field that
-     * cannot be read leaves the name unread, nothing is guessed. The middle name is optional.
+     * The holder's name as a PhilSys card's labelled fields print it, "LAST, GIVEN MIDDLE", or null
+     * (IdFieldExtractor with the PhilSys layout). Both the last and the given name are required, each
+     * in capitals with a word of 3+ letters ("MA. CLARA" is read, a cut-off "JU" is not): a field
+     * that cannot be read leaves the name unread; nothing is guessed. The middle name is optional.
      */
     public static function philsysName(string $text): ?string
     {
-        $lines = array_values(array_filter(array_map('trim', preg_split('/\R/u', self::normalizeText($text)) ?: []), static fn (string $line): bool => $line !== ''));
-        $fieldOf = static fn (string $line): ?string => self::philsysField($line);
-        $values = [];
-        foreach ($lines as $index => $line) {
-            $field = $fieldOf($line);
-            if ($field === null || isset($values[$field]) || !isset($lines[$index + 1])) {
-                continue;
-            }
-            $value = $lines[$index + 1];
-            $words = array_column(self::tokens($value), 'fold');
-            if ($fieldOf($value) === null && preg_match("/^[\p{Lu}][\p{Lu}\p{M} .'’-]*\p{Lu}\.?$/u", $value) === 1
-                && array_intersect($words, self::NOT_NAME_WORDS) === [] && mb_strlen($value) <= 40
-                && max(array_map('mb_strlen', $words ?: [''])) >= 3) {
-                $values[$field] = (string) preg_replace('/\s+/u', ' ', $value);
-            }
+        return IdFieldExtractor::extractAs('philsys_national_id', $text)['name'];
+    }
+
+    /** True when two names have the same words, or one's words are all in the other (a name with or without its middle name). */
+    public static function namesAgree(string $a, string $b): bool
+    {
+        $words = static fn (string $name): array => array_values(array_filter(array_map(static fn (array $t): string => $t['fold'], self::tokens($name))));
+        [$x, $y] = [$words($a), $words($b)];
+        if ($x === [] || $y === []) {
+            return false;
         }
-        if (!isset($values['last'], $values['given'])) {
-            return null;
-        }
-        return $values['last'] . ', ' . $values['given'] . (isset($values['middle']) ? ' ' . $values['middle'] : '');
+        $contains = static function (array $big, array $small): bool {
+            foreach ($small as $word) {
+                $at = array_search($word, $big, true);
+                if ($at === false) {
+                    return false;
+                }
+                unset($big[$at]);
+            }
+            return true;
+        };
+        return $contains($x, $y) || $contains($y, $x);
+    }
+
+    /**
+     * Version 5: the per-ID result that leaves the worker (states only, never field values). $read is
+     * IdFieldExtractor::extract() of the ID's text; $holder the name kept for Staff (found in the text).
+     *
+     * @return array{type_state: string, type: ?string, ocr_state: string, name_state: string, fields: array<string, string>,
+     *   missing_required: list<string>, expiry: string, needs_staff_review: bool}
+     */
+    public static function idCheck(array $read, string $readability, bool $ocrOk, string $holder, bool $nameConflict): array
+    {
+        $ocrState = !$ocrOk || $readability === 'unreadable' ? 'ocr_unsuccessful' : ($readability === 'good' ? 'readable' : 'partially_readable');
+        // 'incomplete': a "LAST, FIRST MIDDLE" name with one word after the comma (a middle name may be missing).
+        $nameState = $nameConflict ? 'conflict' : ($holder === '' ? 'unverified' : (($read['name'] ?? null) !== null && !($read['name_complete'] ?? true) ? 'incomplete' : 'read'));
+        $check = [
+            'type_state' => $read['type_state'],
+            'type' => $read['type'],
+            'ocr_state' => $ocrState,
+            'name_state' => $nameState,
+            'fields' => array_map(static fn (array $field): string => $field['state'], $read['fields']),
+            'missing_required' => $read['missing_required'],
+            'expiry' => $read['expiry'],
+        ];
+        $check['needs_staff_review'] = $check['type_state'] !== 'confirmed' || $nameState !== 'read' || $check['missing_required'] !== []
+            || $check['expiry'] === 'expired' || $ocrState !== 'readable';
+        return $check;
     }
 
     /**
@@ -843,6 +915,9 @@ final class DocumentAnalysis
             if ($object['version'] >= 4) {
                 $fields[] = 'kind_evidence';
             }
+            if ($object['version'] >= 5) {
+                $fields[] = 'id_check';
+            }
             $document = self::exactObject($document, $fields, 'document check');
             $key = self::knownKey($document['key'], $documentKeys);
             if (isset($documents[$key])) {
@@ -872,6 +947,8 @@ final class DocumentAnalysis
                 'name_match' => $object['version'] >= 3 ? self::enum($document['name_match'], self::NAME_MATCH, 'name_match') : 'none',
                 // Version 4: kinds whose printed title or issuer the worker found in this file's text; null = not checked.
                 'kind_evidence' => $object['version'] >= 4 ? self::kindList($document['kind_evidence']) : null,
+                // Version 5: an ID's type, OCR, name and field states (null: not an ID, or an earlier worker).
+                'id_check' => $object['version'] >= 5 ? self::idCheckValue($document['id_check'], $key) : null,
             ];
         }
         if (!is_array($object['rule_findings']) || !array_is_list($object['rule_findings']) || count($object['rule_findings']) > self::MAX_FINDINGS) {
@@ -908,11 +985,17 @@ final class DocumentAnalysis
                 if ($object['version'] < 3 || $documents[$document['key']]['name_match'] === 'none') {
                     $document['holder_name'] = '';
                 }
-                if ($object['version'] < 3) {
-                    $document['property_number'] = '';
+                if ($object['version'] < 3 || self::isIdSlot($document['key'])) {
+                    $document['property_number'] = '';   // also never for an ID, whatever the worker sent
                 }
             }
             unset($document);
+            foreach ($output['findings'] as &$finding) {
+                if (!self::evidenceMayQuote($finding['document_keys'])) {
+                    $finding['evidence'] = '';   // a quote from an ID's text is never kept
+                }
+            }
+            unset($finding);
             if ($object['version'] < 2) {
                 // A worker before version 2 did not check the model's quotes against the OCR
                 // text, and this application cannot (it never receives the text): drop them.
@@ -946,6 +1029,52 @@ final class DocumentAnalysis
      * @return array{outcome:string, reason:string, findings:list<array>, documents:list<array>, manual_review:bool}
      */
     /** A short list of distinct known document kinds (version 4 kind_evidence). */
+    /** A version 5 id_check, strictly: states from fixed lists, field names of the ID types, nothing else. */
+    private static function idCheckValue(mixed $value, string $key): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        if ((self::SLOT_CHECKS[$key] ?? 'none') !== 'id') {
+            throw new UnexpectedValueException('id_check is only for ID uploads');
+        }
+        $check = self::exactObject($value, ['type_state', 'type', 'ocr_state', 'name_state', 'fields', 'missing_required', 'expiry', 'needs_staff_review'], 'id_check');
+        $type = $check['type'];
+        if ($type !== null && (!is_string($type) || !isset(self::ID_KINDS[$type]))) {
+            throw new UnexpectedValueException('id_check type must be an ID kind');
+        }
+        $known = IdDocumentTypes::allFieldNames();
+        if (!is_array($check['fields']) || count($check['fields']) > count($known) || ($check['fields'] !== [] && array_is_list($check['fields']))) {
+            throw new UnexpectedValueException('id_check fields must be field states');
+        }
+        $fields = [];
+        foreach ($check['fields'] as $field => $state) {
+            if (!in_array($field, $known, true)) {
+                throw new UnexpectedValueException('id_check names an unknown field');
+            }
+            $fields[$field] = self::enum($state, IdDocumentTypes::FIELD_STATES, 'field state');
+        }
+        $missing = $check['missing_required'];
+        if (!is_array($missing) || !array_is_list($missing) || array_diff($missing, array_keys($fields)) !== [] || count(array_unique($missing)) !== count($missing)) {
+            throw new UnexpectedValueException('id_check missing_required must list its own fields');
+        }
+        if (!is_bool($check['needs_staff_review'])) {
+            throw new UnexpectedValueException('needs_staff_review must be a boolean');
+        }
+        return [
+            'type_state' => self::enum($check['type_state'], IdDocumentTypes::TYPE_STATES, 'type_state'),
+            'type' => $type,
+            'ocr_state' => self::enum($check['ocr_state'], ['readable', 'partially_readable', 'ocr_unsuccessful'], 'ocr_state'),
+            'name_state' => self::enum($check['name_state'], ['read', 'unverified', 'conflict', 'incomplete'], 'name_state'),
+            'fields' => $fields,
+            'missing_required' => array_values($missing),
+            'expiry' => self::enum($check['expiry'], ['valid', 'expired', 'not_read', 'not_applicable'], 'expiry'),
+            // Recomputed, never trusted: anything unverified needs a person.
+            'needs_staff_review' => $check['needs_staff_review'] || $check['type_state'] !== 'confirmed' || $check['name_state'] !== 'read'
+                || $missing !== [] || $check['expiry'] === 'expired' || $check['ocr_state'] !== 'readable',
+        ];
+    }
+
     private static function kindList(mixed $value): array
     {
         if (!is_array($value) || !array_is_list($value) || count($value) > count(self::KIND_EVIDENCE)) {
@@ -988,6 +1117,43 @@ final class DocumentAnalysis
                 // "Passed" needs every document read clearly: the checks cannot vouch for text they only partly read.
                 $findings[] = self::finding('ocr_uncertainty', 'other', [$document['key']],
                     'Only part of the text of ' . $label($document['key']) . ' could be read, so the automatic checks may have missed something. Inspect it manually.', '', 'ocr');
+            }
+        }
+        // Version 5: an ID whose type, name or required printed details OCR could not confirm needs a person.
+        foreach ($worker['documents'] as $document) {
+            $id = $document['id_check'] ?? null;
+            if ($id === null || $document['ocr_status'] === 'failed' || in_array($document['readability'], ['poor', 'unreadable'], true)) {
+                continue;   // an ID OCR could not read already has its finding above
+            }
+            $which = $label($document['key']);
+            $kindLabel = $id['type'] === null ? 'an ID' : self::documentKinds()[$id['type']];
+            if ($id['type_state'] === 'unverified') {
+                // Readable text (unreadable files have their own finding above) without any recognised
+                // government ID title: a school, company or other unsupported ID, or a different document.
+                $findings[] = self::finding('cannot_verify', 'document_type', [$document['key']],
+                    'No recognised government ID title was found in ' . $which . '. Please inspect the original document manually.', '', 'ocr');
+            } elseif ($id['type_state'] === 'title_only') {
+                $findings[] = self::finding('cannot_verify', 'document_type', [$document['key']],
+                    'The title of ' . $kindLabel . ' appears in ' . $which . ', but none of its ID details (such as its number) were read, so its type is not confirmed. Inspect it manually.', '', 'ocr');
+            } elseif ($id['type_state'] === 'conflict') {
+                $findings[] = self::finding('possible_inconsistency', 'document_type', [$document['key']],
+                    $which . ' shows the titles of more than one kind of ID. Inspect it manually.', '', 'ocr');
+            }
+            if ($id['name_state'] === 'incomplete') {
+                $findings[] = self::finding('ocr_uncertainty', 'name', [$document['key']],
+                    'The name read from ' . $which . ' may be incomplete: only a last name and one given name were read, so a middle name may be missing. Check the full name on the original.', '', 'ocr');
+            }
+            if ($id['name_state'] === 'conflict') {
+                $findings[] = self::finding('ocr_uncertainty', 'name', [$document['key']],
+                    'Different readings of the name on ' . $which . ' disagree, so no name is shown. Check the name on the original.', '', 'ocr');
+            }
+            if ($id['type_state'] === 'confirmed' && $id['missing_required'] !== []) {
+                $findings[] = self::finding('ocr_uncertainty', 'required_field', [$document['key']],
+                    'These printed details of ' . $which . ' could not be read: ' . implode(', ', array_map([IdDocumentTypes::class, 'fieldLabel'], $id['missing_required'])) . '. Inspect it manually.', '', 'ocr');
+            }
+            if ($id['expiry'] === 'expired') {
+                $findings[] = self::finding('possible_inconsistency', 'date', [$document['key']],
+                    'The printed expiry date on ' . $which . ' appears to have passed. Check the original.', '', 'ocr');
             }
         }
         foreach ($worker['rule_findings'] as $finding) {
@@ -1048,8 +1214,8 @@ final class DocumentAnalysis
             foreach ($model['output']['findings'] as $finding) {
                 // Worded here from validated codes only; the model's own text is never used.
                 $finding['explanation'] = self::modelFindingText($finding['category'], $finding['field'], $finding['document_keys'], $label);
-                if (!self::evidenceAllowed($finding['category'], $finding['evidence'])) {
-                    $finding['evidence'] = '';   // too short to give context, or on a "cannot verify" finding
+                if (!self::evidenceAllowed($finding['category'], $finding['evidence']) || !self::evidenceMayQuote($finding['document_keys'])) {
+                    $finding['evidence'] = '';   // too short to give context, on a "cannot verify" finding, or quoting an ID
                 }
                 $findings[] = $finding['category'] === 'missing_information' ? self::reliableOr($finding, $readability) : $finding;
             }
@@ -1099,11 +1265,13 @@ final class DocumentAnalysis
                 'holder_name_match' => $holder === '' ? null : ($check['name_match'] ?? null),
                 'holder_name_clear' => $holder === '' ? null : ($read['holder_name_clear'] ?? null),
                 'holder_name_uncertain' => self::uncertainNameParts($holder),
-                'property_number' => (string) ($read['property_number'] ?? ''),
+                'property_number' => self::isIdSlot($item['key']) ? '' : (string) ($read['property_number'] ?? ''),
                 // Version 4: printed titles/issuers found in this file's OCR text (null: not checked, an
                 // earlier worker), and the check this upload gets with the kinds it accepts.
                 'kind_evidence' => $check === null ? null : ($check['kind_evidence'] ?? null),
                 'kind_evidence_labels' => array_map(static fn (string $k): string => self::documentKinds()[$k] ?? $k, $check['kind_evidence'] ?? []),
+                // Version 5: the ID's type, OCR, name and field states (null: not an ID or an earlier worker).
+                'id_check' => $check === null ? null : ($check['id_check'] ?? null),
                 'check' => self::SLOT_CHECKS[$item['key']] ?? 'none',
                 'accepted_kinds' => self::acceptedKinds($item['key']),
                 'accepted_kind_labels' => array_map(static fn (string $k): string => self::documentKinds()[$k], self::acceptedKinds($item['key'])),

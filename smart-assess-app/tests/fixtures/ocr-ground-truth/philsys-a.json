@@ -1,0 +1,47 @@
+{
+  "card": "philsys-a",
+  "fictional": true,
+  "about": "Hand-written expected reading of the fictional card tests/support/IdCardFixtures.php draws as 'philsys-a'. Field values are normalised (dates YYYY-MM-DD); null means the field is not printed and must stay unverified. Expiry is judged on 2026-11-20 or later.",
+  "type": "philsys_national_id",
+  "type_state": "confirmed",
+  "required": [
+    "last_name",
+    "given_names"
+  ],
+  "fields": {
+    "last_name": "DELA CRUZ",
+    "given_names": "JUAN",
+    "middle_name": "SANTOS",
+    "birth_date": "1990-01-01",
+    "card_number": "1234-5678-9012-3456"
+  },
+  "name": "DELA CRUZ, JUAN SANTOS",
+  "expiry": "not_applicable",
+  "readability": {
+    "clear": "readable",
+    "pdf_embedded_text": "readable"
+  },
+  "conditions": [
+    "clear",
+    "blurry",
+    "rotated_90",
+    "upside_down",
+    "dark_photo",
+    "glare",
+    "skewed",
+    "low_resolution",
+    "cropped",
+    "missing_field",
+    "pdf_scanned",
+    "pdf_embedded_text",
+    "pdf_incomplete_text"
+  ],
+  "overrides": {
+    "missing_field": {
+      "fields": {
+        "given_names": null
+      },
+      "name": null
+    }
+  }
+}

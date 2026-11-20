@@ -1,0 +1,46 @@
+{
+  "card": "philhealth",
+  "fictional": true,
+  "about": "Hand-written expected reading of the fictional card tests/support/IdCardFixtures.php draws as 'philhealth'. Field values are normalised (dates YYYY-MM-DD); null means the field is not printed and must stay unverified. Expiry is judged on 2026-11-20 or later.",
+  "type": "philhealth_id",
+  "type_state": "confirmed",
+  "required": [
+    "full_name",
+    "pin"
+  ],
+  "fields": {
+    "full_name": "NAVARRO, ELENA CRUZ",
+    "pin": "12-345678901-2",
+    "birth_date": "1985-07-21"
+  },
+  "name": "NAVARRO, ELENA CRUZ",
+  "expiry": "not_applicable",
+  "readability": {
+    "clear": "readable",
+    "pdf_embedded_text": "readable"
+  },
+  "conditions": [
+    "clear",
+    "blurry",
+    "rotated_90",
+    "upside_down",
+    "dark_photo",
+    "glare",
+    "skewed",
+    "low_resolution",
+    "cropped",
+    "missing_field",
+    "pdf_scanned",
+    "pdf_embedded_text",
+    "pdf_incomplete_text"
+  ],
+  "overrides": {
+    "missing_field": {
+      "type_state": "title_only",
+      "fields": {
+        "pin": null
+      },
+      "name": null
+    }
+  }
+}

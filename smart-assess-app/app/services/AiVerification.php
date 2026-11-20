@@ -987,6 +987,8 @@ final class AiVerification
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $findings = json_decode((string) ($row['findings_json'] ?? '[]'), true);
             $documents = json_decode((string) ($row['document_checks_json'] ?? '[]'), true);
+            // Results stored before IDs' numbers were withheld: never show a property number or a quote for an ID.
+            [$documents, $findings] = DocumentAnalysis::withoutIdDetails(is_array($documents) ? $documents : [], is_array($findings) ? $findings : []);
             $views[(int) $row['request_id']] = [
                 'status' => (string) $row['status'],
                 'outcome' => $row['outcome'] === null ? null : (string) $row['outcome'],

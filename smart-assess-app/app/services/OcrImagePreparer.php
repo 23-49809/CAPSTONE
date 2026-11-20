@@ -10,6 +10,8 @@ declare(strict_types=1);
  *  - 'deskew': 'gray', cropped to a light card on a darker background when one is clearly
  *              there, and straightened by the angle (-12..12 degrees) that lines its text up best.
  *  - 'sharp':  'deskew', lightly sharpened (small print softened by a phone camera).
+ *  - 'upside': 'gray' turned over (180 degrees), for a card photographed upside down when
+ *              Tesseract's own orientation detection misses it (cards with little text).
  *  - 'clean':  'deskew', lightly smoothed (speckle noise) and turned black and white (Otsu).
  *
  * Safety: only JPEG and PNG are decoded here (WebP is left to Tesseract); the original upload is
@@ -22,7 +24,7 @@ declare(strict_types=1);
  */
 final class OcrImagePreparer
 {
-    public const VARIANTS = ['gray', 'deskew', 'sharp', 'clean'];
+    public const VARIANTS = ['gray', 'deskew', 'sharp', 'clean', 'upside'];
     /** Larger images are left to Tesseract alone: decoding them in PHP would need too much memory. */
     public const MAX_SOURCE_PIXELS = 12_000_000;
     private const MAX_WORKING_SIDE = 2400;
@@ -61,6 +63,7 @@ final class OcrImagePreparer
                 'gray' => $this->base(),
                 'deskew' => $this->straight(),
                 'sharp' => $this->sharp(),
+                'upside' => ($base = $this->base()) === null ? null : (imagerotate($base, 180, 0xFFFFFF) ?: null),
                 'clean' => $this->clean(),
             };
             if ($image === null) {

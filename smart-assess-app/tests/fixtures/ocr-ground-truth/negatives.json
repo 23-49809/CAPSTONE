@@ -1,0 +1,18 @@
+{
+  "about": "Non-ID documents that mention ID issuers. None may be confirmed as an ID, and no name may be read from them.",
+  "fictional": true,
+  "documents": {
+    "barangay-certification": {
+      "confirmed": false
+    },
+    "requirements-letter": {
+      "confirmed": false
+    },
+    "deed-of-sale": {
+      "confirmed": false
+    },
+    "receipt": {
+      "confirmed": false
+    }
+  }
+}

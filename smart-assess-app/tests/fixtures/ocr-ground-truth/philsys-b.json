@@ -1,0 +1,43 @@
+{
+  "card": "philsys-b",
+  "fictional": true,
+  "about": "Hand-written expected reading of the fictional card tests/support/IdCardFixtures.php draws as 'philsys-b'. Field values are normalised (dates YYYY-MM-DD); null means the field is not printed and must stay unverified. Expiry is judged on 2026-11-20 or later.",
+  "type": "philsys_national_id",
+  "type_state": "confirmed",
+  "required": [
+    "last_name",
+    "given_names"
+  ],
+  "fields": {
+    "last_name": "REYES",
+    "given_names": "ANA MARIE",
+    "middle_name": "LOPEZ",
+    "birth_date": "1993-04-18",
+    "card_number": "2345-6789-0123-4567"
+  },
+  "name": "REYES, ANA MARIE LOPEZ",
+  "expiry": "not_applicable",
+  "readability": {
+    "clear": "readable"
+  },
+  "conditions": [
+    "clear",
+    "blurry",
+    "rotated_90",
+    "upside_down",
+    "dark_photo",
+    "glare",
+    "skewed",
+    "low_resolution",
+    "cropped",
+    "missing_field"
+  ],
+  "overrides": {
+    "missing_field": {
+      "fields": {
+        "last_name": null
+      },
+      "name": null
+    }
+  }
+}

@@ -1481,8 +1481,8 @@
   .dc-check.v-correct .dc-verdict{ color:var(--success, #1f7a4d); }
   .dc-check.v-mismatch, .dc-check.v-missing{ border-left-color:var(--danger); }
   .dc-check.v-mismatch .dc-verdict, .dc-check.v-missing .dc-verdict{ color:var(--danger); }
-  .dc-check.v-possible{ border-left-color:var(--warn); }
-  .dc-check.v-possible .dc-verdict{ color:var(--warn); }
+  .dc-check.v-possible, .dc-check.v-issue{ border-left-color:var(--warn); }
+  .dc-check.v-possible .dc-verdict, .dc-check.v-issue .dc-verdict{ color:var(--warn); }
   .dc-check.v-unable{ border-left-color:var(--line-strong); }
   .dc-check.v-unable .dc-verdict{ color:var(--ink-soft); }
   .dr-issue{ display:grid; gap:2px; padding:8px 10px; border-radius:8px; background:var(--warn-bg); }
@@ -3268,7 +3268,7 @@ function renderDocCheckDetail(x){
         : '<strong>'+(attention.length || DC_LAND_DOCUMENTS-cardChecks.length)+' of '+(x.kind==='land' ? Math.max(cardChecks.length, DC_LAND_DOCUMENTS) : cardChecks.length)+' checks need attention</strong>');
   var counts = {};
   cardChecks.forEach(function(c){ counts[c.verdict] = (counts[c.verdict]||0)+1; });
-  var tally = ['correct','mismatch','possible','missing','unable'].filter(function(v){ return counts[v]; }).map(function(v){ return counts[v]+' '+DC_VERDICT[v].toLowerCase(); }).join(' · ');
+  var tally = ['correct','mismatch','possible','issue','missing','unable'].filter(function(v){ return counts[v]; }).map(function(v){ return counts[v]+' '+DC_VERDICT[v].toLowerCase(); }).join(' · ');
   var dur = aiDurationText(ai);
   var meta = [dur ? 'Checked in '+dur : (ai.completedAt ? 'Checked '+fmtDateTime(ai.completedAt) : ''), 'Automatic outcome: '+outcome, ai.ocrEngine ? 'OCR: '+ai.ocrEngine : '', ai.model ? 'Model: '+ai.model : '', 'Attempts: '+ai.attempts+' of '+ai.maxAttempts]
     .filter(Boolean).join(' · ');
@@ -3304,7 +3304,7 @@ function renderDocCheckDetail(x){
    missing, unable (to verify). Grounded only in what was read from each file: the name is OCR text found
    in that file (worker version 3), and a type counts as confirmed only when its printed title or issuer
    was found in the file's own text (worker version 4), never from a file name. */
-var DC_VERDICT = {correct:'Correct', mismatch:'Mismatch', possible:'Possible mismatch', missing:'Missing', unable:'Unable to verify'};
+var DC_VERDICT = {correct:'Correct', mismatch:'Mismatch', possible:'Possible mismatch', issue:'Possible issue', missing:'Missing', unable:'Unable to verify'};
 /* Results stored before the check type was recorded: the same slots as DocumentAnalysis::SLOT_CHECKS. */
 var DC_SLOT_CHECK = {ownerId:'id', requesterId:'id', authLetter:'none', ctcTdOrTitle:'document', notarialDeed:'document', vicinityMap:'document', certNoImprovement:'document', taxClearance:'document'};
 var DC_GENERIC_KINDS = ['unclear', 'other_document', 'other_id'];
@@ -3320,8 +3320,19 @@ function dcContext(r){
 }
 function dcUnread(d){ return d.ocr_status==='failed' || d.readability==='poor' || d.readability==='unreadable'; }
 function dcCheck(name, verdict, detected, reason){ return {name:name, verdict:verdict, detected:detected||'', reason:reason}; }
-/* ID Type (isId) or Document identification: from the printed titles/issuers found in the file's text. */
+/* ID Type: the title check below, then (worker version 5) what the ID's own fields showed. A title alone
+   (no ID number or other identifying detail read), titles of two IDs, or a printed expiry date that has
+   passed keep it from Correct. States only: no field value reaches this page. */
 function dcKindCheck(d, isId){
+  var base = dcKindCheckTitles(d, isId), idc = isId ? d.id_check : null;
+  if(!idc || base.verdict!=='correct') return base;
+  if(idc.type_state==='title_only') return dcCheck(base.name, 'unable', base.detected+' (title only)', 'Its printed title appears in the text, but none of its ID details (such as the ID number) were read, so the type is not confirmed. Check the original.');
+  if(idc.type_state==='conflict') return dcCheck(base.name, 'unable', '', 'The text shows the titles of more than one kind of ID. Check the original.');
+  if(idc.expiry==='expired') return dcCheck(base.name, 'issue', base.detected, base.reason+' Its printed expiry date appears to have passed. Check the original.');
+  return base;
+}
+/* ID Type (isId) or Document identification: from the printed titles/issuers found in the file's text. */
+function dcKindCheckTitles(d, isId){
   var name = isId ? 'ID Type' : 'Document identification';
   var what = isId ? 'a government-issued ID' : (d.accepted_kind_labels||[]).join(' or ') || 'the required document';
   if(d.requirement==='missing') return dcCheck(name, 'missing', '', isId ? 'No ID was uploaded.' : 'Not uploaded: '+d.label+'.');
@@ -3372,6 +3383,7 @@ function dcNameCheck(d, ctx){
       ? 'The property owner\'s name is not recorded on this request (filed by a representative), so this ID\'s name is not compared. The representative\'s ID is compared with the submitted name.'
       : 'This ID\'s name is not compared with the submitted name.');
   }
+  if(d.id_check && d.id_check.name_state==='conflict') return dcCheck(name, 'unable', '', 'Different readings of the name on this ID disagree, so no name is shown. It is not assumed to match; check the name on the original.');
   if(!d.holder_name) return dcCheck(name, 'unable', '', dcUnread(d) ? 'The ID\'s text could not be read clearly, so no name was read. It is not assumed to match.' : 'No name could be read from the ID. It is not assumed to match.');
   if(!ctx.appName) return dcCheck(name, 'unable', read, 'There is no submitted name to compare with.');
   var detected = read+' · Submitted: '+ctx.appName;
@@ -3381,6 +3393,7 @@ function dcNameCheck(d, ctx){
   if(cmp==='verify') return dcCheck(name, 'possible', detected, 'Close to the submitted name but not the same (a spelling variant, an initial or a misread letter). Check the spelling on the original.');
   if(cmp==='unknown') return dcCheck(name, 'unable', detected, 'Too little of the name was read to compare it.');
   if(unclear) return dcCheck(name, 'possible', detected, 'It matches, but some letters were not read clearly. Check them on the original.');
+  if(d.id_check && d.id_check.name_state==='incomplete') return dcCheck(name, 'issue', detected, 'It matches, but the name read may be incomplete: only a last name and one given name were read, so a middle name may be missing. Check the full name on the original.');
   return dcCheck(name, 'correct', detected, 'The name read from the ID matches the submitted name.');
 }
 /* The checks one uploaded document gets. Document Request: Name Match and ID Type on the ID(s), nothing
