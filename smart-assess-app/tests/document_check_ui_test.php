@@ -107,7 +107,7 @@ $script = 'function esc(s){ return String(s==null?"":s).replace(/[&<>"\']/g,func
     . $fn('aiCheckState') . $fn('aiDurationText') . $fn('renderDocCheckDetail') . $fn('docCheckDisclaimer')
     . $fn('dcNameHtml') . $between($html, 'var DC_DIGIT_LETTERS', 'function dcNameParts(') . $fn('dcNameParts') . $fn('dcEditDistance') . $fn('dcNameCompare')
     . $fn('dcImportantIssues')
-    . $between($html, 'var DC_VERDICT = {', 'function dcContext(r){') . $fn('dcContext') . $fn('dcUnread') . $fn('dcCheck') . $fn('dcKindCheck') . $fn('dcNameCheck')
+    . $between($html, 'var DC_VERDICT = {', 'function dcContext(r){') . $fn('dcContext') . $fn('dcUnread') . $fn('dcCheck') . $fn('dcKindCheck') . $fn('dcKindCheckTitles') . $fn('dcNameCheck')
     . $between($html, 'var DC_LAND_DOCUMENTS', 'function dcDocChecks(') . $fn('dcDocChecks') . $fn('dcAllPassed') . $fn('dcRequestChecks') . $fn('dcChecksHtml') . $fn('drDocCard')
     . 'var cases = ' . json_encode($cases, JSON_UNESCAPED_UNICODE) . ';'
     . <<<'JS'

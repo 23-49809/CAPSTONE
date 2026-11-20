@@ -34,21 +34,22 @@ $run = static function (string $app, string $worker) use ($root): array {
     return [$code, implode("\n", $out)];
 };
 
-$check('this release: the application accepts versions 1 to 4; the worker answers with 4', str_contains($analysis, 'const WORKER_RESULT_VERSIONS = [1, 2, 3, 4];')
-    && str_contains($analysis, 'const WORKER_RESULT_VERSION = 4;'));
-$oldAnalysis = str_replace(['const WORKER_RESULT_VERSIONS = [1, 2, 3, 4];', 'const WORKER_RESULT_VERSION = 4;'], ['const WORKER_RESULT_VERSIONS = [1, 2, 3];', 'const WORKER_RESULT_VERSION = 3;'], $analysis);
+$check('this release: the application accepts versions 1 to 5; the worker answers with 5', str_contains($analysis, 'const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5];')
+    && str_contains($analysis, 'const WORKER_RESULT_VERSION = 5;'));
+// The previous release (#40/#41): accepts 1 to 4, its worker answers 4.
+$oldAnalysis = str_replace(['const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5];', 'const WORKER_RESULT_VERSION = 5;'], ['const WORKER_RESULT_VERSIONS = [1, 2, 3, 4];', 'const WORKER_RESULT_VERSION = 4;'], $analysis);
 $newApp = $tree('new-app', ['app/services/DocumentAnalysis.php' => $analysis, 'app/services/AiVerification.php' => $verification]);
 $oldApp = $tree('old-app', ['app/services/DocumentAnalysis.php' => $oldAnalysis, 'app/services/AiVerification.php' => $verification]);
 $newWorker = $tree('new-worker', ['app/services/DocumentAnalysis.php' => $analysis, 'app/services/AiDocumentWorker.php' => $workerRun]);
 $oldWorker = $tree('old-worker', ['app/services/DocumentAnalysis.php' => $oldAnalysis, 'app/services/AiDocumentWorker.php' => $workerRun]);
 
 [$code, $out] = $run($newApp, $newWorker);
-$check('new application + new worker: compatible (exit 0)', $code === 0 && str_contains($out, 'answers with version 4') && str_contains($out, "\ncompatible"), $out);
+$check('new application + new worker: compatible (exit 0)', $code === 0 && str_contains($out, 'answers with version 5') && str_contains($out, "\ncompatible"), $out);
 [$code, $out] = $run($oldApp, $newWorker);
-$check('application still on versions 1-3 + version 4 worker: NOT compatible (exit 1), deploy the application first', $code === 1 && str_contains($out, 'NOT COMPATIBLE')
+$check('application still on versions 1-4 + version 5 worker: NOT compatible (exit 1), deploy the application first', $code === 1 && str_contains($out, 'NOT COMPATIBLE')
     && str_contains($out, 'Deploy the application release first'), $out);
 [$code, $out] = $run($newApp, $oldWorker);
-$check('new application + version 3 worker (application deployed first): compatible (exit 0)', $code === 0 && str_contains($out, 'answers with version 3'), $out);
+$check('new application + version 4 worker (application deployed first): compatible (exit 0)', $code === 0 && str_contains($out, 'answers with version 4'), $out);
 [$code, $out] = $run($work . '/missing', $newWorker);
 $check('an unreadable application folder: exit 2, nothing decided', $code === 2, $out);
 

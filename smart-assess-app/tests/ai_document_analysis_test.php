@@ -222,8 +222,10 @@ $check('the model\'s document note is never shown', $fieldsOut['documents'][0]['
 
 // Evidence: only exact quotes of the OCR text, checked where the text is known (the worker).
 $texts = ['ownerId' => ['text' => 'REPUBLIC OF THE PHILIPPINES DRIVER LICENSE DELA CRUZ, JUAN'], 'ctcTdOrTitle' => ['text' => 'TAX DECLARATION ARP No. 018-00045 Owner JUAN DELA CRUZ']];
-$evidenceFor = static fn (string $evidence, array $docKeys = ['ownerId']): string => DocumentAnalysis::keepQuotedEvidence(['documents' => [], 'manual_review_recommended' => false,
-    'findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => $docKeys, 'explanation' => 'x', 'evidence' => $evidence]]], $texts)['findings'][0]['evidence'];
+// Quote rules on non-ID documents (a quote from an ID's text is never kept: its numbers and dates stay in the worker).
+$quoteTexts = ['notarialDeed' => ['text' => 'DEED OF ABSOLUTE SALE VENDOR DRIVER LICENSE DELA CRUZ, JUAN'], 'ctcTdOrTitle' => $texts['ctcTdOrTitle'], 'ownerId' => $texts['ownerId']];
+$evidenceFor = static fn (string $evidence, array $docKeys = ['notarialDeed']): string => DocumentAnalysis::keepQuotedEvidence(['documents' => [], 'manual_review_recommended' => false,
+    'findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => $docKeys, 'explanation' => 'x', 'evidence' => $evidence]]], $quoteTexts)['findings'][0]['evidence'];
 $check('evidence: an exact quote of the document text is kept', $evidenceFor('DELA CRUZ, JUAN') === 'DELA CRUZ, JUAN');
 $check('evidence: extra spaces are normalised the same way as the text, then kept', $evidenceFor("DELA  CRUZ,\n JUAN") === 'DELA CRUZ, JUAN');
 foreach ([
@@ -236,15 +238,18 @@ foreach ([
 }
 $check('evidence: a hidden character is stripped, and only the real text it hid is shown', $evidenceFor("DELA\u{200B}CRUZ, JUAN") === 'DELA CRUZ, JUAN'
     && $evidenceFor("LICENSE DELA\u{200B} CRUZ") === 'LICENSE DELA CRUZ' && !str_contains($evidenceFor("LICENSE DELA\u{200B} CRUZ"), "\u{200B}"));
-$check('evidence: a finding naming no document may quote any document', $evidenceFor('ARP No. 018-00045', []) === 'ARP No. 018-00045');
+$check('evidence: a quote on a finding about an ID, or naming no document, is never kept (an ID\'s text holds its numbers and dates)',
+    $evidenceFor('DELA CRUZ, JUAN', ['ownerId']) === '' && $evidenceFor('ARP No. 018-00045', []) === '' && $evidenceFor('DELA CRUZ, JUAN') === 'DELA CRUZ, JUAN');
 $withEvidence = array_replace($goodOutput, ['findings' => [['category' => 'possible_inconsistency', 'field' => 'name', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => 'DRIVER LICENSE DELA CRUZ']]]);
 $check('a version 1 worker (did not check quotes): all model evidence is dropped by the application', $classifyV($withEvidence, 1)['findings'][0]['evidence'] === '');
-$check('a version 2 worker (checked quotes): the checked evidence is shown', array_column(array_filter($classifyV($withEvidence, 2)['findings'],
-    static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['DRIVER LICENSE DELA CRUZ']);
+$propertyEvidence = array_replace($goodOutput, ['findings' => [['category' => 'possible_inconsistency', 'field' => 'property_identifier', 'document_keys' => ['ctcTdOrTitle'], 'explanation' => 'x', 'evidence' => 'ARP No. 018-00045 Owner JUAN']]]);
+$check('a version 2 worker (checked quotes): the checked evidence on a property document is shown; on an ID it is not', array_column(array_filter($classifyV($propertyEvidence, 2)['findings'],
+    static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['ARP No. 018-00045 Owner JUAN']
+    && array_column(array_filter($classifyV($withEvidence, 2)['findings'], static fn (array $f): bool => $f['source'] === 'model'), 'evidence') === ['']);
 // Step 10 (R3): short, cherry-picked quotes and quotes on "cannot verify" findings are never shown.
-$cherryTexts = ['ownerId' => ['text' => 'CERTIFIED TRUE COPY. THIS IS A GENUINE COPY OF THE ORIGINAL. APPROVED BY THE REGISTRAR.']];
+$cherryTexts = ['ctcTdOrTitle' => ['text' => 'CERTIFIED TRUE COPY. THIS IS A GENUINE COPY OF THE ORIGINAL. APPROVED BY THE REGISTRAR.']];
 $quoteOn = static fn (string $category, string $evidence): string => DocumentAnalysis::keepQuotedEvidence(['documents' => [], 'manual_review_recommended' => false,
-    'findings' => [['category' => $category, 'field' => 'other', 'document_keys' => ['ownerId'], 'explanation' => 'x', 'evidence' => $evidence]]], $cherryTexts)['findings'][0]['evidence'];
+    'findings' => [['category' => $category, 'field' => 'other', 'document_keys' => ['ctcTdOrTitle'], 'explanation' => 'x', 'evidence' => $evidence]]], $cherryTexts)['findings'][0]['evidence'];
 foreach (['GENUINE', 'APPROVED', 'GENUINE COPY'] as $short) {
     $check('worker: a real but too short quote is dropped: ' . $short, $quoteOn('possible_inconsistency', $short) === '', $quoteOn('possible_inconsistency', $short));
 }
@@ -366,7 +371,9 @@ $idPng = $png(1);
 $tdPng = $png(2);
 $blankPng = $png(3);
 $tdText = "REPUBLIC OF THE PHILIPPINES PROVINCE OF BATANGAS MUNICIPALITY OF MABINI\nTAX DECLARATION OF REAL PROPERTY\nARP No. 018-00045 Owner JUAN DELA CRUZ Location Poblacion Mabini Assessed Value 120,000";
-file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
+// The ID as OCR reads a card: lines, with its name label and license number (fictional), so its type is confirmed (version 5).
+$idCardText = "REPUBLIC OF THE PHILIPPINES\nDRIVER LICENSE\nLast Name, First Name, Middle Name\nDELA CRUZ, JUAN SANTOS\nLicense No. N01-12-345678\nAddress Mabini Batangas Date of Birth 1980";
+file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idCardText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
 $ocrFactory = static fn (string $directory): OcrService => new OcrService($directory, 5, 20, $tools);
 $job = static fn (array $documents): array => AiDocumentWorker::validateJob(['version' => 1, 'job_id' => 7,
     'declared' => ['flow' => 'landtransfer', 'is_owner' => true, 'first_name' => 'Juan', 'last_name' => 'Dela Cruz', 'arp_number' => '018-00045', 'document_type' => '', 'transfer_type' => 'Sale'],
@@ -420,9 +427,10 @@ $check('v3 worker: a name found in the OCR text is kept with the text\'s own cha
     && $exact['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS' && array_column($exact['documents'], 'name_match') === ['exact', 'exact']
     && $exact['model']['output']['documents'][1]['property_number'] === '018-00045', $exact);
 $changed = $v3Run([$v3Doc('ownerId', 'drivers_license', 'DELA CRUZ, JUAN SANTOZ'), $v3Doc('ctcTdOrTitle', 'tax_declaration', 'Juana Dela Cruz', true, '018-00046')]);
-$check('v3 worker: a corrected spelling, a name from elsewhere and a number not in the text are all dropped (never shown)',
-    $changed['model']['output']['documents'][0]['holder_name'] === '' && $changed['model']['output']['documents'][1]['holder_name'] === ''
-    && $changed['model']['output']['documents'][1]['property_number'] === '' && array_column($changed['documents'], 'name_match') === ['none', 'none'], $changed);
+$check('v3 worker: a corrected spelling, a name from elsewhere and a number not in the text are all dropped (never shown); on a confirmed ID the name its own labelled fields print is shown instead (v5)',
+    $changed['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS' && !str_contains((string) json_encode($changed), 'SANTOZ')
+    && $changed['model']['output']['documents'][1]['holder_name'] === '' && $changed['model']['output']['documents'][1]['property_number'] === ''
+    && array_column($changed['documents'], 'name_match') === ['exact', 'none'], $changed);
 $assembled = $v3Run([$v3Doc('ownerId', 'drivers_license', 'JUAN SANTOS DELA CRUZ'), $v3Doc('ctcTdOrTitle', 'tax_declaration', '')]);
 $check('v3 worker: a full name given in another order is shown as the document prints it (one block, exact)', $assembled['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS'
     && $assembled['documents'][0]['name_match'] === 'exact', $assembled['documents']);
@@ -453,8 +461,9 @@ $check('PhilSys reader: reads LAST, GIVEN MIDDLE from the labelled fields (label
 $check('PhilSys reader: a missing or unreadable last or given name gives no name (nothing is guessed)',
     DocumentAnalysis::philsysName(str_replace("DELA CRUZ\n", '', $card)) === null && DocumentAnalysis::philsysName(str_replace("JUAN\n", "JU\n", $card)) === null
     && DocumentAnalysis::philsysName(str_replace("JUAN\n", "Juan\n", $card)) === null && DocumentAnalysis::philsysName(str_replace("JUAN\n", "J4AN\n", $card)) === null);
-$check('PhilSys reader: the middle name is optional; a label line or a document word is never taken as a value',
-    DocumentAnalysis::philsysName(str_replace("SANTOS\n", '', $card)) === 'DELA CRUZ, JUAN'
+$check('PhilSys reader: the middle name is optional when the card has no middle-name field; when its label is printed but its value is not read, the name is unverified (no shortened name); a label line or a document word is never a value',
+    DocumentAnalysis::philsysName(str_replace("Gitnang Apelyido/Middle Name\nSANTOS\n", '', $card)) === 'DELA CRUZ, JUAN'
+    && DocumentAnalysis::philsysName(str_replace("SANTOS\n", '', $card)) === null
     && DocumentAnalysis::philsysName(str_replace("DELA CRUZ\n", "REPUBLIKA NG PILIPINAS\n", $card)) === null);
 $kept = static fn (string $holder, string $text): array => DocumentAnalysis::keepQuotedDetails(
     ['documents' => [['key' => 'requesterId', 'holder_name' => $holder, 'property_number' => '']]], ['requesterId' => ['text' => $text]]);
@@ -470,19 +479,20 @@ $check('PhilSys reader: a card without the last name stays unverified', $out['do
 $c = static fn (string $key, string $text): ?float => DocumentAnalysis::ocrCompleteness($key, $text);
 $check('OCR completeness: only ID slots are checked (other documents: null, no extra passes)', $c('taxDeclaration', $card) === null && $c('authLetter', $card) === null);
 $check('OCR completeness: a PhilSys card with title, labels and name fields read is complete', $c('requesterId', $card) === 1.0 && $c('ownerId', $misreadLabels . "\nPhilippine Identification Card") === 1.0);
-$check('OCR completeness: confident but incomplete - name fields not read ("JU" too short, a field missing) - is not complete',
-    $c('requesterId', str_replace("JUAN\n", "JU\n", $card)) === 0.5 && $c('requesterId', str_replace("DELA CRUZ\n", '', $card)) === 0.5);
+$check('OCR completeness: confident but incomplete - name fields not read ("JU" too short, a field missing) - is not complete (partial credit 0.75)',
+    $c('requesterId', str_replace("JUAN\n", "JU\n", $card)) === 0.75 && $c('requesterId', str_replace("DELA CRUZ\n", '', $card)) === 0.75);
 $check('OCR completeness: printed labels missing (title and values only) scores lower; nothing ID-like at all is 0',
     $c('requesterId', "REPUBLIKA NG PILIPINAS\nPhilippine Identification Card\nDELA CRUZ\nJUAN\nSANTOS") === 0.25 && $c('requesterId', "Barangay Certification\nThis certifies") === 0.0);
-$check('OCR completeness: another accepted ID with its printed title is complete (its fields are not checked)',
-    $c('requesterId', "REPUBLIC OF THE PHILIPPINES\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nDELA CRUZ, JUAN SANTOS") === 1.0);
+$check('OCR completeness: another ID is complete only with its own required fields (a driver\'s license needs its name and license number)',
+    $c('requesterId', "REPUBLIC OF THE PHILIPPINES\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nLast Name, First Name, Middle Name\nDELA CRUZ, JUAN SANTOS\nLicense No. N01-12-345678") === 1.0
+    && $c('requesterId', "REPUBLIC OF THE PHILIPPINES\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nDELA CRUZ, JUAN SANTOS") < 1.0);
 
 $v3Validated = DocumentAnalysis::validateWorkerResult($exact, $keys);
 $tampered = $exact;
 $tampered['documents'][0]['name_match'] = 'none';
 $check('v3 app: a name the worker did not find in the text is never shown', DocumentAnalysis::validateWorkerResult($tampered, $keys)['model']['output']['documents'][0]['holder_name'] === ''
     && $v3Validated['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS');
-$olderWithName = array_replace($exact, ['version' => 2, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['name_match' => 1, 'kind_evidence' => 1]), $exact['documents'])]);
+$olderWithName = array_replace($exact, ['version' => 2, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['name_match' => 1, 'kind_evidence' => 1, 'id_check' => 1]), $exact['documents'])]);
 $check('v3 app: a version 2 result never shows a name or number (that worker did not check them)', (static function () use ($olderWithName, $keys): bool {
     $docs = DocumentAnalysis::validateWorkerResult($olderWithName, $keys)['model']['output']['documents'];
     return $docs[0]['holder_name'] === '' && $docs[1]['property_number'] === '';
@@ -562,7 +572,9 @@ $deedPdfJob = AiDocumentWorker::validateJob(['version' => 1, 'job_id' => 3, 'dec
 file_put_contents($ocrMap, json_encode(['text' => [md5($tdPng) => $deedText]]));
 $noModel = $makeWorker(null)->run($deedPdfJob);
 $check('worker: the date rule runs with no model at all', in_array('date', array_column($noModel['rule_findings'], 'field'), true) && $noModel['model']['status'] === 'skipped');
-file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
+// The ID as OCR reads a card: lines, with its name label and license number (fictional), so its type is confirmed (version 5).
+$idCardText = "REPUBLIC OF THE PHILIPPINES\nDRIVER LICENSE\nLast Name, First Name, Middle Name\nDELA CRUZ, JUAN SANTOS\nLicense No. N01-12-345678\nAddress Mabini Batangas Date of Birth 1980";
+file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idCardText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
 foreach ([
     'an extra field' => ['version' => 1, 'job_id' => 1, 'declared' => [], 'documents' => [], 'approve' => true],
     'a document over 5 MB' => ['version' => 1, 'job_id' => 1, 'declared' => ['flow' => 'docreq', 'is_owner' => true, 'first_name' => '', 'last_name' => '', 'arp_number' => '', 'document_type' => '', 'transfer_type' => ''],
@@ -719,7 +731,7 @@ foreach (['an unknown kind' => ['approved_document'], 'a repeated kind' => ['pas
     $tamperedEvidence['documents'][0]['kind_evidence'] = $bad;
     $check("v4 app: kind_evidence with {$what} is rejected", $rejects(static fn () => DocumentAnalysis::validateWorkerResult($tamperedEvidence, $keys)));
 }
-$v3Result = array_replace($withoutEvidence, ['version' => 3]);
+$v3Result = array_replace($withoutEvidence, ['version' => 3, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['id_check' => 1]), $withoutEvidence['documents'])]);
 $check('v4 app: a version 3 result is still accepted, with its evidence marked as not checked (null)', array_column(DocumentAnalysis::validateWorkerResult($v3Result, $keys)['documents'], 'kind_evidence') === [null, null]);
 $v4Classified = DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']), $v4, $labels)['documents'];
 $check('v4 classify: an ID gets the ID check with only government-issued IDs accepted', $v4Classified[0]['check'] === 'id' && in_array('drivers_license', $v4Classified[0]['accepted_kinds'], true)

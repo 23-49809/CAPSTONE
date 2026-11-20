@@ -379,9 +379,10 @@ field labels and name fields were read (a cut-off "JU" is not a name), another a
 its printed title was read. A confident but incomplete reading is therefore not accepted while
 a retry may read more. Other documents get no completeness check.
 
-At most seven retries run: Tesseract's orientation detection (PSM 1, for photos taken sideways
+At most eight retries run: Tesseract's orientation detection (PSM 1, for photos taken sideways
 or upside down; needs `osd.traineddata`, skipped without it), a single-block layout (PSM 6, for
-cards held at an angle), and greyscale, straightened, sharpened and cleaned copies made with
+cards held at an angle), a turned-over copy (for an upside-down photo that orientation detection
+missed), and greyscale, straightened, sharpened and cleaned copies made with
 PHP's GD extension (`OcrImagePreparer`). The most complete pass wins, then the most confidently
 read one, so no transformation is applied blindly; a clear, complete image still takes one pass.
 Nothing is invented: when no pass reads a field, the field stays unverified.
@@ -405,6 +406,72 @@ names instead of 16 (noisy and dark-table photos are lost), never a wrong name.
 A PDF page whose text layer has fewer than 200 letters/digits (for example a typed header over
 a scanned card) is also OCR'd; the OCR text replaces the layer only when it reads at least 20
 more letters/digits, and a failed or late OCR keeps the layer (the page never fails because of it).
+
+### Government ID types and printed fields (worker result version 5)
+
+`app/services/IdDocumentTypes.php` lists what SMART ASSESS knows about each Philippine government
+ID: its printed fields, how their labels may be printed (Filipino and English, misread by one
+letter), the fields its extraction requires, and which details identify it. Full layouts:
+PhilSys, Passport, Driver's License, UMID, SSS, PhilHealth and Postal ID; GSIS, PRC, Voter's,
+TIN, Pag-IBIG, Senior Citizen and PWD IDs are recognised by their titles with name-only reading.
+Adding an ID: its title patterns in `DocumentAnalysis::KIND_EVIDENCE` and an entry in the registry.
+
+`app/services/IdFieldExtractor.php` reads an ID upload's OCR text after OCR has finished:
+
+1. **Type**: printed titles and issuers (never the file name). Confirmed only with at least one of
+   the type's identifying details read (usually its number): a letter that names "PhilHealth" is
+   "title only". Titles of two different IDs are a conflict. A school, company or unknown ID is
+   unverified (not supported).
+2. **Fields** of that type: a value follows its label on the same or the next line, and must have
+   the field's form (capital-letter name with a word of 3+ letters, a real date, the printed number
+   format). Letters read in place of digits (O/0, I/1, S/5, B/8) are tried only in numbers and
+   dates, and a value read that way stays unverified. Names are never changed.
+3. **Passport**: the visual zone and the machine-readable zone are both read; a field the two read
+   differently is unverified; machine-zone numbers and dates count only on a complete 44-character
+   line 2 with a correct ICAO check digit for the field AND a correct composite check digit
+   (position 44); a machine-zone name (no check digit) is used only to confirm the visual zone.
+   Check digits catch misreads; they say nothing about whether a passport is genuine.
+4. **Name**: from the type's name fields, only when every required name field is read and every
+   name field the card labels is read (no shortened name). A name printed "LAST, FIRST MIDDLE" on one
+   line (driver's license, SSS, PhilHealth) with a single word after the comma is flagged "possibly
+   incomplete" (a middle name may have been dropped): shown, never as fully read, and needs review.
+   The name is used when the model's name is not in the text; when the model and the fields name
+   different people, or two complete OCR passes read different names, no name is shown ("conflict").
+5. **Expiry**: valid, expired (shown to Staff as a possible issue, never a rejection), not read.
+
+What leaves the worker is `id_check`, per ID upload: the states of the type (confirmed, title only,
+conflict, unverified), OCR (readable, partially readable, OCR unsuccessful), name (read,
+unverified, conflict, incomplete), each field (read / unverified), the unread required fields,
+expiry, and whether Staff review is needed. **No field value** (numbers, dates, nationality) leaves
+the worker or is stored; the name is the only text, checked against the OCR text as before. For an ID
+upload, `property_number` is always empty and no model "evidence" quote is kept (a finding about an
+ID, or about no document in particular, has no quote): the worker removes them, the application
+removes them again on validation and classification, and the Staff view removes them from results
+stored by an earlier release (`DocumentAnalysis::withoutIdDetails()`). Property documents keep their
+numbers and quotes.
+
+The application validates `id_check` strictly and recomputes "needs Staff review" itself. Any
+unverified state adds a finding, so the result is "Needs review", never "Passed": readable text with
+no recognised government ID title ("No recognised government ID title was found ... Please inspect
+the original document manually."), a title only, titles of two IDs, unread required details, a
+conflicting or possibly incomplete name, an expired ID. An unreadable file keeps its own reading
+finding. The Staff page explains these in the existing verdicts' words; an expired ID and a possibly
+incomplete name are "Possible issue" (shown like "Possible mismatch").
+
+Release: the application accepts versions 1 to 5 and must be deployed before the worker answering
+5 (the compatibility check enforces it). Production still runs a version 3 worker.
+
+#### OCR evaluation on fictional IDs
+
+`php tests/tools/ocr-evaluation.php --report=docs/OCR_EVALUATION.md` draws fictional cards of every
+type (`tests/support/IdCardFixtures.php`: generic layouts, invented people, "SYNTHETIC TEST CARD -
+NOT A REAL ID") under 13 conditions (clear, blurry, turned, upside down, dark photo, glare, skewed,
+low resolution, cropped, a missing printed field, scanned PDF, PDF with text, PDF with an incomplete
+text layer) plus non-ID documents, runs each through the worker's reading path in its own process
+and compares it with hand-written ground truth (`tests/fixtures/ocr-ground-truth`). It reports per
+document type: classification, names, false name matches, field exact match, character error rate,
+unverified fields, expiry, time and peak memory. `tests/ocr_evaluation_test.php` runs a quick set in
+the test suite. The results describe synthetic cards only; real IDs will read worse.
 
 #### Checking the worker's OCR dependencies (read-only)
 

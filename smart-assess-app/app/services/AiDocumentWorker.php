@@ -141,6 +141,10 @@ final class AiDocumentWorker
             $labels = [];
             $checks = [];
             $texts = [];
+            /** @var array<string, array> $idReads per ID upload: IdFieldExtractor::extract() (in memory only) */
+            $idReads = [];
+            /** @var array<string, true> $passConflicts IDs whose complete OCR passes read different names */
+            $passConflicts = [];
             foreach ($job['documents'] as $index => $document) {
                 $labels[$document['key']] = $document['label'];
                 $ocrSeconds = (int) floor($deadline - $modelReserve - ($this->clock)());
@@ -167,6 +171,19 @@ final class AiDocumentWorker
                 $text = $ocr['success'] ? DocumentAnalysis::normalizeText($ocr['text']) : '';
                 $readability = DocumentAnalysis::readability($document['key'], $text, $ocr['success']);
                 $texts[$document['key']] = ['text' => $text, 'readability' => $readability, 'label' => $document['label']];
+                if ((DocumentAnalysis::SLOT_CHECKS[$document['key']] ?? 'none') === 'id') {
+                    // OCR is finished: classify by printed titles, then read that type's fields.
+                    $read = IdFieldExtractor::extract($text, date('Y-m-d'));
+                    $idReads[$document['key']] = $read;
+                    $texts[$document['key']]['id_name'] = $read['type_state'] === 'confirmed' ? $read['name'] : null;
+                    foreach ($ocr['alternative_texts'] ?? [] as $alternative) {
+                        $other = $read['type'] === null ? null : IdFieldExtractor::extractAs($read['type'], DocumentAnalysis::normalizeText((string) $alternative))['name'];
+                        if ($other !== null && $read['name'] !== null && !DocumentAnalysis::namesAgree($other, $read['name'])) {
+                            $passConflicts[$document['key']] = true;
+                            $texts[$document['key']]['id_name'] = null;
+                        }
+                    }
+                }
                 $checks[] = [
                     'key' => $document['key'],
                     'ocr_status' => $ocr['success'] ? 'ok' : 'failed',
@@ -189,13 +206,24 @@ final class AiDocumentWorker
 
             $model = $this->askModel($declared, $texts, $deadline);
             $nameMatches = [];
+            $nameConflicts = $passConflicts;
             if ($model['status'] === 'ok') {
                 // Version 3: names and property numbers are kept only where they occur in the
                 // document's own OCR text, written with its characters.
-                [$model['output'], $nameMatches] = DocumentAnalysis::keepQuotedDetails($model['output'], $texts);
+                [$model['output'], $nameMatches, $conflicts] = DocumentAnalysis::keepQuotedDetails($model['output'], $texts);
+                $nameConflicts += $conflicts;
+            }
+            $holders = [];
+            foreach (($model['status'] === 'ok' ? $model['output']['documents'] : []) as $read) {
+                $holders[$read['key']] = (string) ($read['holder_name'] ?? '');
             }
             foreach ($checks as &$check) {
                 $check['name_match'] = $nameMatches[$check['key']] ?? 'none';
+                // Version 5: states only (type, OCR, name, printed fields); field values never leave the worker.
+                $check['id_check'] = isset($idReads[$check['key']])
+                    ? DocumentAnalysis::idCheck($idReads[$check['key']], $check['readability'], $check['ocr_status'] === 'ok',
+                        $holders[$check['key']] ?? '', isset($nameConflicts[$check['key']]))
+                    : null;
             }
             unset($check);
 

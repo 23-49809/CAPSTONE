@@ -62,12 +62,14 @@ final class OcrService
      * Retries for a weak or incomplete first pass, in order: [image variant, Tesseract page segmentation mode].
      * 'original' is the upload (or rendered page) unchanged; other variants come from OcrImagePreparer.
      * PSM 1 adds orientation detection (turned photos), 6 reads one uniform block (skewed, tilted or
-     * small cards), 11 finds scattered text (noisy photos). The most complete, then best-read pass
+     * small cards), 11 finds scattered text (noisy photos); 'upside' is the image turned over, for an
+     * upside-down photo that orientation detection missed. The most complete, then best-read pass
      * wins; the original file is never changed.
      */
     private const RETRY_PASSES = [
         ['original', '1'],
         ['original', '6'],
+        ['upside', '3'],
         ['deskew', '6'],
         ['sharp', '6'],
         ['gray', '11'],
@@ -280,7 +282,11 @@ final class OcrService
         if ($text === '') {
             $warnings[] = 'No text could be extracted from the image.';
         }
-        return $this->success($text, [['page' => 1, 'method' => 'ocr', 'error' => null]], array_values(array_filter($warnings)), 'tesseract', 'image_ocr');
+        $result = $this->success($text, [['page' => 1, 'method' => 'ocr', 'error' => null]], array_values(array_filter($warnings)), 'tesseract', 'image_ocr');
+        // Other passes the caller's completeness check found complete, so the caller can see when complete
+        // readings disagree. In memory only: never stored, never logged.
+        $result['alternative_texts'] = $ocr['alternatives'] ?? [];
+        return $result;
     }
 
     private function extractPdf(string $filePath, string $temporaryDirectory, float $deadline): array
@@ -514,6 +520,8 @@ final class OcrService
             return ['text' => $first['text'], 'error' => null, 'weak' => null];
         }
         $best = $first + ['complete' => $this->completenessOf($first['text'])];
+        /** @var list<array{text: string, complete: float}> $complete other passes the completeness check found complete */
+        $completePasses = [];
         $retryDeadline = min($deadline, $retryDeadline ?? $deadline);
         if ($this->needsRetry($best) && microtime(true) < $retryDeadline) {
             $preparer = new OcrImagePreparer($image);
@@ -532,8 +540,14 @@ final class OcrService
                 $retry = $this->tesseractPass($tesseract, $source, $mode, $temporaryDirectory, $retryDeadline);
                 if ($retry['error'] === null && $retry['score'] !== null) {
                     $retry['complete'] = $this->completenessOf($retry['text']);
+                    $previous = $best;
                     if ($retry['complete'] > $best['complete'] || ($retry['complete'] === $best['complete'] && $retry['score'] > $best['score'])) {
                         $best = $retry;
+                    }
+                    foreach ([$previous, $retry] as $pass) {
+                        if ($pass !== $best && $pass['complete'] >= 1.0 && $this->completeness !== null) {
+                            $completePasses[] = $pass['text'];
+                        }
                     }
                 }
                 if (!$this->needsRetry($best)) {
@@ -545,7 +559,8 @@ final class OcrService
                 @unlink($temporaryDirectory . DIRECTORY_SEPARATOR . 'prepared-' . $variant . '.png');
             }
         }
-        return ['text' => $best['text'], 'error' => null, 'weak' => $this->isWeak($best)];
+        $alternatives = array_values(array_unique(array_filter($completePasses, static fn (string $text): bool => $text !== $best['text'])));
+        return ['text' => $best['text'], 'error' => null, 'weak' => $this->isWeak($best), 'alternatives' => array_slice($alternatives, 0, 3)];
     }
 
     /** 0.0 to 1.0 from the caller's completeness check; 1.0 without one (or when it fails). */
@@ -562,7 +577,13 @@ final class OcrService
         return $value === null ? 1.0 : max(0.0, min(1.0, (float) $value));
     }
 
-    /** @param array{score: ?int, mean: float, complete: float} $pass */
+    /**
+     * A pass needs a retry when it is incomplete or reads poorly. A complete pass that holds little
+     * confident text is still retried: on a small card a first pass can drop a word of the name and
+     * still look complete (measured on the synthetic PhilHealth card), and the best-read pass wins.
+     *
+     * @param array{score: ?int, mean: float, complete: float} $pass
+     */
     private function needsRetry(array $pass): bool
     {
         return $this->isWeak($pass) || $pass['complete'] < 1.0;

@@ -695,7 +695,7 @@ $modelAnswer = $goodAnswer;
         ['key' => 'taxDeclaration', 'label' => 'Tax Declaration', 'mime' => 'image/png', 'content_base64' => base64_encode('td')]],
 ], ['time_budget_seconds' => 300])));
 $check('worker: an ID slot gets the completeness check (a cut-off given name is incomplete, the full card complete); other documents get none',
-    $completenessSeen === [[0.5, 1.0], null], $completenessSeen);
+    $completenessSeen === [[0.75, 1.0], null], $completenessSeen);
 
 $now = 0.0;
 $ocrGiven = [];
