@@ -102,21 +102,23 @@ $g = $run('uploads', $base . $two . 'state.step=3; S.render(); out.shared=(docum
     . ' S.state.formData.isOwner=false; S.state.formData.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true}}; S.state.errors={}; S.submitRequest();'
     . ' out.rep=[S.state.step, S.state.submitConfirmation, Object.keys(S.state.errors).sort()];');
 $check('Step 3 says the uploads are used for every chosen document', str_contains((string) ($g['shared'] ?? ''), 'These files are used for all 2 documents in your application: Certification of Assessment, Certification of No Liens and Encumbrances.'), $g);
-$check('a missing upload blocks submission (owner ID; for a representative, their ID and the authorization letter)', ($g['afterSubmit'] ?? null) === [3, false, ['ownerId']]
-    && ($g['rep'] ?? null) === [3, false, ['authLetter', 'requesterId']], $g);
+// Each ID needs its type selected and both its sides (front and back), plus the letter for a representative.
+$check('a missing upload blocks submission (owner ID type, front and back; for a representative also their ID and the authorization letter)',
+    ($g['afterSubmit'] ?? null) === [3, false, ['ownerIdType', 'ownerId', 'ownerIdBack']]
+    && ($g['rep'] ?? null) === [3, false, ['authLetter', 'ownerIdBack', 'ownerIdType', 'requesterId', 'requesterIdBack', 'requesterIdType']], $g);
 
-$g = $run('review', $base . $two . 'fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render();'
+$g = $run('review', $base . $two . 'fd.ownerIdType="philhealth_id"; fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true},ownerIdBack:{name:"id-back.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render();'
     . ' out.sections=[].slice.call(document.querySelectorAll(".rv-sec th")).map(function(e){return e.textContent;});'
     . ' out.rows=[].slice.call(document.querySelectorAll(".review-table tbody tr:not(.rv-sec)")).map(function(r){return r.textContent;}).filter(function(t){return /^Document \d/.test(t);});'
     . ' S.submitRequest(); out.modal=S.state.submitConfirmation;');
 $check('the review lists every document with its own purpose; uploads are marked as shared', ($g['sections'] ?? null) === ['Personal Information', 'Property Information', 'Documents Requested (2)', 'Uploaded IDs and Documents (used for all documents)']
     && ($g['rows'] ?? null) === ['Document 1Certification of AssessmentPurpose: Personal Copy', 'Document 2Certification of No Liens and EncumbrancesPurpose: For Titling'], $g);
 $check('a complete application opens the one final Submit confirmation', ($g['modal'] ?? false) === true, $g);
-$g = $run('reviewOne', $base . 'S.setDocItems(fd,[{documentType:"Certification of Assessment",purpose:"Personal Copy"}]); fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render();'
+$g = $run('reviewOne', $base . 'S.setDocItems(fd,[{documentType:"Certification of Assessment",purpose:"Personal Copy"}]); fd.ownerIdType="philhealth_id"; fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true},ownerIdBack:{name:"id-back.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render();'
     . ' out.sections=[].slice.call(document.querySelectorAll(".rv-sec th")).map(function(e){return e.textContent;});');
 $check('one document keeps the original review wording', in_array('Document Request Details', $g['sections'] ?? [], true) && in_array('Uploaded IDs and Documents', $g['sections'] ?? [], true), $g);
 
-$g = $run('demo', $base . $two . 'fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render(); S.confirm(); var r=S.state.lastSubmission;'
+$g = $run('demo', $base . $two . 'fd.ownerIdType="philhealth_id"; fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true},ownerIdBack:{name:"id-back.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render(); S.confirm(); var r=S.state.lastSubmission;'
     . ' out.app=[r.isApplication, r.items.length, r.items.map(function(i){return i.id.slice(-2);}), r.items.map(function(i){return i.docType;}), r.items.map(function(i){return i.status;})];'
     . ' out.receipt=[].slice.call(document.querySelectorAll(".rcpt-docs li")).map(function(li){return li.textContent;}); out.ref=(document.querySelector("[data-ref-no]")||{}).textContent;');
 $check('submitting (demo mode) gives one tracking number with each document under it (-1, -2), each Received', ($g['app'][0] ?? false) === true && ($g['app'][1] ?? 0) === 2

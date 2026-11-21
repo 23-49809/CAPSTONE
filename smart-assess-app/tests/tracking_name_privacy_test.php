@@ -79,7 +79,7 @@ $check('the receipt still shows the reference number, request type, date, client
 $check('the browser rejects a file of exactly the limit (>=), as the server does', str_contains($publicPage, 'if(file.size >= maxBytes){')
     && str_contains($publicPage, "'This file is too large. Each file must be smaller than '+maxMb+' MB. Choose a smaller file to continue.'"));
 $check('the browser marks a file valid only below the limit and with its document\'s types',
-    str_contains($publicPage, 'f.size < uploadLimitBytes()') && str_contains($publicPage, "const IMAGE_ONLY_KEYS = ['ownerId','requesterId','authLetter'];")
+    str_contains($publicPage, 'f.size < uploadLimitBytes()') && str_contains($publicPage, "const IMAGE_ONLY_KEYS = ['ownerId','requesterId','authLetter','ownerIdBack','requesterIdBack'];")
     && str_contains($publicPage, 'const IMAGE_FILE_RE = /^image\/(jpeg|png)$/;'));
 $check('the upload hint says "smaller than", not "up to"', str_contains($publicPage, "fileTypesFor(key) + ', smaller than ' + maxMb + ' MB'")
     && !str_contains($publicPage, "', up to ' + maxMb"));

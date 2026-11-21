@@ -296,7 +296,8 @@ const DOCS = ['Certified True Copy of Tax Declaration (CTC-TD)', 'Certification 
 $apply = static function (?array $items, bool $isOwner = true, ?array $uploads = null, array $extra = [], ?object $client = null) use ($browser, $termsVersion, $fixtures): array {
     $client ??= $browser();
     [, $accepted] = $client->json('terms_accept', ['flow' => 'docreq', 'agreed' => true, 'terms_version' => $termsVersion]);
-    $uploads ??= $isOwner ? ['ownerId'] : ['requesterId', 'ownerId', 'authLetter'];
+    // A complete set: each ID's front and back side (required since the front/back upload), plus the letter.
+    $uploads ??= $isOwner ? ['ownerId', 'ownerIdBack'] : ['requesterId', 'requesterIdBack', 'ownerId', 'ownerIdBack', 'authLetter'];
     $payload = ['action' => 'submit_request', 'csrf' => $client->csrf, 'terms_token' => (string) ($accepted['data']['terms_token'] ?? ''),
         'flow' => 'docreq', 'first_name' => 'Rosa', 'middle_name' => '', 'last_name' => 'Fictional', 'contact_number' => '+639170000' . random_int(100, 999),
         'address_line' => '1 Demo Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0001-0' . random_int(1000, 9999),
@@ -389,8 +390,8 @@ $files = $pdo->query('SELECT rd.request_id, rd.doc_key, rd.stored_path, rd.file_
     WHERE r.application_id = ' . (int) $appRow['id'] . ' ORDER BY rd.request_id, rd.id')->fetchAll();
 $paths = array_column($files, 'stored_path');
 $app = $work . '/smart-assess-app/';
-$check('every document request has its own record and its own stored copy of the shared ID (3 distinct files, same content)', count($files) === 3
-    && array_column($files, 'doc_key') === ['ownerId', 'ownerId', 'ownerId'] && count(array_unique($paths)) === 3
+$check('every document request has its own records and its own stored copies of the shared ID, front and back (6 distinct files, same content)', count($files) === 6
+    && array_column($files, 'doc_key') === ['ownerId', 'ownerIdBack', 'ownerId', 'ownerIdBack', 'ownerId', 'ownerIdBack'] && count(array_unique($paths)) === 6
     && array_filter($paths, static fn ($p) => !is_file($app . $p)) === [] && count(array_unique(array_map(static fn ($p) => md5_file($app . $p), $paths))) === 1, $files);
 $check('each document\'s requirements are complete on its own', array_map('intval', array_column($children, 'requirement_complete')) === [1, 1, 1]);
 $check('each document has its own Received history entry', $count('SELECT COUNT(*) FROM request_status_log l JOIN requests r ON r.id = l.request_id WHERE r.application_id = ' . (int) $appRow['id'] . " AND l.status = 'Received' AND l.actor = 'client'") === 3);
@@ -401,8 +402,9 @@ $check('the Terms acceptance is linked once, to the first document', $count('SEL
 [$code, $res, $repRef] = $apply($items(2), false);
 $repFiles = $pdo->query('SELECT r.reference_no, rd.doc_key, rd.file_status FROM request_documents rd JOIN requests r ON r.id = rd.request_id
     WHERE r.reference_no LIKE ' . $pdo->quote($repRef . '-%') . ' ORDER BY r.item_no, rd.id')->fetchAll();
-$check('a representative\'s two documents each keep the representative ID, owner ID and authorization letter', $code === 200 && count($repFiles) === 6
-    && (static function (array $c): array { ksort($c); return $c; })(array_count_values(array_column($repFiles, 'doc_key'))) === ['authLetter' => 2, 'ownerId' => 2, 'requesterId' => 2]
+$check('a representative\'s two documents each keep both sides of the representative ID and of the owner ID, and the authorization letter', $code === 200 && count($repFiles) === 10
+    && (static function (array $c): array { ksort($c); return $c; })(array_count_values(array_column($repFiles, 'doc_key'))) === ['authLetter' => 2, 'ownerId' => 2, 'ownerIdBack' => 2,
+        'requesterId' => 2, 'requesterIdBack' => 2]
     && array_unique(array_column($repFiles, 'file_status')) === ['ok'], $repFiles);
 // ================= Required uploads (server) =================
 $snapshot = static fn (): array => [$count('SELECT COUNT(*) FROM requests'), $count('SELECT COUNT(*) FROM request_applications'),
@@ -414,6 +416,12 @@ $check('several documents with a missing upload (authorization letter) are refus
     && str_contains((string) ($res['error'] ?? ''), 'Authorization Letter') && str_contains((string) ($res['error'] ?? ''), 'Nothing was submitted'), [$code, $res]);
 [$code2, $res2] = $apply($items(3), true, []);
 $check('several documents with no upload at all are refused', $code2 === 422 && str_contains((string) ($res2['error'] ?? ''), 'Valid Government-Issued ID'), [$code2, $res2]);
+// An older cached page: no ID type is sent and it has no place for the back photo. Several documents are
+// refused (nothing is silently accepted), and the message asks the applicant to reload the page.
+[$code3, $res3] = $apply($items(2), true, ['ownerId']);
+$check('an old cached page (several documents, front photo only, no ID type) is refused, naming the back side, and says to reload the page', $code3 === 422
+    && str_contains((string) ($res3['error'] ?? ''), 'Upload every required document before submitting: Valid Government-Issued ID (back side). Nothing was submitted.')
+    && str_contains((string) ($res3['error'] ?? ''), 'If you do not see a place to upload one of these, please reload this page and try again.'), [$code3, $res3]);
 $check('a refused application leaves no request, application, document record, history, notification or file', $snapshot() === $before, [$before, $snapshot()]);
 [$code, $res, $singleMissing] = $apply(null, false, ['requesterId', 'ownerId']);
 $check('one document keeps the earlier rule: a missing file is recorded as missing for Staff to follow up', $code === 200
@@ -432,7 +440,8 @@ $applyAsync = static function (array $items, string $firstName) use ($browser, $
     $jar = (string) (new ReflectionProperty($client, 'jar'))->getValue($client);
     $handle = curl_init('http://127.0.0.1:' . $port . '/api.php?action=submit_request');
     curl_setopt_array($handle, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEFILE => $jar, CURLOPT_POST => true, CURLOPT_TIMEOUT => 60,
-        CURLOPT_POSTFIELDS => ['payload' => json_encode($payload), 'file_ownerId' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]]);
+        CURLOPT_POSTFIELDS => ['payload' => json_encode($payload), 'file_ownerId' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png'),
+            'file_ownerIdBack' => new CURLFile($fixtures . '/id.png', 'image/png', 'id-back.png')]]);
     $multi = curl_multi_init();
     curl_multi_add_handle($multi, $handle);
     curl_multi_exec($multi, $running);
@@ -491,9 +500,14 @@ require_once $work . '/smart-assess-app/app/services/DocumentAnalysis.php';
 require_once $work . '/smart-assess-app/app/services/AiVerification.php';
 $manifests = array_map(static fn (array $job): array => AiVerification::jobManifest($pdo, $job, $work . '/smart-assess-app'), $jobs);
 $jobPaths = array_map(static fn (array $m): array => array_column($m['documents'], 'path'), $manifests);
-$ownPaths = array_map(static fn (int $id): array => array_map(static fn ($p) => realpath($app . $p), $pdo->query("SELECT stored_path FROM request_documents WHERE request_id = {$id} AND file_status = 'ok' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN)), $childIds);
-$check('each job is built from its own document request: its document type and only its own stored files', array_column(array_column($manifests, 'declared'), 'document_type') === [DOCS[0], DOCS[1], DOCS[2]]
+$storedPaths = static fn (int $id, string $which): array => array_map(static fn ($p) => realpath($app . $p), $pdo->query("SELECT stored_path FROM request_documents WHERE request_id = {$id}
+    AND file_status = 'ok' AND doc_key " . $which . " ('ownerIdBack', 'requesterIdBack') ORDER BY id")->fetchAll(PDO::FETCH_COLUMN));
+$ownPaths = array_map(static fn (int $id): array => $storedPaths($id, 'NOT IN'), $childIds);
+$check('each job is built from its own document request: its document type and only its own stored files (the ID fronts)', array_column(array_column($manifests, 'declared'), 'document_type') === [DOCS[0], DOCS[1], DOCS[2]]
     && $jobPaths === $ownPaths && count(array_unique(array_merge(...$jobPaths))) === 3, [array_column($manifests, 'declared'), $jobPaths, $ownPaths]);
+$backPaths = array_merge(...array_map(static fn (int $id): array => $storedPaths($id, 'IN'), $childIds));
+$check('each document keeps its own stored back side, which the automatic check never receives', count($backPaths) === 3 && count(array_unique($backPaths)) === 3
+    && array_intersect($backPaths, array_merge(...$jobPaths)) === [], $backPaths);
 $confirmations = $pdo->query("SELECT request_id, channel, message FROM notifications WHERE type = 'submission_confirmation' AND request_id IN (" . implode(',', $childIds) . ')')->fetchAll();
 $check('the submission confirmation is queued once for the whole application (on the first document, quoting the application reference)', count($confirmations) === 1
     && (int) $confirmations[0]['request_id'] === $childIds[0] && $confirmations[0]['channel'] === 'sms' && str_contains($confirmations[0]['message'], $appRef . '.'), $confirmations);
@@ -527,12 +541,14 @@ $check('a draft keeps the chosen documents (type and purpose each)', ($loaded['d
     ['documentType' => DOCS[0], 'purpose' => 'Personal Copy'], ['documentType' => DOCS[3], 'purpose' => 'For Titling']], $loaded);
 [$code] = $draftClient->json('draft_save', ['flow' => 'docreq', 'step' => 2, 'draft_token' => $draftCode, 'fields' => ['documentRequests' => array_fill(0, 6, ['documentType' => 'x', 'purpose' => 'y'])]]);
 $check('a draft with more documents than allowed is refused', $code === 422, $code);
-$draftClient->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $draftClient->csrf, 'draft_token' => $draftCode, 'doc_key' => 'ownerId']),
-    'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]);
+foreach (['ownerId', 'ownerIdBack'] as $draftKey) {   // the ID's front and back saved with the draft
+    $draftClient->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $draftClient->csrf, 'draft_token' => $draftCode, 'doc_key' => $draftKey]),
+        'file' => new CURLFile($fixtures . '/id.png', 'image/png', $draftKey . '.png')]);
+}
 $draftItems = [['document_type' => DOCS[0], 'purpose' => 'Personal Copy'], ['document_type' => DOCS[3], 'purpose' => 'For Titling']];
 [$code, $res, $draftRef] = $apply($draftItems, true, [], ['draft_token' => $draftCode], $draftClient);
-$check('submitting from a draft copies the saved ID into both documents', $code === 200
-    && $count("SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id = rd.request_id WHERE r.reference_no LIKE " . $pdo->quote($draftRef . '-%') . " AND rd.file_status = 'ok'") === 2, [$code, $res]);
+$check('submitting from a draft copies the saved ID (front and back) into both documents', $code === 200
+    && $count("SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id = rd.request_id WHERE r.reference_no LIKE " . $pdo->quote($draftRef . '-%') . " AND rd.file_status = 'ok'") === 4, [$code, $res]);
 [$code, $res, $againRef] = $apply($draftItems, true, [], ['draft_token' => $draftCode], $draftClient);
 $check('submitting the same draft again returns the same application reference and saves nothing new', $code === 200 && $againRef === $draftRef
     && $count('SELECT COUNT(*) FROM request_applications WHERE reference_no = ' . $pdo->quote($draftRef)) === 1
@@ -552,6 +568,11 @@ $check('an older single-document request has no application on the Staff page', 
     && $legacyStaff['itemNo'] === null && $legacyStaff['itemCount'] === null, $legacyStaff);
 $file1 = (int) ($mine[0]['files'][0]['docId'] ?? 0);
 $file2 = (int) ($mine[1]['files'][0]['docId'] ?? 0);
+// Each document's back side of the ID: its own original, listed after the front.
+$back1 = (int) ($mine[0]['files'][1]['docId'] ?? 0);
+$back2 = (int) ($mine[1]['files'][1]['docId'] ?? 0);
+$check('Staff see each document\'s ID front and back as two separate originals', ($mine[0]['files'][1]['key'] ?? '') === 'ownerIdBack' && $back1 > 0 && $back2 > 0
+    && $back1 !== $file1 && $back2 !== $file2, $mine[0]['files'] ?? []);
 [$c1, $b1] = $staffA->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($appRef . '-1'));
 [$c2] = $staffA->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-2'));
 [$cx] = $staffA->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-1'));
@@ -568,6 +589,9 @@ $check('completing one document leaves the others unchanged', $code === 200 && $
 // ================= Mark as reviewed: each document's own original =================
 $pdo->exec("UPDATE ai_verification_jobs SET status = 'completed' WHERE request_id IN (" . implode(',', $childIds) . ')');
 $staffB->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($appRef . '-1'));
+[$codeR1front] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-1']);
+$check('the ID\'s back side is an original too: with only the front opened, Mark as reviewed is refused', $codeR1front === 409, $codeR1front);
+$staffB->http('/request-file.php?doc=' . $back1 . '&ref=' . rawurlencode($appRef . '-1'));
 [$codeR1] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-1']);
 [$codeR2, $resR2] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-2']);
 $check('opening document 1\'s original allows Mark as reviewed for document 1 only', $codeR1 === 200 && $codeR2 === 409
@@ -575,6 +599,7 @@ $check('opening document 1\'s original allows Mark as reviewed for document 1 on
 $staffB->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-2') . '&preview=1');
 [$codeR2b] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-2']);
 $staffB->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-2'));
+$staffB->http('/request-file.php?doc=' . $back2 . '&ref=' . rawurlencode($appRef . '-2'));
 [$codeR2c] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-2']);
 $check('document 2 needs its own copy opened (an inline preview does not count); then it can be reviewed', $codeR2b === 409 && $codeR2c === 200, [$codeR2b, $codeR2c]);
 $check('reviewing is recorded per document', $count("SELECT COUNT(*) FROM ai_verification_jobs WHERE staff_review_status = 'reviewed' AND request_id IN (" . implode(',', $childIds) . ')') === 2);
