@@ -101,7 +101,7 @@ $g = $run('uploads', $base . $two . 'state.step=3; S.render(); out.shared=(docum
     . ' S.submitRequest(); out.afterSubmit=[S.state.step, S.state.submitConfirmation, Object.keys(S.state.errors)];'
     . ' S.state.formData.isOwner=false; S.state.formData.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true}}; S.state.errors={}; S.submitRequest();'
     . ' out.rep=[S.state.step, S.state.submitConfirmation, Object.keys(S.state.errors).sort()];');
-$check('Step 3 says the uploads are used for every chosen document', str_contains((string) ($g['shared'] ?? ''), 'These files are used for all 2 documents in your application: Certification of Assessment, Certification of No Liens and Encumbrances.'), $g);
+$check('Step 3 says, in one short line, that the uploads are used for every chosen document', ($g['shared'] ?? '') === 'These files are used for all 2 documents.', $g);
 // Each ID needs its type selected and both its sides (front and back), plus the letter for a representative.
 $check('a missing upload blocks submission (owner ID type, front and back; for a representative also their ID and the authorization letter)',
     ($g['afterSubmit'] ?? null) === [3, false, ['ownerIdType', 'ownerId', 'ownerIdBack']]
@@ -188,20 +188,65 @@ $check('the printed report and the report details use the same labels', str_cont
     && str_contains($internal, "[['Applications', s.applications==null ? s.total : s.applications], ['Individual Document Requests', s.total]]")
     && str_contains($internal, '<th class="num">Total Requests Completed (individual requests)</th>'));
 
+// ---- Compact selection and upload layout (spacing and text only; same fonts, colours and behaviour) ----
+$compactJs = 'var cards=[].slice.call(document.querySelectorAll(".doc-req-card")); var t0=document.getElementById("f-doc-0-type").getBoundingClientRect(), p0=document.getElementById("f-doc-0-purpose").getBoundingClientRect();'
+    . ' var heads=[].slice.call(document.querySelectorAll(".doc-req-head")), beside=heads.every(function(h){ var a=h.querySelector("h3").getBoundingClientRect(), b=h.querySelector(".doc-req-remove").getBoundingClientRect(); return Math.abs(a.top+a.height/2-(b.top+b.height/2))<4; });'
+    . ' var oneLine=heads.every(function(h){ var e=h.querySelector("h3"); return e.getBoundingClientRect().height < parseFloat(getComputedStyle(e).fontSize)*2; });'
+    . ' out.c=[cards.length, document.querySelectorAll(".doc-req-needs").length, (document.querySelector(".doc-req-needs")||{}).textContent, Math.abs(t0.top-p0.top)<2, beside && oneLine,'
+    . ' document.documentElement.scrollWidth<=window.innerWidth, getComputedStyle(cards[0]).paddingTop, getComputedStyle(document.querySelector(".doc-req-card .field label")).fontSize, getComputedStyle(document.querySelector(".doc-req-card select")).fontSize,'
+    . ' getComputedStyle(document.querySelector("#f-barangay, .field select:not([data-doc-item])")||document.body).fontSize, document.querySelector(".wizard-card-head p").textContent];';
+foreach (['desktop' => 1366, 'phone' => 390, 'small' => 320] as $device => $width) {
+    $c = $run('compact' . $device, $base . $two . 'state.step=2; S.render();' . $compactJs, $width)['c'] ?? [];
+    $check("Step 2 is compact ({$device}): two cards, one shared requirements line, " . ($device === 'small' ? 'titles on one line' : 'each title on one line with Remove beside it') . ', no sideways scrolling', ($c[0] ?? 0) === 2 && ($c[1] ?? 0) === 1
+        && ($c[2] ?? '') === 'Requirements (all documents): Property Owner Valid ID, uploaded in Step 3.' && ($device === 'small' || ($c[4] ?? false) === true) && ($c[5] ?? false) === true && ($c[6] ?? '') === '12px', $c);
+    if ($device === 'small') {
+        $titles = $run('compactTitles', $base . $two . 'state.step=2; S.render(); out.t=[].slice.call(document.querySelectorAll(".doc-req-head h3")).map(function(e){ return e.getBoundingClientRect().height < parseFloat(getComputedStyle(e).fontSize)*2; });', $width);
+        $check('on a 320px screen each title stays on one line (Remove moves below it)', ($titles['t'] ?? null) === [true, true], $titles);
+    }
+    $check("Step 2 keeps the existing text sizes ({$device}): labels 13px, choices the same size as the other form fields", ($c[7] ?? '') === '13px' && ($c[8] ?? 'a') === ($c[9] ?? 'b'), $c);
+    $check("Step 2 shows document type and purpose " . ($device === 'desktop' ? 'side by side on a wide screen' : 'one above the other on a phone'), ($c[3] ?? null) === ($device === 'desktop'), $c);
+    if ($device === 'desktop') {
+        $check('the Step 2 lead is one short line', ($c[10] ?? '') === 'Up to 5 documents per application, one tracking number.', $c);
+    }
+}
+$one = $run('compactOne', $base . 'state.step=2; S.setDocItems(fd,[{documentType:"Certification of Assessment",purpose:"Personal Copy"}]); S.render(); out.needs=[document.querySelectorAll(".doc-req-needs").length, (document.querySelector(".doc-req-needs")||{}).textContent];');
+$check('one document: one requirements line without "(all documents)"', ($one['needs'] ?? null) === [1, 'Requirements: Property Owner Valid ID, uploaded in Step 3.'], $one);
+$upJs = 'var b=document.querySelector(".id-card-block"), sd=document.querySelector(".id-side"), pv=document.querySelector(".id-side-preview");'
+    . ' out.u=[getComputedStyle(b).paddingTop, getComputedStyle(sd).paddingTop, Math.round(pv.getBoundingClientRect().height)<=120, document.documentElement.scrollWidth<=window.innerWidth, getComputedStyle(document.querySelector(".id-side-label")).fontSize];';
+foreach (['desktop' => 1366, 'phone' => 390] as $device => $width) {
+    $u = $run('compactUp' . $device, $base . $two . 'state.step=3; S.render();' . $upJs, $width)['u'] ?? [];
+    $check("Step 3 ID upload is compact ({$device}): tighter card and sides, previews at most 120px high, no sideways scrolling, same label size", ($u[0] ?? '') === '12px' && ($u[1] ?? '') === '10px'
+        && ($u[2] ?? false) === true && ($u[3] ?? false) === true && ($u[4] ?? '') === ($device === 'desktop' ? '14px' : '13.5px'), $u);
+}
+
 // ---- A server that cannot yet save several documents in one application (its database update has not run) ----
 $oneOnly = 'window.SMART_ASSESS_CONFIG={multiDocument:false};';
 $g = $run('oneOnly', $oneOnly . $base . 'state.step=2; S.setDocItems(fd,[{documentType:"Certification of Assessment",purpose:"Personal Copy"}]); S.render();' . $cards
-    . ' out.hint=(document.querySelector(".doc-req-limit")||{}).textContent; out.lead=document.querySelector(".wizard-card-head p").textContent; S.nextStep(); out.step=S.state.step;');
+    . ' out.hint=(document.querySelector(".doc-req-one")||{}).textContent; out.lead=document.querySelector(".wizard-card-head p").textContent; S.nextStep(); out.step=S.state.step;');
 $check('when the server takes one document per application, the page offers no Add button and says to apply separately', ($g['cards'] ?? 0) === 1 && ($g['add'] ?? true) === false
-    && ($g['hint'] ?? '') === 'To request another document, submit it as a separate application.' && ($g['lead'] ?? '') === 'Choose the document you need.', $g);
+    && ($g['hint'] ?? '') === "One document per application for now.\nSubmit other documents separately." && ($g['lead'] ?? '') === 'Choose the document you need.', $g);
 $check('one document still continues normally on such a server', ($g['step'] ?? 0) === 3, $g);
 $g = $run('oneOnlyDraft', $oneOnly . $base . 'state.step=2; ' . $two . ' S.render(); S.nextStep(); out.step=S.state.step; out.msg=(document.getElementById("err-doc-multi")||{}).textContent;'
     . ' S.state.step=4; S.render(); S.submitRequest(); out.submit=[S.state.step, S.state.submitConfirmation];'
+    . ' out.notices=document.querySelectorAll(".doc-req-one").length;'
     . ' document.querySelector("[data-action=remove-doc-request][data-index=\'1\']").click(); out.left=S.docItems(S.state.formData).length; out.errAfter=!!document.getElementById("err-doc-multi");'
+    . ' out.noteAfter=(document.querySelector(".doc-req-one")||{}).textContent;'
     . ' S.nextStep(); out.after=S.state.step;');
 $check('a restored application with several documents is stopped at Step 2 with a clear message (not refused only at Submit)', ($g['step'] ?? 0) === 2
-    && str_starts_with((string) ($g['msg'] ?? ''), 'For now, one application can include one document.') && ($g['submit'] ?? null) === [2, false], $g);
-$check('removing the extra document clears the message and the application continues', ($g['left'] ?? 0) === 1 && ($g['errAfter'] ?? true) === false && ($g['after'] ?? 0) === 3, $g);
+    && ($g['msg'] ?? '') === "One document per application for now.\nRemove the others and submit them separately." && ($g['submit'] ?? null) === [2, false], $g);
+$check('the message replaces the note, so only one two-line notice is shown', ($g['notices'] ?? 0) === 1, $g);
+$check('removing the extra document clears the message, brings back the note, and the application continues', ($g['left'] ?? 0) === 1 && ($g['errAfter'] ?? true) === false
+    && str_starts_with((string) ($g['noteAfter'] ?? ''), 'One document per application for now.') && ($g['after'] ?? 0) === 3, $g);
+// The notice is compact: two short lines, smaller text, no extra space; on a phone too; same colours as before.
+$noticeJs = ' var e=document.querySelector(".doc-req-one"), cs=getComputedStyle(e), r=e.getBoundingClientRect(); out.n=[Math.round(r.height/parseFloat(cs.lineHeight)), parseFloat(cs.fontSize), parseFloat(cs.lineHeight)/parseFloat(cs.fontSize), cs.paddingTop, cs.marginBottom, cs.color, (function(){ var ref=document.createElement("div"); ref.className=e.classList.contains("field-error") ? "field-error" : "field-hint"; e.parentNode.appendChild(ref); var c=getComputedStyle(ref).color; ref.remove(); return c; })(), document.documentElement.scrollWidth<=window.innerWidth];';
+foreach (['desktop' => 1366, 'phone' => 390] as $device => $width) {
+    $note = $run('noteSize' . $device, $oneOnly . $base . 'state.step=2; S.setDocItems(fd,[{documentType:"Certification of Assessment",purpose:"Personal Copy"}]); S.render();' . $noticeJs, $width);
+    $err = $run('errSize' . $device, $oneOnly . $base . 'state.step=2; ' . $two . ' S.render(); S.nextStep();' . $noticeJs, $width);
+    $check("the one-document notice is two short lines of small text with no extra space ({$device})", ($note['n'][0] ?? 0) === 2 && ($err['n'][0] ?? 0) === 2
+        && ($note['n'][1] ?? 99) <= 13 && ($err['n'][1] ?? 99) <= 12.5 && ($note['n'][2] ?? 9) <= 1.4 && ($note['n'][3] ?? '') === '0px' && ($note['n'][4] ?? '') === '14px'
+        && ($note['n'][7] ?? false) === true && ($err['n'][7] ?? false) === true, [$note, $err]);
+    $check("the notice keeps the existing hint and error colours ({$device})", ($note['n'][5] ?? 'a') === ($note['n'][6] ?? 'b') && ($err['n'][5] ?? 'a') === ($err['n'][6] ?? 'b'), [$note, $err]);
+}
 $g = $run('multiOn', 'window.SMART_ASSESS_CONFIG={multiDocument:true};' . $base . 'state.step=2; S.render();' . $cards);
 $check('when the server takes several documents, the Add button is offered (also without any server, in the demo)', ($g['add'] ?? false) === true, $g);
 $prototype = (string) file_get_contents($project . '/smart-assess-app/web/prototype.php');

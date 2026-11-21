@@ -352,26 +352,34 @@
 
   /* Document Request cards: one per chosen document, in one application. */
   .req-word{ color:var(--brand-700); }
-  .doc-req-list{ display:grid; grid-template-columns:minmax(0,1fr); gap:14px; margin-bottom:14px; }
-  .doc-req-card{ border:1px solid var(--line); border-left:4px solid var(--brand-700); border-radius:var(--radius-md); padding:16px 18px; background:var(--surface); display:grid; grid-template-columns:minmax(0,1fr); gap:14px; min-width:0; }
+  .doc-req-list{ display:grid; grid-template-columns:minmax(0,1fr); gap:10px; margin-bottom:10px; }
+  .doc-req-card{ border:1px solid var(--line); border-left:4px solid var(--brand-700); border-radius:var(--radius-md); padding:12px 14px; background:var(--surface); display:grid; grid-template-columns:minmax(0,1fr); gap:10px; min-width:0; }
+  /* Document type and purpose side by side when there is room; stacked on phones. */
+  .doc-req-fields{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap:10px 12px; min-width:0; }
+  .doc-req-fields .field{ margin:0; min-width:0; }
   .doc-req-card select{ width:100%; min-width:0; max-width:100%; text-overflow:ellipsis; }
   .doc-req-card .advisory{ margin:0; }
-  .doc-req-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .doc-req-head{ display:flex; align-items:center; justify-content:space-between; gap:6px 10px; flex-wrap:wrap; }
+  .doc-req-head h3{ white-space:nowrap; }
   .doc-req-head h3{ display:flex; align-items:center; gap:10px; margin:0; font-family:var(--font-body); font-size:16px; font-weight:700; color:var(--ink); }
-  .doc-req-num{ display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:var(--brand-50); color:var(--brand-700); font-size:14px; font-weight:700; flex-shrink:0; }
-  .doc-req-remove{ min-height:40px; padding:8px 14px; border:1.5px solid var(--line-strong); border-radius:999px; background:transparent; color:var(--danger, #b42318); font-family:var(--font-body); font-size:14px; font-weight:700; cursor:pointer; }
+  .doc-req-num{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--brand-50); color:var(--brand-700); font-size:14px; font-weight:700; flex-shrink:0; }
+  .doc-req-remove{ min-height:36px; padding:6px 12px; border:1.5px solid var(--line-strong); border-radius:999px; background:transparent; color:var(--danger, #b42318); font-family:var(--font-body); font-size:14px; font-weight:700; cursor:pointer; }
   .doc-req-remove:hover{ background:var(--danger-bg, #fdecea); }
   .doc-req-needs{ margin:0; font-size:13px; color:var(--ink-soft); }
-  .doc-req-add{ width:100%; margin-bottom:22px; }
-  .doc-req-limit{ margin-bottom:22px; }
-  .doc-req-shared{ margin:0 0 16px; padding:12px 14px; border-radius:var(--radius-sm); background:var(--brand-50); color:var(--ink); font-size:13.5px; }
+  .doc-req-list + .doc-req-needs{ margin:-2px 0 10px; }
+  .doc-req-add{ width:100%; margin-bottom:16px; }
+  .doc-req-limit{ margin-bottom:16px; }
+  /* One-document notice (before the multi-document database update): two short lines, compact. */
+  .doc-req-one{ margin:-4px 0 14px; font-size:13px; line-height:1.35; white-space:pre-line; }
+  .field-error.doc-req-one{ font-size:12.5px; }
+  .doc-req-shared{ margin:0 0 10px; padding:8px 12px; border-radius:var(--radius-sm); background:var(--brand-50); color:var(--ink); font-size:13.5px; }
   .rv-sub{ display:block; font-size:13px; color:var(--ink-soft); font-weight:400; }
   .rcpt-docs{ margin:0; padding-left:18px; text-align:left; }
   .rcpt-docs li + li{ margin-top:6px; }
   .rcpt-docs small{ display:block; font-size:12px; color:var(--ink-soft); }
   .trk-doc-title{ margin:2px 0 0; font-family:var(--font-body); font-size:17px; font-weight:700; color:var(--ink); }
   .trk-doc-ref{ font-size:13px; color:var(--ink-soft); }
-  @media (max-width:600px){ .doc-req-card{ padding:14px; } .doc-req-head h3{ font-size:15px; } }
+  @media (max-width:600px){ .doc-req-card{ padding:12px; } .doc-req-head h3{ font-size:15px; gap:8px; } .doc-req-remove{ min-height:32px; padding:4px 10px; } }
   .advisory{ display:flex; gap:10px; background:var(--warn-bg); color:var(--warn); border:1px solid rgba(138,90,0,.25); border-radius:var(--radius-sm); padding:12px 14px; font-size:13px; margin:-6px 0 20px; }
   .advisory .icon{ width:17px; height:17px; flex-shrink:0; margin-top:1px; }
 
@@ -439,23 +447,23 @@
      theme's own colours, so text keeps its contrast in the light and the dark theme. Text keeps the
      existing styles (no font changes). Without color-mix() or backdrop-filter the cards are the plain
      opaque theme surface, so readability never depends on the blur. ---- */
-  .id-upload-stack{ display:flex; flex-direction:column; gap:14px; margin-top:12px; }
-  .id-upload-stack + .id-upload-grid{ margin-top:14px; }
-  .id-card-block{ min-width:0; padding:16px; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--surface);
+  .id-upload-stack{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+  .id-upload-stack + .id-upload-grid{ margin-top:10px; }
+  .id-card-block{ min-width:0; padding:12px; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--surface);
     box-shadow:0 8px 24px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.06); }
-  .id-card-title{ margin-bottom:10px; }
+  .id-card-title{ margin-bottom:6px; }
   .id-type-field{ margin-bottom:6px; }
   .id-type-field .reference-note{ margin-top:0; }
   .id-card-block .id-type-select{ transition:border-color .2s ease, box-shadow .2s ease; }
-  .id-card-block .id-sides-note{ margin:4px 0 10px; }
-  .id-sides{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; }
-  .id-side{ display:flex; flex-direction:column; align-items:stretch; gap:8px; min-width:0; padding:12px; text-align:center;
+  .id-card-block .id-sides-note{ margin:2px 0 8px; }
+  .id-sides{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
+  .id-side{ display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0; padding:10px; text-align:center;
     border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--surface-2);
     transition:border-color .2s ease, box-shadow .2s ease; }
   .id-side:hover{ border-color:var(--brand-500); box-shadow:0 6px 18px rgba(15,23,42,.1); }
   .id-side:focus-within{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); }
   .id-side.flagged, .id-side.invalid{ border-color:var(--danger); }
-  .id-side-preview{ width:100%; aspect-ratio:1.586 / 1; display:flex; align-items:center; justify-content:center; overflow:hidden;
+  .id-side-preview{ width:100%; aspect-ratio:1.586 / 1; max-height:120px; display:flex; align-items:center; justify-content:center; overflow:hidden;
     border:1px dashed var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--brand-600); }
   .id-side-preview .icon{ width:26px; height:26px; }
   .id-side-preview.has-img{ border-style:solid; border-color:var(--line); }
@@ -1371,7 +1379,8 @@ const MAX_DOCUMENT_REQUESTS = 5;   // the same limit as the server (DocumentRequ
    database update has not run). Then the page offers one document per application. */
 function multiDocAllowed(){ const c = window.SMART_ASSESS_CONFIG; return !(c && c.multiDocument===false); }
 function canAddDocRequest(items){ return multiDocAllowed() && items.length < Math.min(MAX_DOCUMENT_REQUESTS, DOC_TYPES.length); }
-const ONE_DOC_ONLY_MSG = 'For now, one application can include one document. Keep one document request (remove the others) and submit each other document as its own application.';
+const ONE_DOC_NOTE = 'One document per application for now.\nSubmit other documents separately.';
+const ONE_DOC_ONLY_MSG = 'One document per application for now.\nRemove the others and submit them separately.';
 function docItems(fd){
   if(Array.isArray(fd.documentRequests) && fd.documentRequests.length) return fd.documentRequests;
   return [{documentType:fd.documentType||'', purpose:fd.purpose||''}];
@@ -1806,7 +1815,7 @@ function renderStep2(){
         + '<div class="doc-req-head"><h3 id="doc-req-title-'+i+'"><span class="doc-req-num" aria-hidden="true">'+(i+1)+'</span>Document Request '+(i+1)+(items.length>1 ? ' of '+items.length : '')+'</h3>'
           + (items.length>1 ? '<button type="button" class="doc-req-remove" data-action="remove-doc-request" data-index="'+i+'" aria-label="Remove document request '+(i+1)+(it.documentType ? ': '+esc(it.documentType) : '')+'">Remove</button>' : '')
         + '</div>'
-        + '<div class="field"><label for="f-doc-'+i+'-type">Document Type<span class="req">*</span></label>'
+        + '<div class="doc-req-fields"><div class="field"><label for="f-doc-'+i+'-type">Document Type<span class="req">*</span></label>'
           + '<select id="f-doc-'+i+'-type" class="'+(inv('doc-'+i+'-type')?'invalid':'')+'" data-doc-item="'+i+'" data-doc-field="documentType">'
             + '<option value="">Select a document type</option>'
             + DOC_TYPES.map(function(t){ const taken = others.indexOf(t)!==-1; return '<option value="'+esc(t)+'"'+(it.documentType===t?' selected':'')+(taken?' disabled':'')+'>'+esc(t)+(taken?' (already added)':'')+'</option>'; }).join('')
@@ -1815,19 +1824,19 @@ function renderStep2(){
           + '<select id="f-doc-'+i+'-purpose" class="'+(inv('doc-'+i+'-purpose')?'invalid':'')+'" data-doc-item="'+i+'" data-doc-field="purpose">'
             + '<option value="">Select a purpose</option>'
             + PURPOSES.map(function(p){ return '<option value="'+esc(p)+'"'+(it.purpose===p?' selected':'')+'>'+esc(p)+'</option>'; }).join('')
-          + '</select>' + fieldError('doc-'+i+'-purpose') + '</div>' : '')
+          + '</select>' + fieldError('doc-'+i+'-purpose') + '</div>' : '') + '</div>'
         + (advisory ? '<div class="advisory">'+ic('alert')+'<span>'+esc(advisory)+'</span></div>' : '')
-        + '<p class="doc-req-needs"><strong>Requirements:</strong> '+esc(needs)+(items.length>1 ? ' (uploaded once in Step 3, used for all documents)' : ' (upload in Step 3)')+'</p>'
       + '</section>';
     }).join('');
     const canAdd = canAddDocRequest(items), several = multiDocAllowed();
-    return '<div class="wizard-card-head"><h2>Choose Documents and Enter Property Information</h2><p>'+(several ? 'Choose each document you need. You can request up to '+MAX_DOCUMENT_REQUESTS+' different documents for this property in one application, with one tracking number.' : 'Choose the document you need.')+'</p></div>'
+    return '<div class="wizard-card-head"><h2>Choose Documents and Enter Property Information</h2><p>'+(several ? 'Up to '+MAX_DOCUMENT_REQUESTS+' documents per application, one tracking number.' : 'Choose the document you need.')+'</p></div>'
     + '<div class="wizard-card-body">'
       + '<div class="doc-req-list">'+cards+'</div>'
-      + fieldError('doc-multi')
+      + '<p class="doc-req-needs"><strong>Requirements'+(items.length>1 ? ' (all documents)' : '')+':</strong> '+esc(needs)+', uploaded in Step 3.</p>'
+      + (state.errors['doc-multi'] ? '<div class="field-error doc-req-one" id="err-doc-multi" role="alert">'+esc(state.errors['doc-multi'])+'</div>' : '')
       + (canAdd ? '<button type="button" class="btn btn-ghost doc-req-add" data-action="add-doc-request">'+ic('plus')+'Add Another Document Request</button>'
         : (several ? '<p class="field-hint doc-req-limit">You have added the most documents one application can hold.</p>'
-          : '<p class="field-hint doc-req-limit">To request another document, submit it as a separate application.</p>'))
+          : (state.errors['doc-multi'] ? '' : '<p class="field-hint doc-req-one">'+esc(ONE_DOC_NOTE)+'</p>')))
       + '<div class="section-divider doc-req-divider"><span>Property Information (for all documents)</span></div>'
       + '<div class="field-grid">'
         + barangayField
@@ -1965,7 +1974,7 @@ function renderStep3(){
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">'+(fd.isOwner ? 'I am the registered property owner' : 'I am not the registered property owner')+'</span></label>'
     + docsBlock
-    + (state.flow==='docreq' && docItems(fd).length>1 ? '<p class="doc-req-shared">These files are used for all '+docItems(fd).length+' documents in your application: '+esc(docItems(fd).map(function(it){ return it.documentType; }).join(', '))+'.</p>' : '')
+    + (state.flow==='docreq' && docItems(fd).length>1 ? '<p class="doc-req-shared">These files are used for all '+docItems(fd).length+' documents.</p>' : '')
     + idGuidancePanel(idFrontKeys(fd).map(function(front){ return idCardBlock(front, fd); }).join('')
         + (fd.isOwner ? '' : '<div class="upload-grid id-upload-grid">' + uploadBox('authLetter', idLabel(state.flow, 'authLetter'), fd, true) + '</div>'))
   + '</div>';
