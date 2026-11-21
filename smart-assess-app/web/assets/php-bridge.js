@@ -174,6 +174,10 @@
       is_owner: document.getElementById('f-isOwner') ?
         document.getElementById('f-isOwner').checked : isOwner
     };
+    // The applicant-selected type of each valid ID: a hint for Staff only (checked against the list on
+    // the server; it never confirms the uploaded ID's type). The representative's only when one files.
+    payload.owner_id_type = String(form.ownerIdType || formValues.ownerIdType || '');
+    if (!payload.is_owner) payload.requester_id_type = String(form.requesterIdType || formValues.requesterIdType || '');
     // Document Requests: every chosen document (type and purpose). Each becomes its own request on
     // the server, all under one tracking number; one document is submitted as before.
     if (flow === 'docreq' && Array.isArray(form.documentRequests) && form.documentRequests.length) {

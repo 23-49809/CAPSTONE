@@ -32,10 +32,11 @@ const SA_DRAFT_FIELDS = [
     'addressLine' => 255, 'province' => 80, 'city' => 80, 'zip' => 10, 'requesterBarangay' => 100,
     'documentType' => 120, 'transferType' => 40, 'purpose' => 80, 'arp' => 20, 'barangay' => 100,
     'termsToken' => 48,   // Terms and Conditions acceptance, so a resumed draft is not asked again
+    'ownerIdType' => 40, 'requesterIdType' => 40,   // applicant-selected ID types (checked again on submission)
 ];
 /** Documents a draft may hold (same keys the final submission uses). */
 const SA_DRAFT_DOC_KEYS = [
-    'ownerId', 'requesterId', 'authLetter',
+    'ownerId', 'requesterId', 'authLetter', 'ownerIdBack', 'requesterIdBack',
     'ctcTdOrTitle', 'notarialDeed', 'vicinityMap', 'certNoImprovement', 'taxClearance',
 ];
 

@@ -679,7 +679,7 @@ function sa_internal_bootstrap(): array
     )->fetchAll();
     $data['documents'] = $pdo->query(
         'SELECT rd.id, rd.request_id, rd.doc_key, rd.label, ' . ($withContact ? 'rd.original_name, ' : '') . 'rd.mime_type,
-                rd.file_size, rd.file_status, dv.validation_status, dv.remarks, dv.validated_at
+                rd.file_size, rd.file_status, ' . (sa_has_column('request_documents', 'id_type_hint') ? 'rd.id_type_hint, ' : '') . 'dv.validation_status, dv.remarks, dv.validated_at
          FROM request_documents rd LEFT JOIN document_validation dv ON dv.request_document_id = rd.id
          JOIN (SELECT id FROM requests ORDER BY created_at DESC LIMIT 500) recent
            ON recent.id = rd.request_id

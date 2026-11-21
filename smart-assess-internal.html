@@ -202,6 +202,8 @@
   .ai-outcome.tone-amber{ border-color:var(--warn); }
   .ai-outcome.tone-red{ border-color:var(--danger); }
   .ai-note{ margin:10px 0 0; font-size:12.5px; color:var(--ink-soft); }
+  /* The applicant-selected ID type differs from the type the automatic check identified (theme colours). */
+  .dr-id-mismatch{ margin:8px 0 0; padding:8px 10px; border:1px solid var(--warn); border-radius:8px; background:var(--warn-bg); color:var(--warn); }
   .ai-findings{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
   .ai-findings li{ padding:10px 12px; border:1px solid var(--line); border-radius:10px; }
   .ai-findings .ai-f-head{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; font-size:13px; font-weight:600; }
@@ -3258,7 +3260,18 @@ function renderDocCheckDetail(x){
   ctx.kind = x.kind;
   var docs = ai.documents || [];
   var cardChecks = [];
-  var cards = docs.map(function(d){ var c = dcDocChecks(d, ctx, x.kind); cardChecks = cardChecks.concat(c); return drDocCard(r, d, fileByKey[d.key], ctx, c); });
+  // Each ID's back side (never part of the automatic check) is shown right after its front; any other
+  // uploaded file the check did not return is shown at the end, so every original stays reviewable.
+  var backKeys = {ownerId:'ownerIdBack', requesterId:'requesterIdBack'}, shownKeys = {}, cards = [];
+  var plainCard = function(f){ return drDocCard(r, {key:f.key, label:f.label, requirement:(f.status==='missing' || !f.name) ? 'missing' : 'uploaded_valid_format'}, f, null); };
+  docs.forEach(function(d){ shownKeys[d.key] = true; });
+  docs.forEach(function(d){
+    var c = dcDocChecks(d, ctx, x.kind); cardChecks = cardChecks.concat(c);
+    cards.push(drDocCard(r, d, fileByKey[d.key], ctx, c));
+    var back = backKeys[d.key];
+    if(back && fileByKey[back] && !shownKeys[back]){ shownKeys[back] = true; cards.push(plainCard(fileByKey[back])); }
+  });
+  (r.files||[]).forEach(function(f){ if(f.key && !shownKeys[f.key]){ shownKeys[f.key] = true; cards.push(plainCard(f)); } });
   var attention = cardChecks.filter(function(c){ return c.verdict!=='correct'; });
   var outcome = {passed:'No concerns found', needs_review:'Needs review', missing_information:'Missing information'}[ai.outcome] || 'Needs review';
   // The headline states the request type's own checks; "passed" only when every check is Correct.
@@ -3430,6 +3443,24 @@ function dcChecksHtml(checks){
 /* One uploaded document: the original, its summary, then its problems. ctx is null when no
    automatic result exists (the card then shows the original only). */
 function drDocCard(r, d, f, ctx, checks){
+  // The ID type the applicant selected (front side): their statement only, never a verified type. When
+  // the automatic check confirmed a type from the ID's own printed title and details, the two are
+  // compared: a difference is a warning for Staff (nothing is approved, rejected or changed by it).
+  var idc = d.id_check || null;
+  var detected = idc && idc.type_state==='confirmed' && idc.type ? idc.type : null;
+  var evIdx = detected ? (d.kind_evidence||[]).indexOf(detected) : -1;
+  var detectedLabel = evIdx>-1 && (d.kind_evidence_labels||[])[evIdx] ? d.kind_evidence_labels[evIdx] : String(detected||'').replace(/_/g,' ');
+  var idTypeHint = '';
+  if(f && f.idTypeHint){
+    if(detected && f.idTypeHintCode && f.idTypeHintCode!==detected)
+      idTypeHint = '<p class="dr-id-hint dr-id-mismatch" role="note"><strong>Applicant selected '+esc(f.idTypeHint)+', but the document was identified as '+esc(detectedLabel)+'. Please verify the original ID.</strong></p>';
+    else if(detected && f.idTypeHintCode===detected)
+      idTypeHint = '<p class="cell-sub dr-id-hint">ID type selected by the applicant: <strong>'+esc(f.idTypeHint)+'</strong>. It matches the type identified on the ID; still verify the original.</p>';
+    else
+      idTypeHint = '<p class="cell-sub dr-id-hint">ID type selected by the applicant: <strong>'+esc(f.idTypeHint)+'</strong> (not verified; compare it with the original)</p>';
+  }
+  // The back side of an ID is stored for Staff and never sent to the automatic check.
+  var isIdBack = d.key==='ownerIdBack' || d.key==='requesterIdBack';
   var kinds = {'image/jpeg':'JPG image','image/png':'PNG image','image/webp':'WEBP image','application/pdf':'PDF document'};
   var readText = {good:'Readable', partial:'Partly readable', poor:'Hard to read', unreadable:'Could not be read'};
   var label = d.label || (f && f.label) || 'Document';
@@ -3454,7 +3485,8 @@ function drDocCard(r, d, f, ctx, checks){
       + (metaParts.length ? '<span class="cell-sub dr-file" title="'+esc(uploaded ? f.name : '')+'">'+esc(metaParts.filter(Boolean).join(' · '))+'</span>' : '')+'</div>'
     + (uploaded && f.available!==false ? '<a class="btn btn-outline btn-sm" href="'+esc(url)+'" target="_blank" rel="noopener">Open<span class="sr-only"> '+esc(label)+' in a new tab</span></a>' : '')+'</div>';
   if(!ctx){
-    return '<article class="dr-doc">'+head+'<div class="dr-doc-body">'+preview+'<div class="dr-info"><p class="cell-sub">'+(uploaded ? 'No automatic summary. Review the original.' : 'The client did not upload this document.')+'</p></div></div></article>';
+    return '<article class="dr-doc">'+head+'<div class="dr-doc-body">'+preview+'<div class="dr-info"><p class="cell-sub">'+(!uploaded ? 'The client did not upload this document.'
+      : (isIdBack ? 'Back side of the ID: not part of the automatic check. Review the original.' : 'No automatic summary. Review the original.'))+'</p>'+idTypeHint+'</div></div></article>';
   }
   var facts = [];
   var det = ctx.det;
@@ -3477,7 +3509,7 @@ function drDocCard(r, d, f, ctx, checks){
         ? 'Required with the application, but not part of the Land Transfer Document Check. Inspect the original.' : 'Not checked automatically. Inspect the original.'))+'</p>';
   return '<article class="dr-doc'+(attention ? ' has-issues' : '')+'">'+head
     + '<div class="dr-doc-body">'+preview
-      + '<div class="dr-info">'+body+(facts.length ? '<dl class="dc-facts dr-facts">'+facts.map(function(fx){ return '<div><dt>'+fx[0]+'</dt><dd>'+fx[1]+'</dd></div>'; }).join('')+'</dl>' : '')+'</div></div></article>';
+      + '<div class="dr-info">'+body+(facts.length ? '<dl class="dc-facts dr-facts">'+facts.map(function(fx){ return '<div><dt>'+fx[0]+'</dt><dd>'+fx[1]+'</dd></div>'; }).join('')+'</dl>' : '')+idTypeHint+'</div></div></article>';
 }
 
 /* The name as OCR read it, with the parts that look misread marked (never corrected). */
