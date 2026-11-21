@@ -75,11 +75,15 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
             5 * 1024 * 1024
         ),
     ];
+    // The submit script's address carries a short hash of its content, so a browser that cached an
+    // older copy fetches the new one as soon as it changes (the page itself is never cached).
+    $bridgeFile = __DIR__ . '/assets/php-bridge.js';
+    $bridgeVersion = is_file($bridgeFile) ? substr((string) hash_file('sha256', $bridgeFile), 0, 12) : '0';
     $bridge = '<script>window.SMART_ASSESS_CONFIG='
         . json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
         . ';window.SMART_ASSESS_PAGE='
         . json_encode($bootstrap, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
-        . ';</script><script src="/assets/php-bridge.js"></script>';
+        . ';</script><script src="/assets/php-bridge.js?v=' . $bridgeVersion . '"></script>';
 
     $scriptNeedle = "<script>\n(function(){\n";
     if (!str_contains($html, $scriptNeedle)) {

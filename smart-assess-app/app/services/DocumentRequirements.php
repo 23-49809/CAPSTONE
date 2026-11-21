@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/IdDocumentTypes.php';
+require_once __DIR__ . '/DocumentAnalysis.php';
+
 final class DocumentRequirements
 {
     public const STATUS_MISSING = 'missing';
@@ -14,8 +17,16 @@ final class DocumentRequirements
     public const MAX_FILE_BYTES = 5 * 1024 * 1024;
     /** Different documents one Document Request application may ask for (each its own request). */
     public const MAX_DOCUMENTS_PER_APPLICATION = 5;
-    /** IDs and the authorization letter: photos or scans as JPG/PNG only (as the public form says). */
-    public const IDENTITY_KEYS = ['ownerId', 'requesterId', 'authLetter'];
+    /** IDs (front and back) and the authorization letter: photos or scans as JPG/PNG only (as the public form says). */
+    public const IDENTITY_KEYS = ['ownerId', 'requesterId', 'authLetter', 'ownerIdBack', 'requesterIdBack'];
+    /**
+     * The back side of each ID, stored as its own file: front key => back key. A back side is kept
+     * with the request for Staff to inspect; it is never sent to the automatic document check
+     * (AiVerification::jobManifest() skips it), so the check reads the front exactly as before.
+     */
+    public const ID_BACK_KEYS = ['ownerId' => 'ownerIdBack', 'requesterId' => 'requesterIdBack'];
+    /** Form fields for the applicant-selected type of each ID: front key => submission field. */
+    public const ID_TYPE_FIELDS = ['ownerId' => 'owner_id_type', 'requesterId' => 'requester_id_type'];
     private const IDENTITY_MIME_TYPES = [
         'image/jpeg',
         'image/png',
@@ -52,7 +63,7 @@ final class DocumentRequirements
      *
      * @return array<string,string>
      */
-    public static function requirementsFor(string $requestType, bool $isOwner): array
+    public static function requirementsFor(string $requestType, bool $isOwner, ?array $idTypes = null): array
     {
         if (!in_array($requestType, ['docreq', 'landtransfer'], true)) {
             throw new InvalidArgumentException('Unsupported request type.');
@@ -63,7 +74,50 @@ final class DocumentRequirements
             $requirements['requesterId'] = 'Valid ID of Requester';
             $requirements['authLetter'] = 'Authorization Letter';
         }
+        // Back sides are part of a new submission only ($idTypes given). Every ID needs both sides,
+        // whatever type the applicant selected: the selection is an unverified hint and never decides
+        // what is required. Without $idTypes (the automatic check, older callers) the list is the
+        // front-only one as before.
+        if ($idTypes !== null) {
+            foreach (self::ID_BACK_KEYS as $front => $back) {
+                if (isset($requirements[$front])) {
+                    $requirements[$back] = self::backLabel($requirements[$front]);
+                }
+            }
+        }
         return $requirements;
+    }
+
+    public static function backLabel(string $frontLabel): string
+    {
+        return $frontLabel . ' (back side)';
+    }
+
+    public static function isIdBackKey(string $key): bool
+    {
+        return in_array($key, self::ID_BACK_KEYS, true);
+    }
+
+    /**
+     * The Staff-facing label of a stored applicant-selected ID type, or null for none or for a value
+     * that is not one of the registry's types (an old, tampered or unknown value is never shown).
+     */
+    public static function idTypeHintLabel(mixed $code): ?string
+    {
+        return is_string($code) ? (self::idTypeOptions()[$code] ?? null) : null;
+    }
+
+    /**
+     * The ID types an applicant may select, code => label: exactly the government IDs the
+     * document-recognition registry recognises by their printed title (IdDocumentTypes::PRECEDENCE),
+     * labelled and ordered as DocumentAnalysis::ID_KINDS. A school, company or "other" ID is not
+     * offered. The selection is only the applicant's statement: it never confirms the document's type.
+     *
+     * @return array<string,string>
+     */
+    public static function idTypeOptions(): array
+    {
+        return array_filter(DocumentAnalysis::ID_KINDS, static fn (string $code): bool => in_array($code, IdDocumentTypes::PRECEDENCE, true), ARRAY_FILTER_USE_KEY);
     }
 
     /** Every document key any request can have. */

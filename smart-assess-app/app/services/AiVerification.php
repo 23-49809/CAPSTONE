@@ -624,6 +624,11 @@ final class AiVerification
             if (!preg_match('/^[A-Za-z][A-Za-z0-9_]{0,39}$/', $key) || isset($uploaded[$key])) {
                 continue;
             }
+            // The back side of an ID is for Staff to inspect; it is never sent to the automatic check,
+            // so the worker receives exactly the documents it did before back sides were collected.
+            if (DocumentRequirements::isIdBackKey($key)) {
+                continue;
+            }
             $labels[$key] = (string) $row['label'];
             $uploaded[$key] = null;
             if ($row['file_status'] !== 'ok' || $row['stored_path'] === null) {

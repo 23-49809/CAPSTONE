@@ -104,7 +104,7 @@ foreach ([
 ] as $statement) {
     $pdo->exec($statement);
 }
-foreach (['20261015_terms_acceptances.sql', '20261015_request_drafts.sql', '20261111_ai_document_verification.sql'] as $migration) {
+foreach (['20261015_terms_acceptances.sql', '20261015_request_drafts.sql', '20261111_ai_document_verification.sql', '20261121_request_document_id_type_hint.sql'] as $migration) {
     $migrationFile = $project . '/smart-assess-app/database/migrations/' . $migration;
     if (!is_file($migrationFile)) {
         continue;   // the AI migration exists only once AI verification is added
@@ -114,6 +114,39 @@ foreach (['20261015_terms_acceptances.sql', '20261015_request_drafts.sql', '2026
         $pdo->exec($statement);
     }
 }
+
+// ---- The ID-type migration: safe to run again; its rollback removes only that column (this test's own database) ----
+$runFile = static function (string $file) use ($pdo, $project): void {
+    $sql = (string) preg_replace('/^\s*--.*$/m', '', (string) file_get_contents($project . '/smart-assess-app/database/' . $file));
+    foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
+        // Read any result set (the "SELECT 1" a repeat run executes), as the mysql client does.
+        $result = $pdo->query($statement);
+        if ($result !== false) {
+            if ($result->columnCount() > 0) {
+                $result->fetchAll();
+            }
+            $result->closeCursor();
+        }
+    }
+};
+$columnsOf = static fn (): array => array_column($pdo->query('SHOW COLUMNS FROM request_documents')->fetchAll(), 'Field');
+$withHint = $columnsOf();
+$migrationErrors = [];
+foreach (['migrations/20261121_request_document_id_type_hint.sql', 'rollbacks/20261121_request_document_id_type_hint_rollback.sql',
+    'rollbacks/20261121_request_document_id_type_hint_rollback.sql', 'migrations/20261121_request_document_id_type_hint.sql'] as $i => $step) {
+    try {
+        $runFile($step);
+    } catch (PDOException $e) {
+        $migrationErrors[] = $step;
+    }
+    $after[$i] = $columnsOf();
+}
+$migrationChecks = [
+    'the ID-type migration runs again without error and changes nothing' => $migrationErrors === [] && $after[0] === $withHint && in_array('id_type_hint', $withHint, true),
+    'its rollback removes exactly that column, and nothing else' => array_values(array_diff($withHint, $after[1])) === ['id_type_hint'] && array_diff($after[1], $withHint) === [],
+    'the rollback runs again without error (nothing left to remove)' => $after[2] === $after[1],
+    'the migration then adds the column back, as before' => $after[3] === $withHint,
+];
 
 // ---- Server (6 MB upload limit, so the application's own 5 MiB rule is what is tested) ----
 $probe = stream_socket_server('tcp://127.0.0.1:0');
@@ -153,6 +186,10 @@ register_shutdown_function(static fn () => exec('rm -rf ' . escapeshellarg($fixt
 $image = imagecreatetruecolor(30, 20);
 imagefill($image, 0, 0, imagecolorallocate($image, 200, 30, 30));
 imagepng($image, $fixtures . '/id.png');
+// A different fictional image for an ID's back side, so front and back files can be told apart.
+$backImage = imagecreatetruecolor(40, 24);
+imagefill($backImage, 0, 0, imagecolorallocate($backImage, 30, 60, 90));
+imagepng($backImage, $fixtures . '/id-back.png');
 imagewebp($image, $fixtures . '/id.webp');
 file_put_contents($fixtures . '/doc.pdf', "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n");
 $sized = static function (int $bytes) use ($fixtures): string {
@@ -187,6 +224,10 @@ $documentsOf = static function (string $reference) use ($pdo): array {
 };
 $requestCount = static fn (): int => (int) $pdo->query('SELECT COUNT(*) FROM requests')->fetchColumn();
 
+foreach ($migrationChecks as $label => $passed) {
+    $check($label, $passed, [$migrationErrors, $after ?? null]);
+}
+
 // ================= Shared rules =================
 $check('rules: the size limit is strictly smaller than 5 MiB', DocumentRequirements::MAX_FILE_BYTES === 5 * 1024 * 1024
     && DocumentRequirements::acceptsSize(5 * 1024 * 1024 - 1) && !DocumentRequirements::acceptsSize(5 * 1024 * 1024) && !DocumentRequirements::acceptsSize(0));
@@ -201,23 +242,87 @@ $check('rules: the requirement list matches evaluate()', array_keys(DocumentRequ
 [$status, $ref, $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')],
     ['documents' => ['ownerId' => 'Anything I like', 'bonusDoc' => 'Not a real requirement']]);
 $rows = $documentsOf($ref);
-$check('a submission records only the server\'s requirements with the server\'s labels', $status === 200
-    && $rows === [['doc_key' => 'ownerId', 'label' => 'Valid Government-Issued ID', 'file_status' => 'ok']], [$status, $rows, $body]);
+$check('a submission records only the server\'s requirements with the server\'s labels (the ID\'s back side is one of them)', $status === 200
+    && $rows === [['doc_key' => 'ownerId', 'label' => 'Valid Government-Issued ID', 'file_status' => 'ok'],
+        ['doc_key' => 'ownerIdBack', 'label' => 'Valid Government-Issued ID (back side)', 'file_status' => 'missing']], [$status, $rows, $body]);
 [$status, $ref] = $submit('landtransfer', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')], ['documents' => ['ownerId' => 'Owner ID']]);
 $rows = $documentsOf($ref);
 $complete = (int) $pdo->query("SELECT requirement_complete FROM requests WHERE reference_no = '{$ref}'")->fetchColumn();
-$check('the browser cannot drop requirements: all six land-transfer documents are recorded, five missing', $status === 200
-    && array_column($rows, 'doc_key') === array_keys(DocumentRequirements::requirementsFor('landtransfer', true))
-    && count(array_filter($rows, static fn (array $r): bool => $r['file_status'] === 'missing')) === 5 && $complete === 0, $rows);
+$check('the browser cannot drop requirements: all seven land-transfer documents (five, and the ID front and back) are recorded, six missing', $status === 200
+    && array_column($rows, 'doc_key') === array_keys(DocumentRequirements::requirementsFor('landtransfer', true, ['ownerId' => null]))
+    && count(array_filter($rows, static fn (array $r): bool => $r['file_status'] === 'missing')) === 6 && $complete === 0, $rows);
 [$status, $ref] = $submit('docreq', false, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'requesterId' => $file($fixtures . '/id.png', 'image/png'),
+    'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png'), 'requesterIdBack' => $file($fixtures . '/id-back.png', 'image/png'),
     'authLetter' => $file($fixtures . '/id.png', 'image/png')], ['documents' => []]);
-$check('a representative\'s complete set is accepted and marked complete', $status === 200 && count($documentsOf($ref)) === 3
+$check('a representative\'s complete set (both IDs front and back, and the letter) is accepted and marked complete', $status === 200 && count($documentsOf($ref)) === 5
     && (int) $pdo->query("SELECT requirement_complete FROM requests WHERE reference_no = '{$ref}'")->fetchColumn() === 1);
 $before = $requestCount();
 [$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'passport' => $file($fixtures . '/id.png', 'image/png')]);
 $check('a file for a document that is not a requirement is refused, and nothing is saved', $status === 422 && $requestCount() === $before, [$status, $body]);
 [$status] = $submit('docreq', true, ['requesterId' => $file($fixtures . '/id.png', 'image/png')]);
 $check('a representative-only document on an owner\'s request is refused', $status === 422 && $requestCount() === $before);
+
+// ================= 1b. Each ID's front and back side, and the applicant-selected ID type =================
+$rowsOf = static function (string $reference) use ($pdo): array {
+    $stmt = $pdo->prepare('SELECT d.request_id, d.doc_key, d.stored_path, d.file_status, d.id_type_hint FROM request_documents d JOIN requests r ON r.id = d.request_id
+        WHERE r.reference_no = ? ORDER BY d.id');
+    $stmt->execute([$reference]);
+    return $stmt->fetchAll();
+};
+$completeOf = static fn (string $reference): int => (int) $pdo->query('SELECT requirement_complete FROM requests WHERE reference_no = ' . $pdo->quote($reference))->fetchColumn();
+$storedHash = static fn (array $row): string => (string) md5_file($work . '/smart-assess-app/' . $row['stored_path']);
+[$status, $ref, $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
+    ['owner_id_type' => 'philhealth_id']);
+$rows = $rowsOf($ref);
+$check('front and back are stored as two documents of the same request, each its own file', $status === 200 && array_column($rows, 'doc_key') === ['ownerId', 'ownerIdBack']
+    && count(array_unique(array_column($rows, 'request_id'))) === 1 && count(array_unique(array_column($rows, 'stored_path'))) === 2
+    && array_unique(array_column($rows, 'file_status')) === ['ok'] && $completeOf($ref) === 1, [$status, $rows, $body]);
+$check('the front file holds the front image and the back file the back image (never swapped or merged)', count($rows) === 2
+    && $storedHash($rows[0]) === md5_file($fixtures . '/id.png') && $storedHash($rows[1]) === md5_file($fixtures . '/id-back.png'));
+$check('the selected type is stored on the ID\'s front row only, as given', array_column($rows, 'id_type_hint') === ['philhealth_id', null], $rows);
+$before = $requestCount();
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
+    ['owner_id_type' => 'school_or_company_id']);
+$check('a type that is not in the registry list is refused, and nothing is saved', $status === 422 && str_contains($body, 'Select the type of valid ID from the list.')
+    && $requestCount() === $before, [$status, $body]);
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')], ['owner_id_type' => ['passport']]);
+$check('a type that is not a plain text value is refused', $status === 422 && $requestCount() === $before, [$status, $body]);
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')], ['owner_id_type' => 'passport']);
+$check('Passport selected without a back photo: refused by the server, naming the back side, with the reload hint; nothing saved', $status === 422
+    && str_contains($body, 'Please upload clear photos of both the front and the back of your valid ID: Valid Government-Issued ID (back side) is missing. Nothing was submitted.')
+    && str_contains($body, 'please reload this page and try again.') && $requestCount() === $before, [$status, $body]);
+[$status, , $body] = $submit('docreq', true, ['ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')], ['owner_id_type' => 'umid']);
+$check('a type with only the back photo (no front) is refused the same way', $status === 422 && str_contains($body, 'Valid Government-Issued ID is missing') && $requestCount() === $before, [$status, $body]);
+[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
+    ['owner_id_type' => 'passport']);
+$check('a passport with both photos is accepted: front and back stored as two documents, complete', $status === 200 && array_column($rowsOf($ref), 'doc_key') === ['ownerId', 'ownerIdBack']
+    && $completeOf($ref) === 1, $rowsOf($ref));
+$before = $requestCount();
+[$status, , $body] = $submit('docreq', false, ['requesterId' => $file($fixtures . '/id.png', 'image/png'), 'ownerId' => $file($fixtures . '/id.png', 'image/png'),
+    'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png'), 'authLetter' => $file($fixtures . '/id.png', 'image/png')],
+    ['requester_id_type' => 'passport', 'owner_id_type' => 'umid']);
+$check('representative: a passport selected for the representative\'s ID still needs its back (refused, nothing saved)', $status === 422
+    && str_contains($body, 'Valid ID of Requester (back side) is missing') && $requestCount() === $before, [$status, $body]);
+[$status, $ref] = $submit('docreq', false, ['requesterId' => $file($fixtures . '/id.png', 'image/png'), 'requesterIdBack' => $file($fixtures . '/id-back.png', 'image/png'),
+    'ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png'), 'authLetter' => $file($fixtures . '/id.png', 'image/png')],
+    ['requester_id_type' => 'passport', 'owner_id_type' => 'umid']);
+$rows = $rowsOf($ref);
+$check('representative with both sides of both IDs: accepted, each type stored on its own ID\'s front only', $status === 200 && $completeOf($ref) === 1
+    && array_column($rows, 'id_type_hint', 'doc_key') === ['ownerId' => 'umid', 'requesterId' => 'passport', 'authLetter' => null, 'ownerIdBack' => null, 'requesterIdBack' => null], $rows);
+[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')]);
+$check('an older page (no ID type) with one document keeps the earlier rule: accepted, the back recorded as missing for Staff', $status === 200
+    && array_column($rowsOf($ref), 'file_status', 'doc_key') === ['ownerId' => 'ok', 'ownerIdBack' => 'missing'] && $completeOf($ref) === 0
+    && array_column($rowsOf($ref), 'id_type_hint') === [null, null], $rowsOf($ref));
+[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
+    ['owner_id_type' => 'umid', 'requester_id_type' => 'passport']);
+$check('an owner\'s request ignores a representative type (nothing extra stored)', $status === 200 && array_column($rowsOf($ref), 'id_type_hint') === ['umid', null], $rowsOf($ref));
+$before = $requestCount();
+[$status] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'requesterIdBack' => $file($fixtures . '/id-back.png', 'image/png')]);
+$check('a representative\'s back side on an owner\'s request is refused, and nothing is saved', $status === 422 && $requestCount() === $before);
+$pdfPath = $fixtures . '/back.pdf';
+file_put_contents($pdfPath, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($pdfPath, 'application/pdf')]);
+$check('a back side must be a JPG or PNG image, like the front (a PDF is refused, nothing saved)', $status === 422 && str_contains($body, 'JPG or PNG') && $requestCount() === $before, [$status, $body]);
 
 // ================= 2. One size limit =================
 [$status, , $body] = $submit('docreq', true, ['ownerId' => $file($sized(5 * 1024 * 1024), 'image/png')]);
@@ -303,7 +408,7 @@ $check('a draft submission that fails after its files were copied: refused, noth
     $status >= 500 && $requestCount() === $before && $requestFiles() === $filesBefore && is_file($ownerDraft) && is_file($extra), [$status, substr($body, 0, 200)]);
 [$status, $ref, $body] = $submit('docreq', true, [], ['draft_token' => $code]);
 $check('a draft submission uses only required documents; an unneeded saved file is not attached and is deleted', $status === 200
-    && array_column($documentsOf($ref), 'doc_key') === ['ownerId'] && !is_file($extra), [$status, $documentsOf($ref), $body]);
+    && array_column($documentsOf($ref), 'doc_key') === ['ownerId', 'ownerIdBack'] && !is_file($extra), [$status, $documentsOf($ref), $body]);
 // Step 12 (F1): the request holds its own COPY (a new file, so it gets the folder's default access
 // entries); the draft's file is removed only after the commit.
 $stored = (string) $pdo->query('SELECT d.stored_path FROM request_documents d JOIN requests r ON r.id = d.request_id WHERE r.reference_no = ' . $pdo->quote($ref) . " AND d.doc_key = 'ownerId'")->fetchColumn();

@@ -47,6 +47,10 @@ foreach ($page['documents'] ?? [] as $document) {
         // False when an uploaded original cannot be opened (missing from storage, unsupported type).
         'available' => (bool) ($document['file_available'] ?? false),
         'validation' => ucfirst(strtolower((string) ($document['validation_status'] ?? 'pending'))),
+        // The ID type the applicant selected (front side of an ID only): their statement, not verified.
+        // A stored value that is not one of the registry's types is never shown (label and code null).
+        'idTypeHint' => DocumentRequirements::idTypeHintLabel($document['id_type_hint'] ?? null),
+        'idTypeHintCode' => DocumentRequirements::idTypeHintLabel($document['id_type_hint'] ?? null) === null ? null : (string) $document['id_type_hint'],
     ];
     $validation = strtolower((string) ($document['validation_status'] ?? 'pending'));
     $documentsByRequest[(int) $document['request_id']][] = [

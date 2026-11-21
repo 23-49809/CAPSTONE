@@ -581,6 +581,14 @@ password, because PHP's built-in server drops empty environment variables.
 * There is no public AI endpoint. The dispatcher is command-line only. The
   worker is on a private network and refuses unsigned, stale or replayed jobs.
 * Documents are never sent to external AI services.
+* The back side of each valid ID (`ownerIdBack`, `requesterIdBack`) is stored with the request for Staff
+  to inspect, but it is never sent to the automatic check: `AiVerification::jobManifest()` skips it, so
+  the worker receives the same documents as before back sides were collected (the ID fronts, the
+  authorization letter and the Land Transfer documents). The ID type the applicant selects in the form
+  (`request_documents.id_type_hint`) is shown to Staff as "selected by the applicant, not verified", with a
+  warning when the check confirmed a different type from the ID's own printed title and details. It is not
+  sent to the check either, never confirms an ID's type, and never changes what is required: every ID needs
+  its front and back, whatever type is selected (a passport included).
 * All AI text is escaped before display. Model output that does not match the
   schema exactly is discarded.
 * Logs contain job IDs and error codes only, never document text, names,

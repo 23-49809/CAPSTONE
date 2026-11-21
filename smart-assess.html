@@ -435,6 +435,43 @@
   .upl-center .upl-meta{ justify-content:center; }
   .upl-center .upl-actions{ justify-content:center; }
   .upl-center .field-error{ text-align:center; }
+  /* ---- Valid ID: type selector and front/back photos. A light frosted-glass surface built from the
+     theme's own colours, so text keeps its contrast in the light and the dark theme. Text keeps the
+     existing styles (no font changes). Without color-mix() or backdrop-filter the cards are the plain
+     opaque theme surface, so readability never depends on the blur. ---- */
+  .id-upload-stack{ display:flex; flex-direction:column; gap:14px; margin-top:12px; }
+  .id-upload-stack + .id-upload-grid{ margin-top:14px; }
+  .id-card-block{ min-width:0; padding:16px; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--surface);
+    box-shadow:0 8px 24px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.06); }
+  .id-card-title{ margin-bottom:10px; }
+  .id-type-field{ margin-bottom:6px; }
+  .id-type-field .reference-note{ margin-top:0; }
+  .id-card-block .id-type-select{ transition:border-color .2s ease, box-shadow .2s ease; }
+  .id-card-block .id-sides-note{ margin:4px 0 10px; }
+  .id-sides{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; }
+  .id-side{ display:flex; flex-direction:column; align-items:stretch; gap:8px; min-width:0; padding:12px; text-align:center;
+    border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--surface-2);
+    transition:border-color .2s ease, box-shadow .2s ease; }
+  .id-side:hover{ border-color:var(--brand-500); box-shadow:0 6px 18px rgba(15,23,42,.1); }
+  .id-side:focus-within{ border-color:var(--brand-500); box-shadow:0 0 0 3px var(--brand-100); }
+  .id-side.flagged, .id-side.invalid{ border-color:var(--danger); }
+  .id-side-preview{ width:100%; aspect-ratio:1.586 / 1; display:flex; align-items:center; justify-content:center; overflow:hidden;
+    border:1px dashed var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--brand-600); }
+  .id-side-preview .icon{ width:26px; height:26px; }
+  .id-side-preview.has-img{ border-style:solid; border-color:var(--line); }
+  .id-side-preview img{ width:100%; height:100%; object-fit:contain; display:block; }
+  .id-side .upl-meta{ justify-content:center; margin-top:0; }
+  .id-side .upl-actions{ justify-content:center; flex-wrap:wrap; margin-top:auto; }
+  .id-side .upl-btn{ transition:background-color .2s ease, border-color .2s ease; }
+  .id-side .field-error{ text-align:center; margin-top:0; }
+  @supports (background:color-mix(in srgb, red 50%, transparent)) and ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+    .id-card-block{ background:color-mix(in srgb, var(--surface) 78%, transparent); border-color:color-mix(in srgb, var(--line-strong) 75%, transparent);
+      -webkit-backdrop-filter:blur(10px) saturate(140%); backdrop-filter:blur(10px) saturate(140%); }
+    .id-side{ background:color-mix(in srgb, var(--surface-2) 72%, transparent); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  }
+  /* Phones: front and back stack, each full width. */
+  @media (max-width:640px){ .id-sides{ grid-template-columns:minmax(0, 1fr); } .id-card-block{ padding:12px; } }
+  @media (prefers-reduced-motion:reduce){ .id-side, .id-side .upl-btn, .id-card-block .id-type-select{ transition:none; } }
   @media (max-width:480px){
     .upl-row{ gap:10px; }
     .upl-thumb{ flex-basis:32px; width:32px; height:32px; }
@@ -460,6 +497,9 @@
      pre-842d71f5 styling restored verbatim); compact below that. ---- */
   @media (min-width:1025px){
     .id-guidance-panel{ margin:0 0 22px; padding:18px 18px 16px; background:linear-gradient(180deg,#f7fbff 0%,#f3f5f8 100%); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:inset 0 1px 0 rgba(255,255,255,.8); }
+    /* Dark theme (system setting or chosen): the light gradient above made the panel's own text fail
+       contrast; the theme's surface keeps every line readable. The light theme is unchanged. */
+    :root[data-theme="dark"] .id-guidance-panel{ background:var(--surface-2); box-shadow:inset 0 1px 0 rgba(255,255,255,.04); }
     .guidance-header{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
     .guidance-header .icon{ width:18px; height:18px; color:var(--brand-700); }
     .guidance-header span{ font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:800; color:var(--brand-700); }
@@ -523,6 +563,7 @@
      the theme. */
   .confirm-shell{ flex:1; display:flex; flex-direction:column; align-items:center; padding:28px 16px 36px; background:#eef4f0; }
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .confirm-shell{ background:var(--paper); } }
+  @media (prefers-color-scheme: dark) and (min-width:1025px){ :root:not([data-theme="light"]) .id-guidance-panel{ background:var(--surface-2); box-shadow:inset 0 1px 0 rgba(255,255,255,.04); } }
   :root[data-theme="dark"] .confirm-shell{ background:var(--paper); }
   .rcpt-wrap{ width:min(100%, 460px); filter:drop-shadow(0 18px 30px rgba(20,60,40,.13)) drop-shadow(0 2px 4px rgba(20,60,40,.06)); }
   .rcpt{ --zz:9px; position:relative; overflow:hidden; background:#fbfdfb; color:#1f2a24; padding:30px 26px 20px; text-align:center;
@@ -1214,7 +1255,8 @@ function blankFormData(){
     firstName:'', lastName:'', middleName:'', contact:'+63', email:'',
     addressLine:'', province:'Batangas', city:'Mabini', zip:'4202',
     documentType:'', transferType:'', purpose:'', arp:'', barangay:'', requesterBarangay:'',
-    isOwner:true, files:{}, termsToken:''
+    isOwner:true, files:{}, termsToken:'',
+    ownerIdType:'', requesterIdType:''
   };
 }
 const state = {
@@ -1259,7 +1301,20 @@ function buildArp(barangay, serial){
 /* Same rules as the server (DocumentRequirements): IDs and the authorization
    letter are JPG or PNG only; other documents JPG, PNG, WEBP or PDF; every file
    must be smaller than the upload limit (5 MiB). The server checks again. */
-const IMAGE_ONLY_KEYS = ['ownerId','requesterId','authLetter'];
+const IMAGE_ONLY_KEYS = ['ownerId','requesterId','authLetter','ownerIdBack','requesterIdBack'];
+/* Valid ID types the applicant may select: exactly the government IDs the document-recognition
+   registry recognises (DocumentRequirements::idTypeOptions(), same codes and order; a test keeps the
+   two lists equal). The choice is only the applicant's statement: it never confirms the uploaded ID's
+   type, and the office's automatic check still reads the uploaded ID itself. */
+const ID_TYPE_OPTIONS = [
+  ['philsys_national_id','Philippine National ID (PhilSys)'], ['drivers_license','Philippine Driver\'s License'], ['passport','Passport'],
+  ['umid','UMID'], ['sss_id','SSS ID'], ['gsis_id','GSIS ID'], ['philhealth_id','PhilHealth ID'], ['prc_id','PRC ID'], ['postal_id','Postal ID'],
+  ['voters_id','Voter\'s ID'], ['tin_id','TIN ID'], ['pagibig_id','Pag-IBIG ID'], ['senior_citizen_id','Senior Citizen ID'], ['pwd_id','PWD ID']
+];
+/* Each ID's back side is its own file; its type selection is its own form field. */
+const ID_BACK_KEYS = {ownerId:'ownerIdBack', requesterId:'requesterIdBack'};
+const ID_TYPE_FIELDS = {ownerId:'ownerIdType', requesterId:'requesterIdType'};
+function idTypeLabel(code){ const o = ID_TYPE_OPTIONS.filter(function(x){ return x[0]===code; })[0]; return o ? o[1] : ''; }
 const IMAGE_FILE_RE = /^image\/(jpeg|png)$/;
 function isImageOnlyKey(key){ return IMAGE_ONLY_KEYS.indexOf(key) !== -1; }
 function fileTypesFor(key){ return isImageOnlyKey(key) ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF'; }
@@ -1338,7 +1393,17 @@ function validateStep2(flow, fd, errors){
   else if(!ARP_RE.test(fd.arp.trim()) || fd.arp.slice(3,7)!==arpCode) errors.arp = 'Enter the last 5 digits (format 14-'+arpCode+'-XXXXX).';
   if(!fd.barangay.trim()) errors.barangay = 'Barangay is required.';
 }
-function requiredIdKeys(fd){ return fd.isOwner ? ['ownerId'] : ['requesterId','ownerId','authLetter']; }
+function idFrontKeys(fd){ return fd.isOwner ? ['ownerId'] : ['requesterId','ownerId']; }
+/* Every ID file the request needs: each ID's front and back (for every ID type, a passport included:
+   the selected type never waives a side; the server checks the same), then the letter. */
+function requiredIdKeys(fd){
+  const keys = [];
+  idFrontKeys(fd).forEach(function(front){ keys.push(front, ID_BACK_KEYS[front]); });
+  if(!fd.isOwner) keys.push('authLetter');
+  return keys;
+}
+/* The IDs and documents to mention in a summary (an ID counts once, front and back together). */
+function idSummaryKeys(fd){ return fd.isOwner ? ['ownerId'] : ['requesterId','ownerId','authLetter']; }
 function idLabel(flow, key){
   const map = {
     docreq:{
@@ -1352,6 +1417,7 @@ function idLabel(flow, key){
       authLetter:'Authorization Letter'
     }
   };
+  if(key==='ownerIdBack' || key==='requesterIdBack') return idLabel(flow, key.slice(0, -4)) + ' (back side)';
   return map[flow][key] || (key==='ownerId' ? 'Property Owner Valid ID' : key==='requesterId' ? 'Authorized Representative\'s Valid ID' : 'Authorization Letter');
 }
 function getRequirementChecklist(flow, fd){
@@ -1370,6 +1436,10 @@ function getRequirementChecklist(flow, fd){
 }
 function checklistIsComplete(items){ return items.every(function(i){ return i.status==='ok'; }); }
 function validateUploads(flow, fd, errors){
+  idFrontKeys(fd).forEach(function(front){
+    const field = ID_TYPE_FIELDS[front];
+    if(!fd[field] || !idTypeLabel(fd[field])) errors[field] = 'Select the type of valid ID you are uploading.';
+  });
   getRequirementChecklist(flow, fd).forEach(function(item){
     if(item.status==='missing') errors[item.key] = item.label+' upload is required.';
     else if(item.status==='flagged') errors[item.key] = 'This file cannot be accepted here. Upload a '+fileTypesFor(item.key)+' file smaller than '+(Math.floor(uploadLimitBytes() / (1024*1024)) || 5)+' MB.';
@@ -1713,7 +1783,7 @@ function renderStep2(){
   const barangayField = '<div class="field"><label>Barangay (Property Location)<span class="req">*</span></label>'+barangaySelect(fd, 'barangay') + fieldError('barangay') + '</div>';
   if(state.flow==='docreq'){
     const items = docItems(fd);
-    const needs = requiredIdKeys(fd).map(function(k){ return idLabel(state.flow, k); }).join(', ');
+    const needs = idSummaryKeys(fd).map(function(k){ return idLabel(state.flow, k); }).join(', ');
     const cards = items.map(function(it, i){
       const others = items.filter(function(_, j){ return j!==i; }).map(function(o){ return o.documentType; });
       const advisory = getAdvisory('docreq', it);
@@ -1794,6 +1864,58 @@ function uploadBox(key, label, fd, centered){
     + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
   + '</div>';
 }
+/* One side of an ID (front or back): its own upload control and a preview of the chosen photo.
+   Same data attributes as uploadBox(), so choosing, dropping, replacing and removing work the same
+   way and never touch the other side. */
+function idSideBox(key, side, fd){
+  const file = fd.files[key];
+  const err = state.errors[key];
+  const full = idLabel(state.flow, key);
+  const maxMb = Math.floor(uploadLimitBytes() / (1024*1024)) || 5;
+  const cls = 'upload-box upl id-side'+(file && file.valid?' filled':'')+(file && !file.valid?' flagged':'')+(err?' invalid':'');
+  const hasImg = file && file.preview && /^data:image\/|^blob:/.test(file.preview);
+  const preview = hasImg
+    ? '<div class="id-side-preview has-img"><img src="'+esc(file.preview)+'" alt="Preview of the '+esc(side.toLowerCase())+'"></div>'
+    : '<div class="id-side-preview" aria-hidden="true">'+ic(file ? 'file' : 'upload')+'</div>';
+  const meta = file
+    ? '<span class="upl-file">'+esc(file.name)+'</span><span class="upl-size">'+fmtBytes(file.size||0)+'</span>'
+      + (file.valid ? '<span class="upl-ok">'+ic('check')+(file.saved ? 'Saved' : 'Attached')+'</span>' : '<span class="upl-bad">Invalid format</span>')
+    : '<span>JPG or PNG, smaller than '+maxMb+' MB</span>';
+  const actions = file
+    ? '<button type="button" class="upl-btn" data-replace-file="'+key+'" aria-label="Replace '+esc(full)+'">Replace</button>'
+      + '<button type="button" class="upl-btn upl-remove" data-remove-file="'+key+'" aria-label="Remove '+esc(full)+'">Remove</button>'
+    : '<button type="button" class="upl-btn upl-choose" data-choose-file="'+key+'" aria-label="Choose file for '+esc(full)+'">Choose File</button>';
+  return '<div class="'+cls+'" data-upload="'+key+'">'
+    + '<input type="file" id="file-'+key+'" hidden data-file-input="'+key+'" accept=".jpg,.jpeg,.png,image/jpeg,image/png,image/jpg">'
+    + '<div class="upl-label id-side-label">'+esc(side)+'<span class="req" aria-hidden="true">*</span></div>'
+    + preview
+    + '<div class="upl-meta">'+meta+'</div>'
+    + '<div class="upl-actions">'+actions+'</div>'
+    + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
+  + '</div>';
+}
+/* One valid ID: the type the applicant selects (a hint only), then its front and back photos. */
+function idCardBlock(front, fd){
+  const field = ID_TYPE_FIELDS[front], back = ID_BACK_KEYS[front];
+  // Only a type from the list counts as chosen: an unknown or altered value (e.g. from an old draft) shows
+  // the placeholder and the prompt, never an empty "Selected:", and still fails the required check.
+  const chosen = idTypeLabel(fd[field]) ? fd[field] : '', err = state.errors[field];
+  const select = '<select id="f-'+field+'" class="id-type-select'+(err?' invalid':'')+'" data-bind-select="'+field+'" required aria-required="true"'
+      + ' aria-describedby="hint-'+field+(err ? ' err-'+field : '')+'">'
+      + '<option value="">Select your ID type</option>'
+      + ID_TYPE_OPTIONS.map(function(o){ return '<option value="'+esc(o[0])+'"'+(chosen===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')
+    + '</select>';
+  return '<section class="id-card-block" aria-labelledby="idblk-'+front+'">'
+    + '<div class="upl-label id-card-title" id="idblk-'+front+'">'+esc(idLabel(state.flow, front))+'</div>'
+    + '<div class="field id-type-field"><label for="f-'+field+'">Select Type of Valid ID<span class="req">*</span></label>' + select
+      + '<p class="reference-note id-type-selected" id="hint-'+field+'">'+(chosen
+          ? 'Selected: <strong>'+esc(idTypeLabel(chosen))+'</strong>. The office still checks the ID you upload.'
+          : 'Choose the ID you will upload.')+'</p>'
+      + fieldError(field) + '</div>'
+    + '<p class="reference-note id-sides-note">Upload clear photos of both sides of your ID.</p>'
+    + '<div class="id-sides">' + idSideBox(front, 'FRONT SIDE OF ID', fd) + idSideBox(back, 'BACK SIDE OF ID', fd) + '</div>'
+  + '</section>';
+}
 function idReferenceCard(type){
   const accepted = type === 'accepted';
   const imageName = accepted ? './ID CLear.png' : './Blurry ID.png';
@@ -1811,12 +1933,11 @@ function idGuidancePanel(uploads){
       + idReferenceCard('rejected')
     + '</div>'
     + '<div class="reference-note">Upload a clear, valid, and unexpired ID.</div>'
-    + '<div class="upload-grid id-upload-grid">' + uploads + '</div>'
+    + '<div class="id-upload-stack">' + uploads + '</div>'
   + '</div>';
 }
 function renderStep3(){
   const fd = state.formData;
-  const idKeys = requiredIdKeys(fd);
   let docsBlock = '';
   if(state.flow==='landtransfer'){
     docsBlock = '<div class="section-divider"><span>Required Transfer Documents</span></div>'
@@ -1828,7 +1949,8 @@ function renderStep3(){
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">'+(fd.isOwner ? 'I am the registered property owner' : 'I am not the registered property owner')+'</span></label>'
     + docsBlock
     + (state.flow==='docreq' && docItems(fd).length>1 ? '<p class="doc-req-shared">These files are used for all '+docItems(fd).length+' documents in your application: '+esc(docItems(fd).map(function(it){ return it.documentType; }).join(', '))+'.</p>' : '')
-    + idGuidancePanel(idKeys.map(function(k){ return uploadBox(k, idLabel(state.flow,k), fd, true); }).join(''))
+    + idGuidancePanel(idFrontKeys(fd).map(function(front){ return idCardBlock(front, fd); }).join('')
+        + (fd.isOwner ? '' : '<div class="upload-grid id-upload-grid">' + uploadBox('authLetter', idLabel(state.flow, 'authLetter'), fd, true) + '</div>'))
   + '</div>';
 }
 
@@ -1839,7 +1961,11 @@ function renderStep4(){
   const fullName = [fd.firstName, fd.middleName, fd.lastName].filter(Boolean).join(' ') || '—';
   const row = function(label, value){ return '<tr><th scope="row">'+label+'</th><td>'+value+'</td></tr>'; };
   const section = function(title, rows){ return '<tbody><tr class="rv-sec"><th colspan="2" scope="colgroup">'+title+'</th></tr>'+rows+'</tbody>'; };
-  const uploadedRows = checklist.map(function(c){
+  const idTypeRows = idFrontKeys(fd).map(function(front){
+    const code = fd[ID_TYPE_FIELDS[front]];
+    return row(esc(idLabel(state.flow, front))+': ID Type', code ? esc(idTypeLabel(code)) : '<span class="rv-bad">Not selected</span>');
+  }).join('');
+  const uploadedRows = idTypeRows + checklist.map(function(c){
     const value = c.status==='ok' ? esc((fd.files[c.key]||{}).name||'')
       : (c.status==='flagged' ? '<span class="rv-bad">Invalid format</span>' : '<span class="rv-bad">Not uploaded</span>');
     return row(esc(c.label), value);
