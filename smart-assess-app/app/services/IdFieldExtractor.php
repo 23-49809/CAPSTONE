@@ -20,6 +20,10 @@ require_once __DIR__ . '/DocumentAnalysis.php';
  *    zone). Names are never changed.
  *  - Passport: the visual zone and the machine-readable zone (MRZ) are both read; a field the two
  *    read differently is unverified. MRZ numbers and dates count only when their check digit is right.
+ *  - Photo noise: up to two lines of stray marks (at most two letters and two digits each) between a
+ *    label and its value are skipped; a name value loses short stray fragments at its end ("ee") and
+ *    letter-free marks at its start ("|"). Nothing inside a value is changed, letters at its start are
+ *    never dropped, and a value is never taken from past another label or past real text.
  *  - Reading fields says nothing about whether the ID is genuine.
  */
 final class IdFieldExtractor
@@ -30,6 +34,8 @@ final class IdFieldExtractor
         'issuing authority', 'civil status', 'marital status', 'date of birth', 'valid until', 'expiration date'];
     private const MONTHS = ['JAN' => 1, 'FEB' => 2, 'MAR' => 3, 'APR' => 4, 'MAY' => 5, 'JUN' => 6, 'JUL' => 7, 'AUG' => 8, 'SEP' => 9, 'OCT' => 10, 'NOV' => 11, 'DEC' => 12];
     private const MONTH_PATTERN = 'JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUNE?|JULY?|AUG(?:UST)?|SEPT?(?:EMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?';
+    /** Lines of photo noise (see noiseLine()) skipped between a label and its value; more ends the search. */
+    private const MAX_NOISE_LINES = 2;
     /** Letters OCR commonly reads for digits. */
     private const DIGIT_LOOKALIKES = ['O' => '0', 'D' => '0', 'Q' => '0', 'I' => '1', 'L' => '1', '|' => '1', 'S' => '5', 'B' => '8', 'Z' => '2', 'G' => '6'];
 
@@ -225,8 +231,15 @@ final class IdFieldExtractor
             $end = $spans[$index][$last][2];
             $next = $spans[$index][$last + 1][1] ?? strlen($line);
             $candidates[] = trim(substr($line, $end, $next - $end), " \t:;/|.-_");
-            if (isset($lines[$index + 1]) && $spans[$index + 1] === []) {
-                $candidates[] = $lines[$index + 1];
+            // The value is on the next unlabelled line. Up to MAX_NOISE_LINES lines of photo noise between
+            // the label and its value (a few stray marks from the background, hologram or card edge) are
+            // skipped; any other line, or a line with a label, ends the search, so a value is never taken
+            // from further down the card.
+            for ($ahead = $index + 1; $ahead <= $index + 1 + self::MAX_NOISE_LINES && isset($lines[$ahead]) && $spans[$ahead] === []; $ahead++) {
+                if (!self::noiseLine($lines[$ahead])) {
+                    $candidates[] = $lines[$ahead];
+                    break;
+                }
             }
         }
         $uncertain = false;
@@ -262,13 +275,43 @@ final class IdFieldExtractor
     private static function value(array $rule, string $text): array
     {
         return match ($rule['type']) {
-            'name' => ['value' => self::name($text), 'uncertain' => false],
+            'name' => ['value' => self::name(self::withoutStrayMarks($text)), 'uncertain' => false],
             'full_name' => ['value' => self::fullName($text), 'uncertain' => false],
             'word' => ['value' => preg_match('/^\p{Lu}{3,20}$/u', $text) === 1 ? $text : null, 'uncertain' => false],
             'date' => self::date($text),
             'number' => self::number($rule['pattern'], $text),
             default => ['value' => null, 'uncertain' => false],
         };
+    }
+
+    /**
+     * A line of photo noise: at most two letters and at most two digits (stray marks such as "| ae" or
+     * "= ."). Anything with more is treated as text, never skipped.
+     */
+    private static function noiseLine(string $line): bool
+    {
+        return preg_match_all('/\p{L}/u', $line) <= 2 && preg_match_all('/\p{N}/u', $line) <= 2;
+    }
+
+    /**
+     * A labelled name value without the stray marks OCR adds at its ends: trailing pieces of one or two
+     * characters that hold a lower-case letter or no letter ("DELA CRUZ ee"), and leading pieces of one
+     * or two characters with no letter at all ("| JUAN"). Letters at the start are never removed (they
+     * may be a name particle such as "de la"), capital letters never anywhere (an initial such as "A"
+     * stays), and the rest must still pass name() unchanged: nothing inside the name is altered.
+     */
+    private static function withoutStrayMarks(string $text): string
+    {
+        $pieces = preg_split('/\s+/u', trim($text)) ?: [];
+        $short = static fn (string $piece): bool => mb_strlen($piece) <= 2;
+        $noLetter = static fn (string $piece): bool => preg_match('/\p{L}/u', $piece) !== 1;
+        while ($pieces !== [] && $short($pieces[0]) && $noLetter($pieces[0])) {
+            array_shift($pieces);
+        }
+        while ($pieces !== [] && $short($pieces[count($pieces) - 1]) && ($noLetter($pieces[count($pieces) - 1]) || preg_match('/\p{Ll}/u', $pieces[count($pieces) - 1]) === 1)) {
+            array_pop($pieces);
+        }
+        return implode(' ', $pieces);
     }
 
     /** A name value as printed: capital letters (". ' -" and spaces allowed), a word of 3+ letters, no document words. */

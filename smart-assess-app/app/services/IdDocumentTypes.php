@@ -35,7 +35,11 @@ final class IdDocumentTypes
                 'given_names' => ['labels' => ['mga pangalan', 'given names', 'given name', 'first name', 'mga', 'given'], 'type' => 'name'],
                 'middle_name' => ['labels' => ['gitnang apelyido', 'panggitnang apelyido', 'middle name', 'gitnang', 'middle'], 'type' => 'name'],
                 'birth_date' => ['labels' => ['petsa ng kapanganakan', 'date of birth', 'birth date'], 'type' => 'date'],
-                'card_number' => ['labels' => ['pcn', 'philsys card number'], 'type' => 'number', 'pattern' => '[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}', 'anywhere' => true],
+                // Four groups of four digits, separated by hyphens as printed or by spaces as OCR often reads
+                // them (the same separator throughout); never part of a longer run of four-digit groups. Other
+                // text may follow on the same line (OCR can join the address: "1234-5678-9012-3456 1 RIZAL ST").
+                'card_number' => ['labels' => ['pcn', 'philsys card number'], 'type' => 'number',
+                    'pattern' => '(?<![0-9]{4}[- ])[0-9]{4}([- ])[0-9]{4}\1[0-9]{4}\1[0-9]{4}(?!\1[0-9]{4})', 'anywhere' => true],
             ],
             'required' => ['last_name', 'given_names'],
             'name' => ['last_name', 'given_names', 'middle_name'],
