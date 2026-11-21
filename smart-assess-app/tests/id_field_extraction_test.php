@@ -336,6 +336,52 @@ $check('comma names: the Staff Name Match shows "Possible issue" for a possibly 
     && strpos($html, "if(cmp==='differs')", (int) strpos($html, 'function dcNameCheck')) < strpos($html, "d.id_check.name_state==='incomplete'"));
 $check('v5 app: name_state "incomplete" is accepted and always needs review', DocumentAnalysis::validateWorkerResult($worker([$doc('requesterId', ['needs_staff_review' => false] + $shortCheck)]), ['requesterId'])['documents'][0]['id_check']['needs_staff_review'] === true);
 
+// ---- Photo noise on real cards (National ID first; fictional people only) ----
+// Real photos add stray marks: lines of a few characters between a label and its value, short
+// fragments at the ends of a value line, and spaces read in place of the card number's hyphens.
+$noisy = static fn (string $between = "| ae\n", string $last = 'DELA CRUZ', string $given = 'JUAN'): string => "REPUBLIKA NG PILIPINAS\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine Identification Card\n"
+    . "Apelyido/Last Name\n{$between}{$last}\nMga Pangalan/Given Names\n{$between}{$given}\nGitnang Apelyido/Middle Name\n{$between}SANTOS\nPetsa ng Kapanganakan/Date of Birth\n{$between}JANUARY 01, 1990\n";
+$read = $x($noisy());
+$check('noise: one noise line between each label and its value: every field read, the type confirmed and the full name given', $read['type_state'] === 'confirmed'
+    && $read['name'] === 'DELA CRUZ, JUAN SANTOS' && $states($read)['birth_date'] === '1990-01-01', [$read['type_state'], $read['name'], $states($read)]);
+$read = $x($noisy("= .\n|\n"));
+$check('noise: two noise lines are skipped too', $read['type_state'] === 'confirmed' && $read['name'] === 'DELA CRUZ, JUAN SANTOS', [$read['type_state'], $read['name']]);
+$read = $x($noisy("|\n.\n=\n"));
+$check('noise: three noise lines end the search: no value is taken from further down the card', $states($read)['last_name'] === '-' && $read['name'] === null && $read['type_state'] === 'title_only',
+    [$read['type_state'], $states($read)]);
+$read = $x($noisy("ee ae oo\n"));
+$check('noise: a line with more than two letters is not noise: it is the candidate, fails, and nothing below it is used', $states($read)['last_name'] === '-' && $read['name'] === null, $states($read));
+$read = $x("REPUBLIKA NG PILIPINAS\nPhilippine Identification Card\nApelyido/Last Name\n|\nMga Pangalan/Given Names\nJUAN\nGitnang Apelyido/Middle Name\nSANTOS\n");
+$check('noise: a label line ends the search: a missing last name never takes the given name below its label', $states($read)['last_name'] === '-' && $states($read)['given_names'] === 'JUAN'
+    && $read['name'] === null, $states($read));
+$read = $x($noisy('', 'DELA CRUZ ee', '| JUAN'));
+$check('stray marks: short fragments at the ends of a value line are dropped ("DELA CRUZ ee", "| JUAN")', $read['name'] === 'DELA CRUZ, JUAN SANTOS' && $read['type_state'] === 'confirmed', [$read['name'], $states($read)]);
+$read = $x($noisy('', 'DELA CRUZ', 'JUAN A'));
+$check('stray marks: a capital initial is kept, never dropped', $read['name'] === 'DELA CRUZ, JUAN A SANTOS', $read['name']);
+$check('stray marks: nothing inside a name is changed: a digit or a lower-case word inside it leaves the field unread', $states($x($noisy('', 'DELA CRU2 ee')))['last_name'] === '-'
+    && $states($x($noisy('', 'DELA cruz')))['last_name'] === '-' && $states($x($noisy('', 'de la CRUZ')))['last_name'] === '-');
+$check('mixed case is still not read as a name (no "unclear" state exists, so it is not guessed)', $x($noisy('', 'Dela Cruz', 'Juan'))['name'] === null
+    && $states($x($noisy('', 'Dela Cruz')))['last_name'] === '-');
+$check('stray marks: a value line that is only stray marks gives no value', $states($x($noisy('', 'ee |')))['last_name'] === '-');
+$pcn = static fn (string $number): array => $states($x("REPUBLIKA NG PILIPINAS\nPhilippine Identification Card\n{$number}\n"));
+$check('card number: printed with hyphens or read with spaces, it is read (and confirms the type)', $pcn('1234-5678-9012-3456')['card_number'] === '1234-5678-9012-3456'
+    && $pcn('1234 5678 9012 3456')['card_number'] === '1234 5678 9012 3456' && $x("REPUBLIKA NG PILIPINAS\nPhilippine Identification Card\n1234 5678 9012 3456\n")['type_state'] === 'confirmed');
+$check('card number: mixed separators, a longer run of digit groups, or a short group are not a card number', $pcn('1234-5678 9012-3456')['card_number'] === '-'
+    && $pcn('1234 5678 9012 3456 7890')['card_number'] === '-' && $pcn('9999 1234 5678 9012 3456')['card_number'] === '-' && $pcn('1234 5678 9012 345')['card_number'] === '-'
+    && $pcn('12345678 9012 3456')['card_number'] === '-');
+$check('card number: on separate lines the groups are not joined', $pcn("1234 5678\n9012 3456")['card_number'] === '-');
+$check('card number: other text OCR joined after it on the same line does not hide it (the address\'s house number too)', $pcn('1234-5678-9012-3456 1 RIZAL ST, POBLACION')['card_number'] === '1234-5678-9012-3456'
+    && $pcn('1234 5678 9012 3456 12 MABINI ST')['card_number'] === '1234 5678 9012 3456');
+$check('noise: the other labelled IDs gain the same tolerance (Postal ID, UMID)', $x(str_replace(["Surname\nSORIANO", "First Name\nRAFAEL"], ["Surname\n|\nSORIANO ee", "First Name\n= .\nRAFAEL"], $postal))['name'] === 'SORIANO, RAFAEL GATCHALIAN'
+    && $x(str_replace("SURNAME\nPASCUAL", "SURNAME\n| a\nPASCUAL", $umid))['name'] === 'PASCUAL, LORENZO AQUINO');
+$check('noise: noise lines never turn a letter that only mentions the National ID into a confirmed ID', $x("Please bring your Philippine Identification Card.\n|\nThank you.\n= .\n")['type_state'] !== 'confirmed'
+    && $x("Please bring your Philippine Identification Card.\n|\nThank you.\n= .\n")['name'] === null);
+$check('stray marks: letters at the start of a value are never dropped ("de la CRUZ" stays unread, never "CRUZ")', $states($x($noisy('', 'de la CRUZ')))['last_name'] === '-'
+    && $states($x($noisy('', 'a DELA CRUZ')))['last_name'] === '-');
+$noisyCheck = DocumentAnalysis::idCheck($x($noisy()), 'good', true, '', false);
+$check('worker v5 states for a noisy National ID: type confirmed and the name grounded, states only', ($noisyCheck['type_state'] ?? '') === 'confirmed'
+    && !preg_match('/1990-01-01|JANUARY|1234/', (string) json_encode($noisyCheck)), $noisyCheck);
+
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {
     echo ($passed ? 'PASS  ' : 'FAIL  ') . $name . ($passed ? '' : '   ' . $detail) . "\n";
