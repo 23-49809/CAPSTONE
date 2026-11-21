@@ -208,8 +208,8 @@ $submit = static function (string $flow, bool $isOwner, array $files, array $ext
     $terms = json_decode($json('terms_accept', ['flow' => $flow, 'agreed' => true, 'terms_version' => (preg_match("/SA_TERMS_VERSION = '([^']+)'/", (string) file_get_contents($project . '/smart-assess-app/web/terms-acceptance.php'), $termsMatch) ? $termsMatch[1] : '')])[1], true);
     $payload = $extra + ['action' => 'submit_request', 'csrf' => $csrf, 'flow' => $flow, 'terms_token' => $terms['data']['terms_token'] ?? '',
         'first_name' => 'Juana', 'last_name' => 'Testcase', 'contact_number' => '+639170002222', 'email' => 'juana.test@example.invalid', 'address_line' => '1 Test St',
-        'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'purpose' => 'Test', 'arp_number' => '14-0007-00002', 'property_address' => 'Anilao',
-        'barangay' => 'Anilao', 'is_owner' => $isOwner, 'document_type' => 'Certified True Copy of Tax Declaration', 'transfer_type' => 'Sale'];
+        'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'purpose' => 'Personal Copy', 'arp_number' => '14-0007-00002', 'property_address' => 'Anilao',
+        'barangay' => 'Anilao', 'is_owner' => $isOwner, 'document_type' => 'Certified True Copy of Tax Declaration (CTC-TD)', 'transfer_type' => 'Sale'];
     $post = ['payload' => json_encode($payload)];
     foreach ($files as $key => $curlFile) {
         $post['file_' . $key] = $curlFile;

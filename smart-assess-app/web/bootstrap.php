@@ -511,6 +511,49 @@ function sa_receipt_name_seconds(): int
     return $seconds >= 1 && $seconds <= 3600 ? $seconds : SA_RECEIPT_NAME_DEFAULT_SECONDS;
 }
 
+/**
+ * Duplicate submissions: the page's random key for one application (32 lowercase hex characters).
+ * Anything else, or none (an older page), is not a key, and the submission is handled as before.
+ */
+function sa_submission_key(mixed $value): ?string
+{
+    return is_string($value) && preg_match('/^[a-f0-9]{32}$/', $value) ? $value : null;
+}
+
+/** How long, and how many, submission keys a browser session remembers. */
+const SA_SUBMISSION_KEY_SECONDS = 86400;
+const SA_SUBMISSION_KEY_LIMIT = 20;
+
+/** The reference this browser session already saved for $key, or null. Holds only the reference. */
+function sa_session_submission(string $key): ?string
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return null;
+    }
+    $oldest = time() - SA_SUBMISSION_KEY_SECONDS;
+    $kept = [];
+    foreach ((array) ($_SESSION['sa_submission_keys'] ?? []) as $known => $entry) {
+        if (is_string($known) && is_array($entry) && is_string($entry['ref'] ?? null) && is_int($entry['at'] ?? null) && $entry['at'] >= $oldest) {
+            $kept[$known] = $entry;
+        }
+    }
+    $_SESSION['sa_submission_keys'] = $kept;
+    return $kept[$key]['ref'] ?? null;
+}
+
+/** Remembers that $key was saved as $reference (after the commit was confirmed). */
+function sa_remember_submission(string $key, string $reference): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return;
+    }
+    sa_session_submission($key);
+    $keys = (array) $_SESSION['sa_submission_keys'];
+    unset($keys[$key]);
+    $keys[$key] = ['ref' => $reference, 'at' => time()];
+    $_SESSION['sa_submission_keys'] = array_slice($keys, -SA_SUBMISSION_KEY_LIMIT, null, true);
+}
+
 /** This session's still-valid submitted references: reference => time submitted. Expired ones are dropped. */
 function sa_session_submitted_references(): array
 {

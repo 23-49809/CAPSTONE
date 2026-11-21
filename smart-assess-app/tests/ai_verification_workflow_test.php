@@ -395,8 +395,8 @@ $payloadFor = static function (string $flow, string $lastName, array $uploads, a
     $payload = $extra + [
         'flow' => $flow, 'terms_token' => $token, 'first_name' => 'Maria', 'middle_name' => 'Luisa', 'last_name' => $lastName,
         'contact_number' => '+639170001111', 'email' => 'maria.test@example.invalid', 'address_line' => '1 Test Street', 'province' => 'Batangas',
-        'city' => 'Mabini', 'zip_code' => '4202', 'purpose' => 'Testing', 'arp_number' => '14-0007-00001', 'property_address' => 'Anilao',
-        'barangay' => 'Anilao', 'is_owner' => true, 'document_type' => 'Certified True Copy of Tax Declaration', 'transfer_type' => 'Sale',
+        'city' => 'Mabini', 'zip_code' => '4202', 'purpose' => $flow === 'docreq' ? 'Personal Copy' : 'Testing', 'arp_number' => '14-0007-00001', 'property_address' => 'Anilao',
+        'barangay' => 'Anilao', 'is_owner' => true, 'document_type' => 'Certified True Copy of Tax Declaration (CTC-TD)', 'transfer_type' => 'Sale',
     ];
     $payload['documents'] = array_combine(array_keys($uploads), array_keys($uploads));
     return $payload;

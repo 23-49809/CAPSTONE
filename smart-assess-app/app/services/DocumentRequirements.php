@@ -17,6 +17,26 @@ final class DocumentRequirements
     public const MAX_FILE_BYTES = 5 * 1024 * 1024;
     /** Different documents one Document Request application may ask for (each its own request). */
     public const MAX_DOCUMENTS_PER_APPLICATION = 5;
+    /**
+     * The documents a Document Request may ask for, and the purposes it may name: the same lists, in
+     * the same order, as the public page (DOC_TYPES and PURPOSES in smart-assess.html). The server
+     * accepts only these, for one document or several, whatever the page sent.
+     */
+    public const DOCUMENT_REQUEST_TYPES = [
+        'Certified True Copy of Tax Declaration (CTC-TD)',
+        'Certification of No/With Existing Improvement',
+        'Certification of Property/No Property Holdings',
+        'Certification of No Liens and Encumbrances',
+        'Certification of Assessment',
+    ];
+    public const DOCUMENT_REQUEST_PURPOSES = [
+        'Personal Copy',
+        'For Transfer',
+        'For Titling',
+        'For Building Permit',
+        'For Reclassification',
+        'Other Legal Requirement',
+    ];
     /** IDs (front and back) and the authorization letter: photos or scans as JPG/PNG only (as the public form says). */
     public const IDENTITY_KEYS = ['ownerId', 'requesterId', 'authLetter', 'ownerIdBack', 'requesterIdBack'];
     /**
@@ -96,6 +116,34 @@ final class DocumentRequirements
     public static function isIdBackKey(string $key): bool
     {
         return in_array($key, self::ID_BACK_KEYS, true);
+    }
+
+    /** The listed document type that $value names (letter case and spacing ignored), or null if none. */
+    public static function documentRequestType(mixed $value): ?string
+    {
+        return self::listed(self::DOCUMENT_REQUEST_TYPES, $value);
+    }
+
+    /** The listed purpose that $value names (letter case and spacing ignored), or null if none. */
+    public static function documentRequestPurpose(mixed $value): ?string
+    {
+        return self::listed(self::DOCUMENT_REQUEST_PURPOSES, $value);
+    }
+
+    /** @param list<string> $list */
+    private static function listed(array $list, mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        $normalize = static fn (string $text): string => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $text)), 'UTF-8');
+        $wanted = $normalize($value);
+        foreach ($list as $entry) {
+            if ($normalize($entry) === $wanted) {
+                return $entry;
+            }
+        }
+        return null;
     }
 
     /**

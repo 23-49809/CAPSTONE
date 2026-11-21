@@ -75,6 +75,17 @@ function sa_emit_prototype(string $filename, array $bootstrap, string $portal): 
             5 * 1024 * 1024
         ),
     ];
+    if ($portal === 'client') {
+        // Whether this server can save several documents in one Document Request application
+        // (database update 20261119_request_applications.sql has run). Until then the page offers one
+        // document per application, instead of letting the client fill in several and be refused at
+        // Submit. If this cannot be checked, the page behaves as before (the server still decides).
+        try {
+            $config['multiDocument'] = sa_applications_available();
+        } catch (Throwable) {
+            $config['multiDocument'] = true;
+        }
+    }
     // The submit script's address carries a short hash of its content, so a browser that cached an
     // older copy fetches the new one as soon as it changes (the page itself is never cached).
     $bridgeFile = __DIR__ . '/assets/php-bridge.js';

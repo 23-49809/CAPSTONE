@@ -245,7 +245,7 @@ $submit = static function (string $flow, string $first, string $last, string $mi
     $fields = ['flow' => $flow, 'first_name' => $first, 'middle_name' => $middle, 'last_name' => $last, 'contact_number' => '+639170007' . random_int(100, 999),
         'address_line' => '1 Test Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0007-0' . random_int(1000, 9999),
         'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true]
-        + ($flow === 'docreq' ? ['document_type' => 'Certified True Copy of Tax Declaration', 'purpose' => 'Test'] : ['transfer_type' => 'Deed of Absolute Sale']);
+        + ($flow === 'docreq' ? ['document_type' => DOCS[0], 'purpose' => 'Personal Copy'] : ['transfer_type' => 'Deed of Absolute Sale']);
     [$status, $body] = $client->http('/api.php?action=submit_request', ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $client->csrf,
         'terms_token' => (string) ($accepted['data']['terms_token'] ?? ''), 'draft_token' => $code] + $fields)]);
     $reference = (string) (json_decode($body, true)['data']['reference_no'] ?? '');
@@ -341,6 +341,23 @@ $runSql($pdo, (string) file_get_contents($project . '/smart-assess-app/database/
 $pdo->exec('ALTER TABLE request_status_log ADD COLUMN sms_category VARCHAR(60) NULL, ADD COLUMN delivery_status VARCHAR(20) NULL, ADD COLUMN sms_sent_by_id INT NULL');
 
 // ================= Before the migration =================
+/** The client page as the server renders it: [status, its SMART_ASSESS_CONFIG, its HTML]. */
+$renderedGate = static function () use ($browser): array {
+    [$status, $body] = $browser()->http('/index.php');
+    preg_match('/window\.SMART_ASSESS_CONFIG=(\{.*?\});window\.SMART_ASSESS_PAGE=/s', $body, $m);
+    return [$status, (array) json_decode($m[1] ?? '{}', true), $body];
+};
+[$gateCode, $gateConfig, $gateHtml] = $renderedGate();
+$check('before the migration: the rendered client page tells the page it can take one document per application (multiDocument false)', $gateCode === 200
+    && array_key_exists('multiDocument', $gateConfig) && $gateConfig['multiDocument'] === false && ($gateConfig['portal'] ?? '') === 'client', [$gateCode, $gateConfig]);
+$check('the rendered page carries the gate that hides "Add Another Document Request" and stops several documents at Step 2', str_contains($gateHtml, 'function multiDocAllowed(){')
+    && str_contains($gateHtml, "c.multiDocument===false") && str_contains($gateHtml, "errors['doc-multi'] = ONE_DOC_ONLY_MSG;"));
+[, $internalConfig] = (static function () use ($browser): array {
+    [$status, $body] = $browser('/internal.php')->http('/internal.php');
+    preg_match('/window\.SMART_ASSESS_CONFIG=(\{.*?\});window\.SMART_ASSESS_PAGE=/s', $body, $m);
+    return [$status, (array) json_decode($m[1] ?? '{}', true)];
+})();
+$check('the Staff page is not given the client-page flag', $internalConfig !== [] && !array_key_exists('multiDocument', $internalConfig), $internalConfig);
 [$code, $res, $legacyRef] = $apply(null);
 $check('before the migration: a single-document application is saved as before', $code === 200 && (bool) preg_match('/^DR-\d{4}-[A-F0-9]{8}$/', $legacyRef), [$code, $res]);
 $before = $count('SELECT COUNT(*) FROM requests');
@@ -365,6 +382,9 @@ $check('the migration runs twice without error and adds the new table and column
 unset($legacyAfter['application_id'], $legacyAfter['item_no']);
 $check('existing requests are unchanged by the migration (new columns empty)', $legacyAfter === $legacyBefore && $requestRow($legacyRef)['application_id'] === null
     && $requestRow($legacyRef)['item_no'] === null, [$legacyBefore, $legacyAfter]);
+[$gateCode, $gateConfig] = $renderedGate();
+$check('after the migration: the rendered client page offers several documents (multiDocument true), with no other change', $gateCode === 200
+    && ($gateConfig['multiDocument'] ?? null) === true && ($gateConfig['portal'] ?? '') === 'client', [$gateCode, $gateConfig]);
 [, $tracked] = $browser()->track($legacyRef);
 $check('an existing single-document request is still tracked as before', ($tracked['id'] ?? '') === $legacyRef && ($tracked['docType'] ?? '') === DOCS[1]
     && !isset($tracked['items']) && ($tracked['applicationRef'] ?? null) === null, $tracked);
@@ -530,6 +550,107 @@ $check('refused applications save no request, application or file', $count('SELE
     && $count('SELECT COUNT(*) FROM request_applications') === $beforeApps && count(glob($app . 'private_uploads/requests/*') ?: []) === $beforeFiles);
 [$code, $res, $fiveRef] = $apply($items(5));
 $check('5 different documents are accepted', $code === 200 && $count('SELECT COUNT(*) FROM requests WHERE reference_no LIKE ' . $pdo->quote($fiveRef . '-%')) === 5, [$code, $res]);
+
+// ================= Each document request is checked on its own: listed documents and purposes only =================
+$page = (string) file_get_contents($project . '/smart-assess.html');
+$pageList = static function (string $name) use ($page): array {
+    preg_match('/const ' . $name . ' = \[(.*?)\];/s', $page, $m);
+    preg_match_all("/'([^']+)'/", $m[1] ?? '', $values);
+    return $values[1];
+};
+$check('the server accepts exactly the page\'s document types and purposes, in the same order', $pageList('DOC_TYPES') === DocumentRequirements::DOCUMENT_REQUEST_TYPES
+    && $pageList('PURPOSES') === DocumentRequirements::DOCUMENT_REQUEST_PURPOSES && count(DOCS) === count(DocumentRequirements::DOCUMENT_REQUEST_TYPES)
+    && array_diff(DOCS, DocumentRequirements::DOCUMENT_REQUEST_TYPES) === [], [$pageList('DOC_TYPES'), $pageList('PURPOSES')]);
+$beforeRequests = $count('SELECT COUNT(*) FROM requests');
+$beforeApps = $count('SELECT COUNT(*) FROM request_applications');
+$beforeFiles = count(glob($app . 'private_uploads/requests/*') ?: []);
+[$code, $res] = $apply([['document_type' => DOCS[0], 'purpose' => 'Personal Copy'], ['document_type' => 'Building Plan (not offered)', 'purpose' => 'Personal Copy']]);
+$check('a document that is not offered is refused, naming its request ("Document Request 2")', $code === 422
+    && str_starts_with((string) ($res['error'] ?? ''), 'Document Request 2: Select a document type from the list.'), [$code, $res]);
+[$code, $res] = $apply([['document_type' => DOCS[0], 'purpose' => 'Personal Copy'], ['document_type' => DOCS[1], 'purpose' => 'For Transfer'], ['document_type' => DOCS[2], 'purpose' => 'Anything']]);
+$check('a purpose that is not offered is refused, naming its request ("Document Request 3"), even when the others are valid', $code === 422
+    && str_starts_with((string) ($res['error'] ?? ''), 'Document Request 3: Select a purpose from the list.'), [$code, $res]);
+[$code, $res] = $apply([['document_type' => DOCS[0], 'purpose' => 'Personal Copy'], ['document_type' => '', 'purpose' => '']]);
+[$code2, $res2] = $apply([['document_type' => DOCS[0], 'purpose' => 'Personal Copy'], ['document_type' => DOCS[1], 'purpose' => '']]);
+$check('an empty document type or purpose is refused, naming its request', $code === 422 && ($res['error'] ?? '') !== '' && str_starts_with((string) $res['error'], 'Document Request 2: Select a document type.')
+    && $code2 === 422 && str_starts_with((string) ($res2['error'] ?? ''), 'Document Request 2: Select a purpose.'), [$res, $res2]);
+[$code, $res] = $apply([['document_type' => DOCS[0], 'purpose' => 'Personal Copy'], 'not a request']);
+$check('a malformed entry in the list is refused, naming its request', $code === 422 && str_starts_with((string) ($res['error'] ?? ''), 'Document Request 2:'), [$code, $res]);
+[$code, $res] = $apply(null, true, null, ['document_type' => 'Made-up Certificate']);
+[$code2, $res2] = $apply(null, true, null, ['purpose' => 'Test']);
+$check('one document (the earlier fields) follows the same lists, without a request number', $code === 422 && str_starts_with((string) ($res['error'] ?? ''), 'Select a document type from the list.')
+    && $code2 === 422 && str_starts_with((string) ($res2['error'] ?? ''), 'Select a purpose from the list.'), [$res, $res2]);
+$check('refused document requests save no request, application or file', $count('SELECT COUNT(*) FROM requests') === $beforeRequests
+    && $count('SELECT COUNT(*) FROM request_applications') === $beforeApps && count(glob($app . 'private_uploads/requests/*') ?: []) === $beforeFiles);
+[$code, $res, $spelledRef] = $apply([['document_type' => '  certification of   ASSESSMENT ', 'purpose' => 'for titling'], ['document_type' => DOCS[0], 'purpose' => 'personal copy']]);
+$check('listed choices in another letter case or spacing are saved with the listed spelling, each on its own request', $code === 200
+    && $requestRow($spelledRef . '-1')['document_type'] === 'Certification of Assessment' && $requestRow($spelledRef . '-1')['purpose'] === 'For Titling'
+    && $requestRow($spelledRef . '-2')['document_type'] === DOCS[0] && $requestRow($spelledRef . '-2')['purpose'] === 'Personal Copy', [$code, $res]);
+[$code, $res, $oneRef] = $apply(null);
+$check('one valid document is still saved as before (no application, no item number)', $code === 200 && (bool) preg_match('/^DR-\d{4}-[A-F0-9]{8}$/', $oneRef)
+    && $requestRow($oneRef)['application_id'] === null && $requestRow($oneRef)['document_type'] === DOCS[1], [$code, $res]);
+
+// ================= Duplicate submissions without a saved draft (the page's submission key) =================
+$snapshotKey = static fn (string $ref): array => [
+    $count('SELECT COUNT(*) FROM request_applications WHERE reference_no = ' . $pdo->quote($ref)),
+    $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($ref) . ' OR reference_no LIKE ' . $pdo->quote($ref . '-%')),
+    $count('SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id = rd.request_id WHERE r.reference_no LIKE ' . $pdo->quote($ref . '%')),
+    $count("SELECT COUNT(*) FROM notifications n JOIN requests r ON r.id = n.request_id WHERE n.type = 'submission_confirmation' AND r.reference_no LIKE " . $pdo->quote($ref . '%')),
+];
+$keyClient = $browser();
+$key = bin2hex(random_bytes(16));
+[$code, $res, $keyRef] = $apply($items(3), true, null, ['submission_key' => $key], $keyClient);
+$first = $snapshotKey($keyRef);
+$filesAfterFirst = count(glob($app . 'private_uploads/requests/*') ?: []);
+$allRequests = $count('SELECT COUNT(*) FROM requests');
+$check('an application sent with a submission key is saved once: 3 documents, their files and one confirmation', $code === 200 && $first[0] === 1 && $first[1] === 3 && $first[2] === 6 && $first[3] === 1, [$code, $res, $first]);
+[$code, $res, $againKeyRef] = $apply($items(3), true, null, ['submission_key' => $key], $keyClient);
+$check('sent again with the same key (a lost response, Submit pressed again): the same reference, marked as a repeat', $code === 200 && $againKeyRef === $keyRef
+    && ($res['data']['duplicate'] ?? false) === true, [$code, $res]);
+[$code, $res, $changedRef] = $apply($items(4), true, null, ['submission_key' => $key], $keyClient);
+$check('a repeat with changed contents still returns the saved application and changes nothing', $code === 200 && $changedRef === $keyRef && $snapshotKey($keyRef) === $first, [$code, $res]);
+$check('the repeats saved no request, document record, file or confirmation', $count('SELECT COUNT(*) FROM requests') === $allRequests
+    && count(glob($app . 'private_uploads/requests/*') ?: []) === $filesAfterFirst && $snapshotKey($keyRef) === $first);
+[$code, $res, $otherRef] = $apply($items(3), true, null, ['submission_key' => $key]);
+$check('the same key from another browser session is a separate application (a key never reveals another session\'s reference)', $code === 200
+    && $otherRef !== '' && $otherRef !== $keyRef && ($res['data']['duplicate'] ?? false) === false, [$code, $res]);
+[$code, $res, $newRef] = $apply($items(2), true, null, ['submission_key' => bin2hex(random_bytes(16))], $keyClient);
+$check('a new application from the same browser (a new key) is saved as its own application', $code === 200 && $newRef !== $keyRef && $snapshotKey($newRef)[1] === 2, [$code, $res]);
+$singleKey = bin2hex(random_bytes(16));
+[$code, $res, $singleKeyRef] = $apply(null, true, null, ['submission_key' => $singleKey], $keyClient);
+[$code2, $res2, $singleAgain] = $apply(null, true, null, ['submission_key' => $singleKey], $keyClient);
+$check('one document is protected the same way', $code === 200 && $code2 === 200 && $singleAgain === $singleKeyRef
+    && $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($singleKeyRef)) === 1, [$res, $res2]);
+$retryKey = bin2hex(random_bytes(16));
+[$code, $res] = $apply($items(2), true, ['ownerId'], ['submission_key' => $retryKey], $keyClient);
+[$code2, $res2, $retryRef] = $apply($items(2), true, null, ['submission_key' => $retryKey], $keyClient);
+$check('a refused attempt does not use up its key: corrected and sent again, it is saved', $code === 422 && $code2 === 200 && $retryRef !== ''
+    && ($res2['data']['duplicate'] ?? false) === false && $snapshotKey($retryRef)[1] === 2, [$res, $res2]);
+// The same key for a different kind of application (a page that did not start a new key): a separate
+// application, never answered with the earlier one; the earlier one is still recognized as before.
+$ltKey = bin2hex(random_bytes(16));
+[$code, $res, $ltDocRef] = $apply($items(2), true, null, ['submission_key' => $ltKey], $keyClient);
+[, $ltAccepted] = $keyClient->json('terms_accept', ['flow' => 'landtransfer', 'agreed' => true, 'terms_version' => $termsVersion]);
+$ltPost = ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $keyClient->csrf, 'terms_token' => (string) ($ltAccepted['data']['terms_token'] ?? ''),
+    'flow' => 'landtransfer', 'first_name' => 'Rosa', 'middle_name' => '', 'last_name' => 'Fictional', 'contact_number' => '+639170000' . random_int(100, 999),
+    'address_line' => '1 Demo Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0001-0' . random_int(1000, 9999),
+    'property_address' => 'Poblacion', 'barangay' => 'POBLACION', 'is_owner' => true, 'transfer_type' => 'Sale', 'submission_key' => $ltKey])];
+foreach (array_keys(DocumentRequirements::requirementsFor('landtransfer', true, [])) as $ltDoc) {
+    $ltPost['file_' . $ltDoc] = new CURLFile($fixtures . '/id.png', 'image/png', $ltDoc . '.png');
+}
+[$ltStatus, $ltBody] = $keyClient->http('/api.php?action=submit_request', $ltPost);
+$ltJson = (array) json_decode($ltBody, true);
+$ltRef = (string) ($ltJson['data']['reference_no'] ?? '');
+$check('the same key sent with another kind of application (Land Transfer) saves that application; it is never answered with the earlier one', $code === 200
+    && $ltStatus === 200 && str_starts_with($ltRef, 'LT-') && ($ltJson['data']['duplicate'] ?? false) === false
+    && $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($ltRef)) === 1, [$code, $ltStatus, substr($ltBody, 0, 300)]);
+[$code, $res, $ltDocAgain] = $apply($items(2), true, null, ['submission_key' => $ltKey], $keyClient);
+$check('the earlier Document Request is still recognized by its key afterwards', $code === 200 && $ltDocAgain === $ltDocRef && ($res['data']['duplicate'] ?? false) === true, [$code, $res]);
+$beforeOld = $count('SELECT COUNT(*) FROM request_applications');
+[$code, , $oldRef1] = $apply($items(2), true, null, ['submission_key' => 'not-a-key'], $keyClient);
+[$code2, , $oldRef2] = $apply($items(2), true, null, [], $keyClient);
+$check('an older page (no key, or not a valid key) is handled as before', $code === 200 && $code2 === 200 && $oldRef1 !== $oldRef2
+    && $count('SELECT COUNT(*) FROM request_applications') === $beforeOld + 2);
 
 // ================= Drafts =================
 $draftClient = $browser();

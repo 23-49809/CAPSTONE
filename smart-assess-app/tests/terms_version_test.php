@@ -167,8 +167,8 @@ $image = imagecreatetruecolor(30, 20);
 imagefill($image, 0, 0, imagecolorallocate($image, 20, 120, 60));
 imagepng($image, $fixtures . '/id.png');
 $applicant = ['flow' => 'docreq', 'first_name' => 'Terms', 'last_name' => 'Tester', 'contact_number' => '+639170003333', 'email' => 'terms.test@example.invalid',
-    'address_line' => '1 Test St', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'purpose' => 'Test', 'arp_number' => '14-0007-00003',
-    'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true, 'document_type' => 'Certified True Copy of Tax Declaration'];
+    'address_line' => '1 Test St', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'purpose' => 'Personal Copy', 'arp_number' => '14-0007-00003',
+    'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true, 'document_type' => 'Certified True Copy of Tax Declaration (CTC-TD)'];
 $submit = static function (array $extra, array $files = []) use ($http, $csrf, $applicant): array {
     $post = ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $csrf] + $extra + $applicant)];
     foreach ($files as $key => $path) {
