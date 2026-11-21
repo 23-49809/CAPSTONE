@@ -669,6 +669,16 @@ function sa_submit_request(array $data): array
     if (!in_array($flow, ['docreq', 'landtransfer'], true)) {
         throw new SaHttpException(422);
     }
+    // The page sends one random key per application it submits and keeps it when a submission must be
+    // retried (a lost response, a second click, a second press of Submit). A key this browser session
+    // has already submitted returns that application's reference, so nothing is saved twice, even
+    // without a saved draft. (PHP's session lock makes two such submissions run one after the other.)
+    $submissionKey = sa_submission_key($data['submission_key'] ?? null);
+    // Keys are remembered per application type: a key can only repeat the same kind of application.
+    $earlier = $submissionKey !== null ? sa_session_submission($flow . ':' . $submissionKey) : null;
+    if ($earlier !== null) {
+        return ['reference_no' => $earlier, 'status' => 'Received', 'duplicate' => true];
+    }
     $fields = [
         'first_name' => [80, true],
         'middle_name' => [80, false],
@@ -705,6 +715,13 @@ function sa_submit_request(array $data): array
     $items = null;
     if ($flow === 'docreq' && array_key_exists('document_requests', $data)) {
         $items = sa_document_request_items($data['document_requests']);
+        $values['purpose'] = $items[0]['purpose'];
+    } elseif ($flow === 'docreq') {
+        // One document sent the earlier way (document_type and purpose): the same lists apply.
+        $items = [[
+            'document_type' => sa_document_request_choice($data['document_type'] ?? null, 'type'),
+            'purpose' => sa_document_request_choice($data['purpose'] ?? null, 'purpose'),
+        ]];
         $values['purpose'] = $items[0]['purpose'];
     }
     if ($values['purpose'] === null) {
@@ -1140,6 +1157,9 @@ function sa_submit_request(array $data): array
         // This browser session submitted it, so its receipt and tracking show the
         // full applicant name (the duplicate return above records nothing).
         sa_remember_submitted_reference($reference);
+        if ($submissionKey !== null) {
+            sa_remember_submission($flow . ':' . $submissionKey, $reference);
+        }
         return ['reference_no' => $reference, 'status' => 'Received']
             + ($isApplication ? ['documents' => array_map(static fn (int $i): array => ['reference_no' => $reference . '-' . ($i + 1),
                 'document_type' => $items[$i]['document_type']], array_keys($items))] : []);
@@ -1185,22 +1205,39 @@ function sa_document_request_items(mixed $raw): array
     if (count($raw) > DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION) {
         throw new SaHttpException(422, 'One application can include up to ' . DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION . ' documents.');
     }
+    // Each document request is checked on its own, and a refusal names which one ("Document Request 2:
+    // ..."), as the page numbers them. Only the listed documents and purposes are accepted
+    // (DocumentRequirements), saved with their listed spelling.
     $items = [];
     $seen = [];
-    foreach ($raw as $item) {
+    $several = count($raw) > 1;
+    foreach ($raw as $index => $item) {
+        $which = $several ? 'Document Request ' . ($index + 1) . ': ' : '';
         if (!is_array($item)) {
-            throw new SaHttpException(422, 'Choose at least one document to request.');
+            throw new SaHttpException(422, $which . 'Choose a document type and a purpose.');
         }
-        $type = (string) sa_text($item, 'document_type', 120, true);
-        $purpose = (string) sa_text($item, 'purpose', 80, true);
-        $key = mb_strtolower((string) preg_replace('/\s+/u', ' ', $type), 'UTF-8');
-        if (isset($seen[$key])) {
-            throw new SaHttpException(422, 'Each document can be chosen only once in an application. Remove the repeated "' . $type . '".');
+        $type = sa_document_request_choice($item['document_type'] ?? null, 'type', $which);
+        $purpose = sa_document_request_choice($item['purpose'] ?? null, 'purpose', $which);
+        if (isset($seen[$type])) {
+            throw new SaHttpException(422, $which . 'Each document can be chosen only once in an application. Remove the repeated "' . $type . '".');
         }
-        $seen[$key] = true;
+        $seen[$type] = true;
         $items[] = ['document_type' => $type, 'purpose' => $purpose];
     }
     return $items;
+}
+
+/** A Document Request's document type or purpose, as listed (DocumentRequirements), or a 422 that says which. */
+function sa_document_request_choice(mixed $value, string $what, string $which = ''): string
+{
+    $empty = !is_string($value) || trim($value) === '';
+    $listed = $what === 'type' ? DocumentRequirements::documentRequestType($value) : DocumentRequirements::documentRequestPurpose($value);
+    if ($listed !== null) {
+        return $listed;
+    }
+    $name = $what === 'type' ? 'document type' : 'purpose';
+    throw new SaHttpException(422, $which . ($empty ? 'Select a ' . $name . '.' : 'Select a ' . $name . ' from the list.')
+        . ($empty ? '' : ' If the list on your page looks different, reload the page and try again.'));
 }
 
 function sa_update_request_status(array $data): array

@@ -1367,6 +1367,11 @@ function validateStep1(fd, errors){
    fd.documentType / fd.purpose, which single-document applications and older drafts use. Each
    document becomes its own request on the server, all under one tracking number. */
 const MAX_DOCUMENT_REQUESTS = 5;   // the same limit as the server (DocumentRequirements)
+/* False only when the server says it cannot yet save several documents in one application (its
+   database update has not run). Then the page offers one document per application. */
+function multiDocAllowed(){ const c = window.SMART_ASSESS_CONFIG; return !(c && c.multiDocument===false); }
+function canAddDocRequest(items){ return multiDocAllowed() && items.length < Math.min(MAX_DOCUMENT_REQUESTS, DOC_TYPES.length); }
+const ONE_DOC_ONLY_MSG = 'For now, one application can include one document. Keep one document request (remove the others) and submit each other document as its own application.';
 function docItems(fd){
   if(Array.isArray(fd.documentRequests) && fd.documentRequests.length) return fd.documentRequests;
   return [{documentType:fd.documentType||'', purpose:fd.purpose||''}];
@@ -1386,6 +1391,7 @@ function validateStep2(flow, fd, errors){
       else if(!it.purpose) errors['doc-'+i+'-purpose'] = 'Please select a purpose.';
       if(it.documentType) seen[it.documentType] = true;
     });
+    if(docItems(fd).length>1 && !multiDocAllowed()) errors['doc-multi'] = ONE_DOC_ONLY_MSG;
   } else if(!fd.transferType) errors.transferType = 'Please select a transfer type.';
   const arpCode = barangayCode(fd.barangay);
   if(!arpCode) errors.arp = 'Select the property barangay to fill in its ARP code.';
@@ -1465,13 +1471,22 @@ function pushStatus(record, status){
 
 /* ======================= Navigation helpers ======================= */
 function go(view){ state.view = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+/* One random key per application: sent with Submit and kept when Submit has to be pressed again (a
+   lost response, a refusal), so the server returns the application it already saved instead of a
+   second one. Every application started or resumed gets a new key; it is never saved in a draft. */
+function newSubmissionKey(){
+  const c = window.crypto || window.msCrypto;
+  if(!c || !c.getRandomValues) return '';
+  const bytes = new Uint8Array(16); c.getRandomValues(bytes);
+  return Array.prototype.map.call(bytes, function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
+}
 function startFlow(flow, confirmed){
   const existing = draftLocalRead(flow);
   if(!confirmed && existing && draftHasContent(existing) && !confirm('You have an unfinished '+draftTypeName(flow)+'. Start a new one and discard it?')) return;
   draftReset();             // leave the other application type's draft untouched
   discardDraft(flow);
   state.flow = flow; state.view='wizard'; state.step=1; state.maxStep=1;
-  state.formData = blankFormData(); state.errors={};
+  state.formData = blankFormData(); state.errors={}; state.submissionKey = newSubmissionKey();
   render(); window.scrollTo({top:0,behavior:'smooth'});
 }
 function goToServices(){
@@ -1805,12 +1820,14 @@ function renderStep2(){
         + '<p class="doc-req-needs"><strong>Requirements:</strong> '+esc(needs)+(items.length>1 ? ' (uploaded once in Step 3, used for all documents)' : ' (upload in Step 3)')+'</p>'
       + '</section>';
     }).join('');
-    const canAdd = items.length < Math.min(MAX_DOCUMENT_REQUESTS, DOC_TYPES.length);
-    return '<div class="wizard-card-head"><h2>Choose Documents and Enter Property Information</h2><p>Choose each document you need. You can request up to '+MAX_DOCUMENT_REQUESTS+' different documents for this property in one application, with one tracking number.</p></div>'
+    const canAdd = canAddDocRequest(items), several = multiDocAllowed();
+    return '<div class="wizard-card-head"><h2>Choose Documents and Enter Property Information</h2><p>'+(several ? 'Choose each document you need. You can request up to '+MAX_DOCUMENT_REQUESTS+' different documents for this property in one application, with one tracking number.' : 'Choose the document you need.')+'</p></div>'
     + '<div class="wizard-card-body">'
       + '<div class="doc-req-list">'+cards+'</div>'
+      + fieldError('doc-multi')
       + (canAdd ? '<button type="button" class="btn btn-ghost doc-req-add" data-action="add-doc-request">'+ic('plus')+'Add Another Document Request</button>'
-        : '<p class="field-hint doc-req-limit">You have added the most documents one application can hold.</p>')
+        : (several ? '<p class="field-hint doc-req-limit">You have added the most documents one application can hold.</p>'
+          : '<p class="field-hint doc-req-limit">To request another document, submit it as a separate application.</p>'))
       + '<div class="section-divider doc-req-divider"><span>Property Information (for all documents)</span></div>'
       + '<div class="field-grid">'
         + barangayField
@@ -2924,7 +2941,7 @@ function renderCardDraft(flow){
     + '<button type="button" class="btn btn-primary card-draft-btn" data-action="draft-resume" data-flow="'+flow+'">Proceed</button></div>';
 }
 function draftApplyFields(flow, step, maxStep, fields, savedFiles){
-  state.flow = flow; state.view = 'wizard';
+  state.flow = flow; state.view = 'wizard'; state.submissionKey = newSubmissionKey();
   state.formData = Object.assign(blankFormData(), fields || {}, { files:{} });
   // A saved list of documents is the source of truth; the first one is mirrored into the single fields.
   if(flow==='docreq' && Array.isArray(state.formData.documentRequests) && state.formData.documentRequests.length) setDocItems(state.formData, state.formData.documentRequests);
@@ -2997,7 +3014,7 @@ function discardDraft(flow){
 }
 function draftCompleted(){ Object.keys(draftPendingFiles).forEach(function(k){ delete draftPendingFiles[k]; }); draftLocalClear(); draftReset(); }
 window.SMART_ASSESS_DRAFT_DONE = draftCompleted;
-window.SMART_ASSESS_FORM = function(){ return { flow:state.flow, formData:state.formData, draftCode:draft.code }; };
+window.SMART_ASSESS_FORM = function(){ return { flow:state.flow, formData:state.formData, draftCode:draft.code, submissionKey:state.submissionKey||'' }; };
 window.addEventListener('online', function(){ if(state.view==='wizard' && (draft.status==='offline' || draft.status==='error')){ draft.revision += 1; setDraftStatus('saving'); flushDraft(); } });
 window.addEventListener('offline', function(){ if(state.view==='wizard' && draft.status!=='idle') setDraftStatus('offline'); });
 /* Leaving or closing the page: push the latest change without waiting. */
@@ -3279,7 +3296,7 @@ function bindEvents(root){
       }
       else if(a==='add-doc-request'){
         const items = docItems(state.formData).slice();
-        if(items.length < Math.min(MAX_DOCUMENT_REQUESTS, DOC_TYPES.length)){
+        if(canAddDocRequest(items)){
           items.push({documentType:'', purpose:''});
           setDocItems(state.formData, items);
           render();

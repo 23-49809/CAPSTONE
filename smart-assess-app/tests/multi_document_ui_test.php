@@ -39,7 +39,7 @@ $check('tracking accepts a document\'s own reference (DR-2026-AB12CD34-2)', str_
 
 // ---- Rendered ----
 $hook = 'window.__SA = {get state(){ return state; }, render:function(){ render(); }, setDocItems:setDocItems, docItems:docItems, nextStep:function(){ nextStep(); },'
-    . ' submitRequest:function(){ submitRequest(); }, confirm:function(){ confirmSubmitRequest(); }, applyDraft:function(f,st,mx,fields,files){ draftApplyFields(f,st,mx,fields,files); }};' . "\n" . 'window.SMART_ASSESS_FORM = function(){';
+    . ' submitRequest:function(){ submitRequest(); }, confirm:function(){ confirmSubmitRequest(); }, applyDraft:function(f,st,mx,fields,files){ draftApplyFields(f,st,mx,fields,files); }, startFlow:function(f){ startFlow(f, true); }, draftFields:function(){ return draftFields(); }};' . "\n" . 'window.SMART_ASSESS_FORM = function(){';
 $page0 = str_replace('window.SMART_ASSESS_FORM = function(){', $hook, $html);
 $check('the test hook could be added to the temporary copy', $page0 !== $html);
 $work = sys_get_temp_dir() . '/sa-multi-doc-ui-' . bin2hex(random_bytes(4));
@@ -187,6 +187,97 @@ $check('Staff performance keeps its figures, only labelled by what they count (n
 $check('the printed report and the report details use the same labels', str_contains($internal, "'Applications: <b>'+applications+'</b> &nbsp;·&nbsp; Individual document requests submitted: <b>'")
     && str_contains($internal, "[['Applications', s.applications==null ? s.total : s.applications], ['Individual Document Requests', s.total]]")
     && str_contains($internal, '<th class="num">Total Requests Completed (individual requests)</th>'));
+
+// ---- A server that cannot yet save several documents in one application (its database update has not run) ----
+$oneOnly = 'window.SMART_ASSESS_CONFIG={multiDocument:false};';
+$g = $run('oneOnly', $oneOnly . $base . 'state.step=2; S.setDocItems(fd,[{documentType:"Certification of Assessment",purpose:"Personal Copy"}]); S.render();' . $cards
+    . ' out.hint=(document.querySelector(".doc-req-limit")||{}).textContent; out.lead=document.querySelector(".wizard-card-head p").textContent; S.nextStep(); out.step=S.state.step;');
+$check('when the server takes one document per application, the page offers no Add button and says to apply separately', ($g['cards'] ?? 0) === 1 && ($g['add'] ?? true) === false
+    && ($g['hint'] ?? '') === 'To request another document, submit it as a separate application.' && ($g['lead'] ?? '') === 'Choose the document you need.', $g);
+$check('one document still continues normally on such a server', ($g['step'] ?? 0) === 3, $g);
+$g = $run('oneOnlyDraft', $oneOnly . $base . 'state.step=2; ' . $two . ' S.render(); S.nextStep(); out.step=S.state.step; out.msg=(document.getElementById("err-doc-multi")||{}).textContent;'
+    . ' S.state.step=4; S.render(); S.submitRequest(); out.submit=[S.state.step, S.state.submitConfirmation];'
+    . ' document.querySelector("[data-action=remove-doc-request][data-index=\'1\']").click(); out.left=S.docItems(S.state.formData).length; out.errAfter=!!document.getElementById("err-doc-multi");'
+    . ' S.nextStep(); out.after=S.state.step;');
+$check('a restored application with several documents is stopped at Step 2 with a clear message (not refused only at Submit)', ($g['step'] ?? 0) === 2
+    && str_starts_with((string) ($g['msg'] ?? ''), 'For now, one application can include one document.') && ($g['submit'] ?? null) === [2, false], $g);
+$check('removing the extra document clears the message and the application continues', ($g['left'] ?? 0) === 1 && ($g['errAfter'] ?? true) === false && ($g['after'] ?? 0) === 3, $g);
+$g = $run('multiOn', 'window.SMART_ASSESS_CONFIG={multiDocument:true};' . $base . 'state.step=2; S.render();' . $cards);
+$check('when the server takes several documents, the Add button is offered (also without any server, in the demo)', ($g['add'] ?? false) === true, $g);
+$prototype = (string) file_get_contents($project . '/smart-assess-app/web/prototype.php');
+$check('the client page is told whether the server can take several documents (from the database check)', str_contains($prototype, "\$config['multiDocument'] = sa_applications_available();"));
+
+// ---- The page's own key: one per application started or resumed, kept while that application is retried ----
+$g = $run('pageKey', 'S.startFlow("docreq"); var k1=S.state.submissionKey; out.k1=k1; out.exposed=window.SMART_ASSESS_FORM().submissionKey===k1;'
+    . ' S.nextStep(); S.submitRequest(); out.kept=S.state.submissionKey===k1; out.inDraft=JSON.stringify(S.draftFields()).indexOf(k1)>=0;'
+    . ' S.startFlow("docreq"); out.k2=S.state.submissionKey; S.startFlow("landtransfer"); out.k3=S.state.submissionKey;'
+    . ' S.applyDraft("docreq",2,2,{firstName:"Rosa"},[]); out.k4=S.state.submissionKey;');
+$keysSeen = [$g['k1'] ?? '', $g['k2'] ?? '', $g['k3'] ?? '', $g['k4'] ?? ''];
+$check('every application the page starts or resumes gets its own random key (32 hex characters), given to the submit script',
+    count(array_filter($keysSeen, static fn ($k) => (bool) preg_match('/^[a-f0-9]{32}$/', (string) $k))) === 4 && count(array_unique($keysSeen)) === 4 && ($g['exposed'] ?? false) === true, $g);
+$check('the key stays the same while that application is checked and retried, and is never saved in a draft', ($g['kept'] ?? false) === true && ($g['inDraft'] ?? true) === false, $g);
+
+// ---- Submit: one key per application, kept for retries (no duplicate application without a saved draft) ----
+$node = trim((string) shell_exec('command -v node 2>/dev/null'));
+if ($node === '') {
+    $check('Node.js is available for the submit-key checks', false, 'node not found');
+} else {
+    $bridgeJs = $work . '/bridge-run.js';
+    file_put_contents($bridgeJs, <<<'JS'
+const fs = require('fs');
+const posts = []; const answers = []; const assigned = []; let clickHandler = null;
+const node = () => ({ style: {}, appendChild() {}, insertBefore() {}, remove() {}, setAttribute() {}, addEventListener() {}, querySelector: () => null, prepend() {}, classList: { add() {}, remove() {} } });
+global.window = { SMART_ASSESS_CONFIG: { portal: 'client', csrf: 'c', api: '/api.php' }, crypto: globalThis.crypto, setTimeout: () => 0, location: { assign: (u) => assigned.push(u) } };
+window.SMART_ASSESS_FORM = () => ({ flow: 'docreq', draftCode: '', formData: { isOwner: true, firstName: 'Rosa', documentRequests: [
+  { documentType: 'Certification of Assessment', purpose: 'Personal Copy' }, { documentType: 'Certification of No Liens and Encumbrances', purpose: 'For Titling' }] } });
+global.document = { addEventListener: (type, fn) => { if (type === 'click') clickHandler = fn; }, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [],
+  createElement: node, body: node(), readyState: 'complete' };
+global.fetch = (url, opts) => { posts.push(JSON.parse(opts.body.get('payload'))); return answers.shift()(); };
+eval(fs.readFileSync(process.argv[2], 'utf8'));
+const submit = () => clickHandler({ target: { closest: () => ({ getAttribute: () => 'confirm-submit' }) }, preventDefault() {}, stopImmediatePropagation() {} });
+const ok = () => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, request: { reference_no: 'DR-2026-AB12CD34' } }) });
+const lost = () => Promise.reject(new TypeError('Failed to fetch'));
+const refused = () => Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'Upload every required document before submitting.' }) });
+const settle = () => new Promise((r) => setTimeout(r, 20));
+(async () => {
+  answers.push(lost, refused, ok, ok);
+  submit(); submit(); await settle();          // a double click sends once; the response is lost
+  submit(); await settle();                    // Submit again: refused (nothing saved)
+  submit(); await settle();                    // Submit again: saved
+  submit(); await settle();                    // a click while the page leaves for the receipt: nothing sent
+  eval(fs.readFileSync(process.argv[2], 'utf8')); // the next application: a new page load
+  submit(); await settle();
+  // A current page gives its own key per application: the script sends that one.
+  const pageKeys = ['0123456789abcdef0123456789abcdef', 'fedcba9876543210fedcba9876543210'];
+  let flowNow = 'docreq', pageKey = pageKeys[0];
+  window.SMART_ASSESS_FORM = () => ({ flow: flowNow, draftCode: '', submissionKey: pageKey, formData: { isOwner: true, firstName: 'Rosa' } });
+  eval(fs.readFileSync(process.argv[2], 'utf8'));
+  answers.push(lost, ok);
+  submit(); await settle();                    // lost response
+  pageKey = pageKeys[1]; flowNow = 'landtransfer';
+  submit(); await settle();                    // the client started a different application on the same page
+  // An older page (no key of its own): the script's key changes with the application type.
+  window.SMART_ASSESS_FORM = () => ({ flow: flowNow, draftCode: '', formData: { isOwner: true, firstName: 'Rosa' } });
+  eval(fs.readFileSync(process.argv[2], 'utf8'));
+  answers.push(lost, lost);
+  flowNow = 'docreq'; submit(); await settle();
+  flowNow = 'landtransfer'; submit(); await settle();
+  console.log(JSON.stringify({ count: posts.length, keys: posts.map((p) => p.submission_key), docs: posts[0].document_requests, assigned }));
+})();
+JS);
+    $out = (array) json_decode((string) shell_exec(escapeshellarg($node) . ' ' . escapeshellarg($bridgeJs) . ' ' . escapeshellarg($project . '/smart-assess-app/web/assets/php-bridge.js') . ' 2>&1'), true);
+    $keys = $out['keys'] ?? [];
+    $check('the page sends a random submission key with every application (32 hex characters); a double click, or a click after success, sends nothing more', ($out['count'] ?? 0) === 8
+        && count($keys) === 8 && (bool) preg_match('/^[a-f0-9]{32}$/', (string) ($keys[0] ?? '')), $out);
+    $check('after a lost response or a refusal, Submit again sends the same key, so the server returns the saved application', isset($keys[2]) && $keys[0] === $keys[1] && $keys[1] === $keys[2], $out);
+    $check('the next application (a new page after the receipt) gets a new key', isset($keys[3]) && $keys[3] !== $keys[2] && (bool) preg_match('/^[a-f0-9]{32}$/', (string) $keys[3]), $out);
+    $check('with a current page, the page\'s key for each application is sent (a new application on the same page, a new key)',
+        array_slice($keys, 4, 2) === ['0123456789abcdef0123456789abcdef', 'fedcba9876543210fedcba9876543210'], $out);
+    $check('with an older page, the script makes a new key when the application type changes', isset($keys[7]) && $keys[6] !== $keys[7]
+        && !in_array($keys[6], array_slice($keys, 0, 6), true), $out);
+    $check('each attempt still sends every chosen document', ($out['docs'] ?? null) === [['document_type' => 'Certification of Assessment', 'purpose' => 'Personal Copy'],
+        ['document_type' => 'Certification of No Liens and Encumbrances', 'purpose' => 'For Titling']] && count($out['assigned'] ?? []) === 3, $out);
+}
 
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {

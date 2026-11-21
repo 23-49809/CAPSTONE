@@ -167,6 +167,45 @@ Apply the compatibility-view migration after the `users.email` migration,
 since the unified account view depends on that column. Use the existing source
 tables for writes.
 
+### Several documents in one Document Request
+
+One Document Request application can ask for up to five different documents
+(`DocumentRequirements::MAX_DOCUMENTS_PER_APPLICATION`), each with its own
+purpose. Each document becomes its own request (`DR-YYYY-XXXXXXXX-1`, `-2`, …)
+with its own status, Staff member, copies of the shared uploads and document
+check, all linked to one application reference that the client tracks.
+
+- **Database update required:** `database/migrations/20261119_request_applications.sql`
+  (rollback in `database/rollbacks/`). Until it has run, the client page offers
+  one document per application (`SMART_ASSESS_CONFIG.multiDocument` is `false`),
+  a restored draft with several documents is stopped at Step 2 with a clear
+  message, and the server still refuses several documents. One-document
+  applications work the same before and after the update.
+- **Validation:** the server accepts only the page's listed documents and
+  purposes (`DOCUMENT_REQUEST_TYPES`, `DOCUMENT_REQUEST_PURPOSES`), checks
+  each document request on its own and names the one at fault
+  ("Document Request 2: …"). A repeated document, a missing upload, or more
+  than five documents refuses the whole application; nothing is saved.
+- **Duplicates:** a submission from a saved draft returns the reference it
+  already produced. The page also sends one random `submission_key` per
+  application (a new one for every application started or resumed, never
+  saved in a draft), kept when Submit is pressed again after a lost response
+  or a refusal; the same browser session then gets the saved reference back
+  instead of a second application. Keys are remembered per application type
+  in the PHP session (the last 20), so a key never answers a different kind of
+  application, and a key from another session is never matched, so it cannot
+  reveal another applicant's reference.
+- **Sessions in production:** the website runs on Apache with `mod_php`,
+  which uses PHP's default file sessions (`session.save_handler = files`,
+  `/var/lib/php/sessions` on local disk). File sessions lock each session for
+  the whole request, so one browser's submissions run one after another; the
+  guard relies on this. A remembered key lasts only as long as its session:
+  Ubuntu's session cleanup removes sessions idle longer than `php.ini`'s
+  `session.gc_maxlifetime` (1440 seconds), so after roughly 24–54 minutes of
+  inactivity a retry is no longer recognized and a saved draft is the only
+  protection. (The code never keeps a key longer than 24 hours, but that
+  limit is not reached in production.)
+
 ## Current scope and verification status
 
 - PHP pages preserve the prototypes' markup, styles, and client-side layout;

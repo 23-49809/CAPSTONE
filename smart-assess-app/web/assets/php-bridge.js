@@ -111,6 +111,18 @@
   }
 
   var submitting = false;
+  // One random key per application, kept when a submission has to be tried again (a lost response,
+  // Submit pressed again), so the server returns the reference it already saved instead of saving the
+  // application twice. The page makes a new key for every application it starts or resumes; with an
+  // older page that has none, this script keeps its own, renewed when the application type changes
+  // and after a confirmed success.
+  var submissionKey = '';
+  var submissionKeyFlow = '';
+  function newSubmissionKey() {
+    var bytes = new Uint8Array(16);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    return Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
   function submitPublicRequest() {
     if (submitting) return;   // ignore double clicks while a submission is in flight
     var page = window.SMART_ASSESS_PAGE || {};
@@ -122,6 +134,8 @@
     var transferType = inputValue('transferType') || formValues.transferType || form.transferType || '';
     var flow = live && live.flow ? live.flow
       : ((transferType || document.querySelector('[data-upload="ctcTdOrTitle"]')) ? 'landtransfer' : 'docreq');
+    if (!submissionKey || submissionKeyFlow !== flow) { submissionKey = newSubmissionKey(); submissionKeyFlow = flow; }
+    var key = live && /^[a-f0-9]{32}$/.test(String(live.submissionKey || '')) ? String(live.submissionKey) : submissionKey;
     var identityDocuments = isOwner
       ? [{ doc_key: 'ownerId', label: 'Property Owner Valid ID' }]
       : [
@@ -171,6 +185,7 @@
       documents: documents,
       draft_token: live && live.draftCode ? live.draftCode : undefined,
       terms_token: form.termsToken || undefined,
+      submission_key: key,
       is_owner: document.getElementById('f-isOwner') ?
         document.getElementById('f-isOwner').checked : isOwner
     };
@@ -215,6 +230,7 @@
           failure.code = result.code || '';
           throw failure;
         }
+        submissionKey = '';
         if (typeof window.SMART_ASSESS_DRAFT_DONE === 'function') window.SMART_ASSESS_DRAFT_DONE();
         window.location.assign('/index.php?submitted=' + encodeURIComponent(result.request.reference_no));
       });

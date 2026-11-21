@@ -261,8 +261,8 @@ imagepng($image, $fixtures . '/id.png');
 // Made-up applicant. Everything in $private must never reach another browser.
 $applicant = ['flow' => 'docreq', 'first_name' => 'Lorna', 'middle_name' => 'Quintos', 'last_name' => 'Ybañez', 'contact_number' => '+639170005151',
     'email' => 'lorna.tracking@example.invalid', 'address_line' => '77 Zinniaxq Lane', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202',
-    'purpose' => 'Test', 'arp_number' => '14-0007-05151', 'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true,
-    'document_type' => 'Certified True Copy of Tax Declaration'];
+    'purpose' => 'Personal Copy', 'arp_number' => '14-0007-05151', 'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true,
+    'document_type' => 'Certified True Copy of Tax Declaration (CTC-TD)'];
 $private = ['first name' => 'Lorna', 'middle name' => 'Quintos', 'last name' => 'Ybañez', 'last name (JSON)' => 'Yba\\u00f1ez', 'phone' => '9170005151',
     'email' => 'lorna.tracking', 'home address' => 'Zinniaxq', 'file name' => 'lorna-id-scan'];
 $leaks = static function (string $body) use ($private): array {
@@ -290,7 +290,7 @@ $receipt = $page['lastSubmission'] ?? [];
 $check('submitting browser: the receipt opens with the full applicant name', $status === 200 && ($page['view'] ?? '') === 'confirmation'
     && ($receipt['applicant'] ?? '') === 'Lorna Ybañez' && ($receipt['applicantInitialsOnly'] ?? null) === false, $receipt);
 $check('submitting browser: the receipt keeps the reference, service and current status', ($receipt['id'] ?? '') === $reference
-    && ($receipt['docType'] ?? '') === 'Certified True Copy of Tax Declaration' && ($receipt['status'] ?? '') === 'Received', $receipt);
+    && ($receipt['docType'] ?? '') === 'Certified True Copy of Tax Declaration (CTC-TD)' && ($receipt['status'] ?? '') === 'Received', $receipt);
 $check('submitting browser: the receipt page has no contact details', array_diff($leaks($html), ['first name', 'last name', 'last name (JSON)']) === [], $leaks($html));
 
 [$status, $page] = $submitter->page('/index.php?track=' . rawurlencode($reference));
@@ -308,7 +308,7 @@ $other->http('/index.php');
 $result = $page['track']['result'] ?? [];
 $check('other browser: tracking shows initials (L. Y.)', $status === 200 && ($result['applicant'] ?? '') === 'L. Y.'
     && ($result['applicantInitialsOnly'] ?? null) === true, $result);
-$check('other browser: the service and status are still shown', ($result['docType'] ?? '') === 'Certified True Copy of Tax Declaration'
+$check('other browser: the service and status are still shown', ($result['docType'] ?? '') === 'Certified True Copy of Tax Declaration (CTC-TD)'
     && ($result['status'] ?? '') === 'Received' && ($result['id'] ?? '') === $reference, $result);
 $check('other browser: the tracking page has no name, contact details or file names', $leaks($html) === [], $leaks($html));
 

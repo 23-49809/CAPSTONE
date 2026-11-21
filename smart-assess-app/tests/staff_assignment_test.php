@@ -234,7 +234,7 @@ $submit = static function (string $flow, string $first, string $last, string $mi
     $fields = ['flow' => $flow, 'first_name' => $first, 'middle_name' => $middle, 'last_name' => $last, 'contact_number' => '+639170007' . random_int(100, 999),
         'address_line' => '1 Test Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0007-0' . random_int(1000, 9999),
         'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true]
-        + ($flow === 'docreq' ? ['document_type' => 'Certified True Copy of Tax Declaration', 'purpose' => 'Test'] : ['transfer_type' => 'Deed of Absolute Sale']);
+        + ($flow === 'docreq' ? ['document_type' => 'Certified True Copy of Tax Declaration (CTC-TD)', 'purpose' => 'Personal Copy'] : ['transfer_type' => 'Deed of Absolute Sale']);
     [$status, $body] = $client->http('/api.php?action=submit_request', ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $client->csrf,
         'terms_token' => (string) ($accepted['data']['terms_token'] ?? ''), 'draft_token' => $code] + $fields)]);
     $reference = (string) (json_decode($body, true)['data']['reference_no'] ?? '');
