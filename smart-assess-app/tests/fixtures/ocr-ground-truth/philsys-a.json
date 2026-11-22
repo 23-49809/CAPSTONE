@@ -34,7 +34,9 @@
     "missing_field",
     "pdf_scanned",
     "pdf_embedded_text",
-    "pdf_incomplete_text"
+    "pdf_incomplete_text",
+    "security_background",
+    "security_background_dense"
   ],
   "overrides": {
     "missing_field": {

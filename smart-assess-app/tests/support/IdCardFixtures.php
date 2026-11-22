@@ -161,7 +161,7 @@ final class IdCardFixtures
         ];
     }
 
-    public function card(string $id, bool $omit = false): GdImage
+    public function card(string $id, bool $omit = false, float $security = 0.0): GdImage
     {
         $layout = $this->layouts()[$id];
         $w = 1300;
@@ -179,6 +179,9 @@ final class IdCardFixtures
                 }
                 $previous = [$x, $y];
             }
+        }
+        if ($security > 0) {
+            $this->securityPrint($im, $w, $h, $security);
         }
         $navy = imagecolorallocate($im, 20, 45, 100);
         $ink = imagecolorallocate($im, 25, 25, 30);
@@ -219,6 +222,37 @@ final class IdCardFixtures
         return $im;
     }
 
+    /**
+     * A dense security print like a real National ID's: fine guilloche lines a few pixels apart, rosette
+     * arcs and repeated micro-text, in pastel inks behind all the printing (fictional; drawn, not copied).
+     * $strength 1.0 = pale inks; higher darkens them, as a real card photographed in poor light shows its
+     * security print darker relative to the text (1.3 defeats every OCR pass of the release of 22 Nov 2026).
+     */
+    private function securityPrint(GdImage $im, int $w, int $h, float $strength): void
+    {
+        $ink = static fn (int $r, int $g, int $b): int => imagecolorallocate($im, ...array_map(static fn (int $c): int => (int) max(0, 255 - (255 - $c) * $strength), [$r, $g, $b]));
+        $inks = [$ink(150, 185, 215), $ink(215, 160, 175), $ink(200, 190, 140), $ink(160, 200, 185)];
+        for ($k = 0; $k < (int) ($h / 5); $k++) {
+            $previous = null;
+            for ($x = 0; $x <= $w; $x += 4) {
+                $y = (int) ($k * 5 + 7 * sin($x / (23 + ($k % 7) * 4) + $k * 0.7) + 4 * sin($x / 9.0 + $k));
+                if ($previous !== null) {
+                    imageline($im, $previous[0], $previous[1], $x, $y, $inks[$k % 4]);
+                }
+                $previous = [$x, $y];
+            }
+        }
+        foreach ([[980, 420], [260, 700], [700, 150]] as $r => [$cx, $cy]) {
+            for ($a = 0; $a < 72; $a++) {
+                imagearc($im, (int) ($cx + 60 * cos($a * M_PI / 36)), (int) ($cy + 60 * sin($a * M_PI / 36)), 240, 240, 0, 360, $inks[($a + $r) % 4]);
+            }
+        }
+        $micro = 'REPUBLIKA NG PILIPINAS PHILSYS PAMBANSANG PAGKAKAKILANLAN ';
+        for ($y = 12; $y < $h; $y += 13) {
+            imagettftext($im, 7, 0, -(($y * 7) % 90), $y, $inks[intdiv($y, 13) % 4], $this->regular, str_repeat($micro, 6));
+        }
+    }
+
     public function negative(string $id): GdImage
     {
         $lines = $this->negatives()[$id];
@@ -237,12 +271,17 @@ final class IdCardFixtures
     public function write(string $id, string $condition, string $directory): string
     {
         $base = $directory . DIRECTORY_SEPARATOR . $id . '--' . $condition;
-        $card = fn (): GdImage => $this->card($id, $condition === 'missing_field');
+        $security = ['security_background' => 1.0, 'security_background_dense' => 1.3][$condition] ?? 0.0;
+        $card = fn (): GdImage => $this->card($id, $condition === 'missing_field', $security);
         $jpeg = static function (GdImage $im, string $path, int $quality = 88): string {
             imagejpeg($im, $path, $quality);
             return $path;
         };
         switch ($condition) {
+            case 'security_background':
+            case 'security_background_dense':
+                // As photographed: the security print, a slight tilt on a table and phone-camera JPEG.
+                return $jpeg($this->onBackground($card(), 1500, 1100, 2, 1300, [228, 226, 222]), $base . '.jpg', 82);
             case 'clear':
             case 'missing_field':
                 imagepng($card(), $base . '.png');
