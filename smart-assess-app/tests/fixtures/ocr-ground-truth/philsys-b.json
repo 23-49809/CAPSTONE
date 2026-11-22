@@ -30,7 +30,9 @@
     "skewed",
     "low_resolution",
     "cropped",
-    "missing_field"
+    "missing_field",
+    "security_background",
+    "security_background_dense"
   ],
   "overrides": {
     "missing_field": {
