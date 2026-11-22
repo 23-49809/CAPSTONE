@@ -268,6 +268,8 @@ $submit = static function (string $flow, string $first, string $last, string $mi
     $code = str_replace('-', '', (string) ($draft['data']['code'] ?? ''));
     $client->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $client->csrf,
         'draft_token' => $code, 'doc_key' => 'ownerId']), 'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]);
+    $client->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $client->csrf,
+        'draft_token' => $code, 'doc_key' => 'ownerIdBack']), 'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id-back.png')]);   // National ID only: front and back
     $fields = ['flow' => $flow, 'first_name' => $first, 'middle_name' => $middle, 'last_name' => $last, 'contact_number' => '+639170007' . random_int(100, 999),
         'address_line' => '1 Test Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0007-0' . random_int(1000, 9999),
         'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true]

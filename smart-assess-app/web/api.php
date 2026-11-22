@@ -183,35 +183,6 @@ function sa_field_label(string $key): string
  *  maxlength: “smart quotes”, ñ and — are 2-3 bytes each, so a byte limit
  *  rejected text the form itself allowed. A 65,535-byte ceiling (a MySQL
  *  TEXT column) still guards storage. */
-/**
- * The applicant-selected type of each ID the request needs (front key => type code, or null when the
- * form did not send one, e.g. a page loaded before the selector existed). A value that is sent must be
- * one of the registry's ID types (DocumentRequirements::idTypeOptions()). It is only the applicant's
- * statement: it never confirms the document's type and is never given to the automatic check.
- *
- * @return array<string, ?string>
- */
-function sa_id_type_hints(array $data, bool $isOwner): array
-{
-    $options = DocumentRequirements::idTypeOptions();
-    $hints = [];
-    foreach (DocumentRequirements::ID_TYPE_FIELDS as $front => $field) {
-        if ($front === 'requesterId' && $isOwner) {
-            continue;
-        }
-        $value = $data[$field] ?? null;
-        if ($value === null || $value === '') {
-            $hints[$front] = null;
-            continue;
-        }
-        if (!is_string($value) || !isset($options[$value])) {
-            throw new SaHttpException(422, 'Select the type of valid ID from the list.');
-        }
-        $hints[$front] = $value;
-    }
-    return $hints;
-}
-
 function sa_text(array $data, string $key, int $max, bool $required = false): ?string
 {
     $value = trim((string) ($data[$key] ?? ''));
@@ -765,14 +736,13 @@ function sa_submit_request(array $data): array
         }
         $files[$key] = $file;
     }
-    // The applicant-selected type of each ID: only a hint for Staff (stored as "applicant-selected,
-    // not verified"). It never confirms the document's type, is never sent to the automatic check and
-    // never changes what is required: every ID needs its front and back, whatever type is selected.
-    $idTypes = sa_id_type_hints($data, (bool) $values['is_owner']);
+    // Only the National ID is accepted (DocumentRequirements::ACCEPTED_ID_TYPE), front and back, for every
+    // ID; the applicant no longer chooses a type. An ID type sent by a page opened before this rule
+    // (owner_id_type / requester_id_type) is ignored and not stored.
     // The required documents and their labels come only from the server
     // (DocumentRequirements). A "documents" list sent by the browser is ignored,
     // so it can neither drop a requirement nor add or relabel a document.
-    $documents = DocumentRequirements::requirementsFor($flow, (bool) $values['is_owner'], $idTypes);
+    $documents = DocumentRequirements::requirementsFor($flow, (bool) $values['is_owner'], true);
     foreach (array_keys($files) as $key) {
         if (!isset($documents[$key])) {
             throw new SaHttpException(422, 'One of the uploaded files is not a document this request needs. Remove it and try again.');
@@ -845,14 +815,10 @@ function sa_submit_request(array $data): array
                     . ' If you do not see a place to upload one of these, please reload this page and try again.');
             }
         }
-        // A form that names an ID type (the current form) must send that ID's front AND back, for every
-        // type, a passport included: the selected type is never trusted to waive a side. Checked here,
-        // whatever the page did. An older page sends no type; it keeps the earlier rules above and below.
+        // Every National ID needs its front AND back photo, newly uploaded or saved with the draft, for one
+        // document or several. Checked here, whatever the page did, before anything is saved.
         $missingSides = [];
         foreach (DocumentRequirements::ID_BACK_KEYS as $front => $back) {
-            if (($idTypes[$front] ?? null) === null) {
-                continue;
-            }
             foreach ([$front, $back] as $side) {
                 if (isset($documents[$side]) && !isset($files[$side]) && !isset($draftFiles[$side])) {
                     $missingSides[] = $documents[$side];
@@ -860,7 +826,7 @@ function sa_submit_request(array $data): array
             }
         }
         if ($missingSides !== []) {
-            throw new SaHttpException(422, 'Please upload clear photos of both the front and the back of your valid ID: ' . implode(', ', $missingSides)
+            throw new SaHttpException(422, 'Please upload clear photos of both the front and the back of your National ID: ' . implode(', ', $missingSides)
                 . ' is missing. Nothing was submitted. If you do not see a place to upload it, please reload this page and try again.');
         }
         // Server-side Terms and Conditions check (not just the checkbox).
@@ -896,18 +862,14 @@ function sa_submit_request(array $data): array
             throw new RuntimeException('Upload directory is outside the configured location.');
         }
 
-        // The applicant-selected ID type is stored on the ID's front row, once the migration that adds
-        // request_documents.id_type_hint has run (20261121_request_document_id_type_hint.sql); before
-        // that, the submission works as before and the hint is not kept.
-        $withIdTypeHint = sa_has_column('request_documents', 'id_type_hint');
+        // request_documents.id_type_hint (migration 20261121) keeps the ID types applicants chose before the
+        // National-ID-only rule; new submissions leave it empty (the label says which rule applies).
         $documentInsert = $pdo->prepare(
-            'INSERT INTO request_documents (request_id, doc_key, label, original_name, stored_path, mime_type, file_size, file_status'
-            . ($withIdTypeHint ? ', id_type_hint' : '') . ')
-             VALUES (:request_id, :doc_key, :label, :original_name, :stored_path, :mime_type, :file_size, :file_status'
-            . ($withIdTypeHint ? ', :id_type_hint' : '') . ')'
+            'INSERT INTO request_documents (request_id, doc_key, label, original_name, stored_path, mime_type, file_size, file_status)
+             VALUES (:request_id, :doc_key, :label, :original_name, :stored_path, :mime_type, :file_size, :file_status)'
         );
-        $insertDocument = static function (array $row) use ($documentInsert, $withIdTypeHint, $idTypes): void {
-            $documentInsert->execute($row + ($withIdTypeHint ? ['id_type_hint' => $idTypes[$row['doc_key']] ?? null] : []));
+        $insertDocument = static function (array $row) use ($documentInsert): void {
+            $documentInsert->execute($row);
         };
         $validationInsert = $pdo->prepare(
             "INSERT INTO document_validation (request_document_id, validation_status)

@@ -581,14 +581,18 @@ password, because PHP's built-in server drops empty environment variables.
 * There is no public AI endpoint. The dispatcher is command-line only. The
   worker is on a private network and refuses unsigned, stale or replayed jobs.
 * Documents are never sent to external AI services.
-* The back side of each valid ID (`ownerIdBack`, `requesterIdBack`) is stored with the request for Staff
+* Only the National ID is accepted (PhilSys card or ePhilID), for every ID of every request; applicants no
+  longer choose an ID type. Each National ID's front and back are required (the server checks).
+* The back side of each ID (`ownerIdBack`, `requesterIdBack`) is stored with the request for Staff
   to inspect, but it is never sent to the automatic check: `AiVerification::jobManifest()` skips it, so
   the worker receives the same documents as before back sides were collected (the ID fronts, the
-  authorization letter and the Land Transfer documents). The ID type the applicant selects in the form
-  (`request_documents.id_type_hint`) is shown to Staff as "selected by the applicant, not verified", with a
-  warning when the check confirmed a different type from the ID's own printed title and details. It is not
-  sent to the check either, never confirms an ID's type, and never changes what is required: every ID needs
-  its front and back, whatever type is selected (a passport included).
+  authorization letter and the Land Transfer documents).
+* On a request submitted under the National-ID-only rule (its ID files carry the labels "Property Owner
+  National ID" / "Authorized Representative National ID"), the Staff **ID Type** check shows **Mismatch**
+  when the check identifies another government ID; Staff decide from the original, nothing is rejected
+  automatically. Older requests accepted any government ID: they keep the type their applicant selected
+  (`request_documents.id_type_hint`, shown as "selected by the applicant, not verified") and never get
+  this warning. No ID type is sent to the check.
 * All AI text is escaped before display. Model output that does not match the
   schema exactly is discarded.
 * Logs contain job IDs and error codes only, never document text, names,
@@ -872,7 +876,8 @@ The Staff page then runs only the checks of the request type:
 * Document Request: on each ID, **Name Match** (the name read from the ID against the
   submitted name; a representative's own ID is the one compared, the owner's ID name is not
   compared when the owner's name was not submitted) and **ID Type** (a government-issued ID,
-  confirmed only when its title or issuer appears in the text).
+  confirmed only when its title or issuer appears in the text; on National-ID-only requests, any other
+  ID type is a Mismatch).
 * Land Transfer: **Document identification** of the five required documents only (Tax
   Declaration or Title; Deed of Sale or Donation). The ID is still required with the
   application but is not part of its Document Check; "all checks passed" needs all five.

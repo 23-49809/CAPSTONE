@@ -402,11 +402,15 @@ $payloadFor = static function (string $flow, string $lastName, array $uploads, a
     return $payload;
 };
 $submit = static function (string $flow, string $lastName, array $uploads, array $extra = []) use ($client, $files, $payloadFor): array {
+    // National ID only: every ID's front goes with its back side (the same fictional image here).
+    foreach (['ownerId' => 'ownerIdBack', 'requesterId' => 'requesterIdBack'] as $front => $back) { if (isset($uploads[$front]) && !isset($uploads[$back])) { $uploads[$back] = $uploads[$front]; } }
     [$status, $response] = $client->submit($payloadFor($flow, $lastName, $uploads, $extra), array_map(static fn (string $name): array => [$name, $files[$name]], $uploads));
     return [$status, (string) (json_decode($response, true)['data']['reference_no'] ?? ''), $response];
 };
 // Starts a submission without waiting for it (for the deadlock tests); the answer is written to $out.
 $submitAsync = static function (string $flow, array $uploads, string $out, array $extra = []) use ($client, $files, $payloadFor) {
+    // National ID only: every ID's front goes with its back side (the same fictional image here).
+    foreach (['ownerId' => 'ownerIdBack', 'requesterId' => 'requesterIdBack'] as $front => $back) { if (isset($uploads[$front]) && !isset($uploads[$back])) { $uploads[$back] = $uploads[$front]; } }
     return $client->startSubmit($payloadFor($flow, 'Santos', $uploads, $extra), array_map(static fn (string $name): array => [$name, $files[$name]], $uploads), $out);
 };
 $requestRow = static function (string $reference) use ($pdo): array {
@@ -1215,7 +1219,7 @@ $pdo->exec("CREATE TRIGGER sa_test_block_ai_queue BEFORE INSERT ON ai_verificati
 $pdo->exec('DROP TRIGGER sa_test_block_ai_queue');
 $saved = $refQueueFail !== '' ? $requestRow($refQueueFail) : [];
 $check('the AI queue failing during a submission: the submission still succeeds and is saved with its documents', $status === 200 && ($saved['status'] ?? '') === 'Received'
-    && count($originals($refQueueFail)) === 1, [$status, substr($body, 0, 200)]);
+    && count($originals($refQueueFail)) === 2, [$status, substr($body, 0, 200)]);   // the National ID's front and back
 $check('...and no AI job was half-created for it', !$hasJob($refQueueFail));
 $check('no AI step in this test ever sent an SMS or email', !preg_match('/ai-verification-dispatch|web/', (string) @file_get_contents($sendAttempts)), (string) @file_get_contents($sendAttempts));
 
@@ -1239,8 +1243,8 @@ $check('an original missing from storage answers 404, an unsupported file 415 (a
     $fileStatus($staff8, (int) $docRows['notarialDeed']['id'], $refFiles) === 404 && $fileStatus($staff8, (int) $docRows['ctcTdOrTitle']['id'], $refFiles) === 415
     && (int) $pdo->query('SELECT COUNT(*) FROM request_document_views WHERE request_document_id IN (' . (int) $docRows['notarialDeed']['id'] . ',' . (int) $docRows['ctcTdOrTitle']['id'] . ')')->fetchColumn() === 0);
 [$status, $body] = $staff8->api('ai_verification_reviewed', ['reference' => $refFiles]);
-$check('before opening the one original that can be served: refused, naming 1 to open and 2 that cannot be opened', $status === 409
-    && str_contains($body, '1 not opened by you yet') && str_contains($body, '2 original(s) cannot be opened'), [$status, $body]);
+$check('before opening the originals that can be served (the National ID front and back): refused, naming 2 to open and 2 that cannot be opened', $status === 409
+    && str_contains($body, '2 not opened by you yet') && str_contains($body, '2 original(s) cannot be opened'), [$status, $body]);
 [, $html] = $staff8->request('GET', '/internal.php?view=land-transfer-requests');
 $fileFlags = [];
 foreach (array_merge($pageData($html)['docRequests'] ?? [], $pageData($html)['landRequests'] ?? []) as $record) {
@@ -1252,9 +1256,10 @@ foreach (array_merge($pageData($html)['docRequests'] ?? [], $pageData($html)['la
         }
     }
 }
-$check('the Staff page marks exactly the two originals that cannot be opened', $fileFlags === ['ctcTdOrTitle' => false, 'notarialDeed' => false, 'ownerId' => true], $fileFlags);
+$check('the Staff page marks exactly the two originals that cannot be opened', $fileFlags === ['ctcTdOrTitle' => false, 'notarialDeed' => false, 'ownerId' => true, 'ownerIdBack' => true], $fileFlags);
 $check('the Staff page still carries no storage path', !str_contains($html, 'private_uploads'));
-$check('Staff open the original that can be served', $fileStatus($staff8, (int) $docRows['ownerId']['id'], $refFiles) === 200);
+$check('Staff open the originals that can be served (the National ID front and back)', $fileStatus($staff8, (int) $docRows['ownerId']['id'], $refFiles) === 200
+    && $fileStatus($staff8, (int) $docRows['ownerIdBack']['id'], $refFiles) === 200);
 [$status, $body] = $staff8->api('ai_verification_reviewed', ['reference' => $refFiles]);
 $check('then the review is recorded: unavailable originals do not lock Staff out', $status === 200 && $job($refFiles)['staff_review_status'] === 'reviewed'
     && (int) (json_decode($body, true)['data']['unavailable_originals'] ?? -1) === 2, [$status, $body]);
@@ -1272,7 +1277,7 @@ foreach (array_merge($pageData($html)['docRequests'] ?? [], $pageData($html)['la
     }
 }
 $check('after the review, the cheaper hint still flags the missing file but no longer reads file types; opening the bad file still answers 415',
-    $hintFlags === ['ctcTdOrTitle' => true, 'notarialDeed' => false, 'ownerId' => true]
+    $hintFlags === ['ctcTdOrTitle' => true, 'notarialDeed' => false, 'ownerId' => true, 'ownerIdBack' => true]
     && $fileStatus($staff8, (int) $docRows['ctcTdOrTitle']['id'], $refFiles) === 415, $hintFlags);
 // Step 10 (R4): every model judgement in Document Review is labelled as a suggestion that is not verified.
 $panel = (string) file_get_contents($work . '/smart-assess-internal.html');

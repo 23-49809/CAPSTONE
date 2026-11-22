@@ -3344,7 +3344,10 @@ function dcContext(r){
     // The requester's own ID: their ID when they are the owner, the representative's ID otherwise. The
     // submitted name is the requester's, so only that ID's name is compared with it.
     ownIdKey: det ? (det.isOwner ? 'ownerId' : 'requesterId') : null,
-    appName: det ? [det.firstName, det.middleName, det.lastName].filter(function(v){ return String(v||'').trim(); }).join(' ') : ''
+    appName: det ? [det.firstName, det.middleName, det.lastName].filter(function(v){ return String(v||'').trim(); }).join(' ') : '',
+    // Submitted under the National-ID-only rule (the server marks each file by its label): an ID identified
+    // as another type is a mismatch for Staff to check. Earlier requests accepted any government ID.
+    nationalIdOnly: (r.files||[]).some(function(f){ return f && f.nationalIdOnly; })
   };
 }
 function dcUnread(d){ return d.ocr_status==='failed' || d.readability==='poor' || d.readability==='unreadable'; }
@@ -3352,8 +3355,19 @@ function dcCheck(name, verdict, detected, reason){ return {name:name, verdict:ve
 /* ID Type: the title check below, then (worker version 5) what the ID's own fields showed. A title alone
    (no ID number or other identifying detail read), titles of two IDs, or a printed expiry date that has
    passed keep it from Correct. States only: no field value reaches this page. */
-function dcKindCheck(d, isId){
+function dcKindCheck(d, isId, ctx){
+  var DC_NATIONAL_ID = 'philsys_national_id';   // DocumentRequirements::ACCEPTED_ID_TYPE
   var base = dcKindCheckTitles(d, isId), idc = isId ? d.id_check : null;
+  // National ID only: an ID whose type was identified as another government ID (confirmed by its own
+  // details, or by its printed title when no details were read) is a mismatch. Staff decide from the original.
+  if(isId && ctx && ctx.nationalIdOnly && base.verdict==='correct'){
+    var ev = d.kind_evidence || [];
+    var identified = idc && idc.type_state==='confirmed' && idc.type ? idc.type : (ev.filter(function(k){ return k!==DC_NATIONAL_ID && k!=='other_id' && k!=='school_or_company_id'; })[0] || (ev.indexOf(DC_NATIONAL_ID)>-1 ? DC_NATIONAL_ID : null));
+    if(identified && identified!==DC_NATIONAL_ID){
+      var li = ev.indexOf(identified), label = li>-1 && (d.kind_evidence_labels||[])[li] ? d.kind_evidence_labels[li] : String(identified).replace(/_/g,' ');
+      return dcCheck(base.name, 'mismatch', label, 'This looks like '+label+', not a National ID. Only the National ID (PhilSys card or ePhilID) is accepted. Check the original.');
+    }
+  }
   if(!idc || base.verdict!=='correct') return base;
   if(idc.type_state==='title_only') return dcCheck(base.name, 'unable', base.detected+' (title only)', 'Its printed title appears in the text, but none of its ID details (such as the ID number) were read, so the type is not confirmed. Check the original.');
   if(idc.type_state==='conflict') return dcCheck(base.name, 'unable', '', 'The text shows the titles of more than one kind of ID. Check the original.');
@@ -3432,7 +3446,7 @@ var DC_LAND_DOCUMENTS = 5;
 function dcDocChecks(d, ctx, kind){
   var check = d.check || DC_SLOT_CHECK[d.key] || 'none';
   if(kind==='land') return check==='document' ? [dcKindCheck(d, false)] : [];
-  if(check==='id') return [dcNameCheck(d, ctx), dcKindCheck(d, true)];
+  if(check==='id') return [dcNameCheck(d, ctx), dcKindCheck(d, true, ctx)];
   return [];
 }
 /* All checks passed: every check Correct (a Land Transfer: all five required documents identified). */

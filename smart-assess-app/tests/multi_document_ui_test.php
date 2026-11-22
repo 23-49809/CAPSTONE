@@ -102,10 +102,10 @@ $g = $run('uploads', $base . $two . 'state.step=3; S.render(); out.shared=(docum
     . ' S.state.formData.isOwner=false; S.state.formData.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true}}; S.state.errors={}; S.submitRequest();'
     . ' out.rep=[S.state.step, S.state.submitConfirmation, Object.keys(S.state.errors).sort()];');
 $check('Step 3 says, in one short line, that the uploads are used for every chosen document', ($g['shared'] ?? '') === 'These files are used for all 2 documents.', $g);
-// Each ID needs its type selected and both its sides (front and back), plus the letter for a representative.
-$check('a missing upload blocks submission (owner ID type, front and back; for a representative also their ID and the authorization letter)',
-    ($g['afterSubmit'] ?? null) === [3, false, ['ownerIdType', 'ownerId', 'ownerIdBack']]
-    && ($g['rep'] ?? null) === [3, false, ['authLetter', 'ownerIdBack', 'ownerIdType', 'requesterId', 'requesterIdBack', 'requesterIdType']], $g);
+// Each National ID needs both its sides (front and back), plus the letter for a representative; no ID type is chosen.
+$check('a missing upload blocks submission (the owner\'s National ID front and back; for a representative also their National ID and the authorization letter)',
+    ($g['afterSubmit'] ?? null) === [3, false, ['ownerId', 'ownerIdBack']]
+    && ($g['rep'] ?? null) === [3, false, ['authLetter', 'ownerIdBack', 'requesterId', 'requesterIdBack']], $g);
 
 $g = $run('review', $base . $two . 'fd.ownerIdType="philhealth_id"; fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true},ownerIdBack:{name:"id-back.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render();'
     . ' out.sections=[].slice.call(document.querySelectorAll(".rv-sec th")).map(function(e){return e.textContent;});'
@@ -198,7 +198,7 @@ $compactJs = 'var cards=[].slice.call(document.querySelectorAll(".doc-req-card")
 foreach (['desktop' => 1366, 'phone' => 390, 'small' => 320] as $device => $width) {
     $c = $run('compact' . $device, $base . $two . 'state.step=2; S.render();' . $compactJs, $width)['c'] ?? [];
     $check("Step 2 is compact ({$device}): two cards, one shared requirements line, " . ($device === 'small' ? 'titles on one line' : 'each title on one line with Remove beside it') . ', no sideways scrolling', ($c[0] ?? 0) === 2 && ($c[1] ?? 0) === 1
-        && ($c[2] ?? '') === 'Requirements (all documents): Property Owner Valid ID, uploaded in Step 3.' && ($device === 'small' || ($c[4] ?? false) === true) && ($c[5] ?? false) === true && ($c[6] ?? '') === '12px', $c);
+        && ($c[2] ?? '') === 'Requirements (all documents): Property Owner National ID, uploaded in Step 3.' && ($device === 'small' || ($c[4] ?? false) === true) && ($c[5] ?? false) === true && ($c[6] ?? '') === '12px', $c);
     if ($device === 'small') {
         $titles = $run('compactTitles', $base . $two . 'state.step=2; S.render(); out.t=[].slice.call(document.querySelectorAll(".doc-req-head h3")).map(function(e){ return e.getBoundingClientRect().height < parseFloat(getComputedStyle(e).fontSize)*2; });', $width);
         $check('on a 320px screen each title stays on one line (Remove moves below it)', ($titles['t'] ?? null) === [true, true], $titles);
@@ -210,7 +210,7 @@ foreach (['desktop' => 1366, 'phone' => 390, 'small' => 320] as $device => $widt
     }
 }
 $one = $run('compactOne', $base . 'state.step=2; S.setDocItems(fd,[{documentType:"Certification of Assessment",purpose:"Personal Copy"}]); S.render(); out.needs=[document.querySelectorAll(".doc-req-needs").length, (document.querySelector(".doc-req-needs")||{}).textContent];');
-$check('one document: one requirements line without "(all documents)"', ($one['needs'] ?? null) === [1, 'Requirements: Property Owner Valid ID, uploaded in Step 3.'], $one);
+$check('one document: one requirements line without "(all documents)"', ($one['needs'] ?? null) === [1, 'Requirements: Property Owner National ID, uploaded in Step 3.'], $one);
 $upJs = 'var b=document.querySelector(".id-card-block"), sd=document.querySelector(".id-side"), pv=document.querySelector(".id-side-preview");'
     . ' out.u=[getComputedStyle(b).paddingTop, getComputedStyle(sd).paddingTop, Math.round(pv.getBoundingClientRect().height)<=120, document.documentElement.scrollWidth<=window.innerWidth, getComputedStyle(document.querySelector(".id-side-label")).fontSize];';
 foreach (['desktop' => 1366, 'phone' => 390] as $device => $width) {

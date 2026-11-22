@@ -51,6 +51,9 @@ foreach ($page['documents'] ?? [] as $document) {
         // A stored value that is not one of the registry's types is never shown (label and code null).
         'idTypeHint' => DocumentRequirements::idTypeHintLabel($document['id_type_hint'] ?? null),
         'idTypeHintCode' => DocumentRequirements::idTypeHintLabel($document['id_type_hint'] ?? null) === null ? null : (string) $document['id_type_hint'],
+        // Stored under the National-ID-only rule (by its label): the automatic check's ID type is then
+        // compared with the National ID, as a warning for Staff. Earlier requests accepted any government ID.
+        'nationalIdOnly' => DocumentRequirements::isNationalIdLabel((string) ($document['label'] ?? '')),
     ];
     $validation = strtolower((string) ($document['validation_status'] ?? 'pending'));
     $documentsByRequest[(int) $document['request_id']][] = [

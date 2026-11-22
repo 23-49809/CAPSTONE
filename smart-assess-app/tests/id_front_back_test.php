@@ -2,18 +2,19 @@
 declare(strict_types=1);
 
 /*
- * Client valid-ID upload: "Select Type of Valid ID" plus separate FRONT and BACK photos for the
- * Property Owner's ID (ownerId / ownerIdBack) and the Authorized Representative's ID (requesterId /
- * requesterIdBack). No database server and no network: the automatic-check manifest runs against an
+ * Client National ID upload (only the National ID is accepted: PhilSys card or ePhilID; no ID type is
+ * chosen), with separate FRONT and BACK photos for the Property Owner's ID (ownerId / ownerIdBack) and
+ * the Authorized Representative's ID (requesterId / requesterIdBack). No database server and no network: the automatic-check manifest runs against an
  * in-memory SQLite copy of its two tables, the client page runs in headless Chrome (a test-only hook
  * is added to a temporary copy, never to the page), and the Staff page's own functions run in Node.
  * Every person, ID and image is fictional and generated here.
  *
- *  - the ID types offered are exactly the recognition registry's government IDs (server and page agree);
- *  - the selected type is a hint only: it never reaches the automatic check, and a back side never does;
+ *  - only the National ID is accepted: no ID type dropdown or field remains (page, submit script, drafts, server);
+ *  - a back side never reaches the automatic check, and neither does an ID type stored by an older request;
  *  - front and back are separate files: choosing, replacing or removing one never touches the other;
- *  - both sides are required for every ID type, a passport included (page and server); the type is required;
- *  - Staff are warned when the selected type differs from the type the automatic check identified;
+ *  - both sides are required for every National ID (page and server);
+ *  - Staff are warned when the automatic check identifies another ID type on a National-ID-only request,
+ *    and older requests keep showing the type their applicant selected (marked "not verified");
  *  - the new parts keep WCAG AA contrast (4.5:1) in the light and the dark theme;
  *  - front and back sit side by side on desktop and tablet and stack on phones;
  *  - Staff see each back side next to its front, and the selected type marked "not verified".
@@ -43,70 +44,55 @@ $work = sys_get_temp_dir() . '/sa-id-front-back-' . bin2hex(random_bytes(4));
 mkdir($work . '/private_uploads/requests', 0700, true);
 register_shutdown_function(static fn () => exec('rm -rf ' . escapeshellarg($work)));
 
-// ================= 1. The ID types offered come from the recognition registry =================
-$options = DocumentRequirements::idTypeOptions();
-$check('1. the options are exactly the government IDs the registry recognises (IdDocumentTypes::PRECEDENCE), 14 of them',
-    count($options) === 14 && array_diff(IdDocumentTypes::PRECEDENCE, array_keys($options)) === [] && array_diff(array_keys($options), IdDocumentTypes::PRECEDENCE) === [], $options);
-$check('1. labels and order are the registry\'s own (DocumentAnalysis::ID_KINDS); no school, company or "other" ID is offered',
-    array_values(array_intersect(array_keys(DocumentAnalysis::ID_KINDS), array_keys($options))) === array_keys($options)
-    && !isset($options['school_or_company_id']) && !isset($options['other_id'])
-    && array_intersect_key(DocumentAnalysis::ID_KINDS, $options) === $options);
-preg_match('/const ID_TYPE_OPTIONS = \[(.*?)\];/s', $html, $m);
-preg_match_all("/\['([a-z_]+)','((?:[^'\\\\]|\\\\.)*)'\]/", $m[1] ?? '', $pairs, PREG_SET_ORDER);
-$pageOptions = [];
-foreach ($pairs as $pair) {
-    $pageOptions[$pair[1]] = stripcslashes($pair[2]);
-}
-$check('1. the page offers the same codes, labels and order as the server (no invented type)', $pageOptions === $options, [$pageOptions, $options]);
+// ================= 1. National ID only: no ID type is chosen =================
+$check('1. only the National ID is accepted (server: the type and how it is described)', DocumentRequirements::ACCEPTED_ID_TYPE === 'philsys_national_id'
+    && DocumentRequirements::ACCEPTED_ID_DESCRIPTION === 'National ID (PhilSys card or ePhilID)' && isset(DocumentAnalysis::ID_KINDS['philsys_national_id']));
+$check('1. the page has no ID type dropdown and names the accepted ID with the server\'s description', !str_contains($html, 'ID_TYPE_OPTIONS') && !str_contains($html, 'Select Type of Valid ID')
+    && !str_contains($html, 'ownerIdType') && !str_contains($html, 'requesterIdType') && str_contains($html, "const ACCEPTED_ID = 'National ID (PhilSys card or ePhilID)';"));
+$check('1. no ID type field remains in the submit script or in drafts', !str_contains($bridge, 'owner_id_type') && !str_contains($bridge, 'requester_id_type')
+    && !str_contains($drafts, 'ownerIdType') && !str_contains($drafts, 'requesterIdType'));
 
-// ================= 2. Requirements: front and back for every ID type =================
-$owner = DocumentRequirements::requirementsFor('docreq', true, ['ownerId' => 'philhealth_id']);
-$check('2. a new owner submission needs the ID\'s front and back', array_keys($owner) === ['ownerId', 'ownerIdBack']
-    && $owner['ownerIdBack'] === 'Valid Government-Issued ID (back side)', $owner);
-$check('2. an unknown type (an older page that sends none) still needs the back', array_keys(DocumentRequirements::requirementsFor('docreq', true, ['ownerId' => null])) === ['ownerId', 'ownerIdBack']);
-$everyTypeNeedsBack = array_filter(array_keys($options), static fn (string $code): bool =>
-    array_keys(DocumentRequirements::requirementsFor('docreq', false, ['ownerId' => $code, 'requesterId' => $code])) !== ['ownerId', 'requesterId', 'authLetter', 'ownerIdBack', 'requesterIdBack']);
-$check('2. every one of the 14 types, a passport included, needs the ID\'s front and back (no type waives a side)', $everyTypeNeedsBack === []
-    && !method_exists(DocumentRequirements::class, 'optionalFor') && !defined(DocumentRequirements::class . '::BACK_OPTIONAL_ID_TYPES'), $everyTypeNeedsBack);
-$check('2. the page has no type-based exception either: the same rule on both sides (client and server)', !str_contains($html, 'BACK_OPTIONAL') && !str_contains($html, 'backIsOptional')
-    && str_contains($html, "idFrontKeys(fd).forEach(function(front){ keys.push(front, ID_BACK_KEYS[front]); });"));
-$check('2. a stored type is shown to Staff only when it is one of the registry\'s types', DocumentRequirements::idTypeHintLabel('umid') === 'UMID'
-    && DocumentRequirements::idTypeHintLabel('school_or_company_id') === null && DocumentRequirements::idTypeHintLabel('<b>x</b>') === null
-    && DocumentRequirements::idTypeHintLabel(null) === null && DocumentRequirements::idTypeHintLabel(['umid']) === null);
-$rep = DocumentRequirements::requirementsFor('landtransfer', false, ['ownerId' => 'umid', 'requesterId' => 'drivers_license']);
-$check('2. a representative (Land Transfer): both IDs front and back, the letter and the five documents', array_keys($rep) === ['ctcTdOrTitle', 'notarialDeed', 'vicinityMap',
-    'certNoImprovement', 'taxClearance', 'ownerId', 'requesterId', 'authLetter', 'ownerIdBack', 'requesterIdBack'], array_keys($rep));
-$check('2. the automatic check\'s list (no types given) is unchanged: fronts only', array_keys(DocumentRequirements::requirementsFor('docreq', false)) === ['ownerId', 'requesterId', 'authLetter']
+// ================= 2. Requirements: every National ID's front and back =================
+$owner = DocumentRequirements::requirementsFor('docreq', true, true);
+$check('2. a new owner submission needs the National ID\'s front and back', $owner === ['ownerId' => 'Property Owner National ID', 'ownerIdBack' => 'Property Owner National ID (back side)'], $owner);
+$repDoc = DocumentRequirements::requirementsFor('docreq', false, true);
+$check('2. a representative: both National IDs front and back, and the letter', array_keys($repDoc) === ['ownerId', 'requesterId', 'authLetter', 'ownerIdBack', 'requesterIdBack']
+    && $repDoc['requesterId'] === 'Authorized Representative National ID' && $repDoc['requesterIdBack'] === 'Authorized Representative National ID (back side)', $repDoc);
+$rep = DocumentRequirements::requirementsFor('landtransfer', false, true);
+$check('2. a representative (Land Transfer): both National IDs front and back, the letter and the five documents, with the same ID labels', array_keys($rep) === ['ctcTdOrTitle', 'notarialDeed', 'vicinityMap',
+    'certNoImprovement', 'taxClearance', 'ownerId', 'requesterId', 'authLetter', 'ownerIdBack', 'requesterIdBack'] && $rep['ownerId'] === 'Property Owner National ID', $rep);
+$check('2. the automatic check\'s list is unchanged: fronts only', array_keys(DocumentRequirements::requirementsFor('docreq', false)) === ['ownerId', 'requesterId', 'authLetter']
     && array_column((new DocumentRequirements())->evaluate('docreq', true, ['ownerId' => ['mime' => 'image/png', 'size' => 10]])['items'], 'key') === ['ownerId']);
 $check('2. a back side is an ID image: JPG or PNG only, the same 5 MB rule', DocumentRequirements::allowedMimeTypes('ownerIdBack') === ['image/jpeg', 'image/png']
     && DocumentRequirements::allowedMimeTypes('requesterIdBack') === ['image/jpeg', 'image/png'] && in_array('ownerIdBack', DocumentRequirements::IDENTITY_KEYS, true)
     && in_array('requesterIdBack', DocumentRequirements::allKeys(), true));
-$check('2. drafts may hold both back sides and remember both selected types', str_contains($drafts, "'ownerIdBack', 'requesterIdBack',")
-    && str_contains($drafts, "'ownerIdType' => 40, 'requesterIdType' => 40"));
+$check('2. drafts may hold both back sides', str_contains($drafts, "'ownerIdBack', 'requesterIdBack',"));
+$check('2. a stored label tells which rule applies: the National ID labels (front or back) do, the earlier labels never',
+    DocumentRequirements::isNationalIdLabel('Property Owner National ID') && DocumentRequirements::isNationalIdLabel('Authorized Representative National ID (back side)')
+    && !DocumentRequirements::isNationalIdLabel('Valid Government-Issued ID') && !DocumentRequirements::isNationalIdLabel('Valid ID of Requester')
+    && !DocumentRequirements::isNationalIdLabel('Valid ID of Property Owner (back side)') && !DocumentRequirements::isNationalIdLabel(''));
+$check('2. an older request\'s stored type is shown to Staff only when it is one of the registry\'s types', DocumentRequirements::idTypeHintLabel('umid') === 'UMID'
+    && DocumentRequirements::idTypeHintLabel('school_or_company_id') === null && DocumentRequirements::idTypeHintLabel('<b>x</b>') === null
+    && DocumentRequirements::idTypeHintLabel(null) === null && DocumentRequirements::idTypeHintLabel(['umid']) === null);
 
-// ================= 3. Submission (source): hint validated, back stored separately, nothing to the AI =================
-$check('3. the server accepts only a registry type (or none) and checks it before anything is saved', str_contains($api, 'function sa_id_type_hints(array $data, bool $isOwner): array')
-    && str_contains($api, "throw new SaHttpException(422, 'Select the type of valid ID from the list.');")
-    && strpos($api, '$idTypes = sa_id_type_hints($data') < strpos($api, '$pdo = sa_db();' . "\n    \$storedFiles"));
+// ================= 3. Submission (source): both sides of every National ID, no ID type =================
+$check('3. the server requires every National ID\'s front and back before anything is saved', str_contains($api, "DocumentRequirements::requirementsFor(\$flow, (bool) \$values['is_owner'], true);")
+    && str_contains($api, '$missingSides[] = $documents[$side];') && str_contains($api, "'Please upload clear photos of both the front and the back of your National ID: '"));
+$check('3. no ID type is read or stored for a new submission (a type sent by an older page is ignored)', !str_contains($api, 'sa_id_type_hints') && !str_contains($api, "\$data['owner_id_type']")
+    && str_contains($api, "'INSERT INTO request_documents (request_id, doc_key, label, original_name, stored_path, mime_type, file_size, file_status)\n"));
 $check('3. a file that is not required is still refused', str_contains($api, "foreach (array_keys(\$files) as \$key) {\n        if (!isset(\$documents[\$key])) {"));
-$check('3. a form that names a type must send that ID\'s front and back (the server checks, whatever the page did)', str_contains($api, '$missingSides[] = $documents[$side];')
-    && str_contains($api, "'Please upload clear photos of both the front and the back of your valid ID: '"));
 $check('3. the missing-document messages tell the applicant to reload the page if the upload place is not shown', substr_count($api, 'please reload this page and try again.') === 2);
 $check('3. the submit script\'s address carries a version (a hash of its content), so an old cached copy is not used', str_contains((string) file_get_contents($app . '/web/prototype.php'),
     "<script src=\"/assets/php-bridge.js?v=' . \$bridgeVersion . '\"></script>'")
     && str_contains((string) file_get_contents($app . '/web/prototype.php'), "\$bridgeVersion = is_file(\$bridgeFile) ? substr((string) hash_file('sha256', \$bridgeFile), 0, 12) : '0';"));
 $check('3. every file is stored under its own key (front and back never share a row or a file name)', str_contains($api, 'foreach ($documents as $key => $label) {')
     && str_contains($api, "\$storedName = \$itemId . '_' . bin2hex(random_bytes(16)) . '.' . \$extension;"));
-$check('3. the selected type is stored only once the migration has run (no error before it)', str_contains($api, "\$withIdTypeHint = sa_has_column('request_documents', 'id_type_hint');"));
+$check('3. Staff receive, per file, whether it was stored under the National-ID-only rule', str_contains((string) file_get_contents($app . '/web/internal.php'),
+    "'nationalIdOnly' => DocumentRequirements::isNationalIdLabel((string) (\$document['label'] ?? '')),"));
 $migration = (string) file_get_contents($app . '/database/migrations/20261121_request_document_id_type_hint.sql');
 $sql = trim((string) preg_replace('/^--.*$/m', '', $migration));
-$check('3. the migration adds one nullable column, only when it is missing (safe to run again)', str_contains($sql, "'ALTER TABLE request_documents ADD COLUMN id_type_hint VARCHAR(40) NULL DEFAULT NULL AFTER file_status'")
+$check('3. the earlier migration (the column that keeps older requests\' types) is unchanged: one nullable column, only when missing', str_contains($sql, "'ALTER TABLE request_documents ADD COLUMN id_type_hint VARCHAR(40) NULL DEFAULT NULL AFTER file_status'")
     && str_contains($sql, "SET @sql := IF(@has_id_type_hint = 0,") && substr_count($sql, 'ALTER TABLE') === 1 && !preg_match('/\b(DROP|DELETE|UPDATE|TRUNCATE)\b/i', $sql), $sql);
-$rollback = trim((string) preg_replace('/^--.*$/m', '', (string) file_get_contents($app . '/database/rollbacks/20261121_request_document_id_type_hint_rollback.sql')));
-$check('3. the rollback drops only that column, only when present', str_contains($rollback, "'ALTER TABLE request_documents DROP COLUMN id_type_hint'")
-    && str_contains($rollback, 'SET @sql := IF(@has_id_type_hint = 1,') && substr_count($rollback, 'ALTER TABLE') === 1 && substr_count($rollback, 'DROP') === 1, $rollback);
-$check('3. the bridge sends the selected types (the representative\'s only for a representative)', str_contains($bridge, "payload.owner_id_type = String(form.ownerIdType || formValues.ownerIdType || '');")
-    && str_contains($bridge, "if (!payload.is_owner) payload.requester_id_type = String(form.requesterIdType || formValues.requesterIdType || '');"));
 
 // ================= 4. The automatic check never receives a back side or the selected type =================
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
@@ -139,7 +125,9 @@ $check('4. representative: the two fronts and the letter, as before; no back sid
 $check('4. the selected ID type is not in what the check receives', !str_contains((string) json_encode([$owner['declared'], $owner['documents'], $repManifest['declared']]), 'philhealth_id')
     && array_keys($owner['declared']) === ['flow', 'is_owner', 'first_name', 'last_name', 'arp_number', 'document_type', 'transfer_type']);
 
-// ================= 5. Staff page: back side next to its front, the type marked "not verified" =================
+// ================= 5. Staff page: back side next to its front; an older request's type marked "not verified" =================
+// (These requests carry the earlier labels and a stored applicant-selected type: requests from before the
+// National-ID-only rule. They are never held to that rule.)
 $between = static function (string $source, string $start, string $end): string {
     $from = strpos($source, $start);
     if ($from === false) {
@@ -240,6 +228,37 @@ $check('5b. without a confirmed type (title only, or an older result) there is n
 $check('5b. the warning never approves, rejects or changes anything (no action control, the outcome is the check\'s own)', !preg_match('/data-action="(approve|reject)/', (string) ($warn['mismatchUmid'] ?? ''))
     && ($cases['mismatchUmid'][0]['outcome'] ?? '') === ($v5('umid', 'confirmed')['outcome'] ?? 'x'));
 
+// 5c. National ID only: an ID the automatic check identifies as another government ID is a mismatch for Staff
+$natFiles = [array_replace($files[0], ['label' => 'Property Owner National ID', 'idTypeHint' => null, 'idTypeHintCode' => null, 'nationalIdOnly' => true]),
+    array_replace($files[1], ['label' => 'Property Owner National ID (back side)', 'nationalIdOnly' => true])];
+$oldFiles = [array_replace($files[0], ['idTypeHint' => null, 'idTypeHintCode' => null, 'nationalIdOnly' => false]), array_replace($files[1], ['nationalIdOnly' => false])];
+$natCases = [
+    'natUmid' => [$v5('umid', 'confirmed'), $natFiles],
+    'natLicense' => [$v5('drivers_license', 'confirmed'), $natFiles],
+    'natPhilsys' => [$v5('philsys_national_id', 'confirmed'), $natFiles],
+    'natTitleOnly' => [$v5('philsys_national_id', 'title_only'), $natFiles],
+    'oldUmid' => [$v5('umid', 'confirmed'), $oldFiles],
+];
+$script3 = substr($script, 0, (int) strpos($script, 'var files = '))
+    . 'var cases = ' . json_encode(array_map(static fn (array $c): array => ['ai' => $c[0], 'files' => $c[1]], $natCases)) . '; var out = {};'
+    . 'Object.keys(cases).forEach(function(k){ var r = {id:"DR-DEMO-1", applicant:"Rosa Fictional", ai:cases[k].ai, aiEligibility:{eligible:true},'
+    . ' details:{firstName:"Rosa", middleName:"", lastName:"Fictional", isOwner:true, arpNumber:""}, files:cases[k].files};'
+    . ' var ctx = dcContext(r); var d = (cases[k].ai.documents || []).filter(function(x){ return x.key==="ownerId"; })[0]; var c = dcKindCheck(d, true, ctx);'
+    . ' out[k] = {verdict:c.verdict, detected:c.detected, reason:c.reason, html:renderDocCheckDetail({r:r, kind:"doc", type:"Certification of Assessment", state:aiCheckState(r, "doc")})}; });'
+    . 'process.stdout.write(JSON.stringify(out));';
+file_put_contents($jsFile, $script3);
+$nat = json_decode((string) shell_exec(escapeshellarg($node) . ' ' . escapeshellarg($jsFile) . ' 2>&1'), true);
+$nat = is_array($nat) ? $nat : [];
+$check('5c. National ID only: an ID identified as a UMID is a Mismatch, naming it and the rule, for Staff to check', ($nat['natUmid']['verdict'] ?? '') === 'mismatch'
+    && ($nat['natUmid']['reason'] ?? '') === 'This looks like UMID, not a National ID. Only the National ID (PhilSys card or ePhilID) is accepted. Check the original.', $nat['natUmid'] ?? $nat);
+$check('5c. the same for a Driver\'s License', ($nat['natLicense']['verdict'] ?? '') === 'mismatch' && str_contains((string) ($nat['natLicense']['reason'] ?? ''), 'not a National ID'), $nat['natLicense'] ?? null);
+$check('5c. a confirmed National ID is Correct (no warning)', ($nat['natPhilsys']['verdict'] ?? '') === 'correct' && !str_contains((string) ($nat['natPhilsys']['html'] ?? 'not a National ID'), 'not a National ID'), $nat['natPhilsys'] ?? null);
+$check('5c. a National ID read by its title only stays "Unable to verify" (as before), not a mismatch', ($nat['natTitleOnly']['verdict'] ?? '') === 'unable', $nat['natTitleOnly'] ?? null);
+$check('5c. an older request (any government ID was accepted) never gets the National ID warning', ($nat['oldUmid']['verdict'] ?? '') === 'correct'
+    && !str_contains((string) ($nat['oldUmid']['html'] ?? 'not a National ID'), 'not a National ID'), $nat['oldUmid'] ?? null);
+$check('5c. the mismatch only informs: no approve or reject control, the check\'s own outcome', !preg_match('/data-action="(approve|reject)/', (string) ($nat['natUmid']['html'] ?? ''))
+    && str_contains((string) ($nat['natUmid']['html'] ?? ''), 'not a National ID'));
+
 // ================= 6. Client page in headless Chrome =================
 $chrome = getenv('CHROME_BIN') ?: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 if (!is_file($chrome)) {
@@ -308,19 +327,17 @@ $layout = 'var blocks=[].slice.call(document.querySelectorAll(".id-card-block"))
     . ' out.scrollX = document.documentElement.scrollWidth > window.innerWidth + 1; out.viewport = window.innerWidth;';
 $shotDir = getenv('SA_SCREENSHOT_DIR') ?: null;
 
-// 6.1 Dropdown and layout (owner, desktop)
+// 6.1 No dropdown; the accepted ID is named; layout (owner, desktop)
 $g = $run('desktop', $base . 'S.render();' . $layout
-    . ' var sel=document.getElementById("f-ownerIdType"); out.label=document.querySelector("label[for=f-ownerIdType]").textContent; out.placeholder=sel.options[0].textContent;'
-    . ' out.placeholderValue=sel.options[0].value; out.options=sel.options.length; out.required=sel.required; out.note=document.querySelector(".id-sides-note").textContent;'
-    . ' sel.value="philhealth_id"; sel.dispatchEvent(new Event("change")); out.chosen=S.state.formData.ownerIdType;'
-    . ' out.selected=(document.getElementById("hint-ownerIdType")||{}).textContent; out.selValue=document.getElementById("f-ownerIdType").value;', 1366);
-$check('6.1 owner: one ID block with the label "Select Type of Valid ID" and the placeholder "Select your ID type"', ($g['blocks'] ?? 0) === 1
-    && ($g['label'] ?? '') === 'Select Type of Valid ID*' && ($g['placeholder'] ?? '') === 'Select your ID type' && ($g['placeholderValue'] ?? 'x') === '', $g);
-$check('6.1 the dropdown lists the 14 registry types and is required', ($g['options'] ?? 0) === 15 && ($g['required'] ?? false) === true, $g);
-$check('6.1 choosing a type keeps it in the form and shows it clearly', ($g['chosen'] ?? '') === 'philhealth_id' && ($g['selValue'] ?? '') === 'philhealth_id'
-    && ($g['selected'] ?? '') === 'Selected: PhilHealth ID. The office still checks the ID you upload.', $g);
-$check('6.1 desktop: FRONT and BACK side by side, equal widths, with the instruction', ($g['sides'][0]['sideBySide'] ?? false) === true && ($g['sides'][0]['equal'] ?? false) === true
-    && ($g['sides'][0]['labels'] ?? null) === ['FRONT SIDE OF ID*', 'BACK SIDE OF ID*'] && ($g['note'] ?? '') === 'Upload clear photos of both sides of your ID.' && ($g['scrollX'] ?? true) === false, $g);
+    . ' out.selects=document.querySelectorAll(".id-card-block select").length; out.title=(document.querySelector(".id-card-title")||{}).textContent;'
+    . ' out.note=(document.querySelector(".id-sides-note")||{}).textContent; out.head=(document.querySelector(".wizard-card-head h2")||{}).textContent;'
+    . ' out.lead=(document.querySelector(".wizard-card-head p")||{}).textContent;', 1366);
+$check('6.1 owner: one National ID block, no ID type dropdown, and the accepted ID named', ($g['blocks'] ?? 0) === 1 && ($g['selects'] ?? 1) === 0
+    && ($g['title'] ?? '') === 'Property Owner National ID' && ($g['note'] ?? '') === 'Accepted ID: National ID (PhilSys card or ePhilID). Upload clear photos of its front and back.', $g);
+$check('6.1 Step 3 says only the National ID is accepted, front and back', ($g['head'] ?? '') === 'National ID Verification'
+    && ($g['lead'] ?? '') === 'Only the National ID is accepted (PhilSys card or ePhilID), front and back.', $g);
+$check('6.1 desktop: FRONT and BACK side by side, equal widths', ($g['sides'][0]['sideBySide'] ?? false) === true && ($g['sides'][0]['equal'] ?? false) === true
+    && ($g['sides'][0]['labels'] ?? null) === ['FRONT SIDE OF ID*', 'BACK SIDE OF ID*'] && ($g['scrollX'] ?? true) === false, $g);
 
 // 6.2 Representative at tablet and phone widths
 $repBase = $base . 'fd.isOwner=false; S.render();';
@@ -349,29 +366,21 @@ $check('6.3 replacing the back keeps the front', ($g['replaced'] ?? null) === ['
 $check('6.3 removing the back keeps the front, which still offers Replace and Remove', ($g['removed'] ?? null) === ['front-side.png', null] && ($g['backButton'] ?? false) && ($g['frontButtons'] ?? false), $g);
 $check('6.3 each side has its own JPG/PNG file input', ($g['inputs'] ?? null) === [['ownerId', '.jpg,.jpeg,.png,image/jpeg,image/png,image/jpg'], ['ownerIdBack', '.jpg,.jpeg,.png,image/jpeg,image/png,image/jpg']], $g);
 
-// 6.4 Required fields (a passport's back included); the review
+// 6.4 Required photos (both sides); the review
 $g = $run('required', $base . 'S.render(); S.nextStep(); out.errors=Object.keys(S.state.errors); out.step=S.state.step;'
-    . ' out.typeError=(document.getElementById("err-ownerIdType")||{}).textContent; out.backError=(document.getElementById("err-ownerIdBack")||{}).textContent;'
-    . ' fd.ownerIdType="passport"; fd.files={ownerId:{name:"front.png",size:10,type:"image/png",valid:true}}; S.state.errors={}; S.render();'
-    . ' out.passportNote=document.querySelector(".id-sides-note").textContent; out.backLabel=document.querySelectorAll(".id-side-label")[1].textContent;'
-    . ' out.passportBackError=(document.getElementById("err-ownerIdBack")||{}).textContent||null;'
-    . ' S.nextStep(); out.passportStep=S.state.step; out.passportErrors=Object.keys(S.state.errors);'
-    . ' fd.ownerIdType="umid"; S.state.step=3; S.render(); S.nextStep(); out.umidErrors=Object.keys(S.state.errors);'
+    . ' out.backError=(document.getElementById("err-ownerIdBack")||{}).textContent;'
+    . ' fd.files={ownerId:{name:"front.png",size:10,type:"image/png",valid:true}}; S.state.errors={}; S.render(); S.nextStep(); out.frontOnlyStep=S.state.step; out.frontOnlyErrors=Object.keys(S.state.errors);'
     . ' fd.files.ownerIdBack={name:"back.png",size:10,type:"image/png",valid:true}; S.state.errors={}; S.nextStep(); out.okStep=S.state.step;'
-    . ' out.review=[].slice.call(document.querySelectorAll(".review-table tr")).map(function(r){ return r.textContent; }).filter(function(t){ return /Valid ID/.test(t); });', 1366);
-$check('6.4 without a type or photos the step does not continue: type, front and back are each required', ($g['step'] ?? 0) === 3
-    && ($g['errors'] ?? null) === ['ownerIdType', 'ownerId', 'ownerIdBack'] && ($g['typeError'] ?? '') === 'Select the type of valid ID you are uploading.'
-    && ($g['backError'] ?? '') === 'Property Owner Valid ID (back side) upload is required.', $g);
-$check('6.4 a passport also needs its back: still required, and the step does not continue with the front only', ($g['passportNote'] ?? '') === 'Upload clear photos of both sides of your ID.'
-    && ($g['backLabel'] ?? '') === 'BACK SIDE OF ID*' && ($g['passportStep'] ?? 0) === 3 && ($g['passportErrors'] ?? null) === ['ownerIdBack'], $g);
-$check('6.4 any other ID still needs its back; with both sides it continues', ($g['umidErrors'] ?? null) === ['ownerIdBack'] && ($g['okStep'] ?? 0) === 4, $g);
-$check('6.4 the review shows the selected type and both sides', ($g['review'] ?? null) === ['Property Owner Valid ID: ID TypeUMID', 'Property Owner Valid IDfront.png',
-    'Property Owner Valid ID (back side)back.png'], $g);
+    . ' out.review=[].slice.call(document.querySelectorAll(".review-table tr")).map(function(r){ return r.textContent; }).filter(function(t){ return /National ID|ID Type/.test(t); });', 1366);
+$check('6.4 without photos the step does not continue: front and back are each required (no ID type to choose)', ($g['step'] ?? 0) === 3
+    && ($g['errors'] ?? null) === ['ownerId', 'ownerIdBack'] && ($g['backError'] ?? '') === 'Property Owner National ID (back side) upload is required.', $g);
+$check('6.4 the front alone is not enough; with both sides it continues', ($g['frontOnlyStep'] ?? 0) === 3 && ($g['frontOnlyErrors'] ?? null) === ['ownerIdBack'] && ($g['okStep'] ?? 0) === 4, $g);
+$check('6.4 the review shows both sides and no ID type row', ($g['review'] ?? null) === ['Property Owner National IDfront.png', 'Property Owner National ID (back side)back.png'], $g);
 
-// 6.5 Representative: both IDs need their own type and both sides
+// 6.5 Representative: both National IDs need both sides
 $g = $run('repRequired', $repBase . 'S.nextStep(); out.errors=Object.keys(S.state.errors).sort();', 1366);
-$check('6.5 representative: each ID has its own type, front and back; the letter is still required', ($g['errors'] ?? null) === ['authLetter', 'ownerId', 'ownerIdBack', 'ownerIdType',
-    'requesterId', 'requesterIdBack', 'requesterIdType'], $g);
+$check('6.5 representative: each National ID needs its front and back; the letter is still required', ($g['errors'] ?? null) === ['authLetter', 'ownerId', 'ownerIdBack',
+    'requesterId', 'requesterIdBack'], $g);
 
 // 6.6 Land Transfer uses the same ID blocks
 $g = $run('land', 'state.view="wizard"; state.flow="landtransfer"; state.maxStep=4; state.step=3; S.render(); out.blocks=document.querySelectorAll(".id-card-block").length;'
@@ -385,35 +394,29 @@ $g = $run('landRep', 'state.view="wizard"; state.flow="landtransfer"; state.maxS
     . ' out.blocks=[].slice.call(document.querySelectorAll(".id-card-block .id-card-title")).map(function(e){ return e.textContent; });'
     . ' out.letter=!!document.querySelector(".id-upload-grid [data-upload=authLetter]"); out.docs=document.querySelectorAll(".doc-upload-list [data-upload]").length;'
     . ' S.nextStep(); out.errors=Object.keys(S.state.errors).sort();'
-    . ' var ok={name:"x.png",size:10,type:"image/png",valid:true}; fd.requesterIdType="drivers_license"; fd.ownerIdType="passport";'
+    . ' var ok={name:"x.png",size:10,type:"image/png",valid:true};'
     . ' ["requesterId","requesterIdBack","ownerId","ownerIdBack","authLetter"].concat(docs).forEach(function(k){ fd.files[k]=Object.assign({}, ok, {name:k+".png"}); });'
     . ' S.state.errors={}; S.nextStep(); out.step=S.state.step;'
-    . ' out.review=[].slice.call(document.querySelectorAll(".review-table tr")).map(function(r){ return r.textContent; }).filter(function(t){ return /Valid ID/.test(t); });', 1366);
-$check('6.6b representative Land Transfer: the representative\'s and the owner\'s ID blocks, the letter and the five documents', ($g['blocks'] ?? null) === ["Authorized Representative's Valid ID", 'Property Owner Valid ID']
+    . ' out.review=[].slice.call(document.querySelectorAll(".review-table tr")).map(function(r){ return r.textContent; }).filter(function(t){ return /National ID|ID Type/.test(t); });', 1366);
+$check('6.6b representative Land Transfer: the representative\'s and the owner\'s National ID blocks, the letter and the five documents', ($g['blocks'] ?? null) === ['Authorized Representative National ID', 'Property Owner National ID']
     && ($g['letter'] ?? false) === true && ($g['docs'] ?? 0) === 5, $g);
-$check('6.6b nothing uploaded: every document, both IDs\' types and both sides of each ID are required', ($g['errors'] ?? null) === ['authLetter', 'certNoImprovement', 'ctcTdOrTitle',
-    'notarialDeed', 'ownerId', 'ownerIdBack', 'ownerIdType', 'requesterId', 'requesterIdBack', 'requesterIdType', 'taxClearance', 'vicinityMap'], $g);
-$check('6.6b complete: it continues to the review, which lists both IDs\' types and both sides', ($g['step'] ?? 0) === 4 && ($g['review'] ?? null) === [
-    "Authorized Representative's Valid ID: ID TypePhilippine Driver's License", 'Property Owner Valid ID: ID TypePassport', "Authorized Representative's Valid IDrequesterId.png",
-    "Authorized Representative's Valid ID (back side)requesterIdBack.png", 'Property Owner Valid IDownerId.png', 'Property Owner Valid ID (back side)ownerIdBack.png'], $g);
+$check('6.6b nothing uploaded: every document and both sides of each National ID are required', ($g['errors'] ?? null) === ['authLetter', 'certNoImprovement', 'ctcTdOrTitle',
+    'notarialDeed', 'ownerId', 'ownerIdBack', 'requesterId', 'requesterIdBack', 'taxClearance', 'vicinityMap'], $g);
+$check('6.6b complete: it continues to the review, which lists both sides of both National IDs (no ID type rows)', ($g['step'] ?? 0) === 4 && ($g['review'] ?? null) === [
+    'Authorized Representative National IDrequesterId.png', 'Authorized Representative National ID (back side)requesterIdBack.png',
+    'Property Owner National IDownerId.png', 'Property Owner National ID (back side)ownerIdBack.png'], $g);
 
-// 6.6c A saved draft restored in the browser: both photos and the selected type come back
+// 6.6c A saved draft restored in the browser: both photos come back; an ID type saved by an older page is ignored
 $saved = '[{doc_key:"ownerId", name:"front.png", size:120, type:"image/png"}, {doc_key:"ownerIdBack", name:"back.png", size:130, type:"image/png"}]';
 $g = $run('draftRestore', 'S.applyDraft("docreq", 3, 3, {firstName:"Rosa", lastName:"Fictional", contact:"+639170000001", addressLine:"1 Demo St.", requesterBarangay:"POBLACION",'
-    . ' barangay:"POBLACION", arp:"14-0001-00045", documentType:"Certification of Assessment", purpose:"Personal Copy", ownerIdType:"umid"}, ' . $saved . '); S.render();'
-    . ' out.type=document.getElementById("f-ownerIdType").value; out.selected=document.getElementById("hint-ownerIdType").textContent;'
+    . ' barangay:"POBLACION", arp:"14-0001-00045", documentType:"Certification of Assessment", purpose:"Personal Copy", ownerIdType:"<b>umid</b>"}, ' . $saved . '); S.render();'
+    . ' out.selects=document.querySelectorAll(".id-card-block select").length; out.injected=document.querySelector(".id-card-block").innerHTML.indexOf("umid")>-1;'
     . ' out.sides=[].slice.call(document.querySelectorAll(".id-side .upl-file")).map(function(e){ return e.textContent; });'
     . ' out.saved=[].slice.call(document.querySelectorAll(".id-side .upl-ok")).map(function(e){ return e.textContent; });'
     . ' S.nextStep(); out.step=S.state.step; out.errors=Object.keys(S.state.errors);', 1366);
-$check('6.6c a restored draft shows its selected type and both saved photos, and continues without asking again', ($g['type'] ?? '') === 'umid'
-    && ($g['selected'] ?? '') === 'Selected: UMID. The office still checks the ID you upload.' && ($g['sides'] ?? null) === ['front.png', 'back.png']
-    && ($g['saved'] ?? null) === ['Saved', 'Saved'] && ($g['step'] ?? 0) === 4 && ($g['errors'] ?? null) === [], $g);
-$g = $run('draftTampered', 'S.applyDraft("docreq", 3, 3, {firstName:"Rosa", lastName:"Fictional", ownerIdType:"<b>bogus</b>"}, ' . $saved . '); S.render();'
-    . ' out.type=document.getElementById("f-ownerIdType").value; out.selected=document.getElementById("hint-ownerIdType").textContent;'
-    . ' out.html=document.querySelector(".id-type-field").innerHTML.indexOf("bogus")>-1; S.nextStep(); out.step=S.state.step; out.typeError=(document.getElementById("err-ownerIdType")||{}).textContent;', 1366);
-$check('6.6c an unknown or altered saved type: the placeholder and the prompt (never an empty "Selected:"), and the type is still required', ($g['type'] ?? 'x') === ''
-    && ($g['selected'] ?? '') === 'Choose the ID you will upload.' && ($g['html'] ?? true) === false && ($g['step'] ?? 0) === 3
-    && ($g['typeError'] ?? '') === 'Select the type of valid ID you are uploading.', $g);
+$check('6.6c a restored draft shows both saved photos and continues; an ID type saved by an older page is ignored (never shown)', ($g['selects'] ?? 1) === 0
+    && ($g['injected'] ?? true) === false && ($g['sides'] ?? null) === ['front.png', 'back.png'] && ($g['saved'] ?? null) === ['Saved', 'Saved']
+    && ($g['step'] ?? 0) === 4 && ($g['errors'] ?? null) === [], $g);
 
 // 6.6d Contrast (WCAG AA, 4.5:1) of the ID panel's text, measured in the rendered page at desktop width.
 // The colour behind each text is worked out from the page itself: each ancestor's background colour,
@@ -425,22 +428,22 @@ $contrast = 'function rgba(c){ var m=c.match(/rgba?\(([^)]+)\)/); if(m){ var p=m
     . ' function lum(c){ return [0,1,2].reduce(function(s,j,i){ var v=c[j]/255; v=v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); return s+[0.2126,0.7152,0.0722][i]*v; },0); }'
     . ' function ratio(el){ var t=rgba(getComputedStyle(el).color), b=behind(el), x=lum(t), y=lum(b); return Math.round(((Math.max(x,y)+0.05)/(Math.min(x,y)+0.05))*100)/100; }'
     . ' function measure(){ var q=function(s){ return document.querySelector(s); };'
-    . '  return {panelNote: ratio(q(".id-guidance-panel > .reference-note")), selected: ratio(q(".id-type-selected")), sidesNote: ratio(q(".id-sides-note")),'
+    . '  return {panelNote: ratio(q(".id-guidance-panel > .reference-note")), sidesNote: ratio(q(".id-sides-note")),'
     . '   title: ratio(q(".id-card-title")), sideLabel: ratio(q(".id-side-label")), meta: ratio(q(".id-side .upl-meta span"))}; }';
-$themeRun = static fn (string $theme): string => 'document.documentElement.setAttribute("data-theme","' . $theme . '");' . $base . 'fd.ownerIdType="philhealth_id"; S.render();'
+$themeRun = static fn (string $theme): string => 'document.documentElement.setAttribute("data-theme","' . $theme . '");' . $base . 'S.render();'
     . $contrast . ' out.r=measure();';
 $dark = $run('contrastDark', $themeRun('dark'), 1366);
 $light = $run('contrastLight', $themeRun('light'), 1366);
 $aa = static fn (array $r): bool => $r !== [] && min($r) >= 4.5;
 echo 'INFO  measured contrast, desktop: dark ' . json_encode($dark['r'] ?? null) . ' | light ' . json_encode($light['r'] ?? null) . "\n";
-$check('6.6d dark theme, desktop: every ID panel text keeps at least 4.5:1 (the guidance note, "Selected:", the instruction, titles, labels)', $aa((array) ($dark['r'] ?? [])), $dark);
+$check('6.6d dark theme, desktop: every ID panel text keeps at least 4.5:1 (the guidance note, the accepted-ID instruction, titles, labels)', $aa((array) ($dark['r'] ?? [])), $dark);
 $check('6.6d light theme, desktop: the same texts keep at least 4.5:1', $aa((array) ($light['r'] ?? [])), $light);
 $check('6.6d the dark panel follows the system setting too (same rule as the chosen dark theme)', str_contains($html,
     '@media (prefers-color-scheme: dark) and (min-width:1025px){ :root:not([data-theme="light"]) .id-guidance-panel{ background:var(--surface-2);')
     && str_contains($html, ':root[data-theme="dark"] .id-guidance-panel{ background:var(--surface-2);'));
 
 // 6.7 Text styles: the new parts reuse the page's existing typography
-$css = $between($html, '/* ---- Valid ID: type selector and front/back photos.', '@media (prefers-reduced-motion:reduce){ .id-side');
+$css = $between($html, '/* ---- National ID: front and back photos.', '@media (prefers-reduced-motion:reduce){ .id-side');
 $check('6.7 the new styles change no font (no font-family, font-size or font shorthand)', $css !== '' && !preg_match('/font(-family|-size)?\s*:/', $css), $css === '' ? 'css block not found' : '');
 [$outsideSupports] = explode('@supports', (string) preg_replace('#/\*.*?\*/#s', '', $css), 2) + [1 => ''];
 $check('6.7 without color-mix() or backdrop-filter the cards are the opaque theme surface (translucency and blur only inside @supports)',
@@ -451,7 +454,7 @@ $check('6.7 the card colours come from the theme (light and dark), never a fixed
 
 // 6.8 Screenshots (optional, outside the repository)
 if ($shotDir !== null && is_dir($shotDir)) {
-    $shotJs = $base . 'fd.ownerIdType="philhealth_id"; S.render(); return Promise.all([fakeId("FRONT SIDE"), fakeId("BACK SIDE")]).then(function(f){ '
+    $shotJs = $base . 'S.render(); return Promise.all([fakeId("FRONT SIDE"), fakeId("BACK SIDE")]).then(function(f){ '
         . ' return Promise.all([S.upload("ownerId", f[0]), S.upload("ownerIdBack", f[1])]); }).then(function(){ var p=document.querySelector(".id-guidance-panel"); if(p) window.scrollTo(0, p.getBoundingClientRect().top + window.scrollY - 12); })';
     foreach (['desktop' => 1366, 'tablet' => 820, 'phone' => 390] as $label => $width) {
         $run('shot-' . $label, $shotJs, $width, rtrim($shotDir, '/') . "/id-upload-{$label}.png");

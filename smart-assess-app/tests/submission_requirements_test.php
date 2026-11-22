@@ -239,30 +239,31 @@ $check('rules: the requirement list matches evaluate()', array_keys(DocumentRequ
     === array_column((new DocumentRequirements())->evaluate('landtransfer', false, [])['items'], 'key'));
 
 // ================= 1. The server decides the required documents =================
-[$status, $ref, $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')],
+$id = static fn () => $file($fixtures . '/id.png', 'image/png');
+$idBack = static fn () => $file($fixtures . '/id-back.png', 'image/png');
+[$status, $ref, $body] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack()],
     ['documents' => ['ownerId' => 'Anything I like', 'bonusDoc' => 'Not a real requirement']]);
 $rows = $documentsOf($ref);
-$check('a submission records only the server\'s requirements with the server\'s labels (the ID\'s back side is one of them)', $status === 200
-    && $rows === [['doc_key' => 'ownerId', 'label' => 'Valid Government-Issued ID', 'file_status' => 'ok'],
-        ['doc_key' => 'ownerIdBack', 'label' => 'Valid Government-Issued ID (back side)', 'file_status' => 'missing']], [$status, $rows, $body]);
-[$status, $ref] = $submit('landtransfer', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')], ['documents' => ['ownerId' => 'Owner ID']]);
+$check('a submission records only the server\'s requirements with the server\'s labels (the National ID, front and back)', $status === 200
+    && $rows === [['doc_key' => 'ownerId', 'label' => 'Property Owner National ID', 'file_status' => 'ok'],
+        ['doc_key' => 'ownerIdBack', 'label' => 'Property Owner National ID (back side)', 'file_status' => 'ok']], [$status, $rows, $body]);
+[$status, $ref] = $submit('landtransfer', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack()], ['documents' => ['ownerId' => 'Owner ID']]);
 $rows = $documentsOf($ref);
 $complete = (int) $pdo->query("SELECT requirement_complete FROM requests WHERE reference_no = '{$ref}'")->fetchColumn();
-$check('the browser cannot drop requirements: all seven land-transfer documents (five, and the ID front and back) are recorded, six missing', $status === 200
-    && array_column($rows, 'doc_key') === array_keys(DocumentRequirements::requirementsFor('landtransfer', true, ['ownerId' => null]))
-    && count(array_filter($rows, static fn (array $r): bool => $r['file_status'] === 'missing')) === 6 && $complete === 0, $rows);
-[$status, $ref] = $submit('docreq', false, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'requesterId' => $file($fixtures . '/id.png', 'image/png'),
-    'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png'), 'requesterIdBack' => $file($fixtures . '/id-back.png', 'image/png'),
-    'authLetter' => $file($fixtures . '/id.png', 'image/png')], ['documents' => []]);
-$check('a representative\'s complete set (both IDs front and back, and the letter) is accepted and marked complete', $status === 200 && count($documentsOf($ref)) === 5
+$check('the browser cannot drop requirements: all seven land-transfer documents (five, and the National ID front and back) are recorded, the five transfer documents missing', $status === 200
+    && array_column($rows, 'doc_key') === array_keys(DocumentRequirements::requirementsFor('landtransfer', true, true))
+    && count(array_filter($rows, static fn (array $r): bool => $r['file_status'] === 'missing')) === 5 && $complete === 0, $rows);
+[$status, $ref] = $submit('docreq', false, ['ownerId' => $id(), 'requesterId' => $id(), 'ownerIdBack' => $idBack(), 'requesterIdBack' => $idBack(), 'authLetter' => $id()], ['documents' => []]);
+$check('a representative\'s complete set (both National IDs front and back, and the letter) is accepted and marked complete', $status === 200 && count($documentsOf($ref)) === 5
     && (int) $pdo->query("SELECT requirement_complete FROM requests WHERE reference_no = '{$ref}'")->fetchColumn() === 1);
+$check('a representative\'s National ID has its own label', in_array(['doc_key' => 'requesterId', 'label' => 'Authorized Representative National ID', 'file_status' => 'ok'], $documentsOf($ref), true), $documentsOf($ref));
 $before = $requestCount();
-[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'passport' => $file($fixtures . '/id.png', 'image/png')]);
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack(), 'passport' => $id()]);
 $check('a file for a document that is not a requirement is refused, and nothing is saved', $status === 422 && $requestCount() === $before, [$status, $body]);
-[$status] = $submit('docreq', true, ['requesterId' => $file($fixtures . '/id.png', 'image/png')]);
+[$status] = $submit('docreq', true, ['requesterId' => $id()]);
 $check('a representative-only document on an owner\'s request is refused', $status === 422 && $requestCount() === $before);
 
-// ================= 1b. Each ID's front and back side, and the applicant-selected ID type =================
+// ================= 1b. National ID only: every ID's front and back; no ID type is chosen =================
 $rowsOf = static function (string $reference) use ($pdo): array {
     $stmt = $pdo->prepare('SELECT d.request_id, d.doc_key, d.stored_path, d.file_status, d.id_type_hint FROM request_documents d JOIN requests r ON r.id = d.request_id
         WHERE r.reference_no = ? ORDER BY d.id');
@@ -271,63 +272,50 @@ $rowsOf = static function (string $reference) use ($pdo): array {
 };
 $completeOf = static fn (string $reference): int => (int) $pdo->query('SELECT requirement_complete FROM requests WHERE reference_no = ' . $pdo->quote($reference))->fetchColumn();
 $storedHash = static fn (array $row): string => (string) md5_file($work . '/smart-assess-app/' . $row['stored_path']);
-[$status, $ref, $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
-    ['owner_id_type' => 'philhealth_id']);
+[$status, $ref, $body] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack()]);
 $rows = $rowsOf($ref);
 $check('front and back are stored as two documents of the same request, each its own file', $status === 200 && array_column($rows, 'doc_key') === ['ownerId', 'ownerIdBack']
     && count(array_unique(array_column($rows, 'request_id'))) === 1 && count(array_unique(array_column($rows, 'stored_path'))) === 2
     && array_unique(array_column($rows, 'file_status')) === ['ok'] && $completeOf($ref) === 1, [$status, $rows, $body]);
 $check('the front file holds the front image and the back file the back image (never swapped or merged)', count($rows) === 2
     && $storedHash($rows[0]) === md5_file($fixtures . '/id.png') && $storedHash($rows[1]) === md5_file($fixtures . '/id-back.png'));
-$check('the selected type is stored on the ID\'s front row only, as given', array_column($rows, 'id_type_hint') === ['philhealth_id', null], $rows);
+$check('no ID type is stored for a new submission', array_column($rows, 'id_type_hint') === [null, null], $rows);
+[$status, $ref, $body] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack()], ['owner_id_type' => 'philhealth_id', 'requester_id_type' => 'passport']);
+$check('an ID type sent by a page opened before the rule is ignored: accepted, nothing stored', $status === 200 && array_column($rowsOf($ref), 'id_type_hint') === [null, null], [$status, $rowsOf($ref), $body]);
+[$status1] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack()], ['owner_id_type' => 'school_or_company_id']);
+[$status2] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack()], ['owner_id_type' => ['passport']]);
+$check('an unknown or malformed ID type is ignored too (it no longer decides anything)', $status1 === 200 && $status2 === 200, [$status1, $status2]);
 $before = $requestCount();
-[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
-    ['owner_id_type' => 'school_or_company_id']);
-$check('a type that is not in the registry list is refused, and nothing is saved', $status === 422 && str_contains($body, 'Select the type of valid ID from the list.')
-    && $requestCount() === $before, [$status, $body]);
-[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')], ['owner_id_type' => ['passport']]);
-$check('a type that is not a plain text value is refused', $status === 422 && $requestCount() === $before, [$status, $body]);
-[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')], ['owner_id_type' => 'passport']);
-$check('Passport selected without a back photo: refused by the server, naming the back side, with the reload hint; nothing saved', $status === 422
-    && str_contains($body, 'Please upload clear photos of both the front and the back of your valid ID: Valid Government-Issued ID (back side) is missing. Nothing was submitted.')
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $id()]);
+$check('a National ID without its back photo is refused, naming the back side, with the reload hint; nothing saved', $status === 422
+    && str_contains($body, 'Please upload clear photos of both the front and the back of your National ID: Property Owner National ID (back side) is missing. Nothing was submitted.')
     && str_contains($body, 'please reload this page and try again.') && $requestCount() === $before, [$status, $body]);
-[$status, , $body] = $submit('docreq', true, ['ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')], ['owner_id_type' => 'umid']);
-$check('a type with only the back photo (no front) is refused the same way', $status === 422 && str_contains($body, 'Valid Government-Issued ID is missing') && $requestCount() === $before, [$status, $body]);
-[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
-    ['owner_id_type' => 'passport']);
-$check('a passport with both photos is accepted: front and back stored as two documents, complete', $status === 200 && array_column($rowsOf($ref), 'doc_key') === ['ownerId', 'ownerIdBack']
-    && $completeOf($ref) === 1, $rowsOf($ref));
-$before = $requestCount();
-[$status, , $body] = $submit('docreq', false, ['requesterId' => $file($fixtures . '/id.png', 'image/png'), 'ownerId' => $file($fixtures . '/id.png', 'image/png'),
-    'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png'), 'authLetter' => $file($fixtures . '/id.png', 'image/png')],
+[$status, , $body] = $submit('docreq', true, ['ownerIdBack' => $idBack()]);
+$check('only the back photo (no front) is refused the same way', $status === 422 && str_contains($body, 'Property Owner National ID is missing') && $requestCount() === $before, [$status, $body]);
+[$status, , $body] = $submit('landtransfer', true, ['ownerId' => $id()]);
+$check('Land Transfer: the National ID\'s back is required too', $status === 422 && str_contains($body, 'Property Owner National ID (back side) is missing') && $requestCount() === $before, [$status, $body]);
+[$status, , $body] = $submit('docreq', false, ['requesterId' => $id(), 'ownerId' => $id(), 'ownerIdBack' => $idBack(), 'authLetter' => $id()]);
+$check('representative: the representative\'s National ID needs its back too (refused, nothing saved)', $status === 422
+    && str_contains($body, 'Authorized Representative National ID (back side) is missing') && $requestCount() === $before, [$status, $body]);
+[$status, $ref] = $submit('docreq', false, ['requesterId' => $id(), 'requesterIdBack' => $idBack(), 'ownerId' => $id(), 'ownerIdBack' => $idBack(), 'authLetter' => $id()],
     ['requester_id_type' => 'passport', 'owner_id_type' => 'umid']);
-$check('representative: a passport selected for the representative\'s ID still needs its back (refused, nothing saved)', $status === 422
-    && str_contains($body, 'Valid ID of Requester (back side) is missing') && $requestCount() === $before, [$status, $body]);
-[$status, $ref] = $submit('docreq', false, ['requesterId' => $file($fixtures . '/id.png', 'image/png'), 'requesterIdBack' => $file($fixtures . '/id-back.png', 'image/png'),
-    'ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png'), 'authLetter' => $file($fixtures . '/id.png', 'image/png')],
-    ['requester_id_type' => 'passport', 'owner_id_type' => 'umid']);
-$rows = $rowsOf($ref);
-$check('representative with both sides of both IDs: accepted, each type stored on its own ID\'s front only', $status === 200 && $completeOf($ref) === 1
-    && array_column($rows, 'id_type_hint', 'doc_key') === ['ownerId' => 'umid', 'requesterId' => 'passport', 'authLetter' => null, 'ownerIdBack' => null, 'requesterIdBack' => null], $rows);
-[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png')]);
-$check('an older page (no ID type) with one document keeps the earlier rule: accepted, the back recorded as missing for Staff', $status === 200
-    && array_column($rowsOf($ref), 'file_status', 'doc_key') === ['ownerId' => 'ok', 'ownerIdBack' => 'missing'] && $completeOf($ref) === 0
-    && array_column($rowsOf($ref), 'id_type_hint') === [null, null], $rowsOf($ref));
-[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($fixtures . '/id-back.png', 'image/png')],
-    ['owner_id_type' => 'umid', 'requester_id_type' => 'passport']);
-$check('an owner\'s request ignores a representative type (nothing extra stored)', $status === 200 && array_column($rowsOf($ref), 'id_type_hint') === ['umid', null], $rowsOf($ref));
+$check('representative with both sides of both National IDs: accepted, complete, no ID type stored', $status === 200 && $completeOf($ref) === 1
+    && array_unique(array_column($rowsOf($ref), 'id_type_hint')) === [null], $rowsOf($ref));
+[$status, $ref] = $submit('docreq', false, ['requesterId' => $id(), 'requesterIdBack' => $idBack(), 'ownerId' => $id(), 'ownerIdBack' => $idBack()]);
+$check('one document without its authorization letter keeps the earlier rule: accepted, the letter recorded as missing for Staff', $status === 200
+    && (array_column($rowsOf($ref), 'file_status', 'doc_key')['authLetter'] ?? '') === 'missing' && $completeOf($ref) === 0, $rowsOf($ref));
 $before = $requestCount();
-[$status] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'requesterIdBack' => $file($fixtures . '/id-back.png', 'image/png')]);
+[$status] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $idBack(), 'requesterIdBack' => $idBack()]);
 $check('a representative\'s back side on an owner\'s request is refused, and nothing is saved', $status === 422 && $requestCount() === $before);
 $pdfPath = $fixtures . '/back.pdf';
 file_put_contents($pdfPath, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
-[$status, , $body] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $file($pdfPath, 'application/pdf')]);
+[$status, , $body] = $submit('docreq', true, ['ownerId' => $id(), 'ownerIdBack' => $file($pdfPath, 'application/pdf')]);
 $check('a back side must be a JPG or PNG image, like the front (a PDF is refused, nothing saved)', $status === 422 && str_contains($body, 'JPG or PNG') && $requestCount() === $before, [$status, $body]);
 
 // ================= 2. One size limit =================
 [$status, , $body] = $submit('docreq', true, ['ownerId' => $file($sized(5 * 1024 * 1024), 'image/png')]);
 $check('an upload of exactly 5 MiB is refused with a clear message', $status === 422 && str_contains($body, 'smaller than 5 MB') && $requestCount() === $before, [$status, $body]);
-[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($sized(5 * 1024 * 1024 - 1), 'image/png')]);
+[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($sized(5 * 1024 * 1024 - 1), 'image/png'), 'ownerIdBack' => $idBack()]);
 $check('an upload one byte under 5 MiB is accepted', $status === 200 && $ref !== '', $status);
 
 // ================= 2b. One image resolution limit (shared with OCR) =================
@@ -342,7 +330,7 @@ $before = $requestCount();
 [$status, , $body] = $submit('docreq', true, ['ownerId' => $file($pngClaiming(6000, 4400), 'image/png')]);   // 26.4 MP, under 5 MB
 $check('an image over 25 megapixels is refused at upload with advice, and nothing is saved',
     $status === 422 && str_contains($body, 'resolution is too high') && str_contains($body, 'lower resolution') && $requestCount() === $before, [$status, $body]);
-[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($pngClaiming(5000, 5000), 'image/png')]);   // exactly 25.0 MP
+[$status, $ref] = $submit('docreq', true, ['ownerId' => $file($pngClaiming(5000, 5000), 'image/png'), 'ownerIdBack' => $idBack()]);   // exactly 25.0 MP
 $check('an image of exactly 25 megapixels is still accepted', $status === 200 && $ref !== '', $status);
 $check('the upload limit is OcrService\'s own (no separate number in api.php)',
     str_contains((string) file_get_contents($project . '/smart-assess-app/web/api.php'), 'OcrService::MAX_IMAGE_PIXELS')
@@ -359,7 +347,7 @@ $check('a WEBP as an ID is refused', $status === 422 && $requestCount() === $bef
     'authLetter' => $file($fixtures . '/doc.pdf', 'application/pdf')]);
 $check('a PDF authorization letter is refused', $status === 422 && $requestCount() === $before);
 [$status, $ref] = $submit('landtransfer', true, ['ctcTdOrTitle' => $file($fixtures . '/doc.pdf', 'application/pdf'), 'vicinityMap' => $file($fixtures . '/id.webp', 'image/webp'),
-    'ownerId' => $file($fixtures . '/id.png', 'image/png')]);
+    'ownerId' => $file($fixtures . '/id.png', 'image/png'), 'ownerIdBack' => $idBack()]);
 $check('PDF and WEBP supporting documents are accepted', $status === 200 && $ref !== '', $status);
 copy($fixtures . '/doc.pdf', $fixtures . '/disguised.png');
 [$status] = $submit('docreq', true, ['ownerId' => $file($fixtures . '/disguised.png', 'image/png')]);
@@ -380,6 +368,7 @@ $check('draft: an image over 25 megapixels is refused', $status === 422, $status
 $check('draft: a PDF supporting document is accepted', $status === 200, $status);
 [$status] = $upload('ownerId', $file($fixtures . '/id.png', 'image/png'));
 $check('draft: a PNG ID is accepted', $status === 200, $status);
+$upload('ownerIdBack', $file($fixtures . '/id-back.png', 'image/png'));   // National ID only: the draft keeps the back side too
 
 $draftId = (int) $pdo->query('SELECT id FROM request_drafts ORDER BY id DESC LIMIT 1')->fetchColumn();
 $plant = static function (string $key, string $source, string $mime) use ($pdo, $draftId, $work): string {

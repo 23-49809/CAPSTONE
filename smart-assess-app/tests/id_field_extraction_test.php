@@ -206,7 +206,7 @@ $check('worker: complete OCR passes that agree leave the name read; passes that 
 
 // ---- Staff page wording (no layout, font or size change) ----
 $html = (string) file_get_contents(dirname(__DIR__, 2) . '/smart-assess-internal.html');
-$from = (int) strpos($html, 'function dcKindCheck(d, isId){');
+$from = (int) strpos($html, 'function dcKindCheck(d, isId, ctx){');
 $wrapper = substr($html, $from, (int) strpos($html, 'function dcKindCheckTitles', $from) - $from);
 $check('Staff page: ID Type explains a title-only ID, titles of two IDs and an expired ID; Name Match explains disagreeing readings',
     str_contains($wrapper, "idc.type_state==='title_only'") && str_contains($wrapper, "idc.type_state==='conflict'") && str_contains($wrapper, "idc.expiry==='expired'")

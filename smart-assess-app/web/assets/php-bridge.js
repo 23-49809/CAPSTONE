@@ -137,10 +137,10 @@
     if (!submissionKey || submissionKeyFlow !== flow) { submissionKey = newSubmissionKey(); submissionKeyFlow = flow; }
     var key = live && /^[a-f0-9]{32}$/.test(String(live.submissionKey || '')) ? String(live.submissionKey) : submissionKey;
     var identityDocuments = isOwner
-      ? [{ doc_key: 'ownerId', label: 'Property Owner Valid ID' }]
+      ? [{ doc_key: 'ownerId', label: 'Property Owner National ID' }]
       : [
-          { doc_key: 'requesterId', label: 'Authorized Representative Valid ID' },
-          { doc_key: 'ownerId', label: 'Property Owner Valid ID' },
+          { doc_key: 'requesterId', label: 'Authorized Representative National ID' },
+          { doc_key: 'ownerId', label: 'Property Owner National ID' },
           { doc_key: 'authLetter', label: 'Authorization Letter' }
         ];
     var documents = flow === 'landtransfer'
@@ -189,10 +189,7 @@
       is_owner: document.getElementById('f-isOwner') ?
         document.getElementById('f-isOwner').checked : isOwner
     };
-    // The applicant-selected type of each valid ID: a hint for Staff only (checked against the list on
-    // the server; it never confirms the uploaded ID's type). The representative's only when one files.
-    payload.owner_id_type = String(form.ownerIdType || formValues.ownerIdType || '');
-    if (!payload.is_owner) payload.requester_id_type = String(form.requesterIdType || formValues.requesterIdType || '');
+    // Only the National ID is accepted (front and back); no ID type is chosen or sent.
     // Document Requests: every chosen document (type and purpose). Each becomes its own request on
     // the server, all under one tracking number; one document is submitted as before.
     if (flow === 'docreq' && Array.isArray(form.documentRequests) && form.documentRequests.length) {

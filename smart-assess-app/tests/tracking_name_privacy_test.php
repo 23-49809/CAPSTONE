@@ -279,6 +279,8 @@ $submitter->http('/index.php');
 $draftCode = str_replace('-', '', (string) ($draft['data']['code'] ?? ''));
 [$status, $body] = $submitter->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $submitter->csrf,
     'draft_token' => $draftCode, 'doc_key' => 'ownerId']), 'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'lorna-id-scan.png')]);
+[$status, $body] = $submitter->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $submitter->csrf,
+    'draft_token' => $draftCode, 'doc_key' => 'ownerIdBack']), 'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'lorna-id-back.png')]);   // National ID only: front and back
 $check('setup: a saved application with an uploaded ID', strlen($draftCode) === 20 && $status === 200, [$status, $body]);
 [$status, $body] = $submitter->http('/api.php?action=submit_request', ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $submitter->csrf,
     'terms_token' => (string) ($accepted['data']['terms_token'] ?? ''), 'draft_token' => $draftCode] + $applicant)]);
@@ -352,7 +354,7 @@ $check('the submitting browser still sees the full name afterwards', ($page['tra
 [, $accepted] = $submitter->json('terms_accept', ['flow' => 'docreq', 'agreed' => true, 'terms_version' => $termsVersion]);
 [$status, $body] = $submitter->http('/api.php?action=submit_request', ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $submitter->csrf,
     'terms_token' => (string) ($accepted['data']['terms_token'] ?? '')] + ['first_name' => 'Marco', 'last_name' => 'Abad'] + $applicant),
-    'file_ownerId' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]);
+    'file_ownerId' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png'), 'file_ownerIdBack' => new CURLFile($fixtures . '/id.png', 'image/png', 'id-back.png')]);
 $secondReference = (string) (json_decode($body, true)['data']['reference_no'] ?? '');
 [, $pageA] = $submitter->page('/index.php?track=' . rawurlencode($reference));
 [, $pageB] = $submitter->page('/index.php?track=' . rawurlencode($secondReference));
@@ -369,7 +371,7 @@ $submitNew = static function (object $b, string $first, string $last) use ($appl
     [, $accepted] = $b->json('terms_accept', ['flow' => 'docreq', 'agreed' => true, 'terms_version' => $GLOBALS['termsVersion']]);
     [, $body] = $b->http('/api.php?action=submit_request', ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $b->csrf,
         'terms_token' => (string) ($accepted['data']['terms_token'] ?? '')] + ['first_name' => $first, 'last_name' => $last] + $applicant),
-        'file_ownerId' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]);
+        'file_ownerId' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png'), 'file_ownerIdBack' => new CURLFile($fixtures . '/id.png', 'image/png', 'id-back.png')]);
     return (string) (json_decode($body, true)['data']['reference_no'] ?? '');
 };
 $nameShown = static function (object $b, string $reference, string $fullName): array {
