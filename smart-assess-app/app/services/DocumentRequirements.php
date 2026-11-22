@@ -45,8 +45,15 @@ final class DocumentRequirements
      * (AiVerification::jobManifest() skips it), so the check reads the front exactly as before.
      */
     public const ID_BACK_KEYS = ['ownerId' => 'ownerIdBack', 'requesterId' => 'requesterIdBack'];
-    /** Form fields for the applicant-selected type of each ID: front key => submission field. */
-    public const ID_TYPE_FIELDS = ['ownerId' => 'owner_id_type', 'requesterId' => 'requester_id_type'];
+    /**
+     * Only the Philippine National ID is accepted, for every ID of every request (the property owner's
+     * and an authorized representative's, Document Requests and Land Transfers): the plastic PhilSys card
+     * or the printed/digital ePhilID, front and back. The type is not chosen by the applicant; the
+     * automatic check compares the type it identifies with this one, as a warning for Staff only.
+     */
+    public const ACCEPTED_ID_TYPE = 'philsys_national_id';
+    public const ACCEPTED_ID_DESCRIPTION = 'National ID (PhilSys card or ePhilID)';
+    public const ID_LABELS = ['ownerId' => 'Property Owner National ID', 'requesterId' => 'Authorized Representative National ID'];
     private const IDENTITY_MIME_TYPES = [
         'image/jpeg',
         'image/png',
@@ -83,22 +90,20 @@ final class DocumentRequirements
      *
      * @return array<string,string>
      */
-    public static function requirementsFor(string $requestType, bool $isOwner, ?array $idTypes = null): array
+    public static function requirementsFor(string $requestType, bool $isOwner, bool $withBackSides = false): array
     {
         if (!in_array($requestType, ['docreq', 'landtransfer'], true)) {
             throw new InvalidArgumentException('Unsupported request type.');
         }
         $requirements = $requestType === 'landtransfer' ? self::LAND_TRANSFER_REQUIREMENTS : [];
-        $requirements['ownerId'] = $requestType === 'landtransfer' ? 'Valid ID of Property Owner' : 'Valid Government-Issued ID';
+        $requirements['ownerId'] = self::ID_LABELS['ownerId'];
         if (!$isOwner) {
-            $requirements['requesterId'] = 'Valid ID of Requester';
+            $requirements['requesterId'] = self::ID_LABELS['requesterId'];
             $requirements['authLetter'] = 'Authorization Letter';
         }
-        // Back sides are part of a new submission only ($idTypes given). Every ID needs both sides,
-        // whatever type the applicant selected: the selection is an unverified hint and never decides
-        // what is required. Without $idTypes (the automatic check, older callers) the list is the
-        // front-only one as before.
-        if ($idTypes !== null) {
+        // A new submission needs every National ID's front AND back. The automatic check and the
+        // completeness rules use the front-only list ($withBackSides false), as before.
+        if ($withBackSides) {
             foreach (self::ID_BACK_KEYS as $front => $back) {
                 if (isset($requirements[$front])) {
                     $requirements[$back] = self::backLabel($requirements[$front]);
@@ -147,7 +152,23 @@ final class DocumentRequirements
     }
 
     /**
-     * The Staff-facing label of a stored applicant-selected ID type, or null for none or for a value
+     * True for the label of an ID stored under the National-ID-only rule (front or back side). Requests
+     * submitted earlier carry the earlier labels ("Valid Government-Issued ID" ...), accepted any
+     * government ID, and are never held to this rule.
+     */
+    public static function isNationalIdLabel(string $label): bool
+    {
+        foreach (self::ID_LABELS as $idLabel) {
+            if ($label === $idLabel || $label === self::backLabel($idLabel)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The Staff-facing label of a stored applicant-selected ID type (requests from before the
+     * National-ID-only rule, when applicants chose a type), or null for none or for a value
      * that is not one of the registry's types (an old, tampered or unknown value is never shown).
      */
     public static function idTypeHintLabel(mixed $code): ?string

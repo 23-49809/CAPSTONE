@@ -231,6 +231,8 @@ $submit = static function (string $flow, string $first, string $last, string $mi
     $code = str_replace('-', '', (string) ($draft['data']['code'] ?? ''));
     $client->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $client->csrf,
         'draft_token' => $code, 'doc_key' => 'ownerId']), 'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]);
+    $client->http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $client->csrf,
+        'draft_token' => $code, 'doc_key' => 'ownerIdBack']), 'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id-back.png')]);   // National ID only: front and back
     $fields = ['flow' => $flow, 'first_name' => $first, 'middle_name' => $middle, 'last_name' => $last, 'contact_number' => '+639170007' . random_int(100, 999),
         'address_line' => '1 Test Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0007-0' . random_int(1000, 9999),
         'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true]
@@ -403,8 +405,10 @@ $check('a download is always recorded, even with the preview flag', $code === 20
 $pdo->exec("DELETE FROM request_document_views WHERE user_id = {$otherId}");
 [$code] = $staffB->http('/request-file.php?doc=' . $r7Doc . '&ref=' . rawurlencode($r7));
 $check('opening the original (Open, or the preview\'s full-size link) is recorded as before', $code === 200 && $opened() === 1, [$code, $opened()]);
+$r7Back = (int) $pdo->query("SELECT d.id FROM request_documents d JOIN requests r ON r.id = d.request_id WHERE r.reference_no = " . $pdo->quote($r7) . " AND d.doc_key = 'ownerIdBack'")->fetchColumn();
+$staffB->http('/request-file.php?doc=' . $r7Back . '&ref=' . rawurlencode($r7));   // the National ID's back side is an original too
 [$code, $res] = $staffB->json('ai_verification_reviewed', ['reference' => $r7]);
-$check('after opening the original, Mark as reviewed succeeds', $code === 200 && ($res['data']['reviewed'] ?? false) === true, [$code, $res]);
+$check('after opening the originals (the National ID front and back), Mark as reviewed succeeds', $code === 200 && ($res['data']['reviewed'] ?? false) === true, [$code, $res]);
 $check('reviewing does not assign the request', $row($r7)['processing_staff_id'] === null);
 [$code] = $browser()->http('/request-file.php?doc=' . $r7Doc . '&ref=' . rawurlencode($r7) . '&preview=1');
 $check('a preview still needs a Staff session', $code === 401, $code);

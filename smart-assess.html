@@ -443,7 +443,7 @@
   .upl-center .upl-meta{ justify-content:center; }
   .upl-center .upl-actions{ justify-content:center; }
   .upl-center .field-error{ text-align:center; }
-  /* ---- Valid ID: type selector and front/back photos. A light frosted-glass surface built from the
+  /* ---- National ID: front and back photos. A light frosted-glass surface built from the
      theme's own colours, so text keeps its contrast in the light and the dark theme. Text keeps the
      existing styles (no font changes). Without color-mix() or backdrop-filter the cards are the plain
      opaque theme surface, so readability never depends on the blur. ---- */
@@ -452,9 +452,6 @@
   .id-card-block{ min-width:0; padding:12px; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--surface);
     box-shadow:0 8px 24px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.06); }
   .id-card-title{ margin-bottom:6px; }
-  .id-type-field{ margin-bottom:6px; }
-  .id-type-field .reference-note{ margin-top:0; }
-  .id-card-block .id-type-select{ transition:border-color .2s ease, box-shadow .2s ease; }
   .id-card-block .id-sides-note{ margin:2px 0 8px; }
   .id-sides{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
   .id-side{ display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0; padding:10px; text-align:center;
@@ -479,7 +476,7 @@
   }
   /* Phones: front and back stack, each full width. */
   @media (max-width:640px){ .id-sides{ grid-template-columns:minmax(0, 1fr); } .id-card-block{ padding:12px; } }
-  @media (prefers-reduced-motion:reduce){ .id-side, .id-side .upl-btn, .id-card-block .id-type-select{ transition:none; } }
+  @media (prefers-reduced-motion:reduce){ .id-side, .id-side .upl-btn{ transition:none; } }
   @media (max-width:480px){
     .upl-row{ gap:10px; }
     .upl-thumb{ flex-basis:32px; width:32px; height:32px; }
@@ -1263,8 +1260,7 @@ function blankFormData(){
     firstName:'', lastName:'', middleName:'', contact:'+63', email:'',
     addressLine:'', province:'Batangas', city:'Mabini', zip:'4202',
     documentType:'', transferType:'', purpose:'', arp:'', barangay:'', requesterBarangay:'',
-    isOwner:true, files:{}, termsToken:'',
-    ownerIdType:'', requesterIdType:''
+    isOwner:true, files:{}, termsToken:''
   };
 }
 const state = {
@@ -1310,19 +1306,11 @@ function buildArp(barangay, serial){
    letter are JPG or PNG only; other documents JPG, PNG, WEBP or PDF; every file
    must be smaller than the upload limit (5 MiB). The server checks again. */
 const IMAGE_ONLY_KEYS = ['ownerId','requesterId','authLetter','ownerIdBack','requesterIdBack'];
-/* Valid ID types the applicant may select: exactly the government IDs the document-recognition
-   registry recognises (DocumentRequirements::idTypeOptions(), same codes and order; a test keeps the
-   two lists equal). The choice is only the applicant's statement: it never confirms the uploaded ID's
-   type, and the office's automatic check still reads the uploaded ID itself. */
-const ID_TYPE_OPTIONS = [
-  ['philsys_national_id','Philippine National ID (PhilSys)'], ['drivers_license','Philippine Driver\'s License'], ['passport','Passport'],
-  ['umid','UMID'], ['sss_id','SSS ID'], ['gsis_id','GSIS ID'], ['philhealth_id','PhilHealth ID'], ['prc_id','PRC ID'], ['postal_id','Postal ID'],
-  ['voters_id','Voter\'s ID'], ['tin_id','TIN ID'], ['pagibig_id','Pag-IBIG ID'], ['senior_citizen_id','Senior Citizen ID'], ['pwd_id','PWD ID']
-];
-/* Each ID's back side is its own file; its type selection is its own form field. */
+/* Only the National ID is accepted, for every ID (the owner's and a representative's), front and back:
+   the PhilSys card or the ePhilID (DocumentRequirements::ACCEPTED_ID_DESCRIPTION; the server checks the
+   same). No ID type is chosen. Each ID's back side is its own file. */
+const ACCEPTED_ID = 'National ID (PhilSys card or ePhilID)';
 const ID_BACK_KEYS = {ownerId:'ownerIdBack', requesterId:'requesterIdBack'};
-const ID_TYPE_FIELDS = {ownerId:'ownerIdType', requesterId:'requesterIdType'};
-function idTypeLabel(code){ const o = ID_TYPE_OPTIONS.filter(function(x){ return x[0]===code; })[0]; return o ? o[1] : ''; }
 const IMAGE_FILE_RE = /^image\/(jpeg|png)$/;
 function isImageOnlyKey(key){ return IMAGE_ONLY_KEYS.indexOf(key) !== -1; }
 function fileTypesFor(key){ return isImageOnlyKey(key) ? 'JPG or PNG' : 'JPG, PNG, WEBP or PDF'; }
@@ -1422,18 +1410,18 @@ function idSummaryKeys(fd){ return fd.isOwner ? ['ownerId'] : ['requesterId','ow
 function idLabel(flow, key){
   const map = {
     docreq:{
-      ownerId:'Property Owner Valid ID',
-      requesterId:'Authorized Representative\'s Valid ID',
+      ownerId:'Property Owner National ID',
+      requesterId:'Authorized Representative National ID',
       authLetter:'Authorization Letter'
     },
     landtransfer:{
-      ownerId:'Property Owner Valid ID',
-      requesterId:'Authorized Representative\'s Valid ID',
+      ownerId:'Property Owner National ID',
+      requesterId:'Authorized Representative National ID',
       authLetter:'Authorization Letter'
     }
   };
   if(key==='ownerIdBack' || key==='requesterIdBack') return idLabel(flow, key.slice(0, -4)) + ' (back side)';
-  return map[flow][key] || (key==='ownerId' ? 'Property Owner Valid ID' : key==='requesterId' ? 'Authorized Representative\'s Valid ID' : 'Authorization Letter');
+  return map[flow][key] || (key==='ownerId' ? 'Property Owner National ID' : key==='requesterId' ? 'Authorized Representative National ID' : 'Authorization Letter');
 }
 function getRequirementChecklist(flow, fd){
   const items = [];
@@ -1451,10 +1439,6 @@ function getRequirementChecklist(flow, fd){
 }
 function checklistIsComplete(items){ return items.every(function(i){ return i.status==='ok'; }); }
 function validateUploads(flow, fd, errors){
-  idFrontKeys(fd).forEach(function(front){
-    const field = ID_TYPE_FIELDS[front];
-    if(!fd[field] || !idTypeLabel(fd[field])) errors[field] = 'Select the type of valid ID you are uploading.';
-  });
   getRequirementChecklist(flow, fd).forEach(function(item){
     if(item.status==='missing') errors[item.key] = item.label+' upload is required.';
     else if(item.status==='flagged') errors[item.key] = 'This file cannot be accepted here. Upload a '+fileTypesFor(item.key)+' file smaller than '+(Math.floor(uploadLimitBytes() / (1024*1024)) || 5)+' MB.';
@@ -1920,25 +1904,12 @@ function idSideBox(key, side, fd){
     + (err ? '<div class="field-error" id="err-'+key+'">'+esc(err)+'</div>' : '')
   + '</div>';
 }
-/* One valid ID: the type the applicant selects (a hint only), then its front and back photos. */
+/* One National ID: its front and back photos (only the National ID is accepted; no type is chosen). */
 function idCardBlock(front, fd){
-  const field = ID_TYPE_FIELDS[front], back = ID_BACK_KEYS[front];
-  // Only a type from the list counts as chosen: an unknown or altered value (e.g. from an old draft) shows
-  // the placeholder and the prompt, never an empty "Selected:", and still fails the required check.
-  const chosen = idTypeLabel(fd[field]) ? fd[field] : '', err = state.errors[field];
-  const select = '<select id="f-'+field+'" class="id-type-select'+(err?' invalid':'')+'" data-bind-select="'+field+'" required aria-required="true"'
-      + ' aria-describedby="hint-'+field+(err ? ' err-'+field : '')+'">'
-      + '<option value="">Select your ID type</option>'
-      + ID_TYPE_OPTIONS.map(function(o){ return '<option value="'+esc(o[0])+'"'+(chosen===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')
-    + '</select>';
+  const back = ID_BACK_KEYS[front];
   return '<section class="id-card-block" aria-labelledby="idblk-'+front+'">'
     + '<div class="upl-label id-card-title" id="idblk-'+front+'">'+esc(idLabel(state.flow, front))+'</div>'
-    + '<div class="field id-type-field"><label for="f-'+field+'">Select Type of Valid ID<span class="req">*</span></label>' + select
-      + '<p class="reference-note id-type-selected" id="hint-'+field+'">'+(chosen
-          ? 'Selected: <strong>'+esc(idTypeLabel(chosen))+'</strong>. The office still checks the ID you upload.'
-          : 'Choose the ID you will upload.')+'</p>'
-      + fieldError(field) + '</div>'
-    + '<p class="reference-note id-sides-note">Upload clear photos of both sides of your ID.</p>'
+    + '<p class="reference-note id-sides-note">Accepted ID: <strong>'+esc(ACCEPTED_ID)+'</strong>. Upload clear photos of its front and back.</p>'
     + '<div class="id-sides">' + idSideBox(front, 'FRONT SIDE OF ID', fd) + idSideBox(back, 'BACK SIDE OF ID', fd) + '</div>'
   + '</section>';
 }
@@ -1953,12 +1924,12 @@ function idReferenceCard(type){
 }
 function idGuidancePanel(uploads){
   return '<div class="id-guidance-panel">'
-    + '<div class="guidance-header">'+ic('id')+'<span>Valid ID Verification</span></div>'
+    + '<div class="guidance-header">'+ic('id')+'<span>National ID Verification</span></div>'
     + '<div class="reference-grid">'
       + idReferenceCard('accepted')
       + idReferenceCard('rejected')
     + '</div>'
-    + '<div class="reference-note">Upload a clear, valid, and unexpired ID.</div>'
+    + '<div class="reference-note">Upload a clear, unexpired National ID (PhilSys card or ePhilID).</div>'
     + '<div class="id-upload-stack">' + uploads + '</div>'
   + '</div>';
 }
@@ -1970,7 +1941,7 @@ function renderStep3(){
       + '<div class="upload-grid doc-upload-list">' + LAND_TRANSFER_DOCS.map(function(d){ return uploadBox(d.key, d.label, fd); }).join('') + '</div>'
       + '<div class="section-divider"><span>Identity Verification</span></div>';
   }
-  return '<div class="wizard-card-head"><h2>Valid ID Verification</h2><p>Upload a clear, valid, and unexpired ID.</p></div>'
+  return '<div class="wizard-card-head"><h2>National ID Verification</h2><p>Only the National ID is accepted (PhilSys card or ePhilID), front and back.</p></div>'
   + '<div class="wizard-card-body">'
     + '<label class="owner-toggle"><input type="checkbox" id="f-isOwner" '+(fd.isOwner?'checked':'')+'><span class="toggle-dot">'+ic('check')+'</span><span class="owner-toggle-label">'+(fd.isOwner ? 'I am the registered property owner' : 'I am not the registered property owner')+'</span></label>'
     + docsBlock
@@ -1987,11 +1958,7 @@ function renderStep4(){
   const fullName = [fd.firstName, fd.middleName, fd.lastName].filter(Boolean).join(' ') || '—';
   const row = function(label, value){ return '<tr><th scope="row">'+label+'</th><td>'+value+'</td></tr>'; };
   const section = function(title, rows){ return '<tbody><tr class="rv-sec"><th colspan="2" scope="colgroup">'+title+'</th></tr>'+rows+'</tbody>'; };
-  const idTypeRows = idFrontKeys(fd).map(function(front){
-    const code = fd[ID_TYPE_FIELDS[front]];
-    return row(esc(idLabel(state.flow, front))+': ID Type', code ? esc(idTypeLabel(code)) : '<span class="rv-bad">Not selected</span>');
-  }).join('');
-  const uploadedRows = idTypeRows + checklist.map(function(c){
+  const uploadedRows = checklist.map(function(c){
     const value = c.status==='ok' ? esc((fd.files[c.key]||{}).name||'')
       : (c.status==='flagged' ? '<span class="rv-bad">Invalid format</span>' : '<span class="rv-bad">Not uploaded</span>');
     return row(esc(c.label), value);

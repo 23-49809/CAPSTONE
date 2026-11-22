@@ -435,16 +435,16 @@ $before = $snapshot();
 $check('several documents with a missing upload (authorization letter) are refused by the server, naming the file', $code === 422
     && str_contains((string) ($res['error'] ?? ''), 'Authorization Letter') && str_contains((string) ($res['error'] ?? ''), 'Nothing was submitted'), [$code, $res]);
 [$code2, $res2] = $apply($items(3), true, []);
-$check('several documents with no upload at all are refused', $code2 === 422 && str_contains((string) ($res2['error'] ?? ''), 'Valid Government-Issued ID'), [$code2, $res2]);
-// An older cached page: no ID type is sent and it has no place for the back photo. Several documents are
-// refused (nothing is silently accepted), and the message asks the applicant to reload the page.
+$check('several documents with no upload at all are refused', $code2 === 422 && str_contains((string) ($res2['error'] ?? ''), 'Property Owner National ID'), [$code2, $res2]);
+// A page opened before the back photo existed: several documents with the front photo only are refused
+// (nothing is silently accepted), and the message asks the applicant to reload the page.
 [$code3, $res3] = $apply($items(2), true, ['ownerId']);
-$check('an old cached page (several documents, front photo only, no ID type) is refused, naming the back side, and says to reload the page', $code3 === 422
-    && str_contains((string) ($res3['error'] ?? ''), 'Upload every required document before submitting: Valid Government-Issued ID (back side). Nothing was submitted.')
+$check('an old cached page (several documents, front photo only) is refused, naming the back side, and says to reload the page', $code3 === 422
+    && str_contains((string) ($res3['error'] ?? ''), 'Upload every required document before submitting: Property Owner National ID (back side). Nothing was submitted.')
     && str_contains((string) ($res3['error'] ?? ''), 'If you do not see a place to upload one of these, please reload this page and try again.'), [$code3, $res3]);
 $check('a refused application leaves no request, application, document record, history, notification or file', $snapshot() === $before, [$before, $snapshot()]);
-[$code, $res, $singleMissing] = $apply(null, false, ['requesterId', 'ownerId']);
-$check('one document keeps the earlier rule: a missing file is recorded as missing for Staff to follow up', $code === 200
+[$code, $res, $singleMissing] = $apply(null, false, ['requesterId', 'requesterIdBack', 'ownerId', 'ownerIdBack']);
+$check('one document keeps the earlier rule for other files: a missing authorization letter is recorded as missing for Staff to follow up', $code === 200
     && (int) $requestRow($singleMissing)['requirement_complete'] === 0
     && $count("SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id = rd.request_id WHERE r.reference_no = " . $pdo->quote($singleMissing) . " AND rd.doc_key = 'authLetter' AND rd.file_status = 'missing'") === 1, [$code, $res]);
 
@@ -635,7 +635,7 @@ $ltPost = ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $ke
     'flow' => 'landtransfer', 'first_name' => 'Rosa', 'middle_name' => '', 'last_name' => 'Fictional', 'contact_number' => '+639170000' . random_int(100, 999),
     'address_line' => '1 Demo Street', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'arp_number' => '14-0001-0' . random_int(1000, 9999),
     'property_address' => 'Poblacion', 'barangay' => 'POBLACION', 'is_owner' => true, 'transfer_type' => 'Sale', 'submission_key' => $ltKey])];
-foreach (array_keys(DocumentRequirements::requirementsFor('landtransfer', true, [])) as $ltDoc) {
+foreach (array_keys(DocumentRequirements::requirementsFor('landtransfer', true, true)) as $ltDoc) {
     $ltPost['file_' . $ltDoc] = new CURLFile($fixtures . '/id.png', 'image/png', $ltDoc . '.png');
 }
 [$ltStatus, $ltBody] = $keyClient->http('/api.php?action=submit_request', $ltPost);

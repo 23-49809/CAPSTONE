@@ -170,6 +170,9 @@ $applicant = ['flow' => 'docreq', 'first_name' => 'Terms', 'last_name' => 'Teste
     'address_line' => '1 Test St', 'province' => 'Batangas', 'city' => 'Mabini', 'zip_code' => '4202', 'purpose' => 'Personal Copy', 'arp_number' => '14-0007-00003',
     'property_address' => 'Anilao', 'barangay' => 'Anilao', 'is_owner' => true, 'document_type' => 'Certified True Copy of Tax Declaration (CTC-TD)'];
 $submit = static function (array $extra, array $files = []) use ($http, $csrf, $applicant): array {
+    if (isset($files['ownerId']) && !isset($files['ownerIdBack'])) {
+        $files['ownerIdBack'] = $files['ownerId'];   // National ID only: front and back
+    }
     $post = ['payload' => json_encode(['action' => 'submit_request', 'csrf' => $csrf] + $extra + $applicant)];
     foreach ($files as $key => $path) {
         $post['file_' . $key] = new CURLFile($path, 'image/png', basename($path));
@@ -192,6 +195,8 @@ $pdo->prepare('INSERT INTO terms_acceptances (token_hash, terms_version, flow) V
     ->execute([hash('sha256', 'smart-assess-terms|' . $oldToken), $previousVersion, 'docreq']);
 [, $draftBody] = $json('draft_save', ['flow' => 'docreq', 'step' => 2, 'fields' => ['firstName' => 'Terms', 'termsToken' => $oldToken]]);
 $code = str_replace('-', '', (string) (json_decode($draftBody, true)['data']['code'] ?? ''));
+$http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $csrf, 'draft_token' => $code, 'doc_key' => 'ownerIdBack']),
+    'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id-back.png')]);   // National ID only: front and back
 [$status] = $http('/api.php?action=draft_upload', ['payload' => json_encode(['action' => 'draft_upload', 'csrf' => $csrf, 'draft_token' => $code, 'doc_key' => 'ownerId']),
     'file' => new CURLFile($fixtures . '/id.png', 'image/png', 'id.png')]);
 $draftFile = $work . '/smart-assess-app/' . (string) $pdo->query('SELECT stored_path FROM request_draft_files ORDER BY id DESC LIMIT 1')->fetchColumn();
@@ -208,7 +213,7 @@ $draftRow = $pdo->query('SELECT submitted_reference, form_data FROM request_draf
 $check('nothing was submitted, and the draft keeps its details', (int) $pdo->query('SELECT COUNT(*) FROM requests')->fetchColumn() === $requestsBefore
     && $draftRow['submitted_reference'] === null && str_contains((string) $draftRow['form_data'], 'Terms'));
 $check('the draft\'s uploaded file is untouched', is_file($draftFile) && hash_file('sha256', $draftFile) === $draftHash
-    && (int) $pdo->query('SELECT COUNT(*) FROM request_draft_files')->fetchColumn() === 1);
+    && (int) $pdo->query('SELECT COUNT(*) FROM request_draft_files')->fetchColumn() === 2);   // the ID's front and back
 $check('the previous acceptance is not marked as used', $pdo->query("SELECT request_id FROM terms_acceptances WHERE terms_version = '{$previousVersion}'")->fetchColumn() === null);
 
 [$status, $body] = $json('terms_accept', ['flow' => 'docreq', 'agreed' => true, 'terms_version' => $version]);
