@@ -242,6 +242,7 @@
   @media (max-width:980px){ .two-col{ grid-template-columns:1fr; } }
 
   .announcement-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px; margin-bottom:12px; }
+  .ann-view-body{ margin:14px 0 0; }   /* Admin's read-only announcement: space between the details and the message */
   .announcement-card .ac-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
   .announcement-card h4{ font-size:14.5px; margin-bottom:4px; }
   .announcement-card .ac-meta{ font-size:11.5px; color:var(--ink-faint); margin-bottom:8px; }
@@ -2482,7 +2483,12 @@ function renderHeadDashboard(acct){
   + '</div></div>';
 }
 
+/* Only the Assessor Head creates and manages announcements; Admin can view them (the server refuses
+   every announcement change from any other role). */
+function canManageAnnouncements(acct){ return !!acct && acct.role==='head'; }
+var ANN_MANAGE_ACTIONS = ['open-ann-modal','edit-ann','delete-ann','ann-publish-now','ann-unpublish','ann-cancel','save-ann'];
 function renderAnnouncements(acct){
+  var manage = canManageAnnouncements(acct);
   var q = (state.search.announcements||'').toLowerCase();
   var statusF = state.filters.annStatus;
   var list = state.announcements.filter(function(a){
@@ -2492,8 +2498,9 @@ function renderAnnouncements(acct){
   });
   var STATUS_TABS = ['all','Draft','Scheduled','Published','Cancelled'];
   return ''
-  + '<div class="page-head"><div><h1>Announcements</h1><p>Post updates to the Client Interface, the Internal Interface (Staff and Admin), or both.</p></div>'
-    + '<button class="btn btn-primary" data-action="open-ann-modal">Create Announcement</button></div>'
+  + '<div class="page-head"><div><h1>Announcements</h1><p>'+(manage ? 'Post updates to the Client Interface, the Internal Interface (Staff and Admin), or both.'
+      : 'Announcements posted by the Assessor Head. You can view them; only the Assessor Head can create or change them.')+'</p></div>'
+    + (manage ? '<button class="btn btn-primary" data-action="open-ann-modal">Create Announcement</button>' : '')+'</div>'
   + '<div class="toolbar">'
     + '<div class="search-box">'+ic('search')+'<input type="text" placeholder="Search announcements" value="'+esc(state.search.announcements)+'" data-input="search-announcements"></div>'
     + '<div class="seg">'
@@ -2502,6 +2509,15 @@ function renderAnnouncements(acct){
   + '</div>'
   + '<div class="table-wrap"><table class="has-actions"><thead><tr><th>Title</th><th>Post To</th><th>Status</th><th>Published / Scheduled</th><th>Created By</th><th class="actions-cell">Actions</th></tr></thead><tbody>'
   + (list.length ? list.map(function(a){
+      if(!manage){
+        var viewOnly = '<button class="icon-btn action-button" data-action="view-ann" data-id="'+a.id+'">'+ic('eye','13px')+'View</button>';
+        return '<tr><td class="cell-name" data-label="Title">'+esc(a.title)+'</td>'
+          + '<td data-label="Post To">'+audienceLabel(a.postTo)+'</td>'
+          + '<td data-label="Status"><span class="badge '+annBadgeClass(annDisplayStatus(a))+'">'+annDisplayStatus(a)+'</span></td>'
+          + '<td data-label="Published / Scheduled"><div class="ann-date">'+annDateCell(a)+'</div></td>'
+          + '<td data-label="Created By">'+esc(a.postedBy)+'</td>'
+          + '<td class="actions-cell"><div class="actions-container">'+viewOnly+'</div></td></tr>';
+      }
       var actions = '<button class="icon-btn action-button" data-action="edit-ann" data-id="'+a.id+'">'+ic('edit','13px')+'Edit</button>';
       if(a.status==='Draft' || a.status==='Scheduled'){
         actions += '<button class="icon-btn action-button" data-action="ann-publish-now" data-id="'+a.id+'">Publish Now</button>';
@@ -3967,7 +3983,8 @@ function renderModal(){
   if(!m) return '';
   if(m.type==='view-staff') return modalWrap(modalViewStaff(m.id));
   if(m.type==='edit-staff') return modalWrap(modalEditStaff(m.id));
-  if(m.type==='ann-edit') return modalWrap(modalAnnEdit(m.id), false, 'composer-modal');
+  if(m.type==='ann-edit') return canManageAnnouncements(currentAccount()) ? modalWrap(modalAnnEdit(m.id), false, 'composer-modal') : '';
+  if(m.type==='ann-view') return modalWrap(modalAnnView(m.id));
   if(m.type==='report-detail') return modalWrap(modalReportDetail(m.id));
   if(m.type==='doc-detail') return modalWrap(modalReqDetail(m.id,'doc'), false, 'req-detail');
   if(m.type==='land-detail') return modalWrap(modalReqDetail(m.id,'land'), false, 'req-detail');
@@ -3995,6 +4012,21 @@ function modalAnnInbox(){
           + '<h4>'+esc(a.title)+'</h4>'+(a.content?'<p>'+esc(a.content)+'</p>':'')+'</article>';
       }).join('') : '<div class="empty-state">No announcements right now.</div>')
     + '</div>';
+}
+
+/* One announcement, read-only (Admin's view; nothing here changes it). */
+function modalAnnView(id){
+  var a = findAnn(id);
+  var close = '<button type="button" class="modal-close" data-action="close-modal" aria-label="Close" title="Close">'+ic('x','15px')+'</button>';
+  if(!a) return '<div class="modal-head"><h3>Not Found</h3>'+close+'</div>';
+  return '<div class="modal-head"><div><h3>'+esc(a.title)+'</h3><p>Announcement (view only)</p></div>'+close+'</div>'
+    + '<div class="review-card">'
+      + '<div class="review-row"><span class="k">Post To</span><span class="v">'+audienceLabel(a.postTo)+'</span></div>'
+      + '<div class="review-row"><span class="k">Status</span><span class="v"><span class="badge '+annBadgeClass(annDisplayStatus(a))+'">'+annDisplayStatus(a)+'</span></span></div>'
+      + '<div class="review-row"><span class="k">Published / Scheduled</span><span class="v">'+annDateCell(a)+'</span></div>'
+      + '<div class="review-row"><span class="k">Created By</span><span class="v">'+esc(a.postedBy||'')+'</span></div>'
+    + '</div>'
+    + (a.content ? '<p class="ann-view-body">'+esc(a.content).replace(/\n/g,'<br>')+'</p>' : '<p class="cell-sub">No message text.</p>');
 }
 
 function modalViewStaff(id){
@@ -5106,6 +5138,10 @@ function bindEvents(){
     } else if(action==='filter'){
       state.filters[el.getAttribute('data-key')] = el.getAttribute('data-val');
       render();
+    } else if(ANN_MANAGE_ACTIONS.indexOf(action)>-1 && !canManageAnnouncements(currentAccount())){
+      return;   // only the Assessor Head manages announcements
+    } else if(action==='view-ann'){
+      state.modal = {type:'ann-view', id:el.getAttribute('data-id')}; render();
     } else if(action==='open-ann-modal'){
       state.modal = {type:'ann-edit', id:null}; render();
     } else if(action==='edit-ann'){

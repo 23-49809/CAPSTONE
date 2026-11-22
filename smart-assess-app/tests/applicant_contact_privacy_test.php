@@ -354,46 +354,68 @@ $check('signed out: recipient lookup refused with nothing leaked', $status === 4
 [$status, $body] = $anonymous->request('GET', '/api.php?action=track&ref=DR-2026-PRIV1');
 $check('public tracking returns no contact details', $leaks($body, $restricted) === [], [$status, $body]);
 
-// ================= Announcements: Head and Admin manage them; audiences stay separate =================
+// ================= Announcements: only the Department Head manages them; Admin can view them =================
 $titlesOn = static function (Session $session, string $url) use ($pageData): array {
     [, $html] = $session->request('GET', $url);
     return array_column($pageData($html)['announcements'] ?? [], 'title');
 };
-foreach (['Department Head' => 'privacy.head', 'Admin' => 'privacy.admin'] as $role => $username) {
-    $session = new Session($base);
-    $session->login($username, $password);
-    [$status, $body] = $session->api('save_announcement', ['title' => "Draft by {$role}", 'content' => 'Not sent yet.', 'postTo' => 'staff', 'publishMode' => 'draft']);
-    $check("{$role} can save an announcement draft", $status === 200, [$status, substr($body, 0, 160)]);
-    [$status, $body] = $session->api('save_announcement', ['title' => "Internal notice by {$role}", 'content' => 'For Staff and Admin.', 'postTo' => 'staff', 'publishMode' => 'publish']);
-    $check("{$role} can send an announcement to the Internal Interface", $status === 200, [$status, substr($body, 0, 160)]);
-    [$status, $body] = $session->api('save_announcement', ['title' => "Client notice by {$role}", 'content' => 'For clients.', 'postTo' => 'client', 'publishMode' => 'publish']);
-    $check("{$role} can send an announcement to the Client Interface", $status === 200, [$status, substr($body, 0, 160)]);
-    $titles = $titlesOn($session, '/internal.php?view=announcements');
-    $check("{$role} announcements page lists drafts and sent announcements", in_array("Draft by {$role}", $titles, true)
-        && in_array("Client notice by {$role}", $titles, true), $titles);
-}
+$head = new Session($base);
+$head->login('privacy.head', $password);
+[$status, $body] = $head->api('save_announcement', ['title' => 'Draft by Department Head', 'content' => 'Not sent yet.', 'postTo' => 'staff', 'publishMode' => 'draft']);
+$check('the Department Head can save an announcement draft', $status === 200, [$status, substr($body, 0, 160)]);
+[$status, $body] = $head->api('save_announcement', ['title' => 'Internal notice by Department Head', 'content' => "For Staff and Admin.\nSecond line.", 'postTo' => 'staff', 'publishMode' => 'publish']);
+$check('the Department Head can send an announcement to the Internal Interface', $status === 200, [$status, substr($body, 0, 160)]);
+[$status, $body] = $head->api('save_announcement', ['title' => 'Client notice by Department Head', 'content' => 'For clients.', 'postTo' => 'client', 'publishMode' => 'publish']);
+$check('the Department Head can send an announcement to the Client Interface', $status === 200, [$status, substr($body, 0, 160)]);
+$draftId = (int) $pdo->query("SELECT id FROM announcements WHERE title = 'Draft by Department Head'")->fetchColumn();
+$headTitles = $titlesOn($head, '/internal.php?view=announcements');
+$check('the Department Head announcements page lists drafts and sent announcements', in_array('Draft by Department Head', $headTitles, true)
+    && in_array('Client notice by Department Head', $headTitles, true), $headTitles);
+
+// Admin: every way of creating or changing an announcement is refused, and nothing changes.
 $admin = new Session($base);
 $admin->login('privacy.admin', $password);
-$draftId = (int) $pdo->query("SELECT id FROM announcements WHERE title = 'Draft by Admin'")->fetchColumn();
-[$status] = $admin->api('announcement_transition', ['id' => $draftId, 'transition' => 'ann-publish-now']);
-$check('Admin can publish a draft with Publish Now', $status === 200
+$annSnapshot = static fn (): string => (string) json_encode($pdo->query('SELECT id, title, body, audience, status, scheduled_at, published_at FROM announcements ORDER BY id')->fetchAll());
+$before = $annSnapshot();
+$refused = [];
+foreach ([
+    'save (draft)' => ['save_announcement', ['title' => 'Draft by Admin', 'content' => 'x', 'postTo' => 'staff', 'publishMode' => 'draft']],
+    'save (send now)' => ['save_announcement', ['title' => 'Notice by Admin', 'content' => 'x', 'postTo' => 'both', 'publishMode' => 'publish']],
+    'save (schedule)' => ['save_announcement', ['title' => 'Later by Admin', 'content' => 'x', 'postTo' => 'both', 'publishMode' => 'schedule', 'scheduled_at' => date('Y-m-d', strtotime('+3 days')) . ' 09:00:00']],
+    'edit' => ['save_announcement', ['announcement_id' => $draftId, 'title' => 'Edited by Admin', 'content' => 'x', 'postTo' => 'staff', 'publishMode' => 'draft']],
+    'publish now' => ['announcement_transition', ['id' => $draftId, 'transition' => 'ann-publish-now']],
+    'unpublish' => ['announcement_transition', ['id' => $draftId, 'transition' => 'ann-unpublish']],
+    'cancel' => ['announcement_transition', ['id' => $draftId, 'transition' => 'ann-cancel']],
+    'delete' => ['delete_announcement', ['id' => $draftId]],
+    'direct create action' => ['head_create_announcement', ['title' => 'Direct by Admin', 'body' => 'x', 'audience' => 'both']],
+    'direct publish action' => ['head_publish_announcement', ['announcement_id' => $draftId]],
+    'direct delete action' => ['head_delete_announcement', ['announcement_id' => $draftId]],
+] as $label => [$action, $data]) {
+    [$status] = $admin->api($action, $data);
+    $refused[$label] = $status;
+}
+$check('Admin cannot create, edit, schedule, publish, unpublish, cancel or delete announcements (every attempt refused with 403)',
+    array_unique(array_values($refused)) === [403], $refused);
+$check('the refused Admin attempts changed no announcement', $annSnapshot() === $before);
+$adminTitles = $titlesOn($admin, '/internal.php?view=announcements');
+$check('Admin can still view every announcement, drafts included', in_array('Draft by Department Head', $adminTitles, true)
+    && in_array('Internal notice by Department Head', $adminTitles, true) && in_array('Client notice by Department Head', $adminTitles, true), $adminTitles);
+[$status] = $head->api('announcement_transition', ['id' => $draftId, 'transition' => 'ann-publish-now']);
+$check('the Department Head can still publish a draft with Publish Now', $status === 200
     && $pdo->query("SELECT status FROM announcements WHERE id = {$draftId}")->fetchColumn() === 'Published', $status);
-$author = (string) $pdo->query("SELECT author FROM announcements WHERE title = 'Internal notice by Admin'")->fetchColumn();
-$check('an Admin announcement records the Admin as its author', $author !== '' && $author !== 'Privacy Head', $author);
+$author = (string) $pdo->query("SELECT author FROM announcements WHERE title = 'Internal notice by Department Head'")->fetchColumn();
+$check('a Department Head announcement records the Head as its author', $author === 'Privacy Head', $author);
 [$status] = $staff->api('save_announcement', ['title' => 'Staff attempt', 'content' => 'Should be refused.', 'postTo' => 'both', 'publishMode' => 'publish']);
 $check('Staff cannot create announcements', $status === 403, $status);
 [$status] = $staff->api('announcement_transition', ['id' => $draftId, 'transition' => 'ann-unpublish']);
 $check('Staff cannot change announcements', $status === 403, $status);
 $staffTitles = $titlesOn($staff, '/internal.php?view=dashboard');
-$check('Staff receive Internal Interface announcements from Admin and Head', in_array('Internal notice by Admin', $staffTitles, true)
-    && in_array('Internal notice by Department Head', $staffTitles, true), $staffTitles);
-$check('Staff never receive drafts or Client-only announcements', !in_array('Client notice by Admin', $staffTitles, true)
-    && !in_array('Client notice by Department Head', $staffTitles, true) && !in_array('Draft by Department Head', $staffTitles, true), $staffTitles);
+$check('Staff receive Internal Interface announcements from the Head', in_array('Internal notice by Department Head', $staffTitles, true), $staffTitles);
+$check('Staff never receive Client-only announcements', !in_array('Client notice by Department Head', $staffTitles, true), $staffTitles);
 $public = new Session($base);
 $publicTitles = $titlesOn($public, '/index.php');
-$check('clients receive Client Interface announcements', in_array('Client notice by Admin', $publicTitles, true), $publicTitles);
-$check('clients never receive Internal Interface announcements or drafts', !in_array('Internal notice by Admin', $publicTitles, true)
-    && !in_array('Internal notice by Department Head', $publicTitles, true) && !in_array('Draft by Department Head', $publicTitles, true), $publicTitles);
+$check('clients receive Client Interface announcements', in_array('Client notice by Department Head', $publicTitles, true), $publicTitles);
+$check('clients never receive Internal Interface announcements', !in_array('Internal notice by Department Head', $publicTitles, true), $publicTitles);
 
 // ================= Logs and audit =================
 $client = new Session($base);
