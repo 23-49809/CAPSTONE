@@ -1112,6 +1112,7 @@ final class Session
     {
     }
 
+    /** @return array{0: int, 1: string} */
     public function request(string $method, string $path, ?string $body = null): array
     {
         $headers = ['Accept: application/json, text/html'];
@@ -1140,6 +1141,7 @@ final class Session
         return [$status, $response];
     }
 
+    /** @return array{0: int, 1: string} */
     public function api(string $action, array $data = []): array
     {
         return $this->request('POST', '/api.php?action=' . $action, (string) json_encode(['action' => $action, 'csrf' => $this->csrf] + $data));
@@ -1153,9 +1155,14 @@ $session = static function (string $username) use ($appBase, $password): Session
     $s->request('GET', '/internal.php');
     return $s;
 };
-$pageData = static fn (string $html): array => preg_match('/window\.SMART_ASSESS_PAGE=(\{.*?\});?<\/script>/s', $html, $m) ? (array) json_decode($m[1], true) : [];
+$pageData = static function (string $html): array {
+    if (!preg_match('/window\.SMART_ASSESS_PAGE=(\{.*?\});?<\/script>/s', $html, $m)) {
+        return [];
+    }
+    return (array) json_decode($m[1], true);
+};
 $records = static function (Session $s) use ($pageData): array {
-    [, $html] = $s->request('GET', '/internal.php?view=document-requests');
+    $html = (string) $s->request('GET', '/internal.php?view=document-requests')[1];
     $out = [];
     foreach (array_merge($pageData($html)['docRequests'] ?? [], $pageData($html)['landRequests'] ?? []) as $record) {
         $out[(string) ($record['reference'] ?? $record['id'] ?? '')] = $record;
