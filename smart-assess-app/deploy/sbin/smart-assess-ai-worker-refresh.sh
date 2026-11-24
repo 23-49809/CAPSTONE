@@ -2,14 +2,14 @@
 # SMART ASSESS - refresh the local AI worker's code copy, ENFORCING the release order.
 #
 # NOT INSTALLED. Install (with approval) as root:root 0755 at /usr/local/sbin/smart-assess-ai-worker-refresh.sh
-# Run as root, only after the application release has been deployed:
+# Run as root during a paired maintenance upgrade, with the AI dispatcher paused:
 #   sudo smart-assess-ai-worker-refresh.sh --check-only   # stage and check, change nothing
 #   sudo smart-assess-ai-worker-refresh.sh                # stage, check, install, restart, health-check
 #
 # 1. Stages worker/index.php and app/services/*.php from the DEPLOYED application
 #    (/var/www/smart-assess) into a new root-owned, read-only copy.
 # 2. Runs bin/ai-worker-compat-check.php against the deployed application. Anything but
-#    "compatible" (exit 0) stops here with nothing changed: deploy the application first.
+#    "compatible" (exit 0) stops here with nothing changed: install a matched application release.
 # 3. Swaps the copy in (/opt/smart-assess-ai-worker; the previous one is kept as
 #    /opt/smart-assess-ai-worker.previous), restarts the worker's PHP-FPM pool and checks
 #    /v1/health. If the worker does not answer {"ok":true} within 60 s, the previous copy is
@@ -36,7 +36,8 @@ for f in "$APP"/app/services/*.php; do
 done
 (cd "$STAGE" && find worker app -type f -name '*.php' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && chmod 0644 SHA256SUMS)
 
-# The release order, enforced: the deployed application must accept what this worker answers.
+# The pair check is enforced: the deployed application must accept this worker's result and
+# this worker must accept the application's job format. Keep dispatch paused until both match.
 if ! /usr/bin/php -n "$APP/bin/ai-worker-compat-check.php" --app="$APP" --worker="$STAGE"; then
     rm -rf -- "$STAGE"
     echo "REFUSED: this worker copy is not compatible with the deployed application. Nothing was changed." >&2

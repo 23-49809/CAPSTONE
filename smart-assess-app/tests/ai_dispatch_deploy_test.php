@@ -187,15 +187,19 @@ $compat = static function (string $appDir, string $workerDir) use ($app): array 
 [$code, $out] = $compat($app, $app);
 $check('release order: this application with this worker is compatible (exit 0)', $code === 0 && str_contains($out, 'compatible'), $out);
 [$code, $out] = $compat($app, $fixture . '/old-worker');
-$check('release order: this application with the worker installed now (6482fcd0) is compatible', $code === 0, $out);
+$check('release order: new application with the installed version 1-only worker is refused (exit 1)', $code === 1
+    && str_contains($out, 'NOT COMPATIBLE') && str_contains($out, 'does not accept the application\'s job version'), $out);
 [$code, $out] = $compat($fixture . '/old-app', $app);
-$check('release order: the live application (6482fcd0) with this worker is REFUSED (exit 1), naming the order', $code === 1
-    && str_contains($out, 'Deploy the application release first, then refresh the worker'), $out);
+$check('release order: old application with the new version 7 worker is refused (exit 1)', $code === 1
+    && str_contains($out, 'NOT COMPATIBLE') && str_contains($out, 'does not accept the worker\'s result version'), $out);
+[$code, $out] = $compat($fixture . '/old-app', $fixture . '/old-worker');
+$check('release order: the matching old application and old worker remain compatible', $code === 0 && str_contains($out, 'compatible'), $out);
 [$code, $out] = $compat($fixture . '/missing', $app);
 $check('release order: unreadable trees are an error (exit 2), never "compatible"', $code === 2, $out);
 exec('rm -rf ' . escapeshellarg($fixture));
 $docs = (string) file_get_contents($app . '/docs/AI_DOCUMENT_VERIFICATION.md');
-$check('the docs state the release order and the check to run', str_contains($docs, '### Release order') && str_contains($docs, 'bin/ai-worker-compat-check.php'));
+$check('the docs state the paired maintenance upgrade, dispatch pause, and compatibility check', str_contains($docs, '### Paired application and worker upgrade')
+    && stripos($docs, 'pause the AI dispatcher') !== false && str_contains($docs, 'bin/ai-worker-compat-check.php'));
 
 // ---- The settings example ----
 $env = [];

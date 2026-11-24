@@ -844,9 +844,15 @@ $check('privacy: no encryption is claimed for the check or for storage (the serv
 $check('privacy: what is claimed instead is true and verified: restricted accounts without network access, authenticated checks, data stays on the server',
     str_contains($text, 'runs under its own restricted system accounts without network access') && str_contains($text, 'every check is authenticated')
     && str_contains($text, 'the files and details for a check do not leave the server') && str_contains($text, 'not reachable from the internet'));
-$check('privacy: section 3 describes the check\'s own restricted access (no contact details; result only; no access to the database for the checking service)',
-    str_contains($text, 'runs under separate system accounts, not as a Staff account') && str_contains($text, 'not your mobile number, email address or home address')
+$check('privacy: section 3 describes the check\'s restricted access (application address for ID comparison; no mobile/email; result only; no database access for checking service)',
+    str_contains($text, 'runs under separate system accounts, not as a Staff account') && str_contains($text, 'including your application address for the National ID front comparison')
+    && str_contains($text, 'cannot read your mobile number or email address')
     && str_contains($text, 'can record only the check result') && str_contains($text, 'cannot open the database or any stored file other than those passed to it'));
+$check('privacy: the ID review address sent for comparison and retention of the National ID front OCR text are disclosed',
+    str_contains($text, 'the address on your application (street or address line, city, province and ZIP code) is also sent')
+    && str_contains($text, 'its OCR text is also stored with the result so Staff can review what was read')
+    && str_contains($text, 'that text may include other details printed on the ID')
+    && str_contains($text, 'The result and this OCR text follow the retention practices in section 9'));
 $source = (string) file_get_contents($app . '/web/privacy-policy.php');   // the PHP source, including the internal review notes
 $check('privacy: the internal review notes record that no encryption claim is made and the disk is not encrypted', str_contains($source, 'which is NOT')
     && str_contains($source, 'encrypted (verified 15 Nov 2026). This text therefore makes no encryption')
