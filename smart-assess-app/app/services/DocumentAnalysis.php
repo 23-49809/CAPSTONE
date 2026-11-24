@@ -96,6 +96,8 @@ final class DocumentAnalysis
      */
     public const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7];
     public const WORKER_RESULT_VERSION = 7;
+    public const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+    public const WORKER_RESULT_VERSION = 8;
 
     /**
      * What a document is, as the model reads it from the text: code => label shown to Staff
@@ -412,6 +414,8 @@ final class DocumentAnalysis
                     $document['id_front_ocr_text'] = null;
                 }
             }
+            // Never expose a stored raw ID OCR transcript in Staff review.
+            unset($document['id_front_ocr_text']);
         }
         unset($document);
         foreach ($findings as &$finding) {
@@ -951,10 +955,15 @@ final class DocumentAnalysis
                 $fields[] = 'id_review';
             }
             if ($object['version'] >= 7) {
+            if ($object['version'] === 7) {
                 $fields[] = 'id_front_ocr_text';
             }
             $document = self::exactObject($document, $fields, 'document check');
             $key = self::knownKey($document['key'], $documentKeys);
+            // Legacy version 7 may contain a transcript. Validate it, then discard it.
+            if ($object['version'] === 7) {
+                self::idFrontOcrText($document['id_front_ocr_text'], $key);
+            }
             if (isset($documents[$key])) {
                 throw new UnexpectedValueException('document check listed twice');
             }
@@ -1129,6 +1138,7 @@ final class DocumentAnalysis
     }
 
     /** A version 7 OCR transcript is retained only for the applicant's own front-side National ID. */
+    /** Validates a legacy version 7 OCR transcript; the caller discards it. */
     private static function idFrontOcrText(mixed $value, string $key): ?string
     {
         if (!in_array($key, ['ownerId', 'requesterId'], true)) {

@@ -101,6 +101,40 @@ $check('the Staff page payload removes raw transcripts from the general AI docum
     str_contains($internalPhp, "unset(\$reviewDocument['id_front_ocr_text']);")
     && strpos($internalPhp, "IdFrontReview::staffView(") < strpos($internalPhp, "unset(\$reviewDocument['id_front_ocr_text']);"));
 
+
+$aiMatch = [
+    'key' => 'ownerId',
+    'ai_id_review_state' => 'ok',
+    'ai_id_review' => [
+        'key' => 'ownerId',
+        'overall' => 'match',
+        'full_name' => ['assessment' => 'agrees', 'differences' => []],
+        'address' => ['assessment' => 'agrees', 'differences' => []],
+        'attention' => [],
+    ],
+];
+$systemMismatch = [
+    'full_name' => ['result' => 'mismatch', 'reasons' => ['different_full_name']],
+    'address' => ['result' => 'match', 'reasons' => ['same']],
+    'overall' => 'mismatch',
+];
+$mismatchDespiteAiMatch = IdFrontReview::aiFindings($aiMatch, $systemMismatch, $extracted);
+$check('AI match cannot downgrade a deterministic mismatch in the displayed result',
+    $mismatchDespiteAiMatch['overall'] === 'mismatch'
+    && $mismatchDespiteAiMatch['overallLabel'] === 'MISMATCH'
+    && str_contains($mismatchDespiteAiMatch['recommendation'], 'carefully'));
+
+$systemNeedsReview = [
+    'full_name' => ['result' => 'needs_review', 'reasons' => ['incomplete']],
+    'address' => ['result' => 'match', 'reasons' => ['same']],
+    'overall' => 'needs_review',
+];
+$needsReviewDespiteAiMatch = IdFrontReview::aiFindings($aiMatch, $systemNeedsReview, $extracted);
+$check('AI match cannot downgrade a deterministic needs-review result',
+    $needsReviewDespiteAiMatch['overall'] === 'needs_review'
+    && $needsReviewDespiteAiMatch['overallLabel'] === 'NEEDS REVIEW'
+    && str_contains($needsReviewDespiteAiMatch['recommendation'], 'Check the items'));
+
 $failed = 0;
 foreach ($results as [$passed, $name, $detail]) {
     echo ($passed ? 'PASS  ' : 'FAIL  ') . $name . ($passed ? '' : '   ' . $detail) . "\n";

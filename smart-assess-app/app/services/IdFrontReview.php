@@ -105,6 +105,24 @@ final class IdFrontReview
                 'address' => ['status' => 'unreadable', 'value' => null]];
         }
         return ['side' => 'front', 'full_name' => self::fullName($text, $readingsDisagree), 'address' => IdFieldExtractor::address($text)];
+
+        [$type, $typeState] = IdFieldExtractor::classify($text);
+
+        if ($typeState === 'conflict') {
+            return ['side' => 'front',
+                'full_name' => ['status' => 'uncertain', 'value' => null],
+                'address' => ['status' => 'not_found', 'value' => null]];
+        }
+
+        if ($type !== 'philsys_national_id' || $typeState !== 'confirmed') {
+            return ['side' => 'front',
+                'full_name' => ['status' => 'not_found', 'value' => null],
+                'address' => ['status' => 'not_found', 'value' => null]];
+        }
+
+        return ['side' => 'front',
+            'full_name' => self::fullName($text, $readingsDisagree),
+            'address' => IdFieldExtractor::address($text)];
     }
 
     private static function fullName(string $text, bool $readingsDisagree): array
@@ -628,6 +646,9 @@ RULES;
         }
         $attention = array_map(static fn (string $c): string => self::AI_ATTENTION[$c], $review['attention']);
         $recommendation = match ($review['overall']) {
+        // The AI must never downgrade a more cautious deterministic comparison.
+        $overall = self::worst([$review['overall'], $system]);
+        $recommendation = match ($overall) {
             'match' => 'Confirm on the original ID that the full name and address match the application form before continuing.',
             'mismatch' => 'Compare the original ID with the application form carefully before continuing; the details may refer to a different person or address.',
             default => 'Check the items above on the original ID before continuing.',
@@ -636,6 +657,8 @@ RULES;
             'available' => true,
             'overall' => $review['overall'],
             'overallLabel' => self::AI_OVERALL_LABELS[$review['overall']],
+            'overall' => $overall,
+            'overallLabel' => self::AI_OVERALL_LABELS[$overall],
             'fullName' => $field('full name', $review['full_name'], self::AI_NAME_DIFFERENCES),
             'address' => $field('address', $review['address'], self::AI_ADDRESS_DIFFERENCES),
             'attention' => $attention,

@@ -217,6 +217,24 @@ try {
     $rejectedTranscript = true;
 }
 $check('application validation rejects a non-National-ID OCR transcript even from a version 7 worker', $rejectedTranscript);
+$check('worker: agreeing OCR passes preserve the ID review; conflicting passes return no name and raw OCR transcripts are never retained',
+    $agree['version'] === DocumentAnalysis::WORKER_RESULT_VERSION && $agree['documents'][0]['id_check']['type_state'] === 'confirmed'
+    && $disagree['documents'][0]['id_check']['name_state'] === 'conflict'
+    && !array_key_exists('id_front_ocr_text', $agree['documents'][0])
+    && !array_key_exists('id_front_ocr_text', $disagree['documents'][0])
+    && !str_contains((string) json_encode($disagree['documents'][0]['id_review']), 'PEDRO'), [$agree['documents'][0], $disagree['documents'][0]]);
+$passportFront = $passport();
+$otherId = $run([$passportFront], $passportFront);
+$check('worker: raw OCR text is never retained for a non-National-ID upload',
+    !array_key_exists('id_front_ocr_text', $otherId['documents'][0])
+    && $otherId['documents'][0]['id_review']['full_name']['status'] === 'not_found');
+$legacyTranscript = $agree;
+$legacyTranscript['version'] = 7;
+$legacyTranscript['documents'][0]['id_front_ocr_text'] = $philsys;
+$legacyAccepted = DocumentAnalysis::validateWorkerResult($legacyTranscript, ['ownerId']);
+$check('application safely accepts a version 7 result but discards its legacy OCR transcript',
+    !array_key_exists('id_front_ocr_text', $legacyAccepted['documents']['ownerId'] ?? [])
+    && !str_contains((string) json_encode($legacyAccepted), $philsys));
 @rmdir($state);
 
 // ---- Staff page wording (no layout, font or size change) ----
@@ -270,6 +288,10 @@ foreach ($withoutTranscript['documents'] as &$docCheck) {
 unset($docCheck);
 $check('privacy: sensitive ID text is retained only as the applicant-front OCR transcript; parsed numbers and model quotes stay removed',
     $leaks($withoutTranscript) === [] && $leakRun['documents'][0]['id_front_ocr_text'] === $idText && $leakRun['documents'][1]['id_front_ocr_text'] === null
+$check('privacy: sensitive ID text, parsed ID numbers and model quotes are not retained in the worker result',
+    $leaks($leakRun) === []
+    && !array_key_exists('id_front_ocr_text', $leakRun['documents'][0])
+    && !array_key_exists('id_front_ocr_text', $leakRun['documents'][1])
     && $out['documents'][0]['property_number'] === '' && $out['documents'][1]['property_number'] === '018-00045'
     && $out['findings'][0]['evidence'] === '' && $out['findings'][1]['evidence'] === '' && $out['findings'][2]['evidence'] === 'ARP No. 018-00045 Owner JUAN DELA CRUZ', [$leaks($leakRun), $out]);
 $landLabels = ['ownerId' => 'Valid ID', 'ctcTdOrTitle' => 'Tax Declaration'];
@@ -311,6 +333,12 @@ foreach ([3, 4, 5] as $version) {
 $check('privacy (stored results read for Staff): non-National-ID OCR transcripts and ID property numbers/quotes are removed; National-ID transcript and property-document values remain',
     $storedDocs[0]['id_front_ocr_text'] === null && $storedDocs[0]['property_number'] === '' && $storedDocs[1]['id_front_ocr_text'] === $philsys
     && $storedDocs[2]['id_front_ocr_text'] === null && $storedDocs[2]['property_number'] === '018-00045'
+$check('privacy (stored results read for Staff): all legacy OCR transcripts and ID property numbers/quotes are removed; property-document values remain',
+    !array_key_exists('id_front_ocr_text', $storedDocs[0])
+    && $storedDocs[0]['property_number'] === ''
+    && !array_key_exists('id_front_ocr_text', $storedDocs[1])
+    && !array_key_exists('id_front_ocr_text', $storedDocs[2])
+    && $storedDocs[2]['property_number'] === '018-00045'
     && $storedFindings[2]['evidence'] === 'ARP No. 018-00045 Owner JUAN DELA CRUZ');
 $verificationSource = (string) file_get_contents(__DIR__ . '/../app/services/AiVerification.php');
 $check('privacy (Staff view): stored results pass through withoutIdDetails before reaching the page', str_contains($verificationSource, 'DocumentAnalysis::withoutIdDetails('));

@@ -231,12 +231,35 @@ final class AiDocumentWorker
                 ? IdFieldExtractor::classify($texts[$ownKey]['text'])
                 : [null, 'unverified', []];
             $retainOwnNationalIdFrontText = $ownIdType[0] === 'philsys_national_id' && $ownIdType[1] === 'confirmed';
+            // Version 6: compare the applicant's own ID front with the form for advisory analysis.
+            // Raw OCR text is not included in the worker result.
+            $ownKey = IdFrontReview::ownIdKey($declared['is_owner']);
+
+            $fronts = [];
+            if (isset($texts[$ownKey], $idReads[$ownKey])) {
+                $fronts[$ownKey] = IdFrontReview::extract(
+                    $texts[$ownKey]['text'],
+                    true,
+                    isset($passConflicts[$ownKey])
+                );
+            }
+
             $idCheck = null;
             if (isset($fronts[$ownKey])) {
                 $form = IdFrontReview::form($declared);
                 $readability = $texts[$ownKey]['readability'];
                 $ocrState = $readability === 'unreadable' ? 'ocr_unsuccessful' : ($readability === 'good' ? 'readable' : 'partially_readable');
                 $idCheck = IdFrontReview::modelInput($ownKey, $fronts[$ownKey], $form, IdFrontReview::compare($fronts[$ownKey], $form), $ocrState);
+                $ocrState = $readability === 'unreadable'
+                    ? 'ocr_unsuccessful'
+                    : ($readability === 'good' ? 'readable' : 'partially_readable');
+                $idCheck = IdFrontReview::modelInput(
+                    $ownKey,
+                    $fronts[$ownKey],
+                    $form,
+                    IdFrontReview::compare($fronts[$ownKey], $form),
+                    $ocrState
+                );
             }
 
             $model = $this->askModel($declared, $texts, $deadline, $idCheck);
@@ -254,6 +277,7 @@ final class AiDocumentWorker
             }
             foreach ($checks as &$check) {
                 $check['name_match'] = $nameMatches[$check['key']] ?? 'none';
+                $check['id_review'] = $fronts[$check['key']] ?? null;
                 // Version 5: states only (type, OCR, name, printed fields); field values never leave the worker.
                 $check['id_check'] = isset($idReads[$check['key']])
                     ? DocumentAnalysis::idCheck($idReads[$check['key']], $check['readability'], $check['ocr_status'] === 'ok',
@@ -262,6 +286,7 @@ final class AiDocumentWorker
                 $check['id_review'] = $fronts[$check['key']] ?? null;
                 $check['id_front_ocr_text'] = $check['key'] === $ownKey && $retainOwnNationalIdFrontText
                     ? (string) ($texts[$ownKey]['text'] ?? '') : null;
+
             }
             unset($check);
 

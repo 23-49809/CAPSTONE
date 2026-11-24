@@ -145,6 +145,7 @@ foreach ($page['requests'] ?? [] as $request) {
             unset($reviewDocument);
         }
         // Whether the AI check may run for this request; when not, why (Staff only).
+	// Whether the AI check may run for this request; when not, why (Staff only).
         $record['aiEligibility'] = $page['ai_eligibility'][$requestId]
             ?? ['eligible' => false, 'reason' => AiVerification::INELIGIBLE_NOT_ENABLED, 'effectiveFrom' => null];
     }
