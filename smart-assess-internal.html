@@ -694,6 +694,10 @@
   .rd-reject .field-hint{ grid-column:1 / -1; margin:0; }
   .rd-client{ padding-top:4px; }
   .rd-client[hidden]{ display:none; }
+  .id-front-review-image{ display:block; width:min(100%, 620px); max-height:520px; object-fit:contain; object-position:left top; border:1px solid var(--line); background:var(--surface-2); }
+  .id-front-review-pdf{ display:block; width:min(100%, 760px); height:520px; border:1px solid var(--line); }
+  .id-front-review-text{ max-height:260px; overflow:auto; padding:12px; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.5 ui-monospace,monospace; color:var(--ink); background:var(--surface-2); border:1px solid var(--line); }
+  .id-front-review-ai{ max-width:820px; line-height:1.55; }
   .rd-client-title{ font-size:15px; font-weight:600; margin:4px 0 14px; }
   @media (max-width:760px){
     .modal-overlay:has(.modal.req-detail){ padding:0; }
@@ -1690,10 +1694,10 @@ var SEED_ACCOUNTS = [
   {id:'u5', fullName:'Liza D. Fernandez', username:'liza.staff', email:'liza.fernandez@mabini.gov.ph', contact:'+639172005510', position:'Assessment Clerk', role:'staff', status:'inactive', dateCreated:'2025-03-02'}
 ];
 
-var STATUS_ORDER = ['Received','Processing','Approved','Rejected','Out for Release','Timed Out'];
+var STATUS_ORDER = ['Received','Processing','Approved','Rejected','Out for Release','Released','Timed Out'];
 var STATUS_META = {
   'Received':{cls:'slate'}, 'Processing':{cls:'blue'}, 'Approved':{cls:'green'},
-  'Rejected':{cls:'red'}, 'Out for Release':{cls:'green'}, 'Timed Out':{cls:'amber'}
+  'Rejected':{cls:'red'}, 'Out for Release':{cls:'green'}, 'Released':{cls:'green'}, 'Timed Out':{cls:'amber'}
 };
 function statusLabel(status){ return status==='Received'?'Pending':status; }
 
@@ -2446,9 +2450,9 @@ function renderCreateAccount(acct){
 /* ---------------- Head views ---------------- */
 function renderHeadDashboard(acct){
   var docTotal = state.docRequests.length, landTotal = state.landRequests.length;
-  var pendingDoc = state.docRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
-  var pendingLand = state.landRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
-  var completedThisMonth = state.docRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length + state.landRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length;
+  var pendingDoc = state.docRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status); }).length;
+  var pendingLand = state.landRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status); }).length;
+  var completedThisMonth = state.docRequests.filter(function(r){ return ['Approved','Out for Release','Released'].includes(r.status); }).length + state.landRequests.filter(function(r){ return ['Approved','Out for Release','Released'].includes(r.status); }).length;
   var pubAnn = state.announcements.filter(function(a){ return (a.postTo==='staff' || a.postTo==='both') && annVisibleTo(a,'staff'); }).length;
   var recentReports = state.reports.slice(0,4);
   var recentAnn = state.announcements.slice(0,4);
@@ -2545,7 +2549,7 @@ function renderAnnouncements(acct){
    queries. The standalone demo has no server, so it computes the same
    structure from the demo data (srComputeLocal). */
 var SR_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-var SR_COMPLETED = ['Approved', 'Out for Release'];
+var SR_COMPLETED = ['Approved', 'Out for Release', 'Released'];
 function srState(){
   if(!state.sysReport || !state.sysReport.v2){
     var t = phToday();
@@ -3073,7 +3077,7 @@ function updateProcessingTimers(){
 function reqProcessingActions(r){
   var account = currentAccount();
   if(!account || account.role!=='staff') return '';
-  var terminal = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
+  var terminal = ['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status);
   var actions = '';
   if(!r.processingStaffId && !terminal){
     actions += '<button type="button" class="icon-btn action-button" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','13px')+'Process Request</button>';
@@ -4236,8 +4240,8 @@ function modalReqDetail(id, kind){
   var account = currentAccount();
   var canProcess = account && account.role==='staff';
   var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
-  var terminalStatus = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
-  var canTakeRequest = canProcess && !terminalStatus && (!r.processingStaffId || isAssignedStaff);
+  var terminalStatus = ['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status);
+  var canTakeRequest = canProcess && (!terminalStatus || (r.status==='Out for Release' && isAssignedStaff)) && (!r.processingStaffId || isAssignedStaff);
   // One compact row: the stored start and end times side by side (no running timer or
   // duration here; request lists keep theirs). Before processing, how to start it.
   var timeline = r.processingStartedAt
@@ -4249,6 +4253,7 @@ function modalReqDetail(id, kind){
   // then opens Send Updates with a pickup draft. Both need processing to have started.
   var statusChoices = [['Processing','Processing']];
   if(isAssignedStaff && r.processingStartedAt) statusChoices.push(['Rejected','Rejected'], ['Out for Release','Approve']);
+  if(isAssignedStaff && r.status==='Out for Release') statusChoices.push(['Released','Mark as Released']);
   var statusForm = canTakeRequest
     ? '<form class="rd-status-form" data-form="update-status" data-kind="'+kind+'" data-id="'+esc(r.id)+'">'
         + '<div class="rd-form-row">'
@@ -4272,7 +4277,7 @@ function modalReqDetail(id, kind){
     statusForm ? ['Update Status', statusForm, true] : null
   ]);
   // Client details live in their own section, shown only after View Details.
-  var detailsHtml = reqSubmittedDetailsHtml(r) + reqSubmittedFilesHtml(r);
+  var detailsHtml = reqSubmittedDetailsHtml(r) + reqSubmittedFilesHtml(r) + reqIdFrontReviewHtml(r);
   var showDetails = !!(detailsHtml && state.modal && state.modal.showDetails);
   return '<div class="modal-head rd-head"><div class="rd-title"><h3>'+esc(r.id)+'</h3><p>'+esc(r.applicant)+' &middot; Barangay '+esc(r.barangay)+'</p></div>'
       + '<div class="rd-head-actions">'
@@ -4281,6 +4286,47 @@ function modalReqDetail(id, kind){
       + '</div></div>'
     + summary
     + (detailsHtml ? '<div class="rd-client" id="rd-client"'+(showDetails?'':' hidden')+' aria-label="Client details">'+detailsHtml+'</div>' : '');
+}
+
+/* Staff-only review of the applicant's own National ID front. OCR, rule comparison, and model findings
+   stay visually separate; this panel never makes or implies an application decision. */
+function reqIdFrontReviewHtml(r){
+  if(!r.details) return '';
+  var review = r.ai && r.ai.idFrontReview;
+  var ownKey = r.details.isOwner ? 'ownerId' : 'requesterId';
+  var file = (r.files||[]).find(function(f){ return f.key===ownKey && f.status!=='missing' && f.name; });
+  var image = '';
+  if(file && file.available!==false){
+    var url='/request-file.php?doc='+encodeURIComponent(file.docId)+'&ref='+encodeURIComponent(r.id)+'&preview=1';
+    if(/^image\/(jpeg|png|webp)$/.test(file.mime||'')) image='<img class="id-front-review-image" src="'+esc(url)+'" alt="Applicant National ID front side" loading="lazy">';
+    else if(file.mime==='application/pdf') image='<iframe class="id-front-review-pdf" src="'+esc(url)+'" title="Applicant National ID front side" loading="lazy"></iframe>';
+  }
+  var info = '<section class="rd-block id-front-review"><h4 class="rd-caption">Application Information</h4><p><strong>Application reference:</strong> '+esc(r.applicationRef||r.id)+' &nbsp; <strong>Current status:</strong> '+esc(statusLabel(r.status))+'</p>'
+    + '<h4 class="rd-caption">Uploaded ID (Front Side Only)</h4>'+(image||'<p class="cell-sub">The applicant\'s National ID front side is unavailable for preview. Open the uploaded file above if available.</p>');
+  var rows = review && Array.isArray(review.rows) ? review.rows : [];
+  info += '<h4 class="rd-caption">Extracted Information</h4><div class="rd-wrap"><table class="rd-table" aria-label="Extracted ID information"><thead><tr><th>Field</th><th>Extracted Value</th></tr></thead><tbody>'
+    + ['full_name','address'].map(function(field){
+      var row=rows.find(function(x){ return x.field===field; });
+      return '<tr><th scope="row">'+(field==='full_name'?'Full Name':'Address')+'</th><td>'+esc(row&&row.extracted||'Not available')+(row&&row.statusLabel?' <span class="cell-sub">'+esc(row.statusLabel)+'</span>':'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  info += '<h4 class="rd-caption">Application Comparison</h4><div class="rd-wrap"><table class="rd-table" aria-label="Application and ID comparison"><thead><tr><th>Information</th><th>Application Form</th><th>Extracted from ID</th><th>Result</th></tr></thead><tbody>'
+    + ['full_name','address'].map(function(field){
+      var row=rows.find(function(x){ return x.field===field; });
+      return '<tr><th scope="row">'+(field==='full_name'?'Full Name':'Address')+'</th><td>'+esc(row&&row.form||'Not provided')+'</td><td>'+esc(row&&row.extracted||'Not available')+'</td><td>'+esc(row&&row.resultLabel||'Needs Review')+(row&&row.note?'<span class="cell-sub">'+esc(row.note)+'</span>':'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  info += '<h4 class="rd-caption">Original OCR Text (National ID Front)</h4><pre class="id-front-review-text">'+esc(review&&review.ocrText||'OCR text is not available for this result.')+'</pre>';
+  var ai=review&&review.ai;
+  info += '<h4 class="rd-caption">AI Review Findings</h4><div class="id-front-review-ai">';
+  if(ai&&ai.available){
+    info += '<p><strong>'+esc(ai.overallLabel)+'</strong></p><p>'+esc(ai.fullName)+'</p><p>'+esc(ai.address)+'</p>'
+      +(ai.attention&&ai.attention.length?'<p><strong>Staff attention:</strong></p><ul>'+ai.attention.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'')
+      +(ai.notes||[]).map(function(x){return '<p>'+esc(x)+'</p>';}).join('')
+      +'<p>'+esc(ai.recommendation||'')+'</p><p class="cell-sub">'+esc(ai.disclaimer||'')+'</p>';
+  }else{
+    info += '<p>'+(review&&ai&&ai.message?esc(ai.message):'AI review unavailable for this request. Inspect the original ID and use staff judgment.')+'</p>';
+    info += '<p class="cell-sub">AI review is advisory only. Staff inspect the original ID and make the final decision.</p>';
+  }
+  return info+'</div></section>';
 }
 
 /* IPROG's message ID (to look the SMS up with IPROG) and the status it reported

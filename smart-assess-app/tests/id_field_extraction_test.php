@@ -185,7 +185,7 @@ $check('name conflict: the model\'s shorter form of the same name is not a confl
 // ---- Worker: OCR passes that read different names ----
 $state = sys_get_temp_dir() . '/sa-id-extraction-' . bin2hex(random_bytes(4));
 mkdir($state, 0700);
-$fakeOcr = static fn (array $alternatives): Closure => static fn (string $dir, int $seconds = 60): object => new class ($philsys, $alternatives) {
+$fakeOcr = static fn (array $alternatives, ?string $text = null): Closure => static fn (string $dir, int $seconds = 60): object => new class ($text ?? $philsys, $alternatives) {
     public function __construct(private string $text, private array $alternatives)
     {
     }
@@ -196,12 +196,27 @@ $fakeOcr = static fn (array $alternatives): Closure => static fn (string $dir, i
 };
 $job = AiDocumentWorker::validateJob(['version' => 1, 'job_id' => 3, 'declared' => ['flow' => 'docreq', 'is_owner' => true, 'first_name' => 'Juan', 'last_name' => 'Dela Cruz',
     'arp_number' => '', 'document_type' => 'Certification', 'transfer_type' => ''], 'documents' => [['key' => 'ownerId', 'label' => 'Valid ID', 'mime' => 'image/png', 'content_base64' => base64_encode('x')]]]);
-$run = static fn (array $alternatives): array => (new AiDocumentWorker($state, $fakeOcr($alternatives), null, 'none', null, 'tesseract (eng)'))->run($job);
+$run = static fn (array $alternatives, ?string $text = null): array => (new AiDocumentWorker($state, $fakeOcr($alternatives, $text), null, 'none', null, 'tesseract (eng)'))->run($job);
 $agree = $run([str_replace('SANTOS', 'SANTOS', $philsys)]);
 $disagree = $run([str_replace("JUAN\n", "PEDRO\n", $philsys)]);
-$check('worker: complete OCR passes that agree leave the name read; passes that read different names make it a conflict (version 5)',
-    $agree['version'] === 5 && $agree['documents'][0]['id_check']['type_state'] === 'confirmed' && $disagree['documents'][0]['id_check']['name_state'] === 'conflict'
-    && !str_contains((string) json_encode($disagree), 'PEDRO') && !str_contains((string) json_encode($agree), '1234-5678'), [$agree['documents'][0]['id_check'], $disagree['documents'][0]['id_check']]);
+$check('worker: complete OCR passes that agree leave the name read; conflicting passes return no name, while only the original front OCR text is retained for Staff',
+    $agree['version'] === DocumentAnalysis::WORKER_RESULT_VERSION && $agree['documents'][0]['id_check']['type_state'] === 'confirmed'
+    && $disagree['documents'][0]['id_check']['name_state'] === 'conflict'
+    && $agree['documents'][0]['id_front_ocr_text'] === $philsys && $disagree['documents'][0]['id_front_ocr_text'] === $philsys
+    && !str_contains((string) json_encode($disagree['documents'][0]['id_review']), 'PEDRO'), [$agree['documents'][0], $disagree['documents'][0]]);
+$passportFront = $passport();
+$otherId = $run([$passportFront], $passportFront);
+$check('worker: raw OCR text is not retained when the applicant upload is not identified as a National ID front',
+    $otherId['documents'][0]['id_front_ocr_text'] === null && $otherId['documents'][0]['id_review']['full_name']['status'] === 'not_found');
+$malformedTranscript = $agree;
+$malformedTranscript['documents'][0]['id_front_ocr_text'] = $passportFront;
+$rejectedTranscript = false;
+try {
+    DocumentAnalysis::validateWorkerResult($malformedTranscript, ['ownerId']);
+} catch (UnexpectedValueException) {
+    $rejectedTranscript = true;
+}
+$check('application validation rejects a non-National-ID OCR transcript even from a version 7 worker', $rejectedTranscript);
 @rmdir($state);
 
 // ---- Staff page wording (no layout, font or size change) ----
@@ -217,10 +232,10 @@ $check('Staff page: the new wording sets no style; an expired ID is a "Possible 
     && str_contains($html, '.dc-check.v-possible .dc-verdict, .dc-check.v-issue .dc-verdict{ color:var(--warn); }') && str_contains($html, "['correct','mismatch','possible','issue','missing','unable']"));
 
 
-// ================= Fix 1: an ID's numbers never enter property_number, quotes, stored results or Staff payloads =================
-$idText = $passport();
+// ================= Keep parsed ID fields out of model findings and extracted fields; retain only the requested original OCR transcript =================
+$idText = $philsys;
 $tdText = "TAX DECLARATION OF REAL PROPERTY\nARP No. 018-00045 Owner JUAN DELA CRUZ Location Poblacion Mabini";
-$sensitive = ['P4821736B', '850314', '320313', '1985', '2032', 'P<PHL', '<<'];
+$sensitive = ['1234-5678-9012-3456', 'JANUARY 01, 1990'];
 $leaks = static fn (mixed $data): array => array_values(array_filter($sensitive, static fn (string $v): bool => str_contains((string) json_encode($data), $v)));
 $fakeTexts = static fn (array $byKey): Closure => static fn (string $dir, int $seconds = 60): object => new class ($byKey) {
     public function __construct(private array $byKey)
@@ -248,8 +263,14 @@ $landJob = AiDocumentWorker::validateJob(['version' => 1, 'job_id' => 4, 'declar
 $leakRun = (new AiDocumentWorker($state2, $fakeTexts(['ownerId' => $idText, 'ctcTdOrTitle' => $tdText]), static fn () => $leakModel(), 'fake', null, 'tesseract (eng)'))->run($landJob);
 @rmdir($state2);
 $out = $leakRun['model']['output'];
-$check('privacy (worker): a passport number the model puts in property_number, and quotes from the ID\'s text, never leave the worker; the tax declaration keeps its ARP number and quote',
-    $leaks($leakRun) === [] && $out['documents'][0]['property_number'] === '' && $out['documents'][1]['property_number'] === '018-00045'
+$withoutTranscript = $leakRun;
+foreach ($withoutTranscript['documents'] as &$docCheck) {
+    $docCheck['id_front_ocr_text'] = null;
+}
+unset($docCheck);
+$check('privacy: sensitive ID text is retained only as the applicant-front OCR transcript; parsed numbers and model quotes stay removed',
+    $leaks($withoutTranscript) === [] && $leakRun['documents'][0]['id_front_ocr_text'] === $idText && $leakRun['documents'][1]['id_front_ocr_text'] === null
+    && $out['documents'][0]['property_number'] === '' && $out['documents'][1]['property_number'] === '018-00045'
     && $out['findings'][0]['evidence'] === '' && $out['findings'][1]['evidence'] === '' && $out['findings'][2]['evidence'] === 'ARP No. 018-00045 Owner JUAN DELA CRUZ', [$leaks($leakRun), $out]);
 $landLabels = ['ownerId' => 'Valid ID', 'ctcTdOrTitle' => 'Tax Declaration'];
 $landReq = ['items' => [['key' => 'ownerId', 'label' => 'Valid ID', 'status' => 'uploaded_valid_format'], ['key' => 'ctcTdOrTitle', 'label' => 'Tax Declaration', 'status' => 'uploaded_valid_format']]];
@@ -261,6 +282,12 @@ foreach ([3, 4, 5] as $version) {
     foreach ($raw['documents'] as &$d) {
         if ($version < 5) {
             unset($d['id_check']);
+        }
+        if ($version < 6) {
+            unset($d['id_review']);
+        }
+        if ($version < 7) {
+            unset($d['id_front_ocr_text']);
         }
         if ($version < 4) {
             unset($d['kind_evidence']);
@@ -276,11 +303,15 @@ foreach ([3, 4, 5] as $version) {
         && in_array('ARP No. 018-00045 Owner JUAN DELA CRUZ', array_column($classified['findings'], 'evidence'), true), [$version, $leaks($valid), $leaks($classified)]);
 }
 [$storedDocs, $storedFindings] = DocumentAnalysis::withoutIdDetails(
-    [['key' => 'ownerId', 'label' => 'Valid ID', 'property_number' => 'P4821736B'], ['key' => 'ctcTdOrTitle', 'label' => 'Tax Declaration', 'property_number' => '018-00045']],
+    [['key' => 'ownerId', 'label' => 'Valid ID', 'property_number' => 'P4821736B', 'id_front_ocr_text' => $passport()],
+        ['key' => 'requesterId', 'label' => 'Applicant National ID', 'property_number' => '', 'id_front_ocr_text' => $philsys],
+        ['key' => 'ctcTdOrTitle', 'label' => 'Tax Declaration', 'property_number' => '018-00045', 'id_front_ocr_text' => $philsys]],
     [['document_labels' => ['Valid ID'], 'evidence' => 'Passport No. P4821736B'], ['document_labels' => [], 'evidence' => 'Date of birth 14 MAR 1985'],
         ['document_labels' => ['Tax Declaration'], 'evidence' => 'ARP No. 018-00045 Owner JUAN DELA CRUZ']]);
-$check('privacy (results stored by an earlier release, as read for Staff): an ID\'s property number and quotes are removed; the property document\'s are kept',
-    $leaks([$storedDocs, $storedFindings]) === [] && $storedDocs[1]['property_number'] === '018-00045' && $storedFindings[2]['evidence'] === 'ARP No. 018-00045 Owner JUAN DELA CRUZ');
+$check('privacy (stored results read for Staff): non-National-ID OCR transcripts and ID property numbers/quotes are removed; National-ID transcript and property-document values remain',
+    $storedDocs[0]['id_front_ocr_text'] === null && $storedDocs[0]['property_number'] === '' && $storedDocs[1]['id_front_ocr_text'] === $philsys
+    && $storedDocs[2]['id_front_ocr_text'] === null && $storedDocs[2]['property_number'] === '018-00045'
+    && $storedFindings[2]['evidence'] === 'ARP No. 018-00045 Owner JUAN DELA CRUZ');
 $verificationSource = (string) file_get_contents(__DIR__ . '/../app/services/AiVerification.php');
 $check('privacy (Staff view): stored results pass through withoutIdDetails before reaching the page', str_contains($verificationSource, 'DocumentAnalysis::withoutIdDetails('));
 foreach (['UMID CRN' => [$umid, 'CRN-0111-2345678-9'], 'SSS number' => [$sss, '34-5678901-2'], 'PhilHealth PIN' => [$philhealth, '12-345678901-2'], 'Postal PRN' => [$postal, '100141234567P'],

@@ -21,6 +21,17 @@ final class AiDocumentWorker
     private const MIN_SECOND_MODEL_SECONDS = 30;
     public const MIN_BUDGET_SECONDS = 30;
     public const MAX_BUDGET_SECONDS = 1800;
+    /**
+     * Job formats accepted: 1 (declared: flow, owner, first and last name, ARP, document, transfer) and 2
+     * (also the middle name and the applicant's home address, for the National ID Full Name and Address
+     * review). bin/ai-worker-compat-check.php reads this list.
+     */
+    public const JOB_VERSIONS = [1, 2];
+    private const DECLARED_V1 = ['flow', 'is_owner', 'first_name', 'last_name', 'arp_number', 'document_type', 'transfer_type'];
+    private const DECLARED_V2 = ['flow', 'is_owner', 'first_name', 'middle_name', 'last_name', 'address_line', 'city', 'province', 'zip_code',
+        'arp_number', 'document_type', 'transfer_type'];
+    /** Longest address line the form accepts (web/api.php), and the other address fields. */
+    private const DECLARED_LIMITS = ['address_line' => 300, 'city' => 100, 'province' => 100, 'zip_code' => 10];
 
     private readonly Closure $clock;
 
@@ -70,7 +81,7 @@ final class AiDocumentWorker
     public static function validateJob(mixed $job): array
     {
         $keys = ['version', 'job_id', 'declared', 'documents'];
-        if (!is_array($job) || (array_keys($job) !== $keys && array_keys($job) !== [...$keys, 'time_budget_seconds']) || $job['version'] !== 1) {
+        if (!is_array($job) || (array_keys($job) !== $keys && array_keys($job) !== [...$keys, 'time_budget_seconds']) || !in_array($job['version'], self::JOB_VERSIONS, true)) {
             throw new UnexpectedValueException('job must contain exactly version, job_id, declared, documents and optionally time_budget_seconds');
         }
         $budget = $job['time_budget_seconds'] ?? null;
@@ -81,16 +92,18 @@ final class AiDocumentWorker
             throw new UnexpectedValueException('job_id must be a positive integer');
         }
         $declared = $job['declared'];
-        $declaredKeys = ['flow', 'is_owner', 'first_name', 'last_name', 'arp_number', 'document_type', 'transfer_type'];
+        $declaredKeys = $job['version'] === 1 ? self::DECLARED_V1 : self::DECLARED_V2;
         if (!is_array($declared) || array_keys($declared) !== $declaredKeys
             || !in_array($declared['flow'], ['docreq', 'landtransfer'], true) || !is_bool($declared['is_owner'])) {
             throw new UnexpectedValueException('declared details are not valid');
         }
-        foreach (['first_name', 'last_name', 'arp_number', 'document_type', 'transfer_type'] as $field) {
-            if (!is_string($declared[$field]) || mb_strlen($declared[$field]) > 150 || !mb_check_encoding($declared[$field], 'UTF-8')) {
+        foreach (array_diff($declaredKeys, ['flow', 'is_owner']) as $field) {
+            if (!is_string($declared[$field]) || mb_strlen($declared[$field]) > (self::DECLARED_LIMITS[$field] ?? 150) || !mb_check_encoding($declared[$field], 'UTF-8')) {
                 throw new UnexpectedValueException('declared ' . $field . ' is not valid');
             }
         }
+        // A version 1 job has no middle name or address: they are empty, so the address is not compared.
+        $declared += ['middle_name' => '', 'address_line' => '', 'city' => '', 'province' => '', 'zip_code' => ''];
         if (!is_array($job['documents']) || !array_is_list($job['documents']) || count($job['documents']) > self::MAX_DOCUMENTS) {
             throw new UnexpectedValueException('documents must be a list of at most ' . self::MAX_DOCUMENTS);
         }
@@ -204,7 +217,29 @@ final class AiDocumentWorker
                 'arp_number' => $declared['arp_number'],
             ], $labels);
 
-            $model = $this->askModel($declared, $texts, $deadline);
+            // Version 6: the applicant's own ID front is compared with the form, for the model to analyze.
+            // Full OCR text is returned only if the text positively identifies a National ID front.
+            // Values stay in memory until they are returned; nothing is logged.
+            $ownKey = IdFrontReview::ownIdKey($declared['is_owner']);
+            // The simplified identity comparison reads only the applicant's own National ID front.
+            // Other IDs and back sides remain available to the established document checks only.
+            $fronts = [];
+            if (isset($idReads[$ownKey])) {
+                $fronts[$ownKey] = IdFrontReview::extract($texts[$ownKey]['text'], true, isset($passConflicts[$ownKey]));
+            }
+            $ownIdType = isset($texts[$ownKey])
+                ? IdFieldExtractor::classify($texts[$ownKey]['text'])
+                : [null, 'unverified', []];
+            $retainOwnNationalIdFrontText = $ownIdType[0] === 'philsys_national_id' && $ownIdType[1] === 'confirmed';
+            $idCheck = null;
+            if (isset($fronts[$ownKey])) {
+                $form = IdFrontReview::form($declared);
+                $readability = $texts[$ownKey]['readability'];
+                $ocrState = $readability === 'unreadable' ? 'ocr_unsuccessful' : ($readability === 'good' ? 'readable' : 'partially_readable');
+                $idCheck = IdFrontReview::modelInput($ownKey, $fronts[$ownKey], $form, IdFrontReview::compare($fronts[$ownKey], $form), $ocrState);
+            }
+
+            $model = $this->askModel($declared, $texts, $deadline, $idCheck);
             $nameMatches = [];
             $nameConflicts = $passConflicts;
             if ($model['status'] === 'ok') {
@@ -224,6 +259,9 @@ final class AiDocumentWorker
                     ? DocumentAnalysis::idCheck($idReads[$check['key']], $check['readability'], $check['ocr_status'] === 'ok',
                         $holders[$check['key']] ?? '', isset($nameConflicts[$check['key']]))
                     : null;
+                $check['id_review'] = $fronts[$check['key']] ?? null;
+                $check['id_front_ocr_text'] = $check['key'] === $ownKey && $retainOwnNationalIdFrontText
+                    ? (string) ($texts[$ownKey]['text'] ?? '') : null;
             }
             unset($check);
 
@@ -243,7 +281,8 @@ final class AiDocumentWorker
         }
     }
 
-    private function askModel(array $declared, array $texts, float $deadline): array
+    /** @param ?array $idCheck IdFrontReview::modelInput() for the applicant's own ID front, or null */
+    private function askModel(array $declared, array $texts, float $deadline, ?array $idCheck = null): array
     {
         $readable = array_filter($texts, static fn (array $document): bool => $document['readability'] !== 'unreadable');
         if ($this->chat === null || $readable === []) {
@@ -261,9 +300,10 @@ final class AiDocumentWorker
             'arp_or_title_number' => $declared['arp_number'],
             'document_requested' => $declared['document_type'],
             'transfer_type' => $declared['transfer_type'],
-        ], $documents, $perDocument, bin2hex(random_bytes(16)));
+        ], $documents, $perDocument, bin2hex(random_bytes(16)), $idCheck);
 
         $keys = array_keys($texts);
+        $reviewKey = $idCheck === null ? null : (string) $idCheck['document_key'];
         for ($attempt = 1; $attempt <= self::MODEL_ATTEMPTS; $attempt++) {
             $remaining = (int) floor($deadline - ($this->clock)());
             if ($attempt > 1 && $remaining < self::MIN_SECOND_MODEL_SECONDS) {
@@ -272,7 +312,8 @@ final class AiDocumentWorker
             // The first try always gets a few seconds, even if OCR used slightly more than its share.
             $timeout = max(5, min($this->modelTimeoutSeconds, $remaining));
             try {
-                $output = ($this->chat)(DocumentAnalysis::systemPrompt(), $prompt, DocumentAnalysis::modelSchema($keys), $attempt === 1 ? 0.0 : 0.1, $timeout);
+                $output = ($this->chat)(DocumentAnalysis::systemPrompt($reviewKey !== null), $prompt, DocumentAnalysis::modelSchema($keys, $reviewKey),
+                    $attempt === 1 ? 0.0 : 0.1, $timeout);
             } catch (RuntimeException $exception) {
                 if ($exception->getMessage() === 'ollama_invalid_json') {
                     continue;
@@ -283,7 +324,7 @@ final class AiDocumentWorker
                 // Checked here so a bad answer can be retried; returned in the model's own shape,
                 // because the application validates it again independently. Only here is the OCR
                 // text known, so here every "evidence" that is not an exact quote of it is removed.
-                DocumentAnalysis::validateModelOutput($output, $keys);
+                DocumentAnalysis::validateModelOutput($output, $keys, $reviewKey === null ? [] : [$reviewKey]);
                 return ['status' => 'ok', 'name' => $this->modelName, 'digest' => $this->modelDigest,
                     'output' => DocumentAnalysis::keepQuotedEvidence($output, $texts)];
             } catch (UnexpectedValueException) {

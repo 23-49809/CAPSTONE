@@ -227,6 +227,7 @@ function sa_normalize_request_status(mixed $status): string
         'approved' => 'Approved',
         'rejected' => 'Rejected',
         'out for release' => 'Out for Release',
+        'released' => 'Released',
         'ready for release' => 'Out for Release',
         'ready for pickup' => 'Out for Release',
         'for pickup' => 'Out for Release',
@@ -831,10 +832,9 @@ function sa_submit_request(array $data): array
         }
         // Server-side Terms and Conditions check (not just the checkbox).
         $termsAcceptanceId = sa_terms_require($pdo, $data, $flow);
-        // One reference for the application. With several documents, each document is its own
-        // request (own status, Staff member, files and document check), linked to the application
-        // and numbered with the application reference plus "-1", "-2", ...
-        $reference = sa_new_reference($pdo, $flow);
+        // A multi-item Document Request uses an APP parent reference. Each
+        // child remains its own request with an independent DR reference.
+        $reference = $isApplication ? sa_new_application_reference($pdo) : sa_new_reference($pdo, $flow);
         $applicationId = null;
         if ($isApplication) {
             $pdo->prepare('INSERT INTO request_applications (reference_no, flow, client_id, item_count) VALUES (:ref, :flow, :client, :count)')
@@ -876,11 +876,13 @@ function sa_submit_request(array $data): array
              VALUES (:document_id, 'pending')"
         );
         $requestIds = [];
+        $requestReferences = [];
         // The uploaded files are shared by every document of the application: stored once for the
         // first document, then copied, so each document request keeps its own files for Staff.
         $sharedFiles = [];
         foreach ($items as $index => $item) {
-            $itemReference = $isApplication ? $reference . '-' . ($index + 1) : $reference;
+            $itemReference = $isApplication ? sa_new_reference($pdo, 'docreq') : $reference;
+            $requestReferences[] = $itemReference;
             $stmt->execute([
                 'client_id' => $client['id'] ?? null,
                 'reference_no' => $itemReference,
@@ -1123,7 +1125,7 @@ function sa_submit_request(array $data): array
             sa_remember_submission($flow . ':' . $submissionKey, $reference);
         }
         return ['reference_no' => $reference, 'status' => 'Received']
-            + ($isApplication ? ['documents' => array_map(static fn (int $i): array => ['reference_no' => $reference . '-' . ($i + 1),
+            + ($isApplication ? ['documents' => array_map(static fn (int $i): array => ['reference_no' => $requestReferences[$i],
                 'document_type' => $items[$i]['document_type']], array_keys($items))] : []);
     } catch (Throwable $exception) {
         // A lost connection makes rollBack() itself fail; the database then discards the
@@ -1212,12 +1214,15 @@ function sa_update_request_status(array $data): array
         $id = filter_var($lookup->fetchColumn(), FILTER_VALIDATE_INT);
     }
     $status = (string) ($data['status'] ?? '');
-    $validStatuses = ['Received', 'Processing', 'Approved', 'Rejected', 'Out for Release', 'Timed Out'];
+    $validStatuses = ['Received', 'Processing', 'Approved', 'Rejected', 'Out for Release', 'Released', 'Timed Out'];
     if (!$id || !in_array($status, $validStatuses, true)) {
         throw new SaHttpException(422);
     }
     if ($status === 'Processing') {
         return sa_start_request_processing(['request_id' => $id]);
+    }
+    if ($status === 'Released') {
+        return sa_release_request(['request_id' => $id]);
     }
     if (in_array($status, ['Approved', 'Rejected', 'Out for Release'], true)) {
         return sa_complete_request_processing(['request_id' => $id], $status);
@@ -1270,6 +1275,27 @@ function sa_update_request_status(array $data): array
     }
 }
 
+/** Record that the applicant collected one child request. */
+function sa_release_request(array $data): array
+{
+    $user = sa_internal_or_fail(['STAFF']);
+    $id = sa_processing_request_id($data); $pdo = sa_db(); sa_require_request_row_locks($pdo); $pdo->beginTransaction();
+    try {
+        $stmt=$pdo->prepare('SELECT id,client_id,reference_no,status,processing_staff_id FROM requests WHERE id=:id FOR UPDATE');
+        $stmt->execute(['id'=>$id]); $r=$stmt->fetch();
+        if (!$r) throw new SaHttpException(404);
+        if ($r['status'] !== 'Out for Release') throw new SaHttpException(409,'Only a request marked Out for Release can be recorded as Released.');
+        if ($r['processing_staff_id'] !== null && (int)$r['processing_staff_id'] !== (int)$user['id']) throw new SaHttpException(409,'Only the assigned staff member can release this request.');
+        $pdo->prepare("UPDATE requests SET status='Released' WHERE id=:id")->execute(['id'=>$id]);
+        $message='Request '.$r['reference_no'].' was released to the applicant.';
+        $pdo->prepare("INSERT INTO request_status_log (request_id,status,actor,sms_body) VALUES (:id,'Released','staff',:body)")->execute(['id'=>$id,'body'=>$message]);
+        if ($r['client_id'] !== null) $pdo->prepare("INSERT INTO notifications (client_id,request_id,type,message,channel,delivery_status) VALUES (:c,:r,'status_update',:m,'system','sent')")
+            ->execute(['c'=>$r['client_id'],'r'=>$id,'m'=>$message]);
+        sa_audit('staff',(int)$user['id'],(string)$user['name'],'Request released to applicant',(string)$r['reference_no']);
+        $pdo->commit(); return ['request_id'=>$id,'status'=>'Released'];
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+
 function sa_processing_request_id(array $data): int
 {
     $id = filter_var($data['request_id'] ?? null, FILTER_VALIDATE_INT);
@@ -1317,7 +1343,7 @@ function sa_start_request_processing(array $data): array
         if (!$request) {
             throw new SaHttpException(404);
         }
-        if (in_array($request['status'], ['Approved', 'Rejected', 'Out for Release', 'Timed Out'], true)) {
+        if (in_array($request['status'], ['Approved', 'Rejected', 'Out for Release', 'Released', 'Timed Out'], true)) {
             throw new SaHttpException(409, 'Processing cannot be started for a closed request.');
         }
         if ($request['processing_staff_id'] !== null &&
@@ -1431,7 +1457,7 @@ function sa_complete_request_processing(array $data, string $status = 'Out for R
             throw new SaHttpException(409, 'Only the staff member assigned to this request can complete it.');
         }
         if ($request['processing_completed_at'] === null) {
-            if (in_array($request['status'], ['Approved', 'Rejected', 'Out for Release', 'Timed Out'], true)) {
+            if (in_array($request['status'], ['Approved', 'Rejected', 'Out for Release', 'Released', 'Timed Out'], true)) {
                 throw new SaHttpException(409, 'This request already has a terminal status.');
             }
             $pdo->prepare(
@@ -3182,34 +3208,40 @@ function sa_head_monthly_report(mixed $monthIn, mixed $yearIn): array
     // Applications and individual requests. One Document Request application may ask for several
     // documents, each its own request. `documents` counts individual document requests by each
     // request's own saved time. `documentApplications` counts applications: every request_applications
-    // record by its own creation time, plus every Document Request without an application record (an
-    // older or single-document request, one application each). It never depends on any particular
-    // document of an application still existing. Before migration 20261119 every Document Request is
-    // its own application. A land transfer is always one request and one application.
+    // parent by its own creation time, plus standalone requests. Land Transfer is always standalone.
     $applicationsAvailable = sa_applications_available();
     $counts = static function (DateTimeImmutable $from, DateTimeImmutable $to) use ($pdo, $applicationsAvailable): array {
         $window = ['start' => $from->format('Y-m-d H:i:s'), 'end' => $to->format('Y-m-d H:i:s')];
         $stmt = $pdo->prepare(
             "SELECT SUM(flow = 'docreq') AS documents, SUM(flow = 'landtransfer') AS land_transfers, COUNT(*) AS total"
-            . ($applicationsAvailable ? ", SUM(flow = 'docreq' AND application_id IS NULL) AS single_documents" : '') . "
+            . ($applicationsAvailable ? ", SUM(flow = 'docreq' AND application_id IS NULL) AS single_documents,
+                 SUM(flow = 'landtransfer' AND application_id IS NULL) AS single_land_transfers,
+                 SUM(application_id IS NULL) AS single_applications" : '') . "
              FROM requests WHERE created_at >= :start AND created_at < :end"
         );
         $stmt->execute($window);
         $row = $stmt->fetch() ?: [];
         $documentApplications = (int) ($row['documents'] ?? 0);
+        $landApplications = (int) ($row['land_transfers'] ?? 0);
+        $applicationTotal = (int) ($row['total'] ?? 0);
         if ($applicationsAvailable) {
             $grouped = $pdo->prepare(
-                "SELECT COUNT(*) FROM request_applications WHERE flow = 'docreq' AND created_at >= :start AND created_at < :end"
+                "SELECT COUNT(*) FROM request_applications a WHERE a.created_at >= :start AND a.created_at < :end
+                 AND EXISTS (SELECT 1 FROM requests r WHERE r.application_id=a.id AND r.flow='docreq')"
             );
             $grouped->execute($window);
             $documentApplications = (int) ($row['single_documents'] ?? 0) + (int) $grouped->fetchColumn();
+            $landApplications = (int) ($row['single_land_transfers'] ?? 0);
+            $allGrouped=$pdo->prepare('SELECT COUNT(*) FROM request_applications WHERE created_at >= :start AND created_at < :end');
+            $allGrouped->execute($window); $applicationTotal=(int)($row['single_applications']??0)+(int)$allGrouped->fetchColumn();
         }
         return [
             'documents' => (int) ($row['documents'] ?? 0),
             'landTransfers' => (int) ($row['land_transfers'] ?? 0),
             'total' => (int) ($row['total'] ?? 0),
             'documentApplications' => $documentApplications,
-            'applications' => $documentApplications + (int) ($row['land_transfers'] ?? 0),
+            'landTransferApplications' => $landApplications,
+            'applications' => $applicationTotal,
         ];
     };
     $range = ['start' => $start->format('Y-m-d H:i:s'), 'end' => $end->format('Y-m-d H:i:s')];

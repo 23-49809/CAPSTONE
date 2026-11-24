@@ -96,7 +96,7 @@ $check('3. the earlier migration (the column that keeps older requests\' types) 
 
 // ================= 4. The automatic check never receives a back side or the selected type =================
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-$pdo->exec('CREATE TABLE requests (id INTEGER PRIMARY KEY, flow TEXT, is_owner INTEGER, first_name TEXT, last_name TEXT, arp_number TEXT, document_type TEXT, transfer_type TEXT)');
+$pdo->exec('CREATE TABLE requests (id INTEGER PRIMARY KEY, flow TEXT, is_owner INTEGER, first_name TEXT, middle_name TEXT, last_name TEXT, address_line TEXT, city TEXT, province TEXT, zip_code TEXT, arp_number TEXT, document_type TEXT, transfer_type TEXT)');
 $pdo->exec('CREATE TABLE request_documents (id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER, doc_key TEXT, label TEXT, stored_path TEXT, mime_type TEXT, file_size INTEGER, file_status TEXT, id_type_hint TEXT)');
 $png = static function (string $text): string {
     $im = imagecreatetruecolor(320, 200);
@@ -108,7 +108,7 @@ $png = static function (string $text): string {
 };
 $insert = $pdo->prepare('INSERT INTO request_documents (request_id, doc_key, label, stored_path, mime_type, file_size, file_status, id_type_hint) VALUES (?,?,?,?,?,?,?,?)');
 foreach ([[1, 'docreq', 1], [2, 'docreq', 0]] as [$id, $flow, $isOwner]) {
-    $pdo->prepare('INSERT INTO requests VALUES (?,?,?,?,?,?,?,?)')->execute([$id, $flow, $isOwner, 'ROSA', 'FICTIONAL', '', 'Certification of Assessment', '']);
+    $pdo->prepare('INSERT INTO requests VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute([$id, $flow, $isOwner, 'ROSA', '', 'FICTIONAL', '', '', '', '', '', 'Certification of Assessment', '']);
     $keys = $isOwner ? ['ownerId' => 'philhealth_id', 'ownerIdBack' => null] : ['requesterId' => 'umid', 'requesterIdBack' => null, 'ownerId' => 'passport', 'authLetter' => null];
     foreach ($keys as $key => $hint) {
         $name = "{$id}_" . bin2hex(random_bytes(8)) . '.png';
@@ -123,7 +123,7 @@ $check('4. the automatic check receives the front only (owner): the back side is
 $check('4. representative: the two fronts and the letter, as before; no back side', array_column($repManifest['documents'], 'key') === ['requesterId', 'ownerId', 'authLetter']
     && $repManifest['application_findings'] === [], array_column($repManifest['documents'], 'key'));
 $check('4. the selected ID type is not in what the check receives', !str_contains((string) json_encode([$owner['declared'], $owner['documents'], $repManifest['declared']]), 'philhealth_id')
-    && array_keys($owner['declared']) === ['flow', 'is_owner', 'first_name', 'last_name', 'arp_number', 'document_type', 'transfer_type']);
+    && array_keys($owner['declared']) === ['flow', 'is_owner', 'first_name', 'middle_name', 'last_name', 'address_line', 'city', 'province', 'zip_code', 'arp_number', 'document_type', 'transfer_type']);
 
 // ================= 5. Staff page: back side next to its front; an older request's type marked "not verified" =================
 // (These requests carry the earlier labels and a stored applicant-selected type: requests from before the

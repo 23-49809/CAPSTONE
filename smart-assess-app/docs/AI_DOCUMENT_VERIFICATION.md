@@ -661,9 +661,9 @@ password, because PHP's built-in server drops empty environment variables.
   digits or stray symbols are marked as possibly misread
   (`DocumentAnalysis::uncertainNameParts()`), and the name is never corrected.
   ID card numbers are not requested. The document kind is shown as an unverified
-  AI suggestion; the name and number are shown as text read by OCR. Release
-  order: deploy the application first (it accepts versions 1, 2 and 3), then
-  refresh the worker; `bin/ai-worker-compat-check.php` refuses the reverse.
+  AI suggestion; the name and number are shown as text read by OCR. Later
+  releases also changed the job payload, so use the paired maintenance upgrade
+  procedure below rather than relying on this historical result-version order.
 * **Missing details only from a fixed list.** The model may name missing details
   only as codes from `DocumentAnalysis::MISSING_FIELD_LABELS` (for example
   `date_of_birth`, `arp_number`); Staff see the application's labels. Any other
@@ -840,37 +840,43 @@ password, because PHP's built-in server drops empty environment variables.
     permissions script and the release-order check; `systemd-analyze verify`
     must still be run on the server before installing.
 
-### Release order (application first, then the worker)
+### Paired application and worker upgrade
 
-Worker answers carry a result version. A refreshed worker answers version 2 (it
-checks the model's quotes against the OCR text); the application accepts
-version 1 and 2 from this branch on, but release 6482fcd0 accepts version 1 only
-and would fail every job as an invalid worker result. Therefore:
+The application now sends job version 2 and accepts worker result versions 1
+through 7. This worker accepts job versions 1 and 2 and returns result version 7.
+Older releases may send only job version 1 or accept only earlier result versions.
+The compatibility checker correctly refuses mixed pairs in either direction.
 
-1. Deploy the application release that contains this change.
-2. Before refreshing `/opt/smart-assess-ai-worker` (or installing or starting the
-   dispatcher), stage the new worker copy and run, on the server:
-   `php /var/www/smart-assess/bin/ai-worker-compat-check.php --app=/var/www/smart-assess --worker=<staged copy>`
-   It must print "compatible" (exit 0). Exit 1 means "NOT COMPATIBLE: deploy the
-   application first"; exit 2 means the files could not be read. Do not continue
-   on anything but exit 0.
-3. Refresh the worker copy with `deploy/sbin/smart-assess-ai-worker-refresh.sh`
-   (installed as `/usr/local/sbin/smart-assess-ai-worker-refresh.sh`): it stages the
-   copy, runs the check and **refuses** (exit 1, nothing changed) unless it passes,
-   then swaps it in, restarts the worker's PHP pool, checks `/v1/health` and rolls
-   back if the worker is not healthy. `--check-only` stages and checks only.
-4. Enforced at run time too: the dispatcher runs the same check against
-   `/opt/smart-assess-ai-worker` before every run (`ExecStartPre`), so a mismatched
-   worker stops the dispatcher before any job is sent.
+Upgrade the application and worker as a matched pair during a maintenance
+window:
 
-The check reads source files only. A new application with the worker installed
-in Step 4 (version 1) is compatible: model quotes are then simply dropped.
+1. Pause the AI dispatcher and let in-flight jobs finish. Keep the dispatcher
+paused throughout the application and worker file changes; submissions may
+remain queued during this interval.
+2. Install the application and worker release files as one release unit. Do not
+start the dispatcher while only one side has been updated.
+3. Run the compatibility check against the exact installed application and
+   worker paths:
+   `php /var/www/smart-assess/bin/ai-worker-compat-check.php --app=/var/www/smart-assess --worker=/opt/smart-assess-ai-worker`
+   It must print "compatible" (exit 0). Exit 1 means the pair is incompatible;
+   exit 2 means the files could not be read. Do not resume on anything but exit 0.
+4. Run the synthetic worker smoke test using the same application environment
+   and the paired worker. It must confirm the worker is ready, OCR ran, the
+   model answered, and the application accepted the current result version.
+5. Resume the dispatcher only after both checks pass. The dispatcher's
+   `ExecStartPre` repeats the compatibility check before every run.
+
+If a check fails, keep dispatch paused and restore both application and worker
+to the previous matched release before resuming. The compatibility checker
+reads source files only; it does not contact the worker or change files. The
+smoke test uses only its built-in synthetic document and does not access the
+database or send messages.
 
 **Version 4 (printed titles; request-type checks).** The worker now also reports, per file,
 which document titles or issuers appear in that file's own OCR text (`kind_evidence`,
 `DocumentAnalysis::KIND_EVIDENCE`; never the file name). The application accepts versions
-1 to 4; the release before it accepts 1 to 3 and would fail version 4 answers, so the same
-order applies: application first, then the worker (the compatibility check enforces it).
+1 to 4; the release before it accepts 1 to 3 and would fail version 4 answers. Later
+releases also changed the job payload; use the paired maintenance upgrade procedure above.
 The Staff page then runs only the checks of the request type:
 
 * Document Request: on each ID, **Name Match** (the name read from the ID against the
