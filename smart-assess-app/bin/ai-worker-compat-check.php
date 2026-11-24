@@ -13,13 +13,14 @@ declare(strict_types=1);
  * --worker  the worker root (worker/index.php and app/services/), e.g. a staged new copy, or
  *           /opt/smart-assess-ai-worker for the one installed now
  *
- * Exit codes: 0 compatible; 1 NOT compatible (do not install this worker with this
- * application: deploy the application first); 2 the files could not be read or understood.
+ * Exit codes: 0 compatible; 1 NOT compatible (do not run this application/worker pair);
+ * 2 the files could not be read or understood.
  *
  * Why: worker results carry a version. A version 2 worker (it checks the model's quotes
  * against the OCR text) is understood only by an application that accepts version 2; the
- * release 6482fcd0 accepts version 1 only and would fail every job ("invalid worker result").
- * Release order: deploy the application first, then refresh the worker.
+ * release 6482fcd0 accepts version 1 and sends job version 1. New releases change both the
+ * accepted result and sent job formats, so neither side can generally be upgraded first.
+ * Stage a backward-compatible bridge or upgrade the pair together in approved maintenance.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -69,20 +70,32 @@ if (str_contains($workerRun, "'version' => DocumentAnalysis::WORKER_RESULT_VERSI
     exit(2);
 }
 
-/** The job format the application sends, and the one the worker accepts (both version 1 so far). */
+/** The job format the application sends, and the formats the worker accepts. */
 $appJob = $read($app . '/app/services/AiVerification.php');
 $workerJob = $workerRun;
 $sends = preg_match("/'payload' => \[\s*'version' => (\d+),/", $appJob, $m) ? (int) $m[1] : null;
-$takes = preg_match("/\\\$job\['version'\] !== (\d+)\)/", $workerJob, $m) ? (int) $m[1] : null;
+$takes = null;
+if (preg_match('/public const JOB_VERSIONS = \[([0-9,\s]+)\];/', $workerJob, $m)) {
+    $takes = array_map('intval', preg_split('/\s*,\s*/', trim($m[1])));
+} elseif (preg_match("/\\\$job\['version'\] !== (\d+)\)/", $workerJob, $m)) {
+    $takes = [(int) $m[1]];
+}
 if ($sends === null || $takes === null) {
     fwrite(STDERR, "Cannot read the job format version on both sides.\n");
     exit(2);
 }
 
 printf("application %s accepts worker results version %s and sends jobs version %d\n", $app, implode(', ', $accepted), $sends);
-printf("worker      %s answers with version %d and accepts jobs version %d\n", $worker, $answers, $takes);
-if (!in_array($answers, $accepted, true) || $sends !== $takes) {
-    echo "NOT COMPATIBLE: do not install this worker with this application. Deploy the application release first, then refresh the worker.\n";
+printf("worker      %s answers with version %d and accepts jobs version %s\n", $worker, $answers, implode(', ', $takes));
+if (!in_array($answers, $accepted, true) || !in_array($sends, $takes, true)) {
+    echo "NOT COMPATIBLE: do not run this application and worker pair.\n";
+    if (!in_array($answers, $accepted, true)) {
+        echo "The application does not accept the worker's result version.\n";
+    }
+    if (!in_array($sends, $takes, true)) {
+        echo "The worker does not accept the application's job version.\n";
+    }
+    echo "Use a staged compatibility release or upgrade the application and worker together during an approved maintenance window.\n";
     exit(1);
 }
 echo "compatible\n";

@@ -397,7 +397,16 @@ $check('worker: OCR each document, then the model; the result passes the applica
     && array_column($validatedResult['documents'], 'readability') === ['good', 'good'], $result);
 $check('worker: the model saw both documents\' text and the declared details', str_contains(end($prompts), 'ARP No. 018-00045') && str_contains(end($prompts), 'DRIVER LICENSE')
     && str_contains(end($prompts), '"applicant_name":"Juan Dela Cruz"'));
-$check('worker: the result holds no raw OCR text', !str_contains(json_encode($result), 'DRIVER LICENSE') && !str_contains(json_encode($result), 'Assessed Value'));
+$check('worker: other government ID transcripts are not retained as National ID front OCR; other document OCR text is also not retained',
+    ($result['documents'][0]['id_front_ocr_text'] ?? null) === null && ($result['documents'][1]['id_front_ocr_text'] ?? null) === null
+    && !str_contains(json_encode($result), 'Assessed Value'));
+$nationalIdText = "REPUBLIKA NG PILIPINAS\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine Identification Card\nApelyido/Last Name\nDELA CRUZ\nMga Pangalan/Given Names\nJUAN SANTOS\nGitnang Apelyido/Middle Name\nREYES\nTirahan/Address\n123 RIZAL ST, BRGY SAN JUAN, MABINI, BATANGAS";
+file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $nationalIdText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
+$nationalIdResult = $makeWorker($fakeModel($goodOutput))->run($twoDocs);
+$validatedNationalIdResult = DocumentAnalysis::validateWorkerResult($nationalIdResult, ['ownerId', 'ctcTdOrTitle']);
+$check('worker: only the applicant National ID front transcript is retained for Staff',
+    $validatedNationalIdResult['documents'][0]['id_front_ocr_text'] === $nationalIdText && $validatedNationalIdResult['documents'][1]['id_front_ocr_text'] === null);
+file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idCardText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
 $check('worker: job files are removed afterwards', glob($work . '/state/job-*') === []);
 $quoting = array_replace($goodOutput, ['findings' => [
     ['category' => 'possible_inconsistency', 'field' => 'property_identifier', 'document_keys' => ['ctcTdOrTitle'], 'explanation' => 'x', 'evidence' => 'ARP No. 018-00045'],
@@ -492,7 +501,7 @@ $tampered = $exact;
 $tampered['documents'][0]['name_match'] = 'none';
 $check('v3 app: a name the worker did not find in the text is never shown', DocumentAnalysis::validateWorkerResult($tampered, $keys)['model']['output']['documents'][0]['holder_name'] === ''
     && $v3Validated['model']['output']['documents'][0]['holder_name'] === 'DELA CRUZ, JUAN SANTOS');
-$olderWithName = array_replace($exact, ['version' => 2, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['name_match' => 1, 'kind_evidence' => 1, 'id_check' => 1]), $exact['documents'])]);
+$olderWithName = array_replace($exact, ['version' => 2, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['name_match' => 1, 'kind_evidence' => 1, 'id_check' => 1, 'id_review' => 1, 'id_front_ocr_text' => 1]), $exact['documents'])]);
 $check('v3 app: a version 2 result never shows a name or number (that worker did not check them)', (static function () use ($olderWithName, $keys): bool {
     $docs = DocumentAnalysis::validateWorkerResult($olderWithName, $keys)['model']['output']['documents'];
     return $docs[0]['holder_name'] === '' && $docs[1]['property_number'] === '';
@@ -731,7 +740,7 @@ foreach (['an unknown kind' => ['approved_document'], 'a repeated kind' => ['pas
     $tamperedEvidence['documents'][0]['kind_evidence'] = $bad;
     $check("v4 app: kind_evidence with {$what} is rejected", $rejects(static fn () => DocumentAnalysis::validateWorkerResult($tamperedEvidence, $keys)));
 }
-$v3Result = array_replace($withoutEvidence, ['version' => 3, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['id_check' => 1]), $withoutEvidence['documents'])]);
+$v3Result = array_replace($withoutEvidence, ['version' => 3, 'documents' => array_map(static fn (array $d): array => array_diff_key($d, ['id_check' => 1, 'id_review' => 1, 'id_front_ocr_text' => 1]), $withoutEvidence['documents'])]);
 $check('v4 app: a version 3 result is still accepted, with its evidence marked as not checked (null)', array_column(DocumentAnalysis::validateWorkerResult($v3Result, $keys)['documents'], 'kind_evidence') === [null, null]);
 $v4Classified = DocumentAnalysis::classify($requirements(['ownerId' => 'uploaded_valid_format', 'ctcTdOrTitle' => 'uploaded_valid_format']), $v4, $labels)['documents'];
 $check('v4 classify: an ID gets the ID check with only government-issued IDs accepted', $v4Classified[0]['check'] === 'id' && in_array('drivers_license', $v4Classified[0]['accepted_kinds'], true)

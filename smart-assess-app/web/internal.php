@@ -73,6 +73,7 @@ foreach ($page['requests'] ?? [] as $request) {
     $reference = (string) $request['reference_no'];
     $record = [
         'id' => $reference,
+        'flow' => (string) $request['flow'],
         'requestId' => $requestId,
         'applicant' => trim((string) $request['first_name'] . ' ' .
             (string) ($request['middle_name'] ?? '') . ' ' . (string) $request['last_name']),
@@ -128,7 +129,22 @@ foreach ($page['requests'] ?? [] as $request) {
         $record['files'] = $filesByRequest[$requestId] ?? [];
         // AI document check for this request (null when none has been queued).
         $record['ai'] = $page['ai_verifications'][$requestId] ?? null;
-        // Whether the AI check may run for this request; when not, why (Staff only).
+        if (is_array($record['ai'])) {
+            $record['ai']['idFrontReview'] = IdFrontReview::staffView(
+                (array) ($record['ai']['documents'] ?? []),
+                IdFrontReview::form($record['details']),
+                (bool) $request['is_owner']
+            );
+            // The OCR transcript is needed only in the selected applicant National-ID review.
+            // Do not leave transcripts from other ID slots in the page's general AI payload.
+            foreach ($record['ai']['documents'] as &$reviewDocument) {
+                if (is_array($reviewDocument)) {
+                    unset($reviewDocument['id_front_ocr_text']);
+                }
+            }
+            unset($reviewDocument);
+        }
+	// Whether the AI check may run for this request; when not, why (Staff only).
         $record['aiEligibility'] = $page['ai_eligibility'][$requestId]
             ?? ['eligible' => false, 'reason' => AiVerification::INELIGIBLE_NOT_ENABLED, 'effectiveFrom' => null];
     }

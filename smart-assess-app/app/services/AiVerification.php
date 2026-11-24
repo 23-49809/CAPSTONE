@@ -583,7 +583,7 @@ final class AiVerification
             $documents[] = ['key' => $document['key'], 'label' => $document['label'], 'mime' => $document['mime'], 'content_base64' => base64_encode($bytes)];
         }
         return [
-            'payload' => ['version' => 1, 'job_id' => $job['id'], 'declared' => $manifest['declared'], 'documents' => $documents],
+            'payload' => ['version' => 2, 'job_id' => $job['id'], 'declared' => $manifest['declared'], 'documents' => $documents],
             'requirements' => $manifest['requirements'],
             'labels' => $manifest['labels'],
             'keys' => array_column($documents, 'key'),
@@ -603,11 +603,7 @@ final class AiVerification
      */
     public static function jobManifest(PDO $pdo, array $job, string $appRoot): array
     {
-        $stmt = $pdo->prepare(
-            'SELECT flow, is_owner, first_name, last_name, arp_number, document_type, transfer_type FROM requests WHERE id = :id'
-        );
-        $stmt->execute(['id' => $job['request_id']]);
-        $request = $stmt->fetch(PDO::FETCH_ASSOC);
+        $request = self::declaredRow($pdo, (int) $job['request_id']);
         if (!$request) {
             throw new RuntimeException('request_missing');
         }
@@ -661,11 +657,18 @@ final class AiVerification
         unset($document);
 
         return [
+            // Job version 2: also the middle name and the home address, compared with the ID front's Full
+            // Name and Address. Empty when this account may not read them yet (see declaredRow()).
             'declared' => [
                 'flow' => (string) $request['flow'],
                 'is_owner' => (bool) $request['is_owner'],
                 'first_name' => (string) $request['first_name'],
+                'middle_name' => (string) ($request['middle_name'] ?? ''),
                 'last_name' => (string) $request['last_name'],
+                'address_line' => mb_substr((string) ($request['address_line'] ?? ''), 0, 300),
+                'city' => mb_substr((string) ($request['city'] ?? ''), 0, 100),
+                'province' => mb_substr((string) ($request['province'] ?? ''), 0, 100),
+                'zip_code' => mb_substr((string) ($request['zip_code'] ?? ''), 0, 10),
                 'arp_number' => (string) ($request['arp_number'] ?? ''),
                 'document_type' => (string) ($request['document_type'] ?? ''),
                 'transfer_type' => (string) ($request['transfer_type'] ?? ''),
@@ -676,6 +679,29 @@ final class AiVerification
             'keys' => array_column($documents, 'key'),
             'application_findings' => $applicationFindings,
         ];
+    }
+
+    /**
+     * The request details a job declares. The middle name and home address are read only where this
+     * database account may read them: the dispatcher's least-privilege account (deploy/mysql/
+     * ai-dispatch-db-user.sql.example) needs the column grants added with this release. Until they are
+     * granted, MySQL refuses those columns (1142/1143); the job is then built without them, so the
+     * address is shown to Staff as Needs Review by the AI instead of every job failing.
+     */
+    private static function declaredRow(PDO $pdo, int $requestId): array|false
+    {
+        $base = 'flow, is_owner, first_name, last_name, arp_number, document_type, transfer_type';
+        try {
+            $stmt = $pdo->prepare("SELECT {$base}, middle_name, address_line, city, province, zip_code FROM requests WHERE id = :id");
+            $stmt->execute(['id' => $requestId]);
+        } catch (PDOException $exception) {
+            if (!in_array((int) ($exception->errorInfo[1] ?? 0), [1142, 1143], true)) {
+                throw $exception;
+            }
+            $stmt = $pdo->prepare("SELECT {$base} FROM requests WHERE id = :id");
+            $stmt->execute(['id' => $requestId]);
+        }
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     private static function unpreparedFinding(string $key, string $label): array

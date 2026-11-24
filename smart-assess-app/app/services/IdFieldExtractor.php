@@ -126,6 +126,81 @@ final class IdFieldExtractor
     }
 
     /**
+     * Read only the National ID's complete name for the front-side applicant review.
+     * Unlike extractAs(), this path does not parse or return dates, card numbers, sex, or
+     * separate name fields. The field labels are used internally only to assemble one name.
+     *
+     * @return array{status:string, value:?string}
+     */
+    public static function extractNationalIdFullName(string $text): array
+    {
+        $definition = IdDocumentTypes::type('philsys_national_id');
+        if ($definition === null) {
+            return ['status' => 'not_found', 'value' => null];
+        }
+        $text = DocumentAnalysis::normalizeText($text);
+        $nameFields = $definition['name'];
+        $fieldsDefinition = array_intersect_key($definition['fields'], array_fill_keys($nameFields, true));
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\R/u', $text) ?: []), static fn (string $line): bool => $line !== ''));
+        $spans = array_map(static fn (string $line): array => self::labelSpans($line, $fieldsDefinition), $lines);
+        $fields = [];
+        $labelled = [];
+        foreach ($fieldsDefinition as $field => $rule) {
+            $fields[$field] = self::readField($field, $rule, $lines, $spans, $labelled);
+        }
+        $required = array_values(array_intersect($definition['required'], $nameFields));
+        $unknownNameField = false;
+        foreach ($lines as $index => $line) {
+            $named = preg_match('/\bnames?\b/i', $line) === 1;
+            $claimed = array_filter($spans[$index], static fn (array $span): bool => $span[0] !== '' && in_array($span[0], $nameFields, true)) !== [];
+            if ($named && !$claimed && isset($lines[$index + 1]) && $spans[$index + 1] === [] && self::name($lines[$index + 1]) !== null) {
+                $unknownNameField = true;
+            }
+        }
+        $readValues = [];
+        foreach ($nameFields as $field) {
+            if (($fields[$field]['state'] ?? '') === 'read') {
+                $readValues[] = (string) $fields[$field]['value'];
+            }
+        }
+        $fieldValues = array_map(static fn (array $field): string => (string) $field['value'], array_filter($fields, static fn (array $field): bool => $field['state'] === 'read'));
+        foreach ($lines as $index => $line) {
+            if ($index === 0 || $spans[$index] !== [] || self::name($line) === null || in_array($line, $fieldValues, true)) {
+                continue;
+            }
+            $previous = $lines[$index - 1];
+            $afterNameLabel = array_filter($spans[$index - 1], static fn (array $span): bool => in_array($span[0], $nameFields, true)) !== [];
+            if (in_array($previous, $readValues, true) || $afterNameLabel) {
+                $unknownNameField = true;
+            }
+        }
+        $name = $unknownNameField ? null : self::holderName($definition, $fields, $labelled);
+        $complete = $name !== null;
+        foreach ($required as $field) {
+            $complete = $complete && ($fields[$field]['state'] ?? '') === 'read';
+        }
+        foreach ($nameFields as $field) {
+            if (isset($labelled[$field]) && ($fields[$field]['state'] ?? '') !== 'read') {
+                $complete = false;
+            }
+        }
+        // Assemble only one Full Name value, including any individually readable parts without guessing.
+        if ($name !== null) {
+            [$last, $given] = array_pad(array_map('trim', explode(',', $name, 2)), 2, '');
+            $fullName = trim($given . ' ' . $last);
+        } else {
+            $last = ($fields['last_name']['state'] ?? '') === 'read' ? (string) $fields['last_name']['value'] : '';
+            $given = ($fields['given_names']['state'] ?? '') === 'read' ? (string) $fields['given_names']['value'] : '';
+            $middle = ($fields['middle_name']['state'] ?? '') === 'read' ? (string) $fields['middle_name']['value'] : '';
+            $fullName = trim(implode(' ', array_filter([$given, $middle, $last], static fn (string $part): bool => $part !== '')));
+        }
+        if ($fullName === '') {
+            return ['status' => $labelled !== [] ? 'unreadable' : 'not_found', 'value' => null];
+        }
+        return ['status' => $complete ? 'read' : 'incomplete', 'value' => mb_substr($fullName, 0, 120)];
+    }
+
+    /**
      * [type, state, evidence] from printed titles only: state 'confirmed' (one ID's title; extract()
      * then also requires an identifying field), 'conflict' (titles of different IDs; the type
      * returned is only the one tried for reading), 'unverified' (no ID title).
@@ -425,6 +500,116 @@ final class IdFieldExtractor
         }
         $given = array_values(array_filter(array_map(static fn (string $f): ?string => $fields[$f]['state'] === 'read' ? $fields[$f]['value'] : null, array_slice($parts, 1))));
         return $fields[$parts[0]]['value'] . ', ' . implode(' ', $given);
+    }
+
+    // ---- National ID address (front side) ----
+
+    /** The National ID's address label, printed "Tirahan/Address". */
+    private const ADDRESS_LABELS = ['tirahan', 'address'];
+    /** Lines an address may take on the card: the first value line, then continuation lines. */
+    private const MAX_ADDRESS_LINES = 3;
+    private const MAX_ADDRESS = 200;
+
+    /**
+     * The address printed on the front of a National ID, after its "Tirahan/Address" label: the text after
+     * the label on its line (or on the next line, past at most MAX_NOISE_LINES lines of stray marks), then
+     * up to two more unlabelled lines that read as address text. Address text is capital letters, digits
+     * and ". ' # / & ( ) -" between commas; a comma-separated part that is anything else (lower-case OCR
+     * noise, symbols, a 16-digit card number) ends the address. Nothing is changed, completed or guessed.
+     *
+     * Status: 'read'; 'incomplete' (a part that is not address text cut it short, it ends with a comma or
+     * hyphen, or it is a single word; the part read is given); 'unreadable' (the label but no address
+     * text after it); 'not_found' (no address label).
+     *
+     * @return array{status: string, value: ?string}
+     */
+    public static function address(string $text): array
+    {
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\R/u', DocumentAnalysis::normalizeText($text)) ?: []),
+            static fn (string $line): bool => $line !== ''));
+        $rules = IdDocumentTypes::TYPES['philsys_national_id']['fields'] + ['address' => ['labels' => self::ADDRESS_LABELS, 'type' => 'address']];
+        $spans = array_map(static fn (string $line): array => self::labelSpans($line, $rules), $lines);
+        foreach ($lines as $index => $line) {
+            $last = null;
+            foreach ($spans[$index] as $position => $span) {
+                if ($span[0] === 'address') {
+                    $last = $position;   // "Tirahan/Address" is two labels: the value follows the last one
+                }
+            }
+            if ($last !== null) {
+                return self::readAddress($lines, $spans, $index, $last);
+            }
+        }
+        return ['status' => 'not_found', 'value' => null];
+    }
+
+    /** @return array{status: string, value: ?string} */
+    private static function readAddress(array $lines, array $spans, int $index, int $label): array
+    {
+        $line = $lines[$index];
+        $end = $spans[$index][$label][2];
+        $next = $spans[$index][$label + 1][1] ?? strlen($line);
+        $first = trim(substr($line, $end, $next - $end), " \t:;/|_");
+        $after = $index + 1;
+        if ($first === '') {
+            for ($skipped = 0; $skipped < self::MAX_NOISE_LINES && isset($lines[$after]) && $spans[$after] === [] && self::noiseLine($lines[$after]); $skipped++) {
+                $after++;
+            }
+            if (!isset($lines[$after]) || $spans[$after] !== []) {
+                return ['status' => 'unreadable', 'value' => null];
+            }
+            $first = $lines[$after++];
+        } elseif ($next < strlen($line)) {
+            $after = PHP_INT_MAX;   // another label follows on the same line: the address is only what is between
+        }
+        [$piece, $cut, $dangling] = self::addressText($first);
+        if ($piece === '') {
+            return ['status' => 'unreadable', 'value' => null];
+        }
+        $address = $piece;
+        $lineCount = 1;
+        while (!$cut && $lineCount < self::MAX_ADDRESS_LINES && isset($lines[$after]) && $spans[$after] === []) {
+            [$more, $moreCut, $moreDangling] = self::addressText($lines[$after]);
+            if ($more === '' || $moreCut) {
+                break;   // not address text (a number under the photo, noise): the address ended before it
+            }
+            // Joined as printed: after a hyphen at the end of a line directly, otherwise with a comma.
+            $address .= (str_ends_with($address, '-') ? '' : ', ') . $more;
+            $dangling = $moreDangling;
+            $lineCount++;
+            $after++;
+        }
+        $words = preg_match_all('/[\p{L}\p{N}]+/u', $address);
+        $complete = !$cut && !$dangling && $words >= 2 && mb_strlen($address) <= self::MAX_ADDRESS;
+        return ['status' => $complete ? 'read' : 'incomplete', 'value' => mb_substr(rtrim($address, ' -'), 0, self::MAX_ADDRESS)];
+    }
+
+    /**
+     * [address text, cut, dangling] of one line: its comma-separated parts up to the first that is not
+     * address text (cut = true), and whether the line ends with a comma or hyphen (the address continues).
+     *
+     * @return array{0: string, 1: bool, 2: bool}
+     */
+    private static function addressText(string $line): array
+    {
+        $line = trim($line);
+        $parts = explode(',', $line);
+        $kept = [];
+        $cut = false;
+        foreach ($parts as $n => $part) {
+            $part = trim($part);
+            if ($part === '' && $n === count($parts) - 1) {
+                break;   // the line ends with a comma
+            }
+            if ($part === '' || preg_match("/^[#\\p{Lu}\\p{N}][\\p{Lu}\\p{M}\\p{N} .'’#\\/&()-]*$/u", $part) !== 1
+                || preg_match('/\p{Lu}{2,}|\p{N}/u', $part) !== 1 || preg_match_all('/\p{N}/u', $part) >= 10) {
+                $cut = true;
+                break;
+            }
+            $kept[] = $part;
+        }
+        $dangling = !$cut && (str_ends_with($line, ',') || str_ends_with($line, '-'));
+        return [implode(', ', $kept), $cut, $dangling];
     }
 
     // ---- passport machine-readable zone ----
