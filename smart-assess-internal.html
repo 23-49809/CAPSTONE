@@ -1694,10 +1694,10 @@ var SEED_ACCOUNTS = [
   {id:'u5', fullName:'Liza D. Fernandez', username:'liza.staff', email:'liza.fernandez@mabini.gov.ph', contact:'+639172005510', position:'Assessment Clerk', role:'staff', status:'inactive', dateCreated:'2025-03-02'}
 ];
 
-var STATUS_ORDER = ['Received','Processing','Approved','Rejected','Out for Release','Timed Out'];
+var STATUS_ORDER = ['Received','Processing','Approved','Rejected','Out for Release','Released','Timed Out'];
 var STATUS_META = {
   'Received':{cls:'slate'}, 'Processing':{cls:'blue'}, 'Approved':{cls:'green'},
-  'Rejected':{cls:'red'}, 'Out for Release':{cls:'green'}, 'Timed Out':{cls:'amber'}
+  'Rejected':{cls:'red'}, 'Out for Release':{cls:'green'}, 'Released':{cls:'green'}, 'Timed Out':{cls:'amber'}
 };
 function statusLabel(status){ return status==='Received'?'Pending':status; }
 
@@ -2450,9 +2450,9 @@ function renderCreateAccount(acct){
 /* ---------------- Head views ---------------- */
 function renderHeadDashboard(acct){
   var docTotal = state.docRequests.length, landTotal = state.landRequests.length;
-  var pendingDoc = state.docRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
-  var pendingLand = state.landRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Timed Out'].includes(r.status); }).length;
-  var completedThisMonth = state.docRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length + state.landRequests.filter(function(r){ return ['Approved','Out for Release'].includes(r.status); }).length;
+  var pendingDoc = state.docRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status); }).length;
+  var pendingLand = state.landRequests.filter(function(r){ return !['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status); }).length;
+  var completedThisMonth = state.docRequests.filter(function(r){ return ['Approved','Out for Release','Released'].includes(r.status); }).length + state.landRequests.filter(function(r){ return ['Approved','Out for Release','Released'].includes(r.status); }).length;
   var pubAnn = state.announcements.filter(function(a){ return (a.postTo==='staff' || a.postTo==='both') && annVisibleTo(a,'staff'); }).length;
   var recentReports = state.reports.slice(0,4);
   var recentAnn = state.announcements.slice(0,4);
@@ -2549,7 +2549,7 @@ function renderAnnouncements(acct){
    queries. The standalone demo has no server, so it computes the same
    structure from the demo data (srComputeLocal). */
 var SR_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-var SR_COMPLETED = ['Approved', 'Out for Release'];
+var SR_COMPLETED = ['Approved', 'Out for Release', 'Released'];
 function srState(){
   if(!state.sysReport || !state.sysReport.v2){
     var t = phToday();
@@ -3077,7 +3077,7 @@ function updateProcessingTimers(){
 function reqProcessingActions(r){
   var account = currentAccount();
   if(!account || account.role!=='staff') return '';
-  var terminal = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
+  var terminal = ['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status);
   var actions = '';
   if(!r.processingStaffId && !terminal){
     actions += '<button type="button" class="icon-btn action-button" data-action="start-processing" data-id="'+esc(r.id)+'">'+ic('timer','13px')+'Process Request</button>';
@@ -4240,8 +4240,8 @@ function modalReqDetail(id, kind){
   var account = currentAccount();
   var canProcess = account && account.role==='staff';
   var isAssignedStaff = canProcess && Number(r.processingStaffId)===Number(account.id);
-  var terminalStatus = ['Approved','Rejected','Out for Release','Timed Out'].includes(r.status);
-  var canTakeRequest = canProcess && !terminalStatus && (!r.processingStaffId || isAssignedStaff);
+  var terminalStatus = ['Approved','Rejected','Out for Release','Released','Timed Out'].includes(r.status);
+  var canTakeRequest = canProcess && (!terminalStatus || (r.status==='Out for Release' && isAssignedStaff)) && (!r.processingStaffId || isAssignedStaff);
   // One compact row: the stored start and end times side by side (no running timer or
   // duration here; request lists keep theirs). Before processing, how to start it.
   var timeline = r.processingStartedAt
@@ -4253,6 +4253,7 @@ function modalReqDetail(id, kind){
   // then opens Send Updates with a pickup draft. Both need processing to have started.
   var statusChoices = [['Processing','Processing']];
   if(isAssignedStaff && r.processingStartedAt) statusChoices.push(['Rejected','Rejected'], ['Out for Release','Approve']);
+  if(isAssignedStaff && r.status==='Out for Release') statusChoices.push(['Released','Mark as Released']);
   var statusForm = canTakeRequest
     ? '<form class="rd-status-form" data-form="update-status" data-kind="'+kind+'" data-id="'+esc(r.id)+'">'
         + '<div class="rd-form-row">'
@@ -4313,6 +4314,7 @@ function reqIdFrontReviewHtml(r){
       var row=rows.find(function(x){ return x.field===field; });
       return '<tr><th scope="row">'+(field==='full_name'?'Full Name':'Address')+'</th><td>'+esc(row&&row.form||'Not provided')+'</td><td>'+esc(row&&row.extracted||'Not available')+'</td><td>'+esc(row&&row.resultLabel||'Needs Review')+(row&&row.note?'<span class="cell-sub">'+esc(row.note)+'</span>':'')+'</td></tr>';
     }).join('')+'</tbody></table></div>';
+  info += '<h4 class="rd-caption">Original OCR Text (National ID Front)</h4><pre class="id-front-review-text">'+esc(review&&review.ocrText||'OCR text is not available for this result.')+'</pre>';
   var ai=review&&review.ai;
   info += '<h4 class="rd-caption">AI Review Findings</h4><div class="id-front-review-ai">';
   if(ai&&ai.available){

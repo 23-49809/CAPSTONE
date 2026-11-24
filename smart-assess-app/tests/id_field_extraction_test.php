@@ -199,6 +199,24 @@ $job = AiDocumentWorker::validateJob(['version' => 1, 'job_id' => 3, 'declared' 
 $run = static fn (array $alternatives, ?string $text = null): array => (new AiDocumentWorker($state, $fakeOcr($alternatives, $text), null, 'none', null, 'tesseract (eng)'))->run($job);
 $agree = $run([str_replace('SANTOS', 'SANTOS', $philsys)]);
 $disagree = $run([str_replace("JUAN\n", "PEDRO\n", $philsys)]);
+$check('worker: complete OCR passes that agree leave the name read; conflicting passes return no name, while only the original front OCR text is retained for Staff',
+    $agree['version'] === DocumentAnalysis::WORKER_RESULT_VERSION && $agree['documents'][0]['id_check']['type_state'] === 'confirmed'
+    && $disagree['documents'][0]['id_check']['name_state'] === 'conflict'
+    && $agree['documents'][0]['id_front_ocr_text'] === $philsys && $disagree['documents'][0]['id_front_ocr_text'] === $philsys
+    && !str_contains((string) json_encode($disagree['documents'][0]['id_review']), 'PEDRO'), [$agree['documents'][0], $disagree['documents'][0]]);
+$passportFront = $passport();
+$otherId = $run([$passportFront], $passportFront);
+$check('worker: raw OCR text is not retained when the applicant upload is not identified as a National ID front',
+    $otherId['documents'][0]['id_front_ocr_text'] === null && $otherId['documents'][0]['id_review']['full_name']['status'] === 'not_found');
+$malformedTranscript = $agree;
+$malformedTranscript['documents'][0]['id_front_ocr_text'] = $passportFront;
+$rejectedTranscript = false;
+try {
+    DocumentAnalysis::validateWorkerResult($malformedTranscript, ['ownerId']);
+} catch (UnexpectedValueException) {
+    $rejectedTranscript = true;
+}
+$check('application validation rejects a non-National-ID OCR transcript even from a version 7 worker', $rejectedTranscript);
 $check('worker: agreeing OCR passes preserve the ID review; conflicting passes return no name and raw OCR transcripts are never retained',
     $agree['version'] === DocumentAnalysis::WORKER_RESULT_VERSION && $agree['documents'][0]['id_check']['type_state'] === 'confirmed'
     && $disagree['documents'][0]['id_check']['name_state'] === 'conflict'
@@ -268,6 +286,8 @@ foreach ($withoutTranscript['documents'] as &$docCheck) {
     $docCheck['id_front_ocr_text'] = null;
 }
 unset($docCheck);
+$check('privacy: sensitive ID text is retained only as the applicant-front OCR transcript; parsed numbers and model quotes stay removed',
+    $leaks($withoutTranscript) === [] && $leakRun['documents'][0]['id_front_ocr_text'] === $idText && $leakRun['documents'][1]['id_front_ocr_text'] === null
 $check('privacy: sensitive ID text, parsed ID numbers and model quotes are not retained in the worker result',
     $leaks($leakRun) === []
     && !array_key_exists('id_front_ocr_text', $leakRun['documents'][0])
@@ -310,6 +330,9 @@ foreach ([3, 4, 5] as $version) {
         ['key' => 'ctcTdOrTitle', 'label' => 'Tax Declaration', 'property_number' => '018-00045', 'id_front_ocr_text' => $philsys]],
     [['document_labels' => ['Valid ID'], 'evidence' => 'Passport No. P4821736B'], ['document_labels' => [], 'evidence' => 'Date of birth 14 MAR 1985'],
         ['document_labels' => ['Tax Declaration'], 'evidence' => 'ARP No. 018-00045 Owner JUAN DELA CRUZ']]);
+$check('privacy (stored results read for Staff): non-National-ID OCR transcripts and ID property numbers/quotes are removed; National-ID transcript and property-document values remain',
+    $storedDocs[0]['id_front_ocr_text'] === null && $storedDocs[0]['property_number'] === '' && $storedDocs[1]['id_front_ocr_text'] === $philsys
+    && $storedDocs[2]['id_front_ocr_text'] === null && $storedDocs[2]['property_number'] === '018-00045'
 $check('privacy (stored results read for Staff): all legacy OCR transcripts and ID property numbers/quotes are removed; property-document values remain',
     !array_key_exists('id_front_ocr_text', $storedDocs[0])
     && $storedDocs[0]['property_number'] === ''

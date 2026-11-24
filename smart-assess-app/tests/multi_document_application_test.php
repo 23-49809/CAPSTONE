@@ -10,7 +10,7 @@ declare(strict_types=1);
  *  - The migration runs twice without error and leaves every existing request unchanged.
  *  - One document: the same reference format and storage as before (no application row).
  *  - Several documents: one application reference; each document is its own request
- *    (reference + "-1", "-2", ...) with its own type, purpose, status and its own copy of each
+ *    DR references, with its own type, purpose, status and its own copy of each
  *    uploaded file; duplicates and more than 5 documents are refused with nothing saved.
  *  - Drafts keep the chosen documents; resubmitting the same draft returns the same reference.
  *  - Tracking the application shows each document's own status; an item reference shows that
@@ -26,7 +26,7 @@ declare(strict_types=1);
  *  - The rollback script refuses while application data exists, and works when there is none.
  *
  * Run (never against a real database; the name must end in _test):
- *   SMART_ASSESS_TEST_DB=sa_multi_document_application_test DB_HOST=127.0.0.1 DB_PORT=3318 \
+ *   SMART_ASSESS_TEST_DB=smart_assess_test DB_HOST=127.0.0.1 DB_PORT=3318 \
  *   DB_USER=... SMART_ASSESS_DB_PASS='...' php tests/multi_document_application_test.php
  */
 
@@ -35,8 +35,8 @@ if (PHP_SAPI !== 'cli') {
     exit;
 }
 $dbName = (string) getenv('SMART_ASSESS_TEST_DB');
-if (!preg_match('/^[A-Za-z0-9_]+_test$/', $dbName) || !extension_loaded('gd') || !extension_loaded('curl')) {
-    fwrite(STDERR, "Refusing to run: set SMART_ASSESS_TEST_DB to a database whose name ends in _test (GD and curl are also required).\n");
+if ($dbName !== 'smart_assess_test' || !extension_loaded('gd') || !extension_loaded('curl')) {
+    fwrite(STDERR, "Refusing to run: set SMART_ASSESS_TEST_DB=smart_assess_test (GD and curl are also required).\n");
     exit(2);
 }
 $dbHost = getenv('DB_HOST') ?: '127.0.0.1';
@@ -319,6 +319,11 @@ $requestRow = static function (string $reference) use ($pdo): array {
     $stmt->execute([$reference]);
     return (array) $stmt->fetch();
 };
+$childRef = static function (string $applicationReference, int $itemNo) use ($pdo): string {
+    $stmt = $pdo->prepare('SELECT r.reference_no FROM requests r JOIN request_applications a ON a.id=r.application_id WHERE a.reference_no=? AND r.item_no=?');
+    $stmt->execute([$applicationReference, $itemNo]);
+    return (string) $stmt->fetchColumn();
+};
 
 // An SMS service stub that accepts (nothing leaves this computer): it records each send in the send log.
 file_put_contents($work . '/smart-assess-app/iprog-sms.php', "<?php\nfinal class IprogSmsService {\n"
@@ -360,6 +365,11 @@ $check('the rendered page carries the gate that hides "Add Another Document Requ
 $check('the Staff page is not given the client-page flag', $internalConfig !== [] && !array_key_exists('multiDocument', $internalConfig), $internalConfig);
 [$code, $res, $legacyRef] = $apply(null);
 $check('before the migration: a single-document application is saved as before', $code === 200 && (bool) preg_match('/^DR-\d{4}-[A-F0-9]{8}$/', $legacyRef), [$code, $res]);
+$mixedClient = $browser();
+$beforeMixed = [$count('SELECT COUNT(*) FROM requests'), $count('SELECT COUNT(*) FROM request_applications')];
+[$mixedCode, $mixedBody] = $mixedClient->json('submit_request', ['flow' => 'mixed']);
+$check('the submission API rejects the former mixed flow without creating a request or parent', $mixedCode === 422
+    && [$count('SELECT COUNT(*) FROM requests'), $count('SELECT COUNT(*) FROM request_applications')] === $beforeMixed, [$mixedCode, $mixedBody]);
 $before = $count('SELECT COUNT(*) FROM requests');
 [$code, $res] = $apply($items(2));
 $check('before the migration: several documents are refused with a clear message, nothing saved', $code === 422
@@ -376,8 +386,11 @@ $check('before the migration: every Document Request is its own application in t
 // ================= The migration =================
 $migration();
 $migration();
+$runSql($pdo, (string) file_get_contents($project . '/smart-assess-app/database/migrations/20261125_mixed_applications.sql'));
+$runSql($pdo, (string) file_get_contents($project . '/smart-assess-app/database/migrations/20261125_mixed_applications.sql'));
 $legacyAfter = $requestRow($legacyRef);
-$check('the migration runs twice without error and adds the new table and columns', $count("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'requests' AND COLUMN_NAME IN ('application_id', 'item_no')") === 2
+$check('migrations run twice without error and the additive release migration adds Released status', $count("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'requests' AND COLUMN_NAME IN ('application_id', 'item_no')") === 2
+    && str_contains((string)$pdo->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='requests' AND COLUMN_NAME='status'")->fetchColumn(), "'Released'")
     && $count("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'request_applications'") === 1);
 unset($legacyAfter['application_id'], $legacyAfter['item_no']);
 $check('existing requests are unchanged by the migration (new columns empty)', $legacyAfter === $legacyBefore && $requestRow($legacyRef)['application_id'] === null
@@ -397,15 +410,18 @@ $check('one document: the same reference format, no application row, no item num
 // ================= Several documents =================
 [$code, $res, $appRef, $appClient] = $apply($items(3));
 $appRow = (array) $pdo->query('SELECT * FROM request_applications WHERE reference_no = ' . $pdo->quote($appRef))->fetch();
-$check('three documents: one application reference, recorded once with its document count', $code === 200 && (bool) preg_match('/^DR-\d{4}-[A-F0-9]{8}$/', $appRef)
+$check('three documents: one APP application reference, recorded once with its document count', $code === 200 && (bool) preg_match('/^APP-\d{4}-[A-F0-9]{8}$/', $appRef)
     && (int) ($appRow['item_count'] ?? 0) === 3 && $count('SELECT COUNT(*) FROM request_applications') === 1, [$code, $res, $appRow]);
 $children = $pdo->query('SELECT * FROM requests WHERE application_id = ' . (int) $appRow['id'] . ' ORDER BY item_no')->fetchAll();
-$check('each document is its own request: reference -1, -2, -3, own type and purpose, same requester and property', count($children) === 3
-    && array_column($children, 'reference_no') === [$appRef . '-1', $appRef . '-2', $appRef . '-3']
+$check('each document is its own DR request with own type and purpose, same requester and property', count($children) === 3
+    && count(array_unique(array_column($children, 'reference_no'))) === 3
+    && count(array_filter(array_column($children, 'reference_no'), static fn(string $r): bool => (bool)preg_match('/^DR-\d{4}-[A-F0-9]{8}$/', $r))) === 3
     && array_column($children, 'document_type') === [DOCS[0], DOCS[1], DOCS[2]] && array_column($children, 'purpose') === ['Personal Copy', 'For Transfer', 'For Titling']
     && count(array_unique(array_column($children, 'arp_number'))) === 1 && count(array_unique(array_column($children, 'first_name'))) === 1
     && array_map('intval', array_column($children, 'item_no')) === [1, 2, 3], array_map(static fn ($c) => [$c['reference_no'], $c['document_type'], $c['purpose']], $children));
-$check('the application reference itself is not a request (no duplicate record)', $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($appRef)) === 0 && ($res['data']['documents'][2]['reference_no'] ?? '') === $appRef . '-3', $res);
+$check('the APP reference itself is not a request and submission returns each child DR reference',
+    $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($appRef)) === 0
+    && ($res['data']['documents'][2]['reference_no'] ?? '') === $children[2]['reference_no'], $res);
 $files = $pdo->query('SELECT rd.request_id, rd.doc_key, rd.stored_path, rd.file_status FROM request_documents rd JOIN requests r ON r.id = rd.request_id
     WHERE r.application_id = ' . (int) $appRow['id'] . ' ORDER BY rd.request_id, rd.id')->fetchAll();
 $paths = array_column($files, 'stored_path');
@@ -421,7 +437,7 @@ $check('the Terms acceptance is linked once, to the first document', $count('SEL
 // A representative: each document keeps all three identity files of its own.
 [$code, $res, $repRef] = $apply($items(2), false);
 $repFiles = $pdo->query('SELECT r.reference_no, rd.doc_key, rd.file_status FROM request_documents rd JOIN requests r ON r.id = rd.request_id
-    WHERE r.reference_no LIKE ' . $pdo->quote($repRef . '-%') . ' ORDER BY r.item_no, rd.id')->fetchAll();
+    WHERE r.application_id = (SELECT id FROM request_applications WHERE reference_no=' . $pdo->quote($repRef) . ') ORDER BY r.item_no, rd.id')->fetchAll();
 $check('a representative\'s two documents each keep both sides of the representative ID and of the owner ID, and the authorization letter', $code === 200 && count($repFiles) === 10
     && (static function (array $c): array { ksort($c); return $c; })(array_count_values(array_column($repFiles, 'doc_key'))) === ['authLetter' => 2, 'ownerId' => 2, 'ownerIdBack' => 2,
         'requesterId' => 2, 'requesterIdBack' => 2]
@@ -549,7 +565,7 @@ $check('a document without a purpose, or an empty list, is refused', $code === 4
 $check('refused applications save no request, application or file', $count('SELECT COUNT(*) FROM requests') === $beforeRequests
     && $count('SELECT COUNT(*) FROM request_applications') === $beforeApps && count(glob($app . 'private_uploads/requests/*') ?: []) === $beforeFiles);
 [$code, $res, $fiveRef] = $apply($items(5));
-$check('5 different documents are accepted', $code === 200 && $count('SELECT COUNT(*) FROM requests WHERE reference_no LIKE ' . $pdo->quote($fiveRef . '-%')) === 5, [$code, $res]);
+$check('5 different documents are accepted', $code === 200 && $count('SELECT COUNT(*) FROM requests WHERE application_id = (SELECT id FROM request_applications WHERE reference_no=' . $pdo->quote($fiveRef) . ')') === 5, [$code, $res]);
 
 // ================= Each document request is checked on its own: listed documents and purposes only =================
 $page = (string) file_get_contents($project . '/smart-assess.html');
@@ -584,8 +600,8 @@ $check('refused document requests save no request, application or file', $count(
     && $count('SELECT COUNT(*) FROM request_applications') === $beforeApps && count(glob($app . 'private_uploads/requests/*') ?: []) === $beforeFiles);
 [$code, $res, $spelledRef] = $apply([['document_type' => '  certification of   ASSESSMENT ', 'purpose' => 'for titling'], ['document_type' => DOCS[0], 'purpose' => 'personal copy']]);
 $check('listed choices in another letter case or spacing are saved with the listed spelling, each on its own request', $code === 200
-    && $requestRow($spelledRef . '-1')['document_type'] === 'Certification of Assessment' && $requestRow($spelledRef . '-1')['purpose'] === 'For Titling'
-    && $requestRow($spelledRef . '-2')['document_type'] === DOCS[0] && $requestRow($spelledRef . '-2')['purpose'] === 'Personal Copy', [$code, $res]);
+    && $requestRow($childRef($spelledRef, 1))['document_type'] === 'Certification of Assessment' && $requestRow($childRef($spelledRef, 1))['purpose'] === 'For Titling'
+    && $requestRow($childRef($spelledRef, 2))['document_type'] === DOCS[0] && $requestRow($childRef($spelledRef, 2))['purpose'] === 'Personal Copy', [$code, $res]);
 [$code, $res, $oneRef] = $apply(null);
 $check('one valid document is still saved as before (no application, no item number)', $code === 200 && (bool) preg_match('/^DR-\d{4}-[A-F0-9]{8}$/', $oneRef)
     && $requestRow($oneRef)['application_id'] === null && $requestRow($oneRef)['document_type'] === DOCS[1], [$code, $res]);
@@ -593,9 +609,9 @@ $check('one valid document is still saved as before (no application, no item num
 // ================= Duplicate submissions without a saved draft (the page's submission key) =================
 $snapshotKey = static fn (string $ref): array => [
     $count('SELECT COUNT(*) FROM request_applications WHERE reference_no = ' . $pdo->quote($ref)),
-    $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($ref) . ' OR reference_no LIKE ' . $pdo->quote($ref . '-%')),
-    $count('SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id = rd.request_id WHERE r.reference_no LIKE ' . $pdo->quote($ref . '%')),
-    $count("SELECT COUNT(*) FROM notifications n JOIN requests r ON r.id = n.request_id WHERE n.type = 'submission_confirmation' AND r.reference_no LIKE " . $pdo->quote($ref . '%')),
+    $count('SELECT COUNT(*) FROM requests WHERE reference_no=' . $pdo->quote($ref) . ' OR application_id=(SELECT id FROM request_applications WHERE reference_no=' . $pdo->quote($ref) . ')'),
+    $count('SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id=rd.request_id WHERE r.reference_no=' . $pdo->quote($ref) . ' OR r.application_id=(SELECT id FROM request_applications WHERE reference_no=' . $pdo->quote($ref) . ')'),
+    $count("SELECT COUNT(*) FROM notifications n JOIN requests r ON r.id=n.request_id WHERE n.type='submission_confirmation' AND (r.reference_no=" . $pdo->quote($ref) . " OR r.application_id=(SELECT id FROM request_applications WHERE reference_no=" . $pdo->quote($ref) . '))'),
 ];
 $keyClient = $browser();
 $key = bin2hex(random_bytes(16));
@@ -643,7 +659,10 @@ $ltJson = (array) json_decode($ltBody, true);
 $ltRef = (string) ($ltJson['data']['reference_no'] ?? '');
 $check('the same key sent with another kind of application (Land Transfer) saves that application; it is never answered with the earlier one', $code === 200
     && $ltStatus === 200 && str_starts_with($ltRef, 'LT-') && ($ltJson['data']['duplicate'] ?? false) === false
-    && $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($ltRef)) === 1, [$code, $ltStatus, substr($ltBody, 0, 300)]);
+    && $count('SELECT COUNT(*) FROM requests WHERE reference_no = ' . $pdo->quote($ltRef)) === 1
+    && $requestRow($ltRef)['application_id'] === null
+    && $count('SELECT COUNT(*) FROM request_applications WHERE reference_no=' . $pdo->quote($ltRef)) === 0,
+    [$code, $ltStatus, substr($ltBody, 0, 300)]);
 [$code, $res, $ltDocAgain] = $apply($items(2), true, null, ['submission_key' => $ltKey], $keyClient);
 $check('the earlier Document Request is still recognized by its key afterwards', $code === 200 && $ltDocAgain === $ltDocRef && ($res['data']['duplicate'] ?? false) === true, [$code, $res]);
 $beforeOld = $count('SELECT COUNT(*) FROM request_applications');
@@ -669,12 +688,12 @@ foreach (['ownerId', 'ownerIdBack'] as $draftKey) {   // the ID's front and back
 $draftItems = [['document_type' => DOCS[0], 'purpose' => 'Personal Copy'], ['document_type' => DOCS[3], 'purpose' => 'For Titling']];
 [$code, $res, $draftRef] = $apply($draftItems, true, [], ['draft_token' => $draftCode], $draftClient);
 $check('submitting from a draft copies the saved ID (front and back) into both documents', $code === 200
-    && $count("SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id = rd.request_id WHERE r.reference_no LIKE " . $pdo->quote($draftRef . '-%') . " AND rd.file_status = 'ok'") === 4, [$code, $res]);
+    && $count("SELECT COUNT(*) FROM request_documents rd JOIN requests r ON r.id=rd.request_id WHERE r.application_id=(SELECT id FROM request_applications WHERE reference_no=" . $pdo->quote($draftRef) . ") AND rd.file_status='ok'") === 4, [$code, $res]);
 [$code, $res, $againRef] = $apply($draftItems, true, [], ['draft_token' => $draftCode], $draftClient);
 $check('submitting the same draft again returns the same application reference and saves nothing new', $code === 200 && $againRef === $draftRef
     && $count('SELECT COUNT(*) FROM request_applications WHERE reference_no = ' . $pdo->quote($draftRef)) === 1
-    && $count('SELECT COUNT(*) FROM requests WHERE reference_no LIKE ' . $pdo->quote($draftRef . '-%')) === 2, [$code, $res]);
-$check('the repeated submission adds no AI job (one per document)', $count('SELECT COUNT(*) FROM ai_verification_jobs j JOIN requests r ON r.id = j.request_id WHERE r.reference_no LIKE ' . $pdo->quote($draftRef . '-%')) === 2);
+    && $count('SELECT COUNT(*) FROM requests WHERE application_id=(SELECT id FROM request_applications WHERE reference_no=' . $pdo->quote($draftRef) . ')') === 2, [$code, $res]);
+$check('the repeated submission adds no AI job (one per document)', $count('SELECT COUNT(*) FROM ai_verification_jobs j JOIN requests r ON r.id=j.request_id WHERE r.application_id=(SELECT id FROM request_applications WHERE reference_no=' . $pdo->quote($draftRef) . ')') === 2);
 
 // ================= Staff process each document separately =================
 $staffA = $signIn('test.staff');
@@ -694,55 +713,55 @@ $back1 = (int) ($mine[0]['files'][1]['docId'] ?? 0);
 $back2 = (int) ($mine[1]['files'][1]['docId'] ?? 0);
 $check('Staff see each document\'s ID front and back as two separate originals', ($mine[0]['files'][1]['key'] ?? '') === 'ownerIdBack' && $back1 > 0 && $back2 > 0
     && $back1 !== $file1 && $back2 !== $file2, $mine[0]['files'] ?? []);
-[$c1, $b1] = $staffA->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($appRef . '-1'));
-[$c2] = $staffA->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-2'));
-[$cx] = $staffA->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-1'));
+[$c1, $b1] = $staffA->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($childRef($appRef, 1)));
+[$c2] = $staffA->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($childRef($appRef, 2)));
+[$cx] = $staffA->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($childRef($appRef, 1)));
 $check('each document\'s own file opens with its item reference; another document\'s file does not', $c1 === 200 && $b1 !== '' && $c2 === 200 && $cx === 404 && $file1 !== $file2, [$c1, $c2, $cx]);
-[$codeA] = $staffA->json('start_processing', ['id' => $appRef . '-1']);
-[$codeB] = $staffB->json('start_processing', ['id' => $appRef . '-2']);
+[$codeA] = $staffA->json('start_processing', ['id' => $childRef($appRef, 1)]);
+[$codeB] = $staffB->json('start_processing', ['id' => $childRef($appRef, 2)]);
 $check('two Staff members can each handle a different document of the same application', $codeA === 200 && $codeB === 200
-    && (int) $requestRow($appRef . '-1')['processing_staff_id'] !== (int) $requestRow($appRef . '-2')['processing_staff_id']
-    && $requestRow($appRef . '-3')['processing_staff_id'] === null, [$codeA, $codeB]);
-[$code] = $staffA->json('update_request_status', ['id' => $appRef . '-1', 'kind' => 'doc', 'status' => 'Out for Release']);
-$check('completing one document leaves the others unchanged', $code === 200 && $requestRow($appRef . '-1')['status'] === 'Out for Release'
-    && $requestRow($appRef . '-2')['status'] === 'Processing' && $requestRow($appRef . '-3')['status'] === 'Received', $code);
+    && (int) $requestRow($childRef($appRef, 1))['processing_staff_id'] !== (int) $requestRow($childRef($appRef, 2))['processing_staff_id']
+    && $requestRow($childRef($appRef, 3))['processing_staff_id'] === null, [$codeA, $codeB]);
+[$code] = $staffA->json('update_request_status', ['id' => $childRef($appRef, 1), 'kind' => 'doc', 'status' => 'Out for Release']);
+$check('completing one document leaves the others unchanged', $code === 200 && $requestRow($childRef($appRef, 1))['status'] === 'Out for Release'
+    && $requestRow($childRef($appRef, 2))['status'] === 'Processing' && $requestRow($childRef($appRef, 3))['status'] === 'Received', $code);
 
 // ================= Mark as reviewed: each document's own original =================
 $pdo->exec("UPDATE ai_verification_jobs SET status = 'completed' WHERE request_id IN (" . implode(',', $childIds) . ')');
-$staffB->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($appRef . '-1'));
-[$codeR1front] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-1']);
+$staffB->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($childRef($appRef, 1)));
+[$codeR1front] = $staffB->json('ai_verification_reviewed', ['reference' => $childRef($appRef, 1)]);
 $check('the ID\'s back side is an original too: with only the front opened, Mark as reviewed is refused', $codeR1front === 409, $codeR1front);
-$staffB->http('/request-file.php?doc=' . $back1 . '&ref=' . rawurlencode($appRef . '-1'));
-[$codeR1] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-1']);
-[$codeR2, $resR2] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-2']);
+$staffB->http('/request-file.php?doc=' . $back1 . '&ref=' . rawurlencode($childRef($appRef, 1)));
+[$codeR1] = $staffB->json('ai_verification_reviewed', ['reference' => $childRef($appRef, 1)]);
+[$codeR2, $resR2] = $staffB->json('ai_verification_reviewed', ['reference' => $childRef($appRef, 2)]);
 $check('opening document 1\'s original allows Mark as reviewed for document 1 only', $codeR1 === 200 && $codeR2 === 409
     && str_contains((string) ($resR2['error'] ?? ''), 'Open every original document'), [$codeR1, $codeR2, $resR2]);
-$staffB->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-2') . '&preview=1');
-[$codeR2b] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-2']);
-$staffB->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($appRef . '-2'));
-$staffB->http('/request-file.php?doc=' . $back2 . '&ref=' . rawurlencode($appRef . '-2'));
-[$codeR2c] = $staffB->json('ai_verification_reviewed', ['reference' => $appRef . '-2']);
+$staffB->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($childRef($appRef, 2)) . '&preview=1');
+[$codeR2b] = $staffB->json('ai_verification_reviewed', ['reference' => $childRef($appRef, 2)]);
+$staffB->http('/request-file.php?doc=' . $file2 . '&ref=' . rawurlencode($childRef($appRef, 2)));
+$staffB->http('/request-file.php?doc=' . $back2 . '&ref=' . rawurlencode($childRef($appRef, 2)));
+[$codeR2c] = $staffB->json('ai_verification_reviewed', ['reference' => $childRef($appRef, 2)]);
 $check('document 2 needs its own copy opened (an inline preview does not count); then it can be reviewed', $codeR2b === 409 && $codeR2c === 200, [$codeR2b, $codeR2c]);
 $check('reviewing is recorded per document', $count("SELECT COUNT(*) FROM ai_verification_jobs WHERE staff_review_status = 'reviewed' AND request_id IN (" . implode(',', $childIds) . ')') === 2);
 
 // ================= Staff Send Updates on one document =================
-[$code, $owner] = $staffB->json('lookup_request_owner', ['reference' => $appRef . '-2']);
+[$code, $owner] = $staffB->json('lookup_request_owner', ['reference' => $childRef($appRef, 2)]);
 $check('Send Updates finds one document by its own reference', $code === 200 && ($owner['data']['submittedName'] ?? '') === 'Rosa Fictional', [$code, $owner]);
 $beforeSends = [$count("SELECT COUNT(*) FROM notifications WHERE type = 'staff_message' AND request_id = " . $childIds[0]), $count("SELECT COUNT(*) FROM notifications WHERE type = 'staff_message' AND request_id = " . $childIds[2])];
-[$code, $sent] = $staffB->json('send_notification', ['request_ref' => $appRef . '-2', 'message' => 'Fictional update about your second document.', 'category' => 'Request Status Update',
+[$code, $sent] = $staffB->json('send_notification', ['request_ref' => $childRef($appRef, 2), 'message' => 'Fictional update about your second document.', 'category' => 'Request Status Update',
     'channel_choice' => '1', 'send_sms' => '1']);
 $sentRows = $pdo->query("SELECT request_id, channel, delivery_status FROM notifications WHERE type = 'staff_message' AND message = 'Fictional update about your second document.'")->fetchAll();
 $check('a Staff update for document 2 is recorded on document 2 only (SMS stub, nothing leaves the computer)', $code === 200 && count($sentRows) === 1
     && (int) $sentRows[0]['request_id'] === $childIds[1] && $sentRows[0]['channel'] === 'sms'
     && [$count("SELECT COUNT(*) FROM notifications WHERE type = 'staff_message' AND request_id = " . $childIds[0]), $count("SELECT COUNT(*) FROM notifications WHERE type = 'staff_message' AND request_id = " . $childIds[2])] === $beforeSends, [$code, $sent, $sentRows]);
-[$code] = $staffB->json('send_notification', ['request_ref' => $appRef . '-2', 'message' => 'Fictional update about your second document.', 'category' => 'Request Status Update',
+[$code] = $staffB->json('send_notification', ['request_ref' => $childRef($appRef, 2), 'message' => 'Fictional update about your second document.', 'category' => 'Request Status Update',
     'channel_choice' => '1', 'send_sms' => '1']);
 $check('the existing duplicate guard still refuses the same message to document 2', $code === 409, $code);
 
 // ================= Tracking =================
 [$code, $t] = $appClient->track($appRef);
 $check('tracking the application lists each document with its own status and reference', $code === 200 && ($t['isApplication'] ?? false) === true && ($t['id'] ?? '') === $appRef
-    && array_column($t['items'] ?? [], 'id') === [$appRef . '-1', $appRef . '-2', $appRef . '-3']
+    && array_column($t['items'] ?? [], 'id') === [$childRef($appRef, 1), $childRef($appRef, 2), $childRef($appRef, 3)]
     && array_column($t['items'] ?? [], 'status') === ['Out for Release', 'Processing', 'Received'] && array_column($t['items'] ?? [], 'docType') === [DOCS[0], DOCS[1], DOCS[2]], $t);
 $check('each tracked document has its own history times', isset($t['items'][0]['timestamps']['Out for Release'], $t['items'][1]['timestamps']['Processing'])
     && !isset($t['items'][2]['timestamps']['Processing']), $t['items'] ?? null);
@@ -751,8 +770,8 @@ $check('the submitting browser sees the full name; it is the same for every docu
 [, $other] = $browser()->track(strtolower($appRef));
 $check('another browser (lowercase reference too) sees initials only, for the application and every document', ($other['id'] ?? '') === $appRef && ($other['applicant'] ?? '') === 'R. F.'
     && ($other['applicantInitialsOnly'] ?? false) === true && array_unique(array_column($other['items'] ?? [], 'applicant')) === ['R. F.'], $other);
-[, $item] = $browser()->track($appRef . '-2');
-$check('tracking one document\'s reference shows that document and its application', ($item['id'] ?? '') === $appRef . '-2' && ($item['status'] ?? '') === 'Processing'
+[, $item] = $browser()->track($childRef($appRef, 2));
+$check('tracking one document\'s reference shows that document and its application', ($item['id'] ?? '') === $childRef($appRef, 2) && ($item['status'] ?? '') === 'Processing'
     && ($item['applicationRef'] ?? '') === $appRef && ($item['itemNo'] ?? 0) === 2 && ($item['itemCount'] ?? 0) === 3 && ($item['applicant'] ?? '') === 'R. F.', $item);
 [$code, $apiBody] = $browser()->http('/api.php?action=track&ref=' . rawurlencode($appRef));
 $apiTrack = (array) (json_decode($apiBody, true)['request'] ?? []);
@@ -767,7 +786,7 @@ foreach (['Head' => 'test.head', 'Admin' => 'test.admin'] as $role => $username)
     $list = $pageData($session)['docRequests'] ?? [];
     $check("{$role} still receive no applicant details or files (application labels only)", $list !== []
         && array_filter($list, static fn (array $r): bool => isset($r['details']) || isset($r['files']) || isset($r['ai'])) === [], array_keys($list[0] ?? []));
-    [$code] = $session->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($appRef . '-1'));
+    [$code] = $session->http('/request-file.php?doc=' . $file1 . '&ref=' . rawurlencode($childRef($appRef, 1)));
     $check("{$role} cannot open an application's files", $code === 403, $code);
 }
 // ================= Head report: applications and individual document requests =================
@@ -796,16 +815,16 @@ $appIdOf = static fn (string $reference): int => (int) $pdo->query('SELECT id FR
 //     00:00:00 on 1 November (a past year, so no other test data falls in these months).
 [, , $edgeRef] = $apply($items(2));
 $pdo->exec("UPDATE request_applications SET created_at = '2025-10-31 23:59:59' WHERE id = " . $appIdOf($edgeRef));
-$pdo->exec("UPDATE requests SET created_at = '2025-10-31 23:59:59' WHERE reference_no = " . $pdo->quote($edgeRef . '-1'));
-$pdo->exec("UPDATE requests SET created_at = '2025-11-01 00:00:00' WHERE reference_no = " . $pdo->quote($edgeRef . '-2'));
+$pdo->exec("UPDATE requests SET created_at = '2025-10-31 23:59:59' WHERE reference_no = " . $pdo->quote($childRef($edgeRef, 1)));
+$pdo->exec("UPDATE requests SET created_at = '2025-11-01 00:00:00' WHERE reference_no = " . $pdo->quote($childRef($edgeRef, 2)));
 // (b) An older single-document request (no application record) in October.
 [, , $oldRef] = $apply(null);
 $pdo->exec("UPDATE requests SET created_at = '2025-10-15 08:00:00' WHERE reference_no = " . $pdo->quote($oldRef));
 // (c) A three-document application in November whose FIRST document was later removed from the database.
 [, , $gapRef] = $apply($items(3));
 $pdo->exec("UPDATE request_applications SET created_at = '2025-11-10 09:00:00' WHERE id = " . $appIdOf($gapRef));
-$pdo->exec("UPDATE requests SET created_at = '2025-11-10 09:00:00' WHERE reference_no LIKE " . $pdo->quote($gapRef . '-%'));
-$firstId = (int) $requestRow($gapRef . '-1')['id'];
+$pdo->exec("UPDATE requests SET created_at = '2025-11-10 09:00:00' WHERE application_id = " . $appIdOf($gapRef));
+$firstId = (int) $requestRow($childRef($gapRef, 1))['id'];
 $pdo->exec("DELETE FROM ai_verification_jobs WHERE request_id = {$firstId}");
 $pdo->exec("DELETE FROM document_validation WHERE request_document_id IN (SELECT id FROM request_documents WHERE request_id = {$firstId})");
 $pdo->exec("DELETE FROM request_documents WHERE request_id = {$firstId}");
@@ -817,7 +836,7 @@ $check('October: the boundary application counts once, by its own creation date,
 $check('November: the boundary application is not counted again; only its second document is (individual request)', ($nov['cards']['documents'] ?? -1) === 3
     && ($nov['cards']['documentApplications'] ?? -1) === 1, $nov['cards'] ?? null);
 $check('an application whose first document is gone is still counted (from request_applications), and its remaining documents are counted individually',
-    ($nov['cards']['documentApplications'] ?? -1) === 1 && $count('SELECT COUNT(*) FROM requests WHERE reference_no LIKE ' . $pdo->quote($gapRef . '-%')) === 2, $nov['cards'] ?? null);
+    ($nov['cards']['documentApplications'] ?? -1) === 1 && $count('SELECT COUNT(*) FROM requests WHERE application_id=' . $appIdOf($gapRef)) === 2, $nov['cards'] ?? null);
 $check('the previous-month figures use the same definition (November\'s "previous" = October)', ($nov['previousCards'] ?? null) === ($oct['cards'] ?? []), [$nov['previousCards'] ?? null, $oct['cards'] ?? null]);
 $daySum = static fn (array $r): int => array_sum(array_column($r['daily'] ?? [], 'documents'));
 $monthOf = static fn (array $r, int $m): int => (int) (array_values(array_filter($r['monthly'] ?? [], static fn ($x) => (int) $x['month'] === $m))[0]['documents'] ?? -1);
@@ -834,8 +853,8 @@ $loaded = array_column(array_merge($headPage['docRequests'] ?? [], $headPage['la
 $detail = array_values(array_filter($headPage['reports'] ?? [], static fn ($r) => ($r['id'] ?? '') === 'RPT-DOC'))[0]['stats'] ?? [];
 $allDocs = $count("SELECT COUNT(*) FROM requests WHERE flow = 'docreq'");
 $allApps = $count("SELECT COUNT(*) FROM requests WHERE flow = 'docreq' AND application_id IS NULL") + $count("SELECT COUNT(*) FROM request_applications WHERE flow = 'docreq'");
-$check('the page loads only the latest 500 requests, so the applications\' documents are outside it', count($loaded) === 500 && !in_array($appRef . '-1', $loaded, true)
-    && !in_array($edgeRef . '-1', $loaded, true), count($loaded));
+$check('the page loads only the latest 500 requests, so the applications\' documents are outside it', count($loaded) === 500 && !in_array($childRef($appRef, 1), $loaded, true)
+    && !in_array($childRef($edgeRef, 1), $loaded, true), count($loaded));
 $check('report details still count every application and every individual document request in the database', ($detail['applications'] ?? -1) === $allApps
     && ($detail['total'] ?? -1) === $allDocs && $allDocs > 500 && $allApps < $allDocs, [$detail['applications'] ?? null, $detail['total'] ?? null, $allApps, $allDocs]);
 
@@ -851,36 +870,9 @@ $check('the rollback refuses while applications exist, with an error that names 
 $check('the refused rollback changed nothing (table, columns, requests, applications and files kept)', [$count('SELECT COUNT(*) FROM requests'), $count('SELECT COUNT(*) FROM request_applications'), $count('SELECT COUNT(*) FROM request_documents')] === $beforeRollback
     && $count("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'requests' AND COLUMN_NAME IN ('application_id', 'item_no')") === 2
     && $count("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'request_applications'") === 1);
-// On a separate, empty throwaway database: the rollback runs when there is no application data.
-$rbName = 'sa_rollback_check_' . bin2hex(random_bytes(3)) . '_test';
-$pdo->exec("CREATE DATABASE `{$rbName}`");
-register_shutdown_function(static function () use ($pdo, $rbName): void {
-    try {
-        $pdo->exec("DROP DATABASE IF EXISTS `{$rbName}`");
-    } catch (Throwable) {
-    }
-});
-$rb = new PDO(sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $dbHost, (int) $dbPort, $rbName), $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-$rb->exec("CREATE TABLE requests (id INT AUTO_INCREMENT PRIMARY KEY, reference_no VARCHAR(20) NOT NULL UNIQUE) ENGINE=InnoDB");
-$rb->exec("INSERT INTO requests (reference_no) VALUES ('DR-2026-0000AAAA')");
-$migration($rb);
-$rollback($rb);
-$rbCount = static fn (string $sql): int => (int) $rb->query($sql)->fetchColumn();
-$check('with no application data the rollback removes the table, columns and index, and keeps every request', $rbCount("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'requests' AND COLUMN_NAME IN ('application_id', 'item_no')") === 0
-    && $rbCount("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'request_applications'") === 0
-    && $rbCount("SELECT COUNT(*) FROM requests WHERE reference_no = 'DR-2026-0000AAAA'") === 1);
-$rollback($rb);
-$check('running the rollback again is harmless', $rbCount('SELECT COUNT(*) FROM requests') === 1);
-$migration($rb);
-$rb->exec("INSERT INTO request_applications (reference_no, item_count) VALUES ('DR-2026-0000BBBB', 2)");
-$refusedAgain = '';
-try {
-    $rollback($rb);
-} catch (PDOException $e) {
-    $refusedAgain = $e->getMessage();
-}
-$check('an application row alone is enough to refuse the rollback', str_contains($refusedAgain, 'rollback_refused__multi_document_applications_exist')
-    && $rbCount("SELECT COUNT(*) FROM request_applications") === 1, $refusedAgain);
+$releaseRollback = (string) file_get_contents($project . '/smart-assess-app/database/rollbacks/20261125_mixed_applications_rollback.sql');
+$check('the Released rollback is guarded by Released records and never creates or selects another database',
+    str_contains($releaseRollback, "status = 'Released'") && !preg_match('/\\b(?:CREATE|DROP)\\s+DATABASE\\b/i', $releaseRollback));
 
 $sends = is_file($sendLog) ? (string) file_get_contents($sendLog) : '';
 $check('the only send was the one Staff update, to the SMS stub; no real SMS or email', substr_count($sends, 'stub-sms') === 1 && !preg_match('/^(sms|email)$/m', $sends), $sends);

@@ -54,6 +54,10 @@ final class SubmissionConfirmation
             } elseif ($row['channel'] === 'sms') {
                 $outcome = self::sendSms($iprogPath, (string) $details['contact_number'], (string) $row['message'], $provider, $statusWaitMicroseconds);
             } else {
+                if (preg_match('/APP-\\d{4}-[A-Z0-9]{8}/', (string) $row['message'], $match)) {
+                    $details['reference_no'] = $match[0];
+                    $details['flow'] = 'docreq';
+                }
                 $outcome = self::sendEmail($mailerPath, $details);
             }
             self::record($pdo, $row, $outcome, $provider);

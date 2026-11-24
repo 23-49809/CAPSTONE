@@ -94,6 +94,8 @@ final class DocumentAnalysis
      * coded review of the applicant's own ID ("id_review" in its output, optional); 7 also preserves
      * OCR text from only the applicant's own ID front for Staff inspection.
      */
+    public const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7];
+    public const WORKER_RESULT_VERSION = 7;
     public const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8];
     public const WORKER_RESULT_VERSION = 8;
 
@@ -404,6 +406,13 @@ final class DocumentAnalysis
             if (self::isIdSlot((string) ($document['key'] ?? ''))) {
                 $document['property_number'] = '';
                 $idLabels[] = (string) ($document['label'] ?? '');
+            }
+            // Keep Staff display within the same limit as fresh worker results.
+            if (is_string($document['id_front_ocr_text'] ?? null)) {
+                [$type, $state] = IdFieldExtractor::classify($document['id_front_ocr_text']);
+                if (!self::isIdSlot((string) ($document['key'] ?? '')) || $type !== 'philsys_national_id' || $state !== 'confirmed') {
+                    $document['id_front_ocr_text'] = null;
+                }
             }
             // Never expose a stored raw ID OCR transcript in Staff review.
             unset($document['id_front_ocr_text']);
@@ -945,6 +954,7 @@ final class DocumentAnalysis
             if ($object['version'] >= 6) {
                 $fields[] = 'id_review';
             }
+            if ($object['version'] >= 7) {
             if ($object['version'] === 7) {
                 $fields[] = 'id_front_ocr_text';
             }
@@ -985,6 +995,8 @@ final class DocumentAnalysis
                 'id_check' => $object['version'] >= 5 ? self::idCheckValue($document['id_check'], $key) : null,
                 // Version 6: the Full Name and Address read from an ID's front (null: not an ID, or an earlier worker).
                 'id_review' => $object['version'] >= 6 ? self::idReviewValue($document['id_review'], $key) : null,
+                // Version 7: Staff-only OCR text for the applicant's own National ID front.
+                'id_front_ocr_text' => $object['version'] >= 7 ? self::idFrontOcrText($document['id_front_ocr_text'], $key) : null,
             ];
         }
         if (!is_array($object['rule_findings']) || !array_is_list($object['rule_findings']) || count($object['rule_findings']) > self::MAX_FINDINGS) {
@@ -1125,6 +1137,7 @@ final class DocumentAnalysis
         return IdFrontReview::validateExtraction($value);
     }
 
+    /** A version 7 OCR transcript is retained only for the applicant's own front-side National ID. */
     /** Validates a legacy version 7 OCR transcript; the caller discards it. */
     private static function idFrontOcrText(mixed $value, string $key): ?string
     {
@@ -1352,6 +1365,7 @@ final class DocumentAnalysis
                 'id_review' => $idReview,
                 'ai_id_review' => $aiReview,
                 'ai_id_review_state' => $aiState,
+                'id_front_ocr_text' => $check['id_front_ocr_text'] ?? null,
                 'check' => self::SLOT_CHECKS[$item['key']] ?? 'none',
                 'accepted_kinds' => self::acceptedKinds($item['key']),
                 'accepted_kind_labels' => array_map(static fn (string $k): string => self::documentKinds()[$k], self::acceptedKinds($item['key'])),

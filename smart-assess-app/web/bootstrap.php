@@ -114,6 +114,25 @@ function sa_new_reference(PDO $pdo, string $flow): string
     throw new RuntimeException('Could not create a unique reference number.');
 }
 
+/** A unique APP reference for a multi-item Document Request parent. */
+function sa_new_application_reference(PDO $pdo): string
+{
+    for ($try = 0; $try < 5; $try++) {
+        $reference = 'APP-' . date('Y') . '-' . strtoupper(bin2hex(random_bytes(4)));
+        $taken = $pdo->prepare('SELECT COUNT(*) FROM requests WHERE reference_no = :ref');
+        $taken->execute(['ref' => $reference]);
+        if ((int) $taken->fetchColumn() > 0) {
+            continue;
+        }
+        $taken = $pdo->prepare('SELECT COUNT(*) FROM request_applications WHERE reference_no = :ref');
+        $taken->execute(['ref' => $reference]);
+        if ((int) $taken->fetchColumn() === 0) {
+            return $reference;
+        }
+    }
+    throw new RuntimeException('Could not create a unique application reference number.');
+}
+
 function sa_column_nullable(string $table, string $column): bool
 {
     static $cache = [];

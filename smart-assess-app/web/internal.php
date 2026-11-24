@@ -144,6 +144,7 @@ foreach ($page['requests'] ?? [] as $request) {
             }
             unset($reviewDocument);
         }
+        // Whether the AI check may run for this request; when not, why (Staff only).
 	// Whether the AI check may run for this request; when not, why (Staff only).
         $record['aiEligibility'] = $page['ai_eligibility'][$requestId]
             ?? ['eligible' => false, 'reason' => AiVerification::INELIGIBLE_NOT_ENABLED, 'effectiveFrom' => null];
@@ -214,7 +215,7 @@ $landRequests = $page['landRequests'];
 $allRequests = array_merge($documentRequests, $landRequests);
 $reportStats = static function (array $requests): array {
     $completed = count(array_filter($requests, static fn(array $request): bool =>
-        in_array($request['status'], ['Approved', 'Out for Release'], true)
+        in_array($request['status'], ['Approved', 'Out for Release', 'Released'], true)
     ));
     $rejected = count(array_filter($requests, static fn(array $request): bool =>
         $request['status'] === 'Rejected'
@@ -284,12 +285,16 @@ if ($user) {
     $documentStats['total'] = $countOf("SELECT COUNT(*) FROM requests WHERE flow = 'docreq'");
     $documentStats['applications'] = sa_applications_available()
         ? $countOf("SELECT COUNT(*) FROM requests WHERE flow = 'docreq' AND application_id IS NULL")
-            + $countOf("SELECT COUNT(*) FROM request_applications WHERE flow = 'docreq'")
+            + $countOf("SELECT COUNT(*) FROM request_applications a WHERE EXISTS (SELECT 1 FROM requests r WHERE r.application_id=a.id AND r.flow='docreq')")
         : $documentStats['total'];
+    $landRequestsStats=$reportStats($landRequests);
+    $landRequestsStats['applications'] = $landRequestsStats['total'];
+} else {
+    $landRequestsStats=$reportStats($landRequests);
 }
 $page['reports'] = [
     ['id' => 'RPT-DOC', 'title' => 'Document Request Summary', 'type' => 'document', 'dateGenerated' => $reportDate, 'stats' => $documentStats],
-    ['id' => 'RPT-LAND', 'title' => 'Land Transfer Summary', 'type' => 'land-transfer', 'dateGenerated' => $reportDate, 'stats' => $reportStats($landRequests)],
+    ['id' => 'RPT-LAND', 'title' => 'Land Transfer Summary', 'type' => 'land-transfer', 'dateGenerated' => $reportDate, 'stats' => $landRequestsStats],
     ['id' => 'RPT-REQ', 'title' => 'Requirement Checker Results', 'type' => 'requirement', 'dateGenerated' => $reportDate, 'stats' => $requirementCounts],
     ['id' => 'RPT-SUM', 'title' => 'Barangay Request Breakdown', 'type' => 'summary', 'dateGenerated' => $reportDate, 'stats' => [
         'barangays' => count($barangayCounts),

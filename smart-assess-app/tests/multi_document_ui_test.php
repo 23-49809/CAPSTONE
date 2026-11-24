@@ -35,7 +35,39 @@ $check('the bridge sends every chosen document (type and purpose) and the first 
     && str_contains($bridge, 'payload.document_type = payload.document_requests[0].document_type;'));
 $check('the page limit matches the server limit (5)', str_contains($html, 'const MAX_DOCUMENT_REQUESTS = 5;')
     && str_contains((string) file_get_contents($project . '/smart-assess-app/app/services/DocumentRequirements.php'), 'public const MAX_DOCUMENTS_PER_APPLICATION = 5;'));
-$check('tracking accepts a document\'s own reference (DR-2026-AB12CD34-2)', str_contains($html, 'const TRACK_REF_RE = /^(DR|LT)-\d{4}-[A-Z0-9]{4,12}(-[1-9])?$/;'));
+$check('tracking accepts current APP and DR references plus historical suffixed references', str_contains($html, 'const TRACK_REF_RE = /^(?:(?:DR|LT)-\d{4}-[A-Z0-9]{4,12}(?:-[1-5])?|APP-\d{4}-[A-Z0-9]{8})$/;'));
+$check('Document Request multi-item submissions use one APP parent and individual DR child references',
+    str_contains($html, 'APP-\\d{4}-[A-Z0-9]{8}') && str_contains($bridge, 'payload.document_requests = form.documentRequests.map(function (item) {')
+    && !str_contains($html, 'applicationItems') && !str_contains($bridge, 'application_items'));
+$check('Land Transfer remains a standalone flow and no mixed-flow selector remains',
+    str_contains($html, 'data-action="start-landtransfer"') && !str_contains($html, 'start-mixed') && !str_contains($html, 'application_items'));
+$check('demo submissions use an APP parent and individual DR child references for multi-item Document Requests',
+    str_contains($html, 'const refNo = isApplication ? nextApplicationRefNo() : nextRefNo(state.flow);')
+    && str_contains($html, "id:nextRefNo('docreq')") && str_contains($html, "return 'APP-' + new Date().getFullYear() + '-' + suffix;"));
+
+// Probe the exact installed browser once before launching it dozens of times. On macOS, a
+// code-signature abort otherwise looks like dozens of application/UI regressions because the
+// renderer's stderr is intentionally suppressed by shell_exec below. Do not bypass Gatekeeper or
+// alter browser security: report the browser as unavailable and leave source checks usable.
+$probeDir = sys_get_temp_dir() . '/sa-chrome-probe-' . bin2hex(random_bytes(4));
+mkdir($probeDir, 0700, true);
+file_put_contents($probeDir . '/probe.html', '<!doctype html><title>probe</title><p>browser-ok</p>');
+$probeCommand = escapeshellarg($chrome) . ' --headless=new --disable-gpu --no-first-run --no-default-browser-check'
+    . ' --user-data-dir=' . escapeshellarg($probeDir . '/profile') . ' --dump-dom ' . escapeshellarg('file://' . $probeDir . '/probe.html') . ' 2>&1';
+$probeOutput = [];
+$probeStatus = 0;
+exec($probeCommand, $probeOutput, $probeStatus);
+exec('rm -rf ' . escapeshellarg($probeDir));
+if ($probeStatus !== 0 || !str_contains(implode("\n", $probeOutput), 'browser-ok')) {
+    foreach ($results as [$passed, $name, $detail]) {
+        echo ($passed ? 'PASS  ' : 'FAIL  ') . $name . ($passed ? '' : '   ' . $detail) . "\n";
+    }
+    echo count($results) . ' source checks completed; rendered browser checks SKIPPED (headless Chrome unavailable, exit ' . $probeStatus . ").\n";
+    if ($probeOutput !== []) {
+        echo 'Browser diagnostic: ' . substr(implode(' | ', $probeOutput), 0, 500) . "\n";
+    }
+    exit(2);
+}
 
 // ---- Rendered ----
 $hook = 'window.__SA = {get state(){ return state; }, render:function(){ render(); }, setDocItems:setDocItems, docItems:docItems, nextStep:function(){ nextStep(); },'
@@ -119,12 +151,16 @@ $g = $run('reviewOne', $base . 'S.setDocItems(fd,[{documentType:"Certification o
 $check('one document keeps the original review wording', in_array('Document Request Details', $g['sections'] ?? [], true) && in_array('Uploaded IDs and Documents', $g['sections'] ?? [], true), $g);
 
 $g = $run('demo', $base . $two . 'fd.ownerIdType="philhealth_id"; fd.files={ownerId:{name:"id.png",size:10,type:"image/png",valid:true},ownerIdBack:{name:"id-back.png",size:10,type:"image/png",valid:true}}; state.step=4; S.render(); S.confirm(); var r=S.state.lastSubmission;'
-    . ' out.app=[r.isApplication, r.items.length, r.items.map(function(i){return i.id.slice(-2);}), r.items.map(function(i){return i.docType;}), r.items.map(function(i){return i.status;})];'
+    . ' out.app=[r.isApplication, r.items.length, r.items.map(function(i){return i.id;}), r.items.map(function(i){return i.docType;}), r.items.map(function(i){return i.status;})];'
     . ' out.receipt=[].slice.call(document.querySelectorAll(".rcpt-docs li")).map(function(li){return li.textContent;}); out.ref=(document.querySelector("[data-ref-no]")||{}).textContent;');
-$check('submitting (demo mode) gives one tracking number with each document under it (-1, -2), each Received', ($g['app'][0] ?? false) === true && ($g['app'][1] ?? 0) === 2
-    && ($g['app'][2] ?? null) === ['-1', '-2'] && ($g['app'][3] ?? null) === ['Certification of Assessment', 'Certification of No Liens and Encumbrances'] && ($g['app'][4] ?? null) === ['Received', 'Received'], $g);
+$check('submitting (demo mode) gives one APP tracking number and individual DR references, each Received', ($g['app'][0] ?? false) === true && ($g['app'][1] ?? 0) === 2
+    && (bool) preg_match('/^DR-\\d{4}-[0-9]{5}$/', (string) ($g['app'][2][0] ?? ''))
+    && (bool) preg_match('/^DR-\\d{4}-[0-9]{5}$/', (string) ($g['app'][2][1] ?? '')) && ($g['app'][2][0] ?? '') !== ($g['app'][2][1] ?? '')
+    && (bool) preg_match('/^APP-\\d{4}-[A-F0-9]{8}$/', (string) ($g['ref'] ?? ''))
+    && ($g['app'][3] ?? null) === ['Certification of Assessment', 'Certification of No Liens and Encumbrances'] && ($g['app'][4] ?? null) === ['Received', 'Received'], $g);
 $check('the receipt shows the one tracking number and lists each document with its own reference', count($g['receipt'] ?? []) === 2
-    && str_starts_with((string) ($g['receipt'][0] ?? ''), 'Certification of Assessment') && str_ends_with((string) ($g['receipt'][1] ?? ''), '-2') && !str_ends_with((string) ($g['ref'] ?? ''), '-1'), $g);
+    && str_starts_with((string) ($g['receipt'][0] ?? ''), 'Certification of Assessment') && str_contains((string) ($g['receipt'][0] ?? ''), 'DR-')
+    && str_contains((string) ($g['receipt'][1] ?? ''), 'DR-') && (bool) preg_match('/^APP-\\d{4}-[A-F0-9]{8}$/', (string) ($g['ref'] ?? '')), $g);
 
 $track = '{id:"DR-2026-AB12CD34",flow:"docreq",isApplication:true,applicant:"R. F.",applicantInitialsOnly:true,submittedAt:"2026-11-19 10:00:00",items:['
     . '{id:"DR-2026-AB12CD34-1",flow:"docreq",docType:"Certification of Assessment",status:"Out for Release",timestamps:{"Received":"2026-11-19 10:00:00","Out for Release":"2026-11-19 15:00:00"},requirementComplete:true,missing:[]},'

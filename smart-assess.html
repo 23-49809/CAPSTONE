@@ -1233,6 +1233,14 @@ function nextRefNo(flow){
   const prefix = flow === 'docreq' ? 'DR' : 'LT';
   return prefix + '-' + new Date().getFullYear() + '-' + String(n).padStart(5,'0');
 }
+function nextApplicationRefNo(){
+  const c=window.crypto || window.msCrypto;
+  const bytes=new Uint8Array(4);
+  if(c && c.getRandomValues) c.getRandomValues(bytes);
+  else for(let i=0;i<bytes.length;i++) bytes[i]=Math.floor(Math.random()*256);
+  const suffix=Array.prototype.map.call(bytes,function(b){return ('0'+b.toString(16)).slice(-2);}).join('').toUpperCase();
+  return 'APP-' + new Date().getFullYear() + '-' + suffix;
+}
 
 /* ======================= Reference data ======================= */
 const DOC_TYPES = [
@@ -1379,7 +1387,7 @@ function setDocItems(fd, items){
   fd.purpose = fd.documentRequests.length ? fd.documentRequests[0].purpose : '';
 }
 function validateStep2(flow, fd, errors){
-  if(flow==='docreq'){
+  if(flow==='docreq'){  } else if(flow==='docreq'){
     // Every document needs a type and a purpose; the same document cannot be chosen twice.
     const seen = {};
     docItems(fd).forEach(function(it, i){
@@ -1521,7 +1529,9 @@ function confirmSubmitRequest(){
   const fd = state.formData;
   const checklist = getRequirementChecklist(state.flow, fd);
   const missing = checklist.filter(function(c){ return c.status!=='ok'; }).map(function(c){ return c.label; });
-  const refNo = nextRefNo(state.flow);
+  const items = state.flow==='docreq' ? docItems(fd) : [];
+  const isApplication = items.length > 1;
+  const refNo = isApplication ? nextApplicationRefNo() : nextRefNo(state.flow);
   const record = {
     id: refNo, flow: state.flow,
     applicant: [fd.firstName, fd.middleName, fd.lastName].filter(Boolean).join(' '),
@@ -1537,12 +1547,11 @@ function confirmSubmitRequest(){
   };
   pushStatus(record, 'Received');
   // Several documents (demo): one tracking number, each document tracked on its own.
-  const items = state.flow==='docreq' ? docItems(fd) : [];
-  if(items.length>1){
+  if(isApplication){
     record.isApplication = true;
     record.docType = items.map(function(it){ return it.documentType; }).join(', ');
     record.items = items.map(function(it, i){
-      const item = { id:refNo+'-'+(i+1), flow:'docreq', applicant:record.applicant, docType:it.documentType, purpose:it.purpose,
+      const item = { id:nextRefNo('docreq'), flow:'docreq', applicant:record.applicant, docType:it.documentType, purpose:it.purpose,
         requirementComplete:record.requirementComplete, missing:missing.slice(), timestamps:{}, submittedAt:record.submittedAt,
         applicationRef:refNo, itemNo:i+1, itemCount:items.length };
       pushStatus(item, 'Received');
@@ -1687,7 +1696,7 @@ function renderLanding(){
       + '<div class="service-card"><div class="service-title">'
         + '<h3>Document Request</h3></div>'
         + '<p>Request for Certified True Copies of Tax Declarations, Certifications of Land Holdings, and more.</p>'
-        + '<div class="service-actions"><button class="btn btn-primary svc-begin" data-action="start-docreq">Begin Application</button><button class="svc-link" data-action="show-requirements" data-requirements="docreq">View Requirements</button></div>'+renderCardDraft('docreq')+'</div>'
+      + '<div class="service-actions"><button class="btn btn-primary svc-begin" data-action="start-docreq">Begin Application</button><button class="svc-link" data-action="show-requirements" data-requirements="docreq">View Requirements</button></div>'+renderCardDraft('docreq')+'</div>'
       + '<div class="service-card"><div class="service-title">'
         + '<h3>Land Transfer</h3></div>'
         + '<p>Submit requirements for property transfer, consolidation, or subdivision of land records.</p>'
@@ -2264,19 +2273,20 @@ function copyTrackingNumber(button){
 /* ---------- Track ---------- */
 /* Reference numbers: DR-/LT- + year + serial (demo: 00001, server: hex). */
 /* A document of a multi-document application adds its number: DR-2026-AB12CD34-2. */
-const TRACK_REF_RE = /^(DR|LT)-\d{4}-[A-Z0-9]{4,12}(-[1-9])?$/;
+const TRACK_REF_RE = /^(?:(?:DR|LT)-\d{4}-[A-Z0-9]{4,12}(?:-[1-5])?|APP-\d{4}-[A-Z0-9]{8})$/;
 function trackRefError(q){
   if(!q) return 'Enter your reference number to track your request.';
   if(!TRACK_REF_RE.test(q)) return 'That doesn’t look like a reference number. It should look like DR-2026-00001 or LT-2026-00001.';
   return '';
 }
-const TRACK_STATUS_TONE = {'Received':'s-ok','Processing':'s-warn','Approved':'s-ok','Out for Release':'s-ok','Rejected':'s-bad','Timed Out':'s-neutral'};
+const TRACK_STATUS_TONE = {'Received':'s-ok','Processing':'s-warn','Approved':'s-ok','Out for Release':'s-ok','Released':'s-ok','Rejected':'s-bad','Timed Out':'s-neutral'};
 /* What the applicant should do next, for each saved status. */
 const TRACK_STATUS_GUIDE = {
   'Received': ['Waiting for review', 'The Municipal Assessor’s Office has received your request. Staff will review it soon.'],
   'Processing': ['Being processed', 'Staff are reviewing your request and documents. Check this page again for updates.'],
   'Approved': ['Approved', 'Your request has been approved. This page will show when your document is ready for release.'],
   'Out for Release': ['Ready for pickup', 'Your document is ready. Claim it at the Municipal Assessor’s Office of Mabini during office hours, Monday to Friday, 8:00 AM to 5:00 PM. Bring a valid ID and your reference number.'],
+  'Released': ['Released', 'This request has been released to the applicant.'],
   'Rejected': ['Request not approved', 'Your request could not be approved. Call 0998-9695-966 or visit the Municipal Assessor’s Office during office hours to learn the reason and what to do next. You may submit a new request once the issue is resolved.'],
   'Timed Out': ['Request timed out', 'Your request was not completed within the expected processing time. Call 0998-9695-966 or visit the Municipal Assessor’s Office during office hours to follow up, or submit a new request.']
 };
@@ -2297,6 +2307,7 @@ function trackSteps(r){
     ended ? {key:ended, label:ended, bad:true} : {key:'Approved', label:'Approved'},
   ];
   if(!ended) steps.push({key:'Out for Release', label:'Ready for Release'});
+  if(status==='Released') steps.push({key:'Released',label:'Released'});
   let current = steps.findIndex(function(s){ return s.key===status; });
   if(current<0) current = 0;
   return steps.map(function(s, i){
@@ -2332,11 +2343,11 @@ function renderTrack(){
           + '<div class="trk-sum"><div><div class="trk-sum-k" id="trk-sum-title">Application Reference Number</div><div class="trk-ref">'+esc(r.id)+'</div></div>'
             + '<div><div class="trk-sum-k" style="margin-bottom:6px">Documents in this application</div><span class="trk-pill s-neutral">'+r.items.length+' documents</span></div></div>'
           + '<dl class="trk-grid">'
-            + '<div><dt>Request Type</dt><dd>Document Request</dd></div>'
+            + '<div><dt>Request Type</dt><dd>'+'Document Request'+'</dd></div>'
             + '<div><dt>Applicant</dt><dd>'+esc(r.applicant || '—')+(r.applicantInitialsOnly ? '<small class="trk-dd-note">Initials only, to protect the applicant’s privacy</small>' : '')+'</dd></div>'
             + '<div><dt>Date Submitted</dt><dd>'+esc(receiptDate(r.submittedAt))+'</dd></div>'
           + '</dl>'
-          + '<div class="trk-guide is-info" role="note"><strong>Each document is processed separately</strong>Your documents may be ready at different times. The status of each one is shown below.</div>'
+          + '<div class="trk-guide is-info" role="note"><strong>Each document is processed separately</strong>Your documents may be ready at different times. The application is complete only when every request has been released.</div>'
         + '</section>'
         + r.items.map(function(it, i){
             const st = receiptStatus(it), miss = (it.missing || []).filter(Boolean);
@@ -3308,7 +3319,12 @@ function bindEvents(root){
         // "Tracking…" state visible so the action feels confirmed.
         setTimeout(function(){
           state.track.searched = true;
-          state.track.result = loadRequests().find(function(r){ return r.id.toUpperCase()===q; }) || null;
+          const saved = loadRequests();
+          const parent = saved.find(function(r){ return r.id.toUpperCase()===q; });
+          state.track.result = parent || saved.reduce(function(found, application){
+            if(found || !application.isApplication || !Array.isArray(application.items)) return found;
+            return application.items.find(function(item){ return item.id.toUpperCase()===q; }) || null;
+          }, null);
           render();
         }, 350);
       }

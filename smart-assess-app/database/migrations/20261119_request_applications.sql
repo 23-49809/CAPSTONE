@@ -1,9 +1,10 @@
 -- Several document requests in one application (Document Requests only).
 --
--- One application = one reference number shown to the client (DR-2026-AB12CD34).
+-- One multi-item application = one APP reference shown to the client (APP-2026-AB12CD34).
 -- Each selected document stays its own row in `requests`, linked to the application, with
 -- its own document type, purpose, status, assigned Staff member, files and document check,
--- and its own item reference: the application reference plus "-1", "-2", ...
+-- and its own DR reference. Older multi-item records may keep the historical suffixed DR references.
+-- Land Transfer requests remain standalone and do not use this parent table.
 --
 -- Safe to run on existing databases, and safe to run twice:
 --   * creates one new table only if it does not exist;

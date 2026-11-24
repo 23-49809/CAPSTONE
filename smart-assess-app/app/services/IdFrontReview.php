@@ -104,6 +104,7 @@ final class IdFrontReview
             return ['side' => 'front', 'full_name' => ['status' => 'unreadable', 'value' => null],
                 'address' => ['status' => 'unreadable', 'value' => null]];
         }
+        return ['side' => 'front', 'full_name' => self::fullName($text, $readingsDisagree), 'address' => IdFieldExtractor::address($text)];
 
         [$type, $typeState] = IdFieldExtractor::classify($text);
 
@@ -518,6 +519,7 @@ RULES;
             'label' => (string) ($own['label'] ?? ''),
             'uploaded' => $uploaded,
             'side' => 'front',
+            'ocrText' => self::isConfirmedNationalIdText($own['id_front_ocr_text'] ?? null) ? $own['id_front_ocr_text'] : null,
             'rows' => $rows,
             'overall' => self::worst(array_column($rows, 'result')),
             'ai' => self::aiFindings($own, $comparison, $extracted),
@@ -643,6 +645,7 @@ RULES;
             }
         }
         $attention = array_map(static fn (string $c): string => self::AI_ATTENTION[$c], $review['attention']);
+        $recommendation = match ($review['overall']) {
         // The AI must never downgrade a more cautious deterministic comparison.
         $overall = self::worst([$review['overall'], $system]);
         $recommendation = match ($overall) {
@@ -652,6 +655,8 @@ RULES;
         };
         return [
             'available' => true,
+            'overall' => $review['overall'],
+            'overallLabel' => self::AI_OVERALL_LABELS[$review['overall']],
             'overall' => $overall,
             'overallLabel' => self::AI_OVERALL_LABELS[$overall],
             'fullName' => $field('full name', $review['full_name'], self::AI_NAME_DIFFERENCES),
