@@ -70,9 +70,10 @@ $staff = IdFrontReview::staffView([
     ['key' => 'ownerId', 'label' => 'Property Owner National ID', 'requirement' => 'uploaded_valid_format',
         'id_review' => $extracted, 'id_front_ocr_text' => $frontText, 'ai_id_review_state' => 'model_timeout'],
 ], $form, true);
-$check('Staff view shows only applicant front extraction, comparison, original OCR text and unavailable AI state', is_array($staff)
-    && $staff['side'] === 'front' && $staff['ocrText'] === $frontText && count($staff['rows']) === 2
-    && $staff['ai']['available'] === false && $staff['otherIds'] === [], $staff);
+$check('Staff view exposes only applicant front extraction, comparison and unavailable AI state',
+    is_array($staff) && $staff['side'] === 'front' && count($staff['rows']) === 2
+    && $staff['ai']['available'] === false && $staff['otherIds'] === []
+    && !array_key_exists('ocrText', $staff) && !str_contains(json_encode($staff), $frontText), $staff);
 $otherSlotOnly = IdFrontReview::staffView([
     ['key' => 'requesterId', 'label' => 'Representative ID', 'requirement' => 'uploaded_valid_format', 'id_review' => $extracted],
 ], $form, true);
@@ -84,15 +85,19 @@ $bothSlots = IdFrontReview::staffView([
         'id_review' => ['side' => 'front', 'full_name' => ['status' => 'read', 'value' => 'OTHER PERSON'], 'address' => ['status' => 'read', 'value' => 'OTHER ADDRESS']],
         'id_front_ocr_text' => 'representative private OCR'],
 ], $form, true);
-$check('only the selected applicant ID slot is exposed even if another slot contains review data', is_array($bothSlots)
-    && $bothSlots['ocrText'] === $frontText && $bothSlots['otherIds'] === [], $bothSlots);
+$check('only the selected applicant ID fields are exposed; raw transcripts from either slot are excluded',
+    is_array($bothSlots) && $bothSlots['otherIds'] === []
+    && !array_key_exists('ocrText', $bothSlots)
+    && !str_contains(json_encode($bothSlots), $frontText)
+    && !str_contains(json_encode($bothSlots), 'representative private OCR'), $bothSlots);
 $internalHtml = (string) file_get_contents(dirname(__DIR__, 2) . '/smart-assess-internal.html');
 $internalPhp = (string) file_get_contents(dirname(__DIR__) . '/web/internal.php');
-$check('the existing Staff Application Details page renders the original front, OCR, extracted values, comparison and AI findings',
+$check('the Staff Application Details page renders the original front, extracted fields, comparison and AI findings without raw OCR text',
     str_contains($internalHtml, 'function reqIdFrontReviewHtml(r)') && str_contains($internalHtml, 'Uploaded ID (Front Side Only)')
     && str_contains($internalHtml, 'Extracted Information') && str_contains($internalHtml, 'Application Comparison')
-    && str_contains($internalHtml, 'AI Review Findings') && str_contains($internalHtml, 'Original OCR Text (National ID Front)')
-    && str_contains($internalHtml, "esc(review&&review.ocrText||'OCR text is not available for this result.')"));
+    && str_contains($internalHtml, 'AI Review Findings')
+    && !str_contains($internalHtml, 'Original OCR Text (National ID Front)')
+    && !str_contains($internalHtml, 'review.ocrText'));
 $renderFunction = substr($internalHtml, strpos($internalHtml, 'function reqIdFrontReviewHtml(r){'));
 $renderFunction = substr($renderFunction, 0, strpos($renderFunction, "\n}\n") + 3);
 $check('the ID review panel uses the existing protected original-file route and has no approval/rejection action',

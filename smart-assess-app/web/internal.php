@@ -135,8 +135,7 @@ foreach ($page['requests'] ?? [] as $request) {
                 IdFrontReview::form($record['details']),
                 (bool) $request['is_owner']
             );
-            // The OCR transcript is needed only in the selected applicant National-ID review.
-            // Do not leave transcripts from other ID slots in the page's general AI payload.
+            // Defense in depth: remove any legacy OCR transcript from the Staff page payload.
             foreach ($record['ai']['documents'] as &$reviewDocument) {
                 if (is_array($reviewDocument)) {
                     unset($reviewDocument['id_front_ocr_text']);

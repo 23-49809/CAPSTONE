@@ -397,15 +397,18 @@ $check('worker: OCR each document, then the model; the result passes the applica
     && array_column($validatedResult['documents'], 'readability') === ['good', 'good'], $result);
 $check('worker: the model saw both documents\' text and the declared details', str_contains(end($prompts), 'ARP No. 018-00045') && str_contains(end($prompts), 'DRIVER LICENSE')
     && str_contains(end($prompts), '"applicant_name":"Juan Dela Cruz"'));
-$check('worker: other government ID transcripts are not retained as National ID front OCR; other document OCR text is also not retained',
-    ($result['documents'][0]['id_front_ocr_text'] ?? null) === null && ($result['documents'][1]['id_front_ocr_text'] ?? null) === null
+$check('worker: raw OCR transcripts are absent from every document result',
+    !array_key_exists('id_front_ocr_text', $result['documents'][0])
+    && !array_key_exists('id_front_ocr_text', $result['documents'][1])
     && !str_contains(json_encode($result), 'Assessed Value'));
 $nationalIdText = "REPUBLIKA NG PILIPINAS\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine Identification Card\nApelyido/Last Name\nDELA CRUZ\nMga Pangalan/Given Names\nJUAN SANTOS\nGitnang Apelyido/Middle Name\nREYES\nTirahan/Address\n123 RIZAL ST, BRGY SAN JUAN, MABINI, BATANGAS";
 file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $nationalIdText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
 $nationalIdResult = $makeWorker($fakeModel($goodOutput))->run($twoDocs);
 $validatedNationalIdResult = DocumentAnalysis::validateWorkerResult($nationalIdResult, ['ownerId', 'ctcTdOrTitle']);
-$check('worker: only the applicant National ID front transcript is retained for Staff',
-    $validatedNationalIdResult['documents'][0]['id_front_ocr_text'] === $nationalIdText && $validatedNationalIdResult['documents'][1]['id_front_ocr_text'] === null);
+$check('worker: National ID extraction is retained without exposing its raw OCR transcript',
+    isset($validatedNationalIdResult['documents'][0]['id_review'])
+    && !array_key_exists('id_front_ocr_text', $validatedNationalIdResult['documents'][0])
+    && !array_key_exists('id_front_ocr_text', $validatedNationalIdResult['documents'][1]));
 file_put_contents($ocrMap, json_encode(['text' => [md5($idPng) => $idCardText, md5($tdPng) => $tdText, md5($blankPng) => '']]));
 $check('worker: job files are removed afterwards', glob($work . '/state/job-*') === []);
 $quoting = array_replace($goodOutput, ['findings' => [

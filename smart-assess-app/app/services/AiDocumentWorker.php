@@ -217,20 +217,6 @@ final class AiDocumentWorker
                 'arp_number' => $declared['arp_number'],
             ], $labels);
 
-            // Version 6: the applicant's own ID front is compared with the form, for the model to analyze.
-            // Full OCR text is returned only if the text positively identifies a National ID front.
-            // Values stay in memory until they are returned; nothing is logged.
-            $ownKey = IdFrontReview::ownIdKey($declared['is_owner']);
-            // The simplified identity comparison reads only the applicant's own National ID front.
-            // Other IDs and back sides remain available to the established document checks only.
-            $fronts = [];
-            if (isset($idReads[$ownKey])) {
-                $fronts[$ownKey] = IdFrontReview::extract($texts[$ownKey]['text'], true, isset($passConflicts[$ownKey]));
-            }
-            $ownIdType = isset($texts[$ownKey])
-                ? IdFieldExtractor::classify($texts[$ownKey]['text'])
-                : [null, 'unverified', []];
-            $retainOwnNationalIdFrontText = $ownIdType[0] === 'philsys_national_id' && $ownIdType[1] === 'confirmed';
             // Version 6: compare the applicant's own ID front with the form for advisory analysis.
             // Raw OCR text is not included in the worker result.
             $ownKey = IdFrontReview::ownIdKey($declared['is_owner']);
@@ -248,8 +234,6 @@ final class AiDocumentWorker
             if (isset($fronts[$ownKey])) {
                 $form = IdFrontReview::form($declared);
                 $readability = $texts[$ownKey]['readability'];
-                $ocrState = $readability === 'unreadable' ? 'ocr_unsuccessful' : ($readability === 'good' ? 'readable' : 'partially_readable');
-                $idCheck = IdFrontReview::modelInput($ownKey, $fronts[$ownKey], $form, IdFrontReview::compare($fronts[$ownKey], $form), $ocrState);
                 $ocrState = $readability === 'unreadable'
                     ? 'ocr_unsuccessful'
                     : ($readability === 'good' ? 'readable' : 'partially_readable');
@@ -277,15 +261,12 @@ final class AiDocumentWorker
             }
             foreach ($checks as &$check) {
                 $check['name_match'] = $nameMatches[$check['key']] ?? 'none';
-                $check['id_review'] = $fronts[$check['key']] ?? null;
                 // Version 5: states only (type, OCR, name, printed fields); field values never leave the worker.
                 $check['id_check'] = isset($idReads[$check['key']])
                     ? DocumentAnalysis::idCheck($idReads[$check['key']], $check['readability'], $check['ocr_status'] === 'ok',
                         $holders[$check['key']] ?? '', isset($nameConflicts[$check['key']]))
                     : null;
                 $check['id_review'] = $fronts[$check['key']] ?? null;
-                $check['id_front_ocr_text'] = $check['key'] === $ownKey && $retainOwnNationalIdFrontText
-                    ? (string) ($texts[$ownKey]['text'] ?? '') : null;
 
             }
             unset($check);

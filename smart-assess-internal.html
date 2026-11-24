@@ -4288,8 +4288,8 @@ function modalReqDetail(id, kind){
     + (detailsHtml ? '<div class="rd-client" id="rd-client"'+(showDetails?'':' hidden')+' aria-label="Client details">'+detailsHtml+'</div>' : '');
 }
 
-/* Staff-only review of the applicant's own National ID front. OCR, rule comparison, and model findings
-   stay visually separate; this panel never makes or implies an application decision. */
+/* Staff-only review of the applicant's own National ID front. Extracted fields, rule comparison,
+   and model findings stay visually separate; this panel never makes an application decision. */
 function reqIdFrontReviewHtml(r){
   if(!r.details) return '';
   var review = r.ai && r.ai.idFrontReview;
@@ -4314,7 +4314,6 @@ function reqIdFrontReviewHtml(r){
       var row=rows.find(function(x){ return x.field===field; });
       return '<tr><th scope="row">'+(field==='full_name'?'Full Name':'Address')+'</th><td>'+esc(row&&row.form||'Not provided')+'</td><td>'+esc(row&&row.extracted||'Not available')+'</td><td>'+esc(row&&row.resultLabel||'Needs Review')+(row&&row.note?'<span class="cell-sub">'+esc(row.note)+'</span>':'')+'</td></tr>';
     }).join('')+'</tbody></table></div>';
-  info += '<h4 class="rd-caption">Original OCR Text (National ID Front)</h4><pre class="id-front-review-text">'+esc(review&&review.ocrText||'OCR text is not available for this result.')+'</pre>';
   var ai=review&&review.ai;
   info += '<h4 class="rd-caption">AI Review Findings</h4><div class="id-front-review-ai">';
   if(ai&&ai.available){
