@@ -104,7 +104,24 @@ final class IdFrontReview
             return ['side' => 'front', 'full_name' => ['status' => 'unreadable', 'value' => null],
                 'address' => ['status' => 'unreadable', 'value' => null]];
         }
-        return ['side' => 'front', 'full_name' => self::fullName($text, $readingsDisagree), 'address' => IdFieldExtractor::address($text)];
+
+        [$type, $typeState] = IdFieldExtractor::classify($text);
+
+        if ($typeState === 'conflict') {
+            return ['side' => 'front',
+                'full_name' => ['status' => 'uncertain', 'value' => null],
+                'address' => ['status' => 'not_found', 'value' => null]];
+        }
+
+        if ($type !== 'philsys_national_id' || $typeState !== 'confirmed') {
+            return ['side' => 'front',
+                'full_name' => ['status' => 'not_found', 'value' => null],
+                'address' => ['status' => 'not_found', 'value' => null]];
+        }
+
+        return ['side' => 'front',
+            'full_name' => self::fullName($text, $readingsDisagree),
+            'address' => IdFieldExtractor::address($text)];
     }
 
     private static function fullName(string $text, bool $readingsDisagree): array

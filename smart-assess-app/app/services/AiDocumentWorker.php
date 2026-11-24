@@ -217,26 +217,33 @@ final class AiDocumentWorker
                 'arp_number' => $declared['arp_number'],
             ], $labels);
 
-            // Version 6: the applicant's own ID front is compared with the form, for the model to analyze.
-            // Full OCR text is returned only if the text positively identifies a National ID front.
-            // Values stay in memory until they are returned; nothing is logged.
+            // Version 6: compare the applicant's own ID front with the form for advisory analysis.
+            // Raw OCR text is not included in the worker result.
             $ownKey = IdFrontReview::ownIdKey($declared['is_owner']);
-            // The simplified identity comparison reads only the applicant's own National ID front.
-            // Other IDs and back sides remain available to the established document checks only.
+
             $fronts = [];
-            if (isset($idReads[$ownKey])) {
-                $fronts[$ownKey] = IdFrontReview::extract($texts[$ownKey]['text'], true, isset($passConflicts[$ownKey]));
+            if (isset($texts[$ownKey], $idReads[$ownKey])) {
+                $fronts[$ownKey] = IdFrontReview::extract(
+                    $texts[$ownKey]['text'],
+                    true,
+                    isset($passConflicts[$ownKey])
+                );
             }
-            $ownIdType = isset($texts[$ownKey])
-                ? IdFieldExtractor::classify($texts[$ownKey]['text'])
-                : [null, 'unverified', []];
-            $retainOwnNationalIdFrontText = $ownIdType[0] === 'philsys_national_id' && $ownIdType[1] === 'confirmed';
+
             $idCheck = null;
             if (isset($fronts[$ownKey])) {
                 $form = IdFrontReview::form($declared);
                 $readability = $texts[$ownKey]['readability'];
-                $ocrState = $readability === 'unreadable' ? 'ocr_unsuccessful' : ($readability === 'good' ? 'readable' : 'partially_readable');
-                $idCheck = IdFrontReview::modelInput($ownKey, $fronts[$ownKey], $form, IdFrontReview::compare($fronts[$ownKey], $form), $ocrState);
+                $ocrState = $readability === 'unreadable'
+                    ? 'ocr_unsuccessful'
+                    : ($readability === 'good' ? 'readable' : 'partially_readable');
+                $idCheck = IdFrontReview::modelInput(
+                    $ownKey,
+                    $fronts[$ownKey],
+                    $form,
+                    IdFrontReview::compare($fronts[$ownKey], $form),
+                    $ocrState
+                );
             }
 
             $model = $this->askModel($declared, $texts, $deadline, $idCheck);

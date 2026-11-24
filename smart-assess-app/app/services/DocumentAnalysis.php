@@ -945,11 +945,15 @@ final class DocumentAnalysis
             if ($object['version'] >= 6) {
                 $fields[] = 'id_review';
             }
-            if ($object['version'] >= 7) {
+            if ($object['version'] === 7) {
                 $fields[] = 'id_front_ocr_text';
             }
             $document = self::exactObject($document, $fields, 'document check');
             $key = self::knownKey($document['key'], $documentKeys);
+            // Legacy version 7 may contain a transcript. Validate it, then discard it.
+            if ($object['version'] === 7) {
+                self::idFrontOcrText($document['id_front_ocr_text'], $key);
+            }
             if (isset($documents[$key])) {
                 throw new UnexpectedValueException('document check listed twice');
             }
@@ -981,8 +985,6 @@ final class DocumentAnalysis
                 'id_check' => $object['version'] >= 5 ? self::idCheckValue($document['id_check'], $key) : null,
                 // Version 6: the Full Name and Address read from an ID's front (null: not an ID, or an earlier worker).
                 'id_review' => $object['version'] >= 6 ? self::idReviewValue($document['id_review'], $key) : null,
-                // Version 7: Staff-only OCR text for the applicant's own National ID front.
-                'id_front_ocr_text' => $object['version'] >= 7 ? self::idFrontOcrText($document['id_front_ocr_text'], $key) : null,
             ];
         }
         if (!is_array($object['rule_findings']) || !array_is_list($object['rule_findings']) || count($object['rule_findings']) > self::MAX_FINDINGS) {
@@ -1123,7 +1125,7 @@ final class DocumentAnalysis
         return IdFrontReview::validateExtraction($value);
     }
 
-    /** A version 7 OCR transcript is retained only for the applicant's own front-side National ID. */
+    /** Validates a legacy version 7 OCR transcript; the caller discards it. */
     private static function idFrontOcrText(mixed $value, string $key): ?string
     {
         if (!in_array($key, ['ownerId', 'requesterId'], true)) {
@@ -1350,7 +1352,6 @@ final class DocumentAnalysis
                 'id_review' => $idReview,
                 'ai_id_review' => $aiReview,
                 'ai_id_review_state' => $aiState,
-                'id_front_ocr_text' => $check['id_front_ocr_text'] ?? null,
                 'check' => self::SLOT_CHECKS[$item['key']] ?? 'none',
                 'accepted_kinds' => self::acceptedKinds($item['key']),
                 'accepted_kind_labels' => array_map(static fn (string $k): string => self::documentKinds()[$k], self::acceptedKinds($item['key'])),

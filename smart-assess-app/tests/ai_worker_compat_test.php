@@ -34,10 +34,10 @@ $run = static function (string $app, string $worker) use ($root): array {
     return [$code, implode("\n", $out)];
 };
 
-$check('this release: the application accepts versions 1 to 7; the worker answers with 7', str_contains($analysis, 'const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7];')
-    && str_contains($analysis, 'const WORKER_RESULT_VERSION = 7;'));
-// The immediately previous release accepts through result version 6.
-$oldAnalysis = str_replace(['const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7];', 'const WORKER_RESULT_VERSION = 7;'], ['const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6];', 'const WORKER_RESULT_VERSION = 6;'], $analysis);
+$check('this release: the application accepts versions 1 to 8; the worker answers with 8', str_contains($analysis, 'const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8];')
+    && str_contains($analysis, 'const WORKER_RESULT_VERSION = 8;'));
+// The immediately previous release accepts through result version 7.
+$oldAnalysis = str_replace(['const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8];', 'const WORKER_RESULT_VERSION = 8;'], ['const WORKER_RESULT_VERSIONS = [1, 2, 3, 4, 5, 6, 7];', 'const WORKER_RESULT_VERSION = 7;'], $analysis);
 $oldVerification = str_replace("'version' => 2, 'job_id'", "'version' => 1, 'job_id'", $verification);
 $oldWorkerRun = str_replace('public const JOB_VERSIONS = [1, 2];', 'public const JOB_VERSIONS = [1];', $workerRun);
 $newApp = $tree('new-app', ['app/services/DocumentAnalysis.php' => $analysis, 'app/services/AiVerification.php' => $verification]);
@@ -46,9 +46,9 @@ $newWorker = $tree('new-worker', ['app/services/DocumentAnalysis.php' => $analys
 $oldWorker = $tree('old-worker', ['app/services/DocumentAnalysis.php' => $oldAnalysis, 'app/services/AiDocumentWorker.php' => $oldWorkerRun]);
 
 [$code, $out] = $run($newApp, $newWorker);
-$check('new application + new worker: compatible (exit 0)', $code === 0 && str_contains($out, 'answers with version 7') && str_contains($out, "\ncompatible"), $out);
+$check('new application + new worker: compatible (exit 0)', $code === 0 && str_contains($out, 'answers with version 8') && str_contains($out, "\ncompatible"), $out);
 [$code, $out] = $run($oldApp, $newWorker);
-$check('old application + new worker: NOT compatible because the old app rejects result version 7', $code === 1 && str_contains($out, 'NOT COMPATIBLE')
+$check('old application + new worker: NOT compatible because the old app rejects result version 8', $code === 1 && str_contains($out, 'NOT COMPATIBLE')
     && str_contains($out, 'does not accept the worker\'s result version'), $out);
 [$code, $out] = $run($newApp, $oldWorker);
 $check('new application + old worker: NOT compatible because the old worker accepts only job version 1', $code === 1 && str_contains($out, 'does not accept the application\'s job version'), $out);
